@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic.decorator import _typing_extra  # See comments on its use below.
+from pydantic.decorator import ValidatedFunction, V_DUPLICATE_KWARGS
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, Union, overload
 from inspect import Parameter, signature
@@ -23,7 +23,40 @@ async def read_item(item_id: int, scaling_factor: float = 1.0):
 def anactionfunc(repeats: int, title: str="Untitled", attempts: Optional[list[str]] = None) -> str:
     return "finished!!"
 
-#vf = ValidatedFunction(anactionfunc, config=None)
+
+def vf_takes_v_args(vf: ValidatedFunction):
+    """Determine whether a ValidatedFunction accepts extra positional arguments
+    
+    There's no nice easy flag to check this, so we try the validator
+    function, which should raise an exception if it doesn't accept
+    variable numbers of positional arguments (i.e. if there's no `*args`).
+    """
+    try:
+        vf.model.check_args([])
+        # if check_args does not raise an exception, we accept a variable number
+        # of positional arguments.
+        return True
+
+    except TypeError:
+        # if an exception is raised, it means *args are not allowed
+        return False
+
+def vf_takes_v_kwargs(vf: ValidatedFunction):
+    """Determine whether a ValidatedFunction accepts extra keyword arguments
+    
+    There's no nice easy flag to check this, so we try the validator
+    function, which should raise an exception if it doesn't accept
+    extra keyword arguments (i.e. if there's no `**kwargs`).
+    """
+    try:
+        vf.model.check_kwargs({})
+        # if check_kwargs does not raise an exception, we accept a variable number
+        # of positional arguments.
+        return True
+
+    except TypeError:
+        # if an exception is raised, it means **kwargs are not allowed
+        return False
 
 def model_from_signature(func):
     """Create a pydantic model for a function's signature.
@@ -37,59 +70,31 @@ def model_from_signature(func):
     This will fail for position-only arguments, though that may change
     in the future.
     """
-    # The code below is pinched from `pydantic.decorator.ValidatedFunction`.
-    # The `type_hints` mapping is an internal pydantic fix-up that helps
-    # with forward and backward compatibility. I will need to take care in
-    # unit testing that this doesn't break in the future.
-    parameters: Mapping[str, Parameter] = signature(func).parameters
-    type_hints = _typing_extra.get_type_hints(func, include_extras=True)
+    vf = ValidatedFunction(func, None)
+    model = vf.model
 
-    fields: Dict[str, Tuple[Any, Any]] = {}
-    takes_kwargs = False
+    # Raise errors if positional-only or variable positional args are present
+    if vf_takes_v_args(vf):
+        raise TypeError(
+            f"{func.__name__} accepts extra positional arguments, which is not supported."
+        )
+    if len(vf.positional_only_args) > 0:
+        raise TypeError(
+            f"{func.__name__} has positional-only arguments which are not supported."
+        )
     
-    for name, p in parameters.items():
-        if p.annotation is p.empty:
-            annotation = Any
-        else:
-            annotation = type_hints[name]
+    # Remove the extra fields used to trap and raise errors for 
+    # the catch-all *args and **kwargs arguments.
+    del model.__fields__[vf.v_args_name]
+    del model.__fields__[vf.v_kwargs_name]
+    del model.__fields__[V_DUPLICATE_KWARGS]
+    # If the function accepts extra kwargs, reflect that in the model
+    model.Config.extras = "allow" if vf_takes_v_kwargs(vf) else "forbid"
+    model.__name__ = f"{func.__name__}_input"
+    return model
 
-        default = ... if p.default is p.empty else p.default
-        if name.startswith("__"):
-            warnings.warn(
-                f"{func.__name__} has an argument {name} that starts with __, "
-                "which is not supported by model_from_signature and will be "
-                "ignored"
-            )
-            continue
-        if p.kind == Parameter.POSITIONAL_ONLY:
-            raise ValueError(
-                "model_from_signature cannot currently process functions "
-                f"with positional only arguments. {function.__name__} has "
-                "at least one such argument."
-            )
-        elif p.kind == Parameter.POSITIONAL_OR_KEYWORD:
-            fields[name] = annotation, default
-        elif p.kind == Parameter.KEYWORD_ONLY:
-            fields[name] = annotation, default
-        elif p.kind == Parameter.VAR_POSITIONAL:
-            raise ValueError(
-                "model_from_signature cannot currently cope with functions "
-                "that accept a variable number of positional arguments."
-                f"{function.__name__} has at least one such argument."
-            )
-        else:
-            takes_kwargs = True
-    
-    name = f"{func.__name__}_input"
+anaction_input_model = model_from_signature(anactionfunc)
 
-    class Config:
-        extras = "allow" if takes_kwargs else "forbid"
-
-    return create_model(name, **fields, __config__=Config)
-
-
-
-
-@app.get("/anaction")
-def _(body: vf.model):
+@app.post("/anaction")
+def _(body: anaction_input_model):
      return anactionfunc(**body)
