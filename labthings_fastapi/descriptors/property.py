@@ -2,9 +2,10 @@ from __future__ import annotations
 """
 Define an object to represent an Action, as a descriptor.
 """
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from fastapi import Body, FastAPI
 from typing import Annotated
+from ..thing_description import PropertyAffordance, Form
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -75,3 +76,24 @@ class PropertyDescriptor():
         )
         def get_property():
             return self.__get__(thing)
+
+    def property_affordance(self, thing: Thing, path: Optional[str]=None) -> PropertyAffordance:
+        path = path or thing.path
+        forms = [
+            Form(
+                href = path + self.name,
+                op = "readproperty"
+            ),
+        ]
+        if not self.readonly:
+            forms.append(
+                Form(
+                    href = path + self.name,
+                    op = "writeproperty"
+                )
+            )
+
+        return PropertyAffordance(
+            title = self.name,
+            forms = forms,
+        )

@@ -68,3 +68,4 @@ class ActionDescriptor():
         )
         def list_invocations():
             return thing.action_manager.list_invocations(self, thing, as_responses=True)
+

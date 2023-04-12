@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO)
 class MyThing(Thing):
     @thing_action
     def anaction(self, repeats: int, title: str="Untitled", attempts: Optional[list[str]] = None) -> str:
+        self.increment_counter() # We should be able to call actions as normal Python functions
         return "finished!!"
     
     @thing_action
@@ -21,6 +22,7 @@ class MyThing(Thing):
     foo = PropertyDescriptor(str, "Example")
     
 thing_server = ThingServer()
-thing_server.add_thing(MyThing(), "/my_thing")
+my_thing = MyThing()
+thing_server.add_thing(my_thing, "/my_thing")
 
 app = thing_server.app
