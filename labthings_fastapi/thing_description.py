@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Union, Any
 from pydantic.dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, schema_of
 
 
 class Form(BaseModel):
@@ -10,7 +10,7 @@ class Form(BaseModel):
     contentType: str = "application/json"
 
 class DataSchema(BaseModel):
-    title: Optional[str]
+    title: Optional[str] = None
     description: Optional[str] = None
     const: Optional[Any] = None
     default: Optional[Any] = None
@@ -30,3 +30,7 @@ class PropertyAffordance(InteractionAffordance, DataSchema):
 
 class ThingDescription(BaseModel):
     properties: list[PropertyAffordance]
+
+def type_to_dataschema(t) -> dict[str, Any]:
+    schema_dict = schema_of(t)
+    return DataSchema(**schema_dict)
