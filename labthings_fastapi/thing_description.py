@@ -1,17 +1,15 @@
 from __future__ import annotations
 from typing import Optional, Union, Any
 from pydantic.dataclasses import dataclass
-from pydantic import ConfigDict
+from pydantic import BaseModel
 
 
-@dataclass(config=ConfigDict(validate_assignment=True))
-class Form:
+class Form(BaseModel):
     href: str  # This should conform to anyURI
     op: Union[str, list[str]]
     contentType: str = "application/json"
 
-@dataclass(config=ConfigDict(validate_assignment=True))
-class DataSchema:
+class DataSchema(BaseModel):
     title: Optional[str]
     description: Optional[str] = None
     const: Optional[Any] = None
@@ -21,8 +19,7 @@ class DataSchema:
     readonly: bool = False
     writeonly: bool = False
 
-@dataclass(config=ConfigDict(validate_assignment=True))
-class InteractionAffordance:
+class InteractionAffordance(BaseModel):
     title: Optional[str]
     forms: list[Form]
     description: Optional[str] = None
@@ -31,6 +28,5 @@ class PropertyAffordance(InteractionAffordance, DataSchema):
     observable: bool = False
 
 
-@dataclass(config=ConfigDict(validate_assignment=True))
-class ThingDescription:
+class ThingDescription(BaseModel):
     properties: list[PropertyAffordance]

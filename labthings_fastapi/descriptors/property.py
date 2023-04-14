@@ -22,14 +22,22 @@ class PropertyDescriptor():
             self, 
             model: type, 
             initial_value: Any = None,
-            readonly: bool = False
+            readonly: bool = False,
+            description: Optional[str] = None,
+            title: Optional[str] = None,
         ):
         self.model = model
         self.readonly = readonly
         self.initial_value = initial_value
+        self.description = description
+        self.title = title
+        if self.description and not self.title:
+            self.title = self.description.partition("\n")[0]
 
     def __set_name__(self, owner, name: str):
         self._name = name
+        if not self.title:
+            self.title = name
 
     def __get__(self, obj, type=None) -> Any:
         """The value of the property
@@ -79,21 +87,20 @@ class PropertyDescriptor():
 
     def property_affordance(self, thing: Thing, path: Optional[str]=None) -> PropertyAffordance:
         path = path or thing.path
+        ops = ["readproperty"]
+        if not self.readonly:
+            ops.append("writeproperty")
         forms = [
             Form(
                 href = path + self.name,
-                op = "readproperty"
+                op = ops
             ),
         ]
-        if not self.readonly:
-            forms.append(
-                Form(
-                    href = path + self.name,
-                    op = "writeproperty"
-                )
-            )
 
         return PropertyAffordance(
-            title = self.name,
+            title = self.title,
             forms = forms,
+            readonly = self.readonly,
+            description = self.description,
+
         )
