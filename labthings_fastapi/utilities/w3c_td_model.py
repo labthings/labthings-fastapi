@@ -5,11 +5,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TypeVar, Generic
 
 from pydantic import AnyUrl, BaseModel, Extra, Field, conint, validator
+from pydantic.generics import GenericModel
 
 
 class Version(BaseModel):
@@ -97,57 +99,45 @@ class DataSchema(BaseModel):
     required: Optional[List[str]] = None
 
 
-class Op(Enum):
-    readproperty = 'readproperty'             # Only allowed for Property forms (was OpEnum)
+class Response(BaseModel):
+    contentType: Optional[str] = None
+
+
+class PropertyOp(Enum):
+    readproperty = 'readproperty'
     writeproperty = 'writeproperty'
     observeproperty = 'observeproperty'
     unobserveproperty = 'unobserveproperty'
-    invokeaction = 'invokeaction'             # Only for action forms (was OpEnum2)
-    subscribeevent = 'subscribeevent'         # Only for event forms (was OpEnum3)
+
+
+class ActionOp(Enum):
+    invokeaction = 'invokeaction'
+
+
+class EventOp(Enum):
+    subscribeevent = 'subscribeevent'
     unsubscribeevent = 'unsubscribeevent'
-    readallproperties = 'readallproperties'   # Only for root forms (was OpEnum6)
+
+
+class RootOp(Enum):
+    readallproperties = 'readallproperties'
     writeallproperties = 'writeallproperties'
     readmultipleproperties = 'readmultipleproperties'
     writemultipleproperties = 'writemultipleproperties'
 
 
-PROPERTY_OPS = (
-    Op.readproperty,
-    Op.writeproperty,
-    Op.observeproperty,
-    Op.unobserveproperty,
-)
+Op = Union[PropertyOp, ActionOp, EventOp, RootOp]
 
 
-ACTION_OPS = (
-    Op.invokeaction
-)
+OpT = TypeVar("OpT")
 
 
-EVENT_OPS = (
-    Op.subscribeevent,
-    Op.unsubscribeevent,
-)
-
-
-ROOT_OPS = (
-    Op.readallproperties,
-    Op.writeallproperties,
-    Op.readmultipleproperties,
-    Op.writemultipleproperties,
-)
-
-
-class Response(BaseModel):
-    contentType: Optional[str] = None
-
-
-class Form(BaseModel):
+class Form(GenericModel, Generic[OpT]):
     class Config:
         extra = Extra.allow
 
-    op: Optional[Union[Op, List[Op]]] = None
     href: AnyUri
+    op: Optional[Union[OpT, List[OpT]]] = None
     contentType: Optional[str] = None
     contentCoding: Optional[str] = None
     subprotocol: Optional[Subprotocol] = None
@@ -164,26 +154,13 @@ class InteractionAffordance(BaseModel):
     descriptions: Optional[Descriptions] = None
     title: Optional[Title] = None
     titles: Optional[Titles] = None
-    forms: List[Form] = Field(..., min_items=1)
+    forms: List[Form[Op]] = Field(..., min_items=1)
     uriVariables: Optional[Dict[str, DataSchema]] = None
-
-
-def check_form_op(form: Form, allowed_ops: iter[Op]):
-    """Raise a ValueError if a form contains ops not in a list"""
-    if form.op is None:
-        return
-    ops = [form.op] if isinstance(form.op, Op) else form.op
-    for op in ops:
-        if form.op not in allowed_ops:
-            raise ValueError(f"{form.op} is not in {allowed_ops}.")
 
 
 class PropertyAffordance(InteractionAffordance, DataSchema):
     observable: Optional[bool] = None
-
-    @validator("forms", each_item=True, check_fields=False)
-    def check_ops(cls, v):
-        check_form_op(v, PROPERTY_OPS)
+    forms: List[Form[PropertyOp]] = Field(..., min_items=1)
 
 
 class ActionAffordance(InteractionAffordance):
@@ -192,10 +169,7 @@ class ActionAffordance(InteractionAffordance):
     output: Optional[DataSchema] = None
     safe: Optional[bool] = None
     idempotent: Optional[bool] = None
-
-    @validator("forms", each_item=True, check_fields=False)
-    def check_ops(cls, v):
-        check_form_op(v, ACTION_OPS)
+    forms: List[Form[ActionOp]] = Field(..., min_items=1)
 
 
 class EventAffordance(BaseModel):
@@ -203,10 +177,7 @@ class EventAffordance(BaseModel):
     subscription: Optional[DataSchema] = None
     data: Optional[DataSchema] = None
     cancellation: Optional[DataSchema] = None
-    
-    @validator("forms", each_item=True, check_fields=False)
-    def check_ops(cls, v):
-        check_form_op(v, EVENT_OPS)
+    forms: List[Form[EventOp]] = Field(..., min_items=1)
 
 
 class LinkElement(BaseModel):
@@ -305,7 +276,7 @@ class WotTdSchema16October2019(BaseModel):
     descriptions: Optional[Descriptions] = None
     version: Optional[Version] = None
     links: Optional[List[LinkElement]] = None
-    forms: Optional[List[Form]] = Field(None, min_items=1)
+    forms: Optional[List[Form[RootOp]]] = Field(None, min_items=1)
     base: Optional[AnyUri] = None
     securityDefinitions: Dict[str, SecurityScheme]
     support: Optional[AnyUri] = None
@@ -314,10 +285,6 @@ class WotTdSchema16October2019(BaseModel):
     security: Union[str, List[str]]
     field_type: Optional[TypeDeclaration] = Field(None, alias='@type')
     field_context: ThingContext = Field(THING_CONTEXT, alias='@context')
-    
-    @validator("forms", each_item=True, check_fields=False)
-    def check_ops(cls, v):
-        check_form_op(v, ROOT_OPS)
 
 ThingDescription = WotTdSchema16October2019
 

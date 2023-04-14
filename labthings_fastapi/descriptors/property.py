@@ -102,5 +102,4 @@ class PropertyDescriptor():
             forms = forms,
             readonly = self.readonly,
             description = self.description,
-
         )
