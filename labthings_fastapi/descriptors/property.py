@@ -5,7 +5,7 @@ Define an object to represent an Action, as a descriptor.
 from typing import TYPE_CHECKING, Any, Optional
 from fastapi import Body, FastAPI
 from typing import Annotated
-from ..thing_description import PropertyAffordance, Form
+from ..utilities.w3c_td_model import PropertyAffordance, Form
 
 if TYPE_CHECKING:
     from ..thing import Thing
