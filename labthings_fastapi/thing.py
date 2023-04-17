@@ -29,7 +29,7 @@ class Thing:
 
         @server.app.get(self.path)
         def thing_description():
-            return self.thing_description().dict(exclude_unset=True)
+            return self.thing_description().dict(exclude_none=True)
         thing_description()  # run it once to build the model to check it works (i.e. is valid)
         
 
