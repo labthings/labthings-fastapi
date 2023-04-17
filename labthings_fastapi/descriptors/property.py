@@ -5,7 +5,8 @@ Define an object to represent an Action, as a descriptor.
 from typing import TYPE_CHECKING, Any, Optional
 from fastapi import Body, FastAPI
 from typing import Annotated
-from ..utilities.w3c_td_model import PropertyAffordance, Form
+from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema
+from ..utilities.thing_description import type_to_dataschema
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -96,10 +97,15 @@ class PropertyDescriptor():
                 op = ops
             ),
         ]
-
-        return PropertyAffordance(
+        data_schema: DataSchema = type_to_dataschema(self.model)
+        pa: PropertyAffordance = PropertyAffordance(
             title = self.title,
             forms = forms,
             readonly = self.readonly,
             description = self.description,
         )
+        # We merge the data schema with the property affordance (which subclasses the DataSchema model)
+        # with the affordance second so its values take priority.
+        # Note that this works because all of the fields that get filled in by DataSchema are
+        # optional - so the PropertyAffordance is still valid without them.
+        return PropertyAffordance(**{**data_schema, **pa})

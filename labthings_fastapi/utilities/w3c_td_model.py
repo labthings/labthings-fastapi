@@ -8,9 +8,9 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, TypeVar, Generic
+from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
 
-from pydantic import AnyUrl, BaseModel, Extra, Field, conint, validator
+from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator
 from pydantic.generics import GenericModel
 
 
@@ -84,20 +84,113 @@ class DataSchema(BaseModel):
     titles: Optional[Titles] = None
     writeOnly: Optional[bool] = None
     readOnly: Optional[bool] = None
-    oneOf: Optional[List[DataSchema]] = None
+    oneOf: Optional[list[DataSchema]] = None
     unit: Optional[str] = None
-    enum: Optional[List] = Field(None, min_items=1, unique_items=True)
+    enum: Optional[list] = None   # was: Field(None, min_items=1, unique_items=True) but this failed with generic models
     format: Optional[str] = None
     const: Optional[Any] = None
     type: Optional[Type] = None
+    # The fields below should be empty unless type==Type.array
     items: Optional[Union[DataSchema, List[DataSchema]]] = None
     maxItems: Optional[conint(ge=0)] = None
     minItems: Optional[conint(ge=0)] = None
-    minimum: Optional[float] = None
-    maximum: Optional[float] = None
-    properties: Optional[Any] = None
+    # The fields below should be empty unless type==Type.number or Type.integer
+    minimum: Optional[Union[int, float]] = None
+    maximum: Optional[Union[int, float]] = None
+    exclusiveMinimum: Optional[Union[int, float]] = None
+    exclusiveMaximum: Optional[Union[int, float]] = None
+    multipleOf: Optional[Union[int, float]] = None
+    # The fields below should be empty unless type==Type.object
+    properties: Optional[Mapping[str, DataSchema]] = None
+    required: Optional[list[str]] = None
+    # The fields below should be empty unless type==Type.string
+    minLength: Optional[int] = None
+    maxLength: Optional[int] = None
+    pattern: Optional[str] = None
+    contentEncoding: Optional[str] = None
+    contentMediaType: Optional[str] = None
+
+    class Config:
+        extra = Extra.forbid
+
+"""
+# The classes below attempted to implement the w3c spec for type-specific fields.
+# However, this is very hard without complicated logic - and the w3c JSONSchema
+# simply defines one DataSchema type, as I have done above.
+# The code below almost but not quite works.
+
+class ArraySchema(DataSchema):
+    type: Type = Field(Type.array, const=True)
+    items: Optional[Union[DataSchema, List[DataSchema]]] = None
+    maxItems: Optional[conint(ge=0)] = None
+    minItems: Optional[conint(ge=0)] = None
+
+
+numberT = TypeVar("numberT", int, float)
+class GenericNumberSchema(DataSchema, GenericModel, Generic[numberT]):
+    minimum: Optional[numberT] = None
+    maximum: Optional[numberT] = None
+    exclusiveMinimum: Optional[numberT] = None
+    exclusiveMaximum: Optional[numberT] = None
+    multipleOf: Optional[numberT] = None
+
+
+class NumberSchema(GenericNumberSchema[float]):
+    type: Type = Field(Type.number, const=True)
+
+
+class IntegerSchema(GenericNumberSchema[int]):
+    type: Type = Field(Type.integer, const=True)
+    
+
+class BooleanSchema(DataSchema):
+    type: Type = Field(Type.boolean, const=True)
+
+
+class ObjectSchema(DataSchema):
+    type: Type = Field(Type.object, const=True)
+    properties: Optional[Mapping[str, DataSchema]] = None
     required: Optional[List[str]] = None
 
+
+class StringSchema(DataSchema):
+    type: Type = Field(Type.string, const=True)
+    minLength: Optional[int] = None
+    maxLength: Optional[int] = None
+    pattern: Optional[str] = None
+    contentEncoding: Optional[str] = None
+    contentMediaType: Optional[str] = None
+
+
+class NullSchema(DataSchema):
+    type: Type = Field(Type.object, const=True)
+
+
+DataSchema: Type = Union[
+    DataSchema, 
+    ArraySchema,
+    BooleanSchema,
+    IntegerSchema,
+    NullSchema,
+    NumberSchema,
+    ObjectSchema,
+    StringSchema,
+]
+
+
+DATA_SCHEMA_MODELS: list[BaseModel] = [
+    DataSchema, 
+    ArraySchema,
+    BooleanSchema,
+    IntegerSchema,
+    NullSchema,
+    NumberSchema,
+    ObjectSchema,
+    StringSchema,
+]
+for model in DATA_SCHEMA_MODELS:
+    model.update_forward_refs()
+"""
 
 class Response(BaseModel):
     contentType: Optional[str] = None
@@ -287,5 +380,3 @@ class WotTdSchema16October2019(BaseModel):
     field_context: ThingContext = Field(THING_CONTEXT, alias='@context')
 
 ThingDescription = WotTdSchema16October2019
-
-DataSchema.update_forward_refs()
