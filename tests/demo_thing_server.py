@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
@@ -38,6 +39,13 @@ class MyThing(Thing):
         `counter` property).
         """
         self.counter += 1
+
+    @thing_action
+    def slowly_increase_counter(self):
+        """Increment the counter slowly over a minute"""
+        for i in range(60):
+            time.sleep(1)
+            self.increment_counter()
 
     counter = PropertyDescriptor(int, 0, readonly=True, description="A pointless counter")
 

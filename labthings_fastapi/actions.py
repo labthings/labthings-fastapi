@@ -31,6 +31,7 @@ class GenericInvocationModel(GenericModel, Generic[InputT, OutputT]):
     status: InvocationStatus
     id: uuid.UUID
     action: str
+    href: str
     timeStarted: Optional[datetime.datetime]
     timeRequested: Optional[datetime.datetime]
     timeCompleted: Optional[datetime.datetime]
@@ -125,6 +126,7 @@ class Invocation(Thread):
             status=self.status,
             id=self.id,
             action=self.thing.path + self.action.name,
+            href=f"/action_invocations/{self.id}",  # TODO: deduplicate this with ActionManager.attach_to_server
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
