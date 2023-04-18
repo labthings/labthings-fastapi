@@ -10,12 +10,14 @@ import uuid
 from typing import TYPE_CHECKING
 import weakref
 from pydantic.generics import GenericModel
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
     from .descriptors import ActionDescriptor
     from .thing import Thing
+
+ACTION_INVOCATIONS_PATH = "/action_invocations"
 
 class InvocationStatus(Enum):
     PENDING = "pending"
@@ -121,12 +123,16 @@ class Invocation(Thread):
     def thing(self):
         return self.thing_ref()
     
-    def response(self):
+    def response(self, request: Optional[Request] = None):
+        if request:
+            href = str(request.url_for("action_invocation", id=self.id))
+        else:
+            href = f"{ACTION_INVOCATIONS_PATH}/{self.id}"
         return InvocationModel(
             status=self.status,
             id=self.id,
             action=self.thing.path + self.action.name,
-            href=f"/action_invocations/{self.id}",  # TODO: deduplicate this with ActionManager.attach_to_server
+            href=href,
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
@@ -251,9 +257,10 @@ class ActionManager:
             self, 
             action: Optional[ActionDescriptor] = None, 
             thing: Optional[Thing] = None,
-            as_responses: bool = False) -> list[InvocationModel]:
+            as_responses: bool = False,
+            request: Optional[Request] = None) -> list[InvocationModel]:
         return [
-            i.response() if as_responses else i 
+            i.response(request=request) if as_responses else i 
             for i in self.invocations
             if thing is None or i.thing == thing
             if action is None or i.action==action
@@ -261,18 +268,18 @@ class ActionManager:
     
     def attach_to_app(self, app: FastAPI):
         """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""
-        @app.get("/action_invocations", response_model=list[InvocationModel])
-        def list_all_invocations():
-            return self.list_invocations(as_responses=True)
+        @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
+        def list_all_invocations(request: Request):
+            return self.list_invocations(as_responses=True, request=request)
         @app.get(
-            "/action_invocations/{id}", 
+            ACTION_INVOCATIONS_PATH + "/{id}", 
             response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}}
         )
-        def invocation(id: uuid.UUID):
+        def action_invocation(id: uuid.UUID, request: Request):
             try:
                 with self._invocations_lock:
-                    return self._invocations[id].response()
+                    return self._invocations[id].response(request=request)
             except KeyError:
                 raise HTTPException(
                     status_code=404,
