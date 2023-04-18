@@ -74,19 +74,22 @@ class PropertyDescriptor():
                 thing.path + self.name,
                 status_code=201,
                 response_description="Property set successfully",
-                summary=f"Set {self.name}",
-                description=f"Set {self.name}"
+                summary=f"Set {self.title}",
+                description=f"## {self.title}\n\n{self.description or ''}"
             )(set_property)
         
         @app.get(
             thing.path + self.name,
             response_model=self.model,
-            response_description=f"Value of {self.name}"
+            response_description=f"Value of {self.name}",
+            summary=self.title,
+            description=f"## {self.title}\n\n{self.description or ''}"
         )
         def get_property():
             return self.__get__(thing)
 
     def property_affordance(self, thing: Thing, path: Optional[str]=None) -> PropertyAffordance:
+        """Represent the property in a Thing Description."""
         path = path or thing.path
         ops = ["readproperty"]
         if not self.readonly:
@@ -108,4 +111,4 @@ class PropertyDescriptor():
         # with the affordance second so its values take priority.
         # Note that this works because all of the fields that get filled in by DataSchema are
         # optional - so the PropertyAffordance is still valid without them.
-        return PropertyAffordance(**{**data_schema, **pa})
+        return PropertyAffordance(**{**data_schema.dict(exclude_none=True), **pa.dict(exclude_none=True)})

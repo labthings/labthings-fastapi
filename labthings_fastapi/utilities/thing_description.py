@@ -1,8 +1,9 @@
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
+import json
 
-from pydantic import schema_of, parse_obj_as
+from pydantic import schema_of, parse_obj_as, ValidationError
 from .w3c_td_model import DataSchema
 
 
@@ -37,6 +38,30 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
         return resolved
     except KeyError as ke:
         raise KeyError(f"The JSON reference {reference} was not found in the schema (original error {ke}).")
+    
+def is_an_object(d: JSONSchema) -> bool:
+    """Determine whether a JSON schema dict is an object"""
+    return "type" in d and d["type"] == "object"
+
+
+def convert_object(d: JSONSchema) -> JSONSchema:
+    """Convert an object from JSONSchema to Thing Description"""
+    out: JSONSchema = d.copy()
+    # AdditionalProperties is not supported by Thing Description, and it is ambiguous
+    # whether this implies it's false or absent. I will, for now, ignore it, so we
+    # delete the key below.
+    if "additionalProperties" in out:
+        del out["additionalProperties"]
+    return out
+    
+
+
+def check_recursion(depth: int, limit: int):
+    """Check the recursion count is less than the limit"""
+    if depth > limit:
+        raise ValueError(
+            f"Recursion depth of {limit} exceeded - perhaps there is a circular reference?"
+        )
 
 
 def jsonschema_to_dataschema(
@@ -60,20 +85,15 @@ def jsonschema_to_dataschema(
     This generates a copy of the document, to avoid messing up `pydantic`'s cache.
     """
     root_schema = root_schema or d
-    if recursion_depth > recursion_limit:
-        raise ValueError(
-            f"Recursion depth of {recursion_limit} exceeded - perhaps there is a circular reference?"
-        )
+    check_recursion(recursion_depth, recursion_limit)
     # JSONSchema references are one-element dictionaries, with a single key called $ref
-    if is_a_reference(d):
-        # We return the referenced object, calling this function again so we check for any nested references
-        # inside the definition.
-        return jsonschema_to_dataschema(
-                look_up_reference(d["$ref"], root_schema),
-                root_schema = root_schema,
-                recursion_depth = recursion_depth+1,
-                recursion_limit = recursion_limit
-            )
+    while is_a_reference(d):
+        d = look_up_reference(d["$ref"], root_schema)
+        recursion_depth += 1
+        check_recursion(recursion_depth, recursion_limit)
+    
+    if is_an_object(d):
+        d = convert_object(d)
     
     # TODO: convert anyOf to an array, where possible
 
@@ -81,36 +101,37 @@ def jsonschema_to_dataschema(
     # and dereference those if necessary. This could be done with a comprehension, but I
     # am prioritising readability over speed. This code is run when generating the TD, not
     # in time-critical situations.
-    d_copy = {}
+    rkwargs = {
+        "root_schema": root_schema,
+        "recursion_depth": recursion_depth+1,
+        "recursion_limit": recursion_limit,
+    }
+    output: JSONSchema = {}
     for k, v in d.items():
         if isinstance(v, Mapping):
-            d_copy[k] = jsonschema_to_dataschema(
-                v,
-                root_schema = root_schema,
-                recursion_depth = recursion_depth+1,
-                recursion_limit = recursion_limit
-            )
+            # Any items that are Mappings (i.e. sub-dictionaries) must be recursed into
+            output[k] = jsonschema_to_dataschema(v, **rkwargs)
         elif isinstance(v, Sequence) and len(v) > 0 and isinstance(v[0], Mapping):
-            d_copy[k] = [
-                jsonschema_to_dataschema(
-                    item,
-                    root_schema = root_schema,
-                    recursion_depth = recursion_depth+1,
-                    recursion_limit = recursion_limit
-                ) for item in v
-            ]
+            # We can also have lists of mappings (i.e. Array[DataSchema]), so we
+            # recurse into these.
+            output[k] = [jsonschema_to_dataschema(item, **rkwargs) for item in v]
         else:
-            d_copy[k] = v
-    return d_copy
+            output[k] = v
+    return output
 
 
-def type_to_dataschema(t: type) -> DataSchema:
+def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     """Convert a Python type to a Thing Description DataSchema
     
     This makes use of pydantic's `schema_of` function to create a
     json schema, then applies some fixes to make a DataSchema
     as per the Thing Description (because Thing Description is
     almost but not quite compatible with JSONSchema).
+
+    Additional keyword arguments are added to the DataSchema,
+    and will override the fields generated from the type that
+    is passed in. Typically you'll want to use this for the 
+    `title` field.
     """
     schema_dict = jsonschema_to_dataschema(schema_of(t))
     # Definitions of referenced ($ref) schemas are put in a
@@ -120,4 +141,13 @@ def type_to_dataschema(t: type) -> DataSchema:
     # validation error if other junk is left in the schema.
     if "definitions" in schema_dict:
         del schema_dict["definitions"]
-    return parse_obj_as(DataSchema, schema_dict)
+    schema_dict.update(kwargs)
+    try:
+        return parse_obj_as(DataSchema, schema_dict)
+    except ValidationError as ve:
+        print(
+            "Error while constructing DataSchema from the "
+            "following dictionary:\n" +
+            json.dumps(schema_dict, indent=2)
+        )
+        raise ve

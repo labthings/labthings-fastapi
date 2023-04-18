@@ -89,6 +89,7 @@ class DataSchema(BaseModel):
     enum: Optional[list] = None   # was: Field(None, min_items=1, unique_items=True) but this failed with generic models
     format: Optional[str] = None
     const: Optional[Any] = None
+    default: Optional[Any] = None
     type: Optional[Type] = None
     # The fields below should be empty unless type==Type.array
     items: Optional[Union[DataSchema, List[DataSchema]]] = None
@@ -309,7 +310,7 @@ class Flow(Enum):
     code = 'code'
 
 
-class SecurityScheme(BaseModel):
+class BaseSecurityScheme(BaseModel):
     field_type: Optional[TypeDeclaration] = Field(None, alias='@type')
     description: Optional[Description] = None
     descriptions: Optional[Descriptions] = None
@@ -317,8 +318,8 @@ class SecurityScheme(BaseModel):
     scheme: SecuritySchemeEnum
 
 
-class NoSecurityScheme(SecurityScheme):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.nosec
+class NoSecurityScheme(BaseSecurityScheme):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.nosec, const=True)
     description: Optional[Description] = "No security"
 
 
@@ -326,33 +327,45 @@ class NameAndIn(BaseModel):
     in_: Optional[In] = Field(None, alias='in')  # for scheme=basic,digest,apikey,bearer
     name: Optional[str] = None                   # for scheme=basic,digest,apikey,bearer
 
-class BasicSecurityScheme(SecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.basic
+class BasicSecurityScheme(BaseSecurityScheme, NameAndIn):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.basic, const=True)
 
-class DigestSecurityScheme(SecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.digest
+class DigestSecurityScheme(BaseSecurityScheme, NameAndIn):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.digest, const=True)
     qop: Optional[Qop] = None                    # for scheme=digest
 
-class APISecurityScheme(SecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.apikey
+class APISecurityScheme(BaseSecurityScheme, NameAndIn):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.apikey, const=True)
 
-class BearerSecurityScheme(SecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.bearer
+class BearerSecurityScheme(BaseSecurityScheme, NameAndIn):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.bearer, const=True)
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     alg: Optional[str] = None                    # for scheme=bearer
     format: Optional[str] = None                 # for scheme=bearer
 
-class PskSecurityScheme(SecurityScheme):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.psk
+class PskSecurityScheme(BaseSecurityScheme):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.psk, const=True)
     identity: Optional[str] = None               # for scheme=psk
 
-class Oauth2SecurityScheme(SecurityScheme):
-    scheme: SecuritySchemeEnum = SecuritySchemeEnum.oauth2
+class Oauth2SecurityScheme(BaseSecurityScheme):
+    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.oauth2, const=True)
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     token: Optional[AnyUri] = None               # for schema=oauth2
     refresh: Optional[AnyUri] = None             # for scheme=oauth2
     scopes: Optional[Union[List[str], str]] = None  # oauth2
     flow: Optional[Flow] = None                  # for scheme=oauth2
+
+
+SecurityScheme = Union[
+    BaseSecurityScheme,
+    NoSecurityScheme,
+    BasicSecurityScheme,
+    DigestSecurityScheme,
+    APISecurityScheme,
+    BearerSecurityScheme,
+    PskSecurityScheme,
+    Oauth2SecurityScheme,
+]
 
 
 class WotTdSchema16October2019(BaseModel):

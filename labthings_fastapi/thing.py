@@ -6,6 +6,7 @@ from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .utilities.validate_thing_description import validate_thing_description
+from .utilities.introspection import get_summary, get_docstring
 
 if TYPE_CHECKING:
     from .thing_server import ThingServer
@@ -27,7 +28,11 @@ class Thing:
                 # TODO: Do we want to be more choosy about what we add?
                 pass
 
-        @server.app.get(self.path)
+        @server.app.get(
+                self.path, 
+                summary=get_summary(self.thing_description),
+                description=get_docstring(self.thing_description)
+            )
         def thing_description():
             return self.thing_description().dict(exclude_none=True)
         thing_description()  # run it once to build the model to check it works (i.e. is valid)
@@ -35,22 +40,29 @@ class Thing:
 
     _cached_thing_description: Optional[tuple[str, ThingDescription]] = None
     def thing_description(self, path: Optional[str] = None) -> ThingDescription:
-        """A w3c Thing Description representing this thing"""
+        """A w3c Thing Description representing this thing
+        
+        The w3c Web of Things working group defined a standard representation
+        of a Thing, which provides a high-level description of the actions,
+        properties, and events that it exposes. This endpoint delivers a JSON
+        representation of the Thing Description for this Thing.
+        """
         path = path or self.path
         if self._cached_thing_description and self._cached_thing_description[0] == path:
             return self._cached_thing_description[1]
         
         properties = {}
-        #actions = []
+        actions = {}
         for name, item in class_attributes(self):
             if isinstance(item, PropertyDescriptor):
                 properties[name] = item.property_affordance(self, path)
-            #if isinstance(item, ActionDescriptor):
-            #    actions.append(item.action_affordance(self, path))
+            if isinstance(item, ActionDescriptor):
+                actions[name] = (item.action_affordance(self, path))
 
         return ThingDescription(
             title=getattr(self, "title", self.__class__.__name__),
             properties=properties,
+            actions=actions,
             security="no_security",
             securityDefinitions={"no_security": NoSecurityScheme()},
         )
