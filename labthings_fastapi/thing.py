@@ -1,11 +1,13 @@
 from __future__ import annotations
 import logging
+import json
 from typing import TYPE_CHECKING, Optional
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
 from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
-from .utilities.validate_thing_description import validate_thing_description
+from .utilities.validate_thing_description import validate_thing_description as utils_validate_td
 from .utilities.introspection import get_summary, get_docstring
 
 if TYPE_CHECKING:
@@ -34,9 +36,13 @@ class Thing:
                 description=get_docstring(self.thing_description)
             )
         def thing_description():
-            return self.thing_description().dict(exclude_none=True)
-        thing_description()  # run it once to build the model to check it works (i.e. is valid)
-        
+            return self.thing_description_dict()
+
+
+    def validate_thing_description(self):
+        """Raise an exception if the thing description is not valid"""
+        td = self.thing_description_dict()
+        return utils_validate_td(td)
 
     _cached_thing_description: Optional[tuple[str, ThingDescription]] = None
     def thing_description(self, path: Optional[str] = None) -> ThingDescription:
@@ -47,7 +53,7 @@ class Thing:
         properties, and events that it exposes. This endpoint delivers a JSON
         representation of the Thing Description for this Thing.
         """
-        path = path or self.path
+        path = path or getattr(self, "path", "{base_uri}")
         if self._cached_thing_description and self._cached_thing_description[0] == path:
             return self._cached_thing_description[1]
         
@@ -66,4 +72,17 @@ class Thing:
             security="no_security",
             securityDefinitions={"no_security": NoSecurityScheme()},
         )
+    
+    def thing_description_dict(self, path: Optional[str] = None) -> dict:
+        """A w3c Thing Description representing this thing, as a simple dict
+        
+        The w3c Web of Things working group defined a standard representation
+        of a Thing, which provides a high-level description of the actions,
+        properties, and events that it exposes. This endpoint delivers a JSON
+        representation of the Thing Description for this Thing.
+        """
+        td: ThingDescription = self.thing_description(path=path)
+        td_dict: dict = td.dict(exclude_none=True, by_alias=True)
+        return jsonable_encoder(td_dict)
+
         
