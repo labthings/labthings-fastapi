@@ -2,7 +2,6 @@ from __future__ import annotations
 import logging
 import json
 from typing import TYPE_CHECKING, Optional
-from fastapi import FastAPI
 from fastapi.encoders import jsonable_encoder
 from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
