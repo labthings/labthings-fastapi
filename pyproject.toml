@@ -12,6 +12,10 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+    "fastapi[all]",
+    "jsonschema",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/rwb27/labthings-fastapi"
@@ -20,3 +24,4 @@ classifiers = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
