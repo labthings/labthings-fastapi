@@ -1,3 +1,12 @@
+"""
+The `Thing` class enables most of the functionality of this library,
+and is the way in to most of its features. In the future, we might
+support a stub version of the class in a separate package, so
+that instrument control libraries can be LabThings compatible 
+without a hard dependency on LabThings. But that is something we
+will do in the future...
+"""
+
 from __future__ import annotations
 import logging
 import json

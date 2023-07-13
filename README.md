@@ -19,6 +19,6 @@ pip install -e .
 ## demo
 To run the demo, try:
 ```
-cd tests
+cd examples
 uvicorn demo_thing_server:thing_server.app --reload --reload-dir=..
 ```
