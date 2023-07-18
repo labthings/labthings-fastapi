@@ -25,8 +25,7 @@ from typing import Optional, Callable, Iterable, Any, TypeVar, Generic
 import uuid
 from typing import TYPE_CHECKING
 import weakref
-from pydantic.generics import GenericModel
+from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Request
 
 class Listener():
-    

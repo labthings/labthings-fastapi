@@ -9,8 +9,8 @@ from typing import Optional, Callable, Iterable, Any, TypeVar, Generic
 import uuid
 from typing import TYPE_CHECKING
 import weakref
-from pydantic.generics import GenericModel
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -29,7 +29,7 @@ class InvocationStatus(Enum):
 
 InputT = TypeVar("InputT")
 OutputT = TypeVar("OutputT")
-class GenericInvocationModel(GenericModel, Generic[InputT, OutputT]):
+class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     status: InvocationStatus
     id: uuid.UUID
     action: str

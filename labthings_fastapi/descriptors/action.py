@@ -51,6 +51,7 @@ class ActionDescriptor():
             func, remove_first_positional_arg=True,
         )
         self.output_model = return_type(func)
+        print(f"Creating invocation model with input: {self.input_model}, output: {self.output_model}")
         self.invocation_model = GenericInvocationModel[
             self.input_model, Optional[self.output_model]
         ]

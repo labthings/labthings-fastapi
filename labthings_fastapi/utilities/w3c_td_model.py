@@ -10,40 +10,20 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
 
-from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator
-from pydantic.generics import GenericModel
-
+from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator, RootModel
 
 class Version(BaseModel):
     instance: str
 
 
-class AnyUri(BaseModel):
-    __root__: str
-
-
-class Description(BaseModel):
-    __root__: str
-
-
-class Descriptions(BaseModel):
-    __root__: Optional[Dict[str, str]] = None
-
-
-class Title(BaseModel):
-    __root__: str
-
-
-class Titles(BaseModel):
-    __root__: Optional[Dict[str, str]] = None
-
-
-class Security(BaseModel):
-    __root__: Union[List[str], str]
-
-
-class Scopes(BaseModel):
-    __root__: Union[List[str], str]
+AnyUri = RootModel[str]
+Description = RootModel[str]
+Descriptions = RootModel[Optional[Dict[str, str]]]
+Title = RootModel[str]
+Titles = RootModel[Optional[Dict[str, str]]]
+Security = RootModel[Union[List[str], str]]
+Scopes = RootModel[Union[List[str], str]]
+TypeDeclaration = RootModel[Union[str, List[str]]]
 
 
 class Subprotocol(Enum):
@@ -58,12 +38,8 @@ class ThingContextW3cUri(Enum):
 THING_CONTEXT = ThingContextW3cUri.https___www_w3_org_2019_wot_td_v1
 
 
-class ThingContext(BaseModel):
-    __root__: Union[List[Union[AnyUri, Dict[str, Any]]], ThingContextW3cUri]
-
-
-class TypeDeclaration(BaseModel):
-    __root__: Union[str, List[str]]
+class ThingContext(RootModel):
+    root: Union[List[Union[AnyUri, Dict[str, Any]]], ThingContextW3cUri]
 
 
 class Type(Enum):
@@ -121,14 +97,14 @@ class DataSchema(BaseModel):
 # The code below almost but not quite works.
 
 class ArraySchema(DataSchema):
-    type: Type = Field(Type.array, const=True)
+    type: Type = Literal[Type.array]
     items: Optional[Union[DataSchema, List[DataSchema]]] = None
     maxItems: Optional[conint(ge=0)] = None
     minItems: Optional[conint(ge=0)] = None
 
 
 numberT = TypeVar("numberT", int, float)
-class GenericNumberSchema(DataSchema, GenericModel, Generic[numberT]):
+class GenericNumberSchema(DataSchema, BaseModel, Generic[numberT]):
     minimum: Optional[numberT] = None
     maximum: Optional[numberT] = None
     exclusiveMinimum: Optional[numberT] = None
@@ -137,25 +113,25 @@ class GenericNumberSchema(DataSchema, GenericModel, Generic[numberT]):
 
 
 class NumberSchema(GenericNumberSchema[float]):
-    type: Type = Field(Type.number, const=True)
+    type: Type = Literal[Type.number]
 
 
 class IntegerSchema(GenericNumberSchema[int]):
-    type: Type = Field(Type.integer, const=True)
+    type: Type = Literal[Type.integer]
     
 
 class BooleanSchema(DataSchema):
-    type: Type = Field(Type.boolean, const=True)
+    type: Type = Literal[Type.boolean]
 
 
 class ObjectSchema(DataSchema):
-    type: Type = Field(Type.object, const=True)
+    type: Type = Literal[Type.object]
     properties: Optional[Mapping[str, DataSchema]] = None
     required: Optional[List[str]] = None
 
 
 class StringSchema(DataSchema):
-    type: Type = Field(Type.string, const=True)
+    type: Type = Literal[Type.string]
     minLength: Optional[int] = None
     maxLength: Optional[int] = None
     pattern: Optional[str] = None
@@ -164,7 +140,7 @@ class StringSchema(DataSchema):
 
 
 class NullSchema(DataSchema):
-    type: Type = Field(Type.object, const=True)
+    type: Type = Literal[Type.object]
 
 
 DataSchema: Type = Union[
@@ -226,7 +202,7 @@ Op = Union[PropertyOp, ActionOp, EventOp, RootOp]
 OpT = TypeVar("OpT")
 
 
-class Form(GenericModel, Generic[OpT]):
+class Form(BaseModel, Generic[OpT]):
     class Config:
         extra = Extra.allow
 
@@ -319,7 +295,7 @@ class BaseSecurityScheme(BaseModel):
 
 
 class NoSecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.nosec, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.nosec]
     description: Optional[Description] = "No security"
 
 
@@ -328,27 +304,27 @@ class NameAndIn(BaseModel):
     name: Optional[str] = None                   # for scheme=basic,digest,apikey,bearer
 
 class BasicSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.basic, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.basic]
 
 class DigestSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.digest, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.digest]
     qop: Optional[Qop] = None                    # for scheme=digest
 
 class APISecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.apikey, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.apikey]
 
 class BearerSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.bearer, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.bearer]
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     alg: Optional[str] = None                    # for scheme=bearer
     format: Optional[str] = None                 # for scheme=bearer
 
 class PskSecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.psk, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.psk]
     identity: Optional[str] = None               # for scheme=psk
 
 class Oauth2SecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Field(SecuritySchemeEnum.oauth2, const=True)
+    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.oauth2]
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     token: Optional[AnyUri] = None               # for schema=oauth2
     refresh: Optional[AnyUri] = None             # for scheme=oauth2

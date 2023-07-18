@@ -10,7 +10,7 @@ with a few key tasks, in particular creating pydantic models
 from functions by analysing their signatures.
 """
 
-from pydantic.decorator import ValidatedFunction, V_DUPLICATE_KWARGS
+from pydantic.v1.decorator import ValidatedFunction, V_DUPLICATE_KWARGS
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, Union, overload
 import inspect
 from pydantic import BaseModel
@@ -73,6 +73,11 @@ def input_model_from_signature(
       can be downgraded to a warning by specifying 
       `ignore_positional_args=True`.
     * `ignore_first_positional_arg`
+
+    TODO: stop relying on ValidatedFunction.model and build it directly.
+    This isn't actually much code: ValidatedFunction is mostly concerned
+    with replicating the exact Python arguments, and we don't care (we
+    only want to allow keyword arguments anyway).
     """
     vf = ValidatedFunction(func, None)
     model = vf.model
@@ -104,6 +109,7 @@ def input_model_from_signature(
     # If the function accepts extra kwargs, reflect that in the model
     model.Config.extras = "allow" if vf_takes_v_kwargs(vf) else "forbid"
     model.__name__ = f"{func.__name__}_input"
+    print(f"Extracted model from function arguments:\nname: {model.__name__}\nfields:{model.__fields__}")
     return model
 
 
