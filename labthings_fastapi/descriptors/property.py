@@ -5,6 +5,8 @@ Define an object to represent an Action, as a descriptor.
 from typing import TYPE_CHECKING, Any, Optional
 from fastapi import Body, FastAPI
 from typing import Annotated
+from anyio.abc import ObjectSendStream
+from weakref import WeakSet
 from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema
 from ..utilities.thing_description import type_to_dataschema
 
@@ -34,6 +36,7 @@ class PropertyDescriptor():
         self.title = title
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
+        self._observers: WeakSet[ObjectSendStream] = WeakSet()
 
     def __set_name__(self, owner, name: str):
         self._name = name
@@ -53,6 +56,19 @@ class PropertyDescriptor():
     def __set__(self, obj, value):
         """Set the property's value"""
         obj.__dict__[self.name] = value
+        self.emit_changed_event(value)
+
+    def emit_changed_event(self, value):
+        """Notify subscribers that the property has changed"""
+        for observer in self._observers:
+            observer.send(
+                {
+                    "messageType": "propertyStatus",
+                    "data": {
+                        self._name: value
+                    }
+                }
+            )
     
     @property
     def name(self):
