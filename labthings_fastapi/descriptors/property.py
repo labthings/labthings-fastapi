@@ -126,4 +126,4 @@ class PropertyDescriptor():
         # with the affordance second so its values take priority.
         # Note that this works because all of the fields that get filled in by DataSchema are
         # optional - so the PropertyAffordance is still valid without them.
-        return PropertyAffordance(**{**data_schema.dict(exclude_none=True), **pa.dict(exclude_none=True)})
+        return PropertyAffordance(**{**data_schema.model_dump(exclude_none=True), **pa.model_dump(exclude_none=True)})

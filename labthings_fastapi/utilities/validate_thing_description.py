@@ -1,4 +1,4 @@
-from importlib import resources
+from importlib.resources import files
 import json
 
 import jsonschema
@@ -6,7 +6,8 @@ import jsonschema
 from .. import utilities
 
 def validate_thing_description(thing_description: dict):
-        schema = json.load(resources.open_text(utilities, "w3c_td_schema.json"))
+        with files(utilities).joinpath("w3c_td_schema.json").open('r') as f:
+                schema = json.load(f)
         jsonschema.Draft7Validator.check_schema(schema)
         # Decode the JSON back into a primitive dictionary
         # Validate
