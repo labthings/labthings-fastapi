@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
 
-from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator, RootModel
+from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator, RootModel, ConfigDict
 
 class Version(BaseModel):
     instance: str
@@ -84,8 +84,7 @@ class DataSchema(BaseModel):
     contentEncoding: Optional[str] = None
     contentMediaType: Optional[str] = None
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 """
 # The classes below attempted to implement the w3c spec for type-specific fields.
@@ -200,8 +199,7 @@ OpT = TypeVar("OpT")
 
 
 class Form(BaseModel, Generic[OpT]):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     href: AnyUri
     op: Optional[Union[OpT, List[OpT]]] = None
@@ -214,8 +212,7 @@ class Form(BaseModel, Generic[OpT]):
 
 
 class InteractionAffordance(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     description: Optional[Description] = None
     descriptions: Optional[Descriptions] = None
@@ -248,8 +245,7 @@ class EventAffordance(BaseModel):
 
 
 class LinkElement(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     href: AnyUri
     type: Optional[str] = None
@@ -342,8 +338,7 @@ SecurityScheme = Union[
 
 
 class WotTdSchema16October2019(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     id: Optional[AnyUrl] = None
     title: Title
