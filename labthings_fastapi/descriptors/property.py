@@ -7,7 +7,7 @@ from fastapi import Body, FastAPI
 from typing import Annotated
 from anyio.abc import ObjectSendStream
 from weakref import WeakSet
-from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema
+from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..utilities.thing_description import type_to_dataschema
 
 if TYPE_CHECKING:
@@ -107,20 +107,19 @@ class PropertyDescriptor():
     def property_affordance(self, thing: Thing, path: Optional[str]=None) -> PropertyAffordance:
         """Represent the property in a Thing Description."""
         path = path or thing.path
-        ops = ["readproperty"]
+        ops = [PropertyOp.readproperty]
         if not self.readonly:
-            ops.append("writeproperty")
+            ops.append(PropertyOp.writeproperty)
         forms = [
-            Form(
+            Form[PropertyOp](
                 href = path + self.name,
-                op = ops
+                op = ops,
             ),
         ]
         data_schema: DataSchema = type_to_dataschema(self.model)
         pa: PropertyAffordance = PropertyAffordance(
             title = self.title,
             forms = forms,
-            readonly = self.readonly,
             description = self.description,
         )
         # We merge the data schema with the property affordance (which subclasses the DataSchema model)

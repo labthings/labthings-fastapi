@@ -125,7 +125,7 @@ class ActionDescriptor():
         """Represent the property in a Thing Description."""
         path = path or thing.path
         forms = [
-            Form(
+            Form[ActionOp](
                 href = path + self.name,
                 op = [ActionOp.invokeaction]
             ),
