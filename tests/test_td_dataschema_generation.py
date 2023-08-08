@@ -15,7 +15,7 @@ def ds_json_dict(ds: DataSchema) -> dict:
     simple types. This is appropriate if we're testing against
     what we'd expect to see in the API.
     """
-    return json.loads(ds.json())
+    return json.loads(ds.model_dump_json())
 
 def test_int():
     ds = type_to_dataschema(int)
@@ -66,8 +66,6 @@ def test_object():
         a: int
         b: Optional[int] = None
 
-    print(schema_of(A))
-
     ds = type_to_dataschema(A)
     j = ds_json_dict(ds)
     assert j["type"] == "object"
@@ -85,7 +83,7 @@ def test_nested_object():
 
     # locally-defined models can confuse pydantic, so we pass
     # in A explicitly to convert annotations into types.
-    B.update_forward_refs(A=A)
+    B.model_rebuild(_types_namespace = {"A":A})
 
     ds = type_to_dataschema(B)
     j = ds_json_dict(ds)

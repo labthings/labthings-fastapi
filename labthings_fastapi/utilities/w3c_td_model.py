@@ -59,7 +59,7 @@ class DataSchema(BaseModel):
     readOnly: Optional[bool] = None
     oneOf: Optional[list[DataSchema]] = None
     unit: Optional[str] = None
-    enum: Optional[list] = None   # was: Field(None, min_items=1, unique_items=True) but this failed with generic models
+    enum: Optional[list] = None   # was: Field(None, min_length=1, unique_items=True) but this failed with generic models
     format: Optional[str] = None
     const: Optional[Any] = None
     default: Optional[Any] = None
@@ -218,13 +218,13 @@ class InteractionAffordance(BaseModel):
     descriptions: Optional[Descriptions] = None
     title: Optional[Title] = None
     titles: Optional[Titles] = None
-    forms: List[Form[Op]] = Field(..., min_items=1)
+    forms: List[Form[Op]] = Field(..., min_length=1)
     uriVariables: Optional[Dict[str, DataSchema]] = None
 
 
 class PropertyAffordance(InteractionAffordance, DataSchema):
     observable: Optional[bool] = None
-    forms: List[Form[PropertyOp]] = Field(..., min_items=1)
+    forms: List[Form[PropertyOp]] = Field(..., min_length=1)
 
 
 class ActionAffordance(InteractionAffordance):
@@ -233,7 +233,7 @@ class ActionAffordance(InteractionAffordance):
     output: Optional[DataSchema] = None
     safe: Optional[bool] = None
     idempotent: Optional[bool] = None
-    forms: List[Form[ActionOp]] = Field(..., min_items=1)
+    forms: List[Form[ActionOp]] = Field(..., min_length=1)
 
 
 class EventAffordance(BaseModel):
@@ -241,7 +241,7 @@ class EventAffordance(BaseModel):
     subscription: Optional[DataSchema] = None
     data: Optional[DataSchema] = None
     cancellation: Optional[DataSchema] = None
-    forms: List[Form[EventOp]] = Field(..., min_items=1)
+    forms: List[Form[EventOp]] = Field(..., min_length=1)
 
 
 class LinkElement(BaseModel):
@@ -350,7 +350,7 @@ class WotTdSchema16October2019(BaseModel):
     descriptions: Optional[Descriptions] = None
     version: Optional[Version] = None
     links: Optional[List[LinkElement]] = None
-    forms: Optional[List[Form[RootOp]]] = Field(None, min_items=1)
+    forms: Optional[List[Form[RootOp]]] = Field(None, min_length=1)
     base: Optional[AnyUri] = None
     securityDefinitions: Dict[str, SecurityScheme]
     support: Optional[AnyUri] = None

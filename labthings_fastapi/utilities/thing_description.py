@@ -145,12 +145,13 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     """
     schema_dict = jsonschema_to_dataschema(TypeAdapter(t).json_schema())
     # Definitions of referenced ($ref) schemas are put in a
-    # key called "definitions" by pydantic. We should delete this.
+    # key called "definitions" or "$defs" by pydantic. We should delete this.
     # TODO: find a cleaner way to do this
     # This shouldn't be a severe problem: we will fail with a
     # validation error if other junk is left in the schema.
-    if "definitions" in schema_dict:
-        del schema_dict["definitions"]
+    for k in ["definitions", "$defs"]:
+        if k in schema_dict:
+            del schema_dict[k]
     schema_dict.update(kwargs)
     try:
         return DataSchema(**schema_dict)
