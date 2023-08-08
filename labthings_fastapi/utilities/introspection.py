@@ -49,8 +49,7 @@ def input_model_from_signature(
     """
     parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
     if remove_first_positional_arg:
-        # NB we use parameter_mapping (an immutable ordered dict) as parameters doesn't guarantee order
-        name, parameter = next(iter((parameters.items())))
+        name, parameter = next(iter((parameters.items())))  # next(iter()) gets the first item
         if parameter.kind in (Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD):
             raise ValueError("Can't remove first positional argument: there is none.")
         del parameters[name]

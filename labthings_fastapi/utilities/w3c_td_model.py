@@ -31,15 +31,12 @@ class Subprotocol(Enum):
     websub = 'websub'
     sse = 'sse'
 
-
-class ThingContextW3cUri(Enum):
-    https___www_w3_org_2019_wot_td_v1 = 'https://www.w3.org/2019/wot/td/v1'
-
-THING_CONTEXT = ThingContextW3cUri.https___www_w3_org_2019_wot_td_v1
+THING_CONTEXT_LITERAL = Literal['https://www.w3.org/2019/wot/td/v1']
+THING_CONTEXT_URL = THING_CONTEXT_LITERAL.__args__[0]
 
 
 class ThingContext(RootModel):
-    root: Union[List[Union[AnyUri, Dict[str, Any]]], ThingContextW3cUri]
+    root: Union[List[Union[AnyUri, Dict[str, Any]]], THING_CONTEXT_LITERAL]
 
 
 class Type(Enum):
@@ -296,7 +293,7 @@ class BaseSecurityScheme(BaseModel):
 
 class NoSecurityScheme(BaseSecurityScheme):
     scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.nosec]
-    description: Optional[Description] = "No security"
+    description: Optional[Description] = Description("No security")  # TODO: check if this needs a default factory
 
 
 class NameAndIn(BaseModel):
@@ -366,6 +363,6 @@ class WotTdSchema16October2019(BaseModel):
     modified: Optional[datetime] = None
     security: Union[str, List[str]]
     field_type: Optional[TypeDeclaration] = Field(None, alias='@type')
-    field_context: ThingContext = Field(THING_CONTEXT, alias='@context')
+    field_context: ThingContext = Field(ThingContext(THING_CONTEXT_URL), alias='@context')
 
 ThingDescription = WotTdSchema16October2019

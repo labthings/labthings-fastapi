@@ -53,6 +53,7 @@ class MyThing(Thing):
     
 thing_server = ThingServer()
 my_thing = MyThing()
+td = my_thing.thing_description()
 print(my_thing.validate_thing_description())
 thing_server.add_thing(my_thing, "/my_thing")
 

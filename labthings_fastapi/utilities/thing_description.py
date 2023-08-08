@@ -53,7 +53,18 @@ def convert_object(d: JSONSchema) -> JSONSchema:
     if "additionalProperties" in out:
         del out["additionalProperties"]
     return out
-    
+
+
+def convert_anyof(d: JSONSchema) -> JSONSchema:
+    """Convert the anyof key to oneof"""
+    #TODO this isn't technically JSONSchema output - oneof is not allowed...
+    #TODO probably don't need to copy this...
+    if not "anyOf" in d:
+        return d
+    out: JSONSchema = d.copy()
+    out["oneOf"] = out["anyOf"]
+    del out["anyOf"]
+    return out
 
 
 def check_recursion(depth: int, limit: int):
@@ -78,7 +89,7 @@ def jsonschema_to_dataschema(
     references with the appropriate chunk of the file.
 
     JSONSchema can represent `Union` types using the `anyOf` keyword, which is
-    not supported by Thing Description.  It's possible to achieve the same thing
+    called `oneOf` by Thing Description.  It's possible to achieve the same thing
     in the specific case of array elements, by setting `items` to a list of
     `DataSchema` objects. This function does not yet do that conversion.
     
@@ -94,8 +105,7 @@ def jsonschema_to_dataschema(
     
     if is_an_object(d):
         d = convert_object(d)
-    
-    # TODO: convert anyOf to an array, where possible
+    d = convert_anyof(d)
 
     # After checking the object isn't a reference, we now recursively check sub-dictionaries
     # and dereference those if necessary. This could be done with a comprehension, but I

@@ -90,7 +90,7 @@ class Thing:
         representation of the Thing Description for this Thing.
         """
         td: ThingDescription = self.thing_description(path=path)
-        td_dict: dict = td.dict(exclude_none=True, by_alias=True)
+        td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
 
         
