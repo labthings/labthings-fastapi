@@ -10,50 +10,18 @@ with a few key tasks, in particular creating pydantic models
 from functions by analysing their signatures.
 """
 
-from pydantic.v1.decorator import ValidatedFunction, V_DUPLICATE_KWARGS
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, Union, overload
+from collections import OrderedDict
+from typing import (
+    Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, get_type_hints
+)
 import inspect
-from pydantic import BaseModel
-import warnings
+from inspect import Parameter, signature
+from pydantic import BaseModel, ConfigDict
+from pydantic.main import create_model
 
-
-def vf_takes_v_args(vf: ValidatedFunction) -> bool:
-    """Determine whether a ValidatedFunction accepts extra positional arguments
-    
-    There's no nice easy flag to check this, so we try the validator
-    function, which should raise an exception if it doesn't accept
-    variable numbers of positional arguments (i.e. if there's no `*args`).
-    """
-    try:
-        vf.model.check_args([])
-        # if check_args does not raise an exception, we accept a variable number
-        # of positional arguments.
-        return True
-
-    except TypeError:
-        # if an exception is raised, it means *args are not allowed
-        return False
-
-def vf_takes_v_kwargs(vf: ValidatedFunction) -> bool:
-    """Determine whether a ValidatedFunction accepts extra keyword arguments
-    
-    There's no nice easy flag to check this, so we try the validator
-    function, which should raise an exception if it doesn't accept
-    extra keyword arguments (i.e. if there's no `**kwargs`).
-    """
-    try:
-        vf.model.check_kwargs({})
-        # if check_kwargs does not raise an exception, we accept a variable number
-        # of positional arguments.
-        return True
-
-    except TypeError:
-        # if an exception is raised, it means **kwargs are not allowed
-        return False
 
 def input_model_from_signature(
-        func: callable, 
-        ignore_positional_args: bool=False,
+        func: callable,
         remove_first_positional_arg: bool=False,
     ) -> BaseModel:
     """Create a pydantic model for a function's signature.
@@ -68,47 +36,51 @@ def input_model_from_signature(
     in the future. 
     
     Parameters:
-    * `ignore_positional_args`: By default, we will raise a `TypeError`
-      if there are extra positional arguments (i.e. `*args`), but this 
-      can be downgraded to a warning by specifying 
-      `ignore_positional_args=True`.
-    * `ignore_first_positional_arg`
+    * `remove_first_positional_arg` removes the first argument from the 
+      model (this is appropriate for methods, as the first argument, 
+      self, is baked in when it's called, but is present in the 
+      signature).
 
     TODO: stop relying on ValidatedFunction.model and build it directly.
     This isn't actually much code: ValidatedFunction is mostly concerned
     with replicating the exact Python arguments, and we don't care (we
     only want to allow keyword arguments anyway).
+    TODO: deal with (or exclude) functions with a single positional parameter
     """
-    vf = ValidatedFunction(func, None)
-    model = vf.model
+    parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
+    if remove_first_positional_arg:
+        # NB we use parameter_mapping (an immutable ordered dict) as parameters doesn't guarantee order
+        name, parameter = next(iter((parameters.items())))
+        if parameter.kind in (Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD):
+            raise ValueError("Can't remove first positional argument: there is none.")
+        del parameters[name]
 
     # Raise errors if positional-only or variable positional args are present
-    if vf_takes_v_args(vf):
-        message = (
+    if any(p.kind == Parameter.VAR_POSITIONAL for p in parameters.values()):
+        raise TypeError(
             f"{func.__name__} accepts extra positional arguments, "
             "which is not supported."
         )
-        if ignore_positional_args:
-            warnings.warn(message)
-        else:
-            raise TypeError(message)
-    if len(vf.positional_only_args) > 0:
+    if any(p.kind == Parameter.POSITIONAL_ONLY for p in parameters.values()):
         raise TypeError(
             f"{func.__name__} has positional-only arguments which are not supported."
         )
     
-    # Remove the extra fields used to trap and raise errors for 
-    # the catch-all *args and **kwargs arguments.
-    del model.__fields__[vf.v_args_name]
-    del model.__fields__[vf.v_kwargs_name]
-    del model.__fields__[V_DUPLICATE_KWARGS]
+    # The line below determines if we accept arbitrary extra parameters (**kwargs)
+    takes_v_kwargs = any(p.kind == Parameter.VAR_KEYWORD for p in parameters.values())
+    # fields is a dictionary of tuples of (type, default) that defines the input model
+    type_hints = get_type_hints(func, include_extras=True)
+    fields: Dict[str, Tuple[type, Any]] = {}
+    for name, p in parameters.items():
+        p_type = Any if p.annotation is Parameter.empty else type_hints[name]
+        default = ... if p.default is Parameter.empty else p.default  # convert Parameter.empty to `...`
+        fields[name] = (p_type, default)
+    model = create_model(
+        f"{func.__name__}_input",
+        __config__ = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
+        **fields
+    )
 
-    if remove_first_positional_arg:
-        del model.__fields__[vf.arg_mapping[0]]
-
-    # If the function accepts extra kwargs, reflect that in the model
-    model.Config.extras = "allow" if vf_takes_v_kwargs(vf) else "forbid"
-    model.__name__ = f"{func.__name__}_input"
     print(f"Extracted model from function arguments:\nname: {model.__name__}\nfields:{model.__fields__}")
     return model
 
@@ -119,7 +91,10 @@ def return_type(func: Callable, name: Optional[str]=None) -> Type:
     if sig.return_annotation == inspect.Signature.empty:
         return type(None)
     else:
-        return sig.return_annotation
+        # We use `get_type_hints` rather than just `sig.return_annotation`
+        # because it resolves forward references, removes annotations, etc.
+        type_hints = get_type_hints(func, include_extras=True)
+        return type_hints["return"]
 
 
 def get_docstring(obj: Any, remove_summary=False) -> str:

@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Optional
 import json
 
-from pydantic import schema_of, parse_obj_as, ValidationError
+from pydantic import TypeAdapter, ValidationError
 from .w3c_td_model import DataSchema
 
 
@@ -133,7 +133,7 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     is passed in. Typically you'll want to use this for the 
     `title` field.
     """
-    schema_dict = jsonschema_to_dataschema(schema_of(t))
+    schema_dict = jsonschema_to_dataschema(TypeAdapter(t).json_schema())
     # Definitions of referenced ($ref) schemas are put in a
     # key called "definitions" by pydantic. We should delete this.
     # TODO: find a cleaner way to do this
@@ -143,7 +143,7 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
         del schema_dict["definitions"]
     schema_dict.update(kwargs)
     try:
-        return parse_obj_as(DataSchema, schema_dict)
+        return DataSchema(**schema_dict)
     except ValidationError as ve:
         print(
             "Error while constructing DataSchema from the "
