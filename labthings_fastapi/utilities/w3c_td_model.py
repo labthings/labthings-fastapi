@@ -292,7 +292,7 @@ class BaseSecurityScheme(BaseModel):
 
 
 class NoSecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.nosec]
+    scheme: Literal[SecuritySchemeEnum.nosec] = SecuritySchemeEnum.nosec
     description: Optional[Description] = Description("No security")  # TODO: check if this needs a default factory
 
 
@@ -301,27 +301,27 @@ class NameAndIn(BaseModel):
     name: Optional[str] = None                   # for scheme=basic,digest,apikey,bearer
 
 class BasicSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.basic]
+    scheme: Literal[SecuritySchemeEnum.basic] = SecuritySchemeEnum.basic
 
 class DigestSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.digest]
+    scheme: Literal[SecuritySchemeEnum.digest] = SecuritySchemeEnum.digest
     qop: Optional[Qop] = None                    # for scheme=digest
 
 class APISecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.apikey]
+    scheme: Literal[SecuritySchemeEnum.apikey] = SecuritySchemeEnum.apikey
 
 class BearerSecurityScheme(BaseSecurityScheme, NameAndIn):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.bearer]
+    scheme: Literal[SecuritySchemeEnum.bearer] = SecuritySchemeEnum.bearer
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     alg: Optional[str] = None                    # for scheme=bearer
     format: Optional[str] = None                 # for scheme=bearer
 
 class PskSecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.psk]
+    scheme: Literal[SecuritySchemeEnum.psk] = SecuritySchemeEnum.psk
     identity: Optional[str] = None               # for scheme=psk
 
 class Oauth2SecurityScheme(BaseSecurityScheme):
-    scheme: SecuritySchemeEnum = Literal[SecuritySchemeEnum.oauth2]
+    scheme: Literal[SecuritySchemeEnum.oauth2] = SecuritySchemeEnum.oauth2
     authorization: Optional[AnyUri] = None       # for scheme=bearer,oauth2
     token: Optional[AnyUri] = None               # for schema=oauth2
     refresh: Optional[AnyUri] = None             # for scheme=oauth2

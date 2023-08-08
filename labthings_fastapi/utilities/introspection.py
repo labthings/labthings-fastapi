@@ -79,8 +79,6 @@ def input_model_from_signature(
         __config__ = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
         **fields
     )
-
-    print(f"Extracted model from function arguments:\nname: {model.__name__}\nfields:{model.__fields__}")
     return model
 
 
