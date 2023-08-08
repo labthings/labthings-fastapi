@@ -43,7 +43,10 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
 InvocationModel = GenericInvocationModel[Any, Any]
 
 class Invocation(Thread):
-    """A Thread subclass that retains output values and tracks progress"""
+    """A Thread subclass that retains output values and tracks progress
+    
+    TODO: In the future this should probably not be a Thread subclass, but might run in a thread anyway.
+    """
     def __init__(
         self,
         action: ActionDescriptor,
