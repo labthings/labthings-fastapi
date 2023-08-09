@@ -3,18 +3,13 @@ An experimental implementation of a LabThings server using fastapi.
 
 This is currently an incomplete implementation of the WoT specification, and will gradually grow as required to support the OpenFlexure server.
 
-## installation
+## Installation
 
-This is for my reference, until it's properly packaged:
+You can install this repository with `pip`, either clone it and run `pip install -e .[dev]` to work on it, or just `pip install https://gitlab.com/rwb27/labthings-fastapi.git`.
 
-```
-git clone git@github.com:rwb27/labthings-fastapi.git
-cd labthings-fastapi
-python --version
-python -m venv .venv --prompt="LabThings-FastAPI"
-source .venv/bin/activate # Windows: .venv/Scripts/activate
-pip install -e .
-```
+## Developer notes
+
+The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.0.1` yet so it's still subject to summary rearrangement.
 
 ## Demo
 
