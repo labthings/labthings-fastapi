@@ -24,7 +24,7 @@ from __future__ import annotations
 from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
 import logging
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.encoders import jsonable_encoder
 from typing import TYPE_CHECKING
@@ -51,15 +51,17 @@ async def process_messages_from_websocket(websocket: WebSocket, send_stream: Obj
     (or de-registering) for those properties.
     """
     while True:
-        data = await websocket.receive_json()
-        print(f"Got WebSocket message: {data}")
         try:
+            data = await websocket.receive_json()
+            print(f"Got WebSocket message: {data}")
             if data["messageType"] == "addPropertyObservation":
                 for k in data["data"].keys():
                     thing.observe_property(k, send_stream)
         except KeyError as e:
             logging.error(f"Got a bad websocket message: {data}, caused KeyError({e})")
-
+        except WebSocketDisconnect:
+            await send_stream.aclose()
+            return
 
 async def websocket_endpoint(thing: Thing, websocket: WebSocket):
     """Handle communication to a client via websocket"""

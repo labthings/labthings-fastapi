@@ -1,7 +1,6 @@
 from typing import Optional
 from labthings_fastapi.thing import Thing
 
-import logging
 import time
 from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
