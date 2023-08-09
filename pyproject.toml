@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=7.4.0, <8",
+  "pytest-cov",
   "mypy>=0.812",
   "ruff>=0.0.283",
   "types-jsonschema",
