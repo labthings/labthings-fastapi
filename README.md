@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/rwb27/labthings-fastapi/branch/main/graph/badge.svg?token=IR4QNA8X6M)](https://codecov.io/gh/rwb27/labthings-fastapi)
+
 # labthings-fastapi
 An experimental implementation of a LabThings server using fastapi.
 
