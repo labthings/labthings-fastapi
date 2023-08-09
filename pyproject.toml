@@ -23,6 +23,8 @@ dev = [
   "pytest>=7.4.0, <8",
   "mypy>=0.812",
   "ruff>=0.0.283",
+  "types-jsonschema",
+  "pydantic-mypy"
 ]
 
 [project.urls]
@@ -35,3 +37,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 target-version = "py39"
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]

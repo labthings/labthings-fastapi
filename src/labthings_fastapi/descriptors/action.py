@@ -3,9 +3,9 @@ Define an object to represent an Action, as a descriptor.
 """
 from __future__ import annotations
 from functools import partial
-from typing import TYPE_CHECKING, Annotated, Callable, Optional
-
+from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI
+from pydantic import BaseModel
 
 from ..actions import GenericInvocationModel
 from ..utilities.introspection import (
@@ -15,7 +15,7 @@ from ..utilities.introspection import (
     return_type,
 )
 from ..utilities.thing_description import type_to_dataschema
-from ..utilities.w3c_td_model import ActionAffordance, ActionOp, Form
+from ..utilities.w3c_td_model import ActionAffordance, ActionOp, Form, Union
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -56,12 +56,21 @@ class ActionDescriptor():
             func, remove_first_positional_arg=True,
         )
         self.output_model = return_type(func)
+        # TODO: figure out why I get name-defined errors here...
         self.invocation_model = GenericInvocationModel[
-            self.input_model, Optional[self.output_model]
+            self.input_model, Optional[self.output_model]  # type: ignore[name-defined]
         ]
         self.invocation_model.__name__ = f"{self.name}_invocation"
 
-    def __get__(self, obj, type=None) -> Callable:
+    @overload
+    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor:
+        ...
+    @overload
+    def __get__(self, obj: Thing, type=None) -> Callable:
+        ...
+    def __get__(
+            self, obj: Optional[Thing], type=None
+        ) -> Union[ActionDescriptor, Callable]:
         """The function, bound to an object as for a normal method.
         
         This currently doesn't validate the arguments, though it may do so
@@ -102,7 +111,8 @@ class ActionDescriptor():
         start_action.__annotations__["body"] = Annotated[self.input_model, Body()]
         app.post(
             thing.path + self.name,
-            response_model=GenericInvocationModel[self.input_model, type(None)],
+            # type: ignore[name-defined]
+            response_model=GenericInvocationModel[self.input_model, type(None)], 
             status_code=201,
             response_description="Action has been invoked (and may still be running).",
             description=f"## {self.title}\n\n {self.description} {ACTION_POST_NOTICE}",

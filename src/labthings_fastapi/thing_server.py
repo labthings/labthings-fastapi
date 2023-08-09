@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Optional
 from fastapi import FastAPI
 from .actions import ActionManager
 
@@ -7,14 +7,14 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 class ThingServer:
-    def __init__(self, app: FastAPI=None):
+    def __init__(self, app: Optional[FastAPI]=None):
         self.app = app or FastAPI()
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
         self._things: dict[str, Thing] = {}
 
     @property
-    def things(self) -> iter[Thing]:
+    def things(self) -> Iterable[Thing]:
         """Return a dictionary of all the things"""
         return self._things.values()
     

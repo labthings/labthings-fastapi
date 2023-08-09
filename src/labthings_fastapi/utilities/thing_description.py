@@ -1,9 +1,9 @@
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any, Optional, Union
 import json
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter, ValidationError, BaseModel
 from .w3c_td_model import DataSchema
 
 
@@ -116,14 +116,14 @@ def jsonschema_to_dataschema(
     # sub-dictionaries and dereference those if necessary. This could be done with a
     # comprehension, but I am prioritising readability over speed. This code is run when
     # generating the TD, not in time-critical situations.
-    rkwargs = {
+    rkwargs: dict[str, Any] = {
         "root_schema": root_schema,
         "recursion_depth": recursion_depth+1,
         "recursion_limit": recursion_limit,
     }
     output: JSONSchema = {}
     for k, v in d.items():
-        if isinstance(v, Mapping):
+        if isinstance(v, dict):
             # Any items that are Mappings (i.e. sub-dictionaries) must be recursed into
             output[k] = jsonschema_to_dataschema(v, **rkwargs)
         elif isinstance(v, Sequence) and len(v) > 0 and isinstance(v[0], Mapping):
@@ -135,7 +135,7 @@ def jsonschema_to_dataschema(
     return output
 
 
-def type_to_dataschema(t: type, **kwargs) -> DataSchema:
+def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
     """Convert a Python type to a Thing Description DataSchema
     
     This makes use of pydantic's `schema_of` function to create a
@@ -148,7 +148,11 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     is passed in. Typically you'll want to use this for the 
     `title` field.
     """
-    schema_dict = jsonschema_to_dataschema(TypeAdapter(t).json_schema())
+    if isinstance(t, BaseModel):
+        json_schema = t.model_json_schema()
+    else:
+        json_schema = TypeAdapter(t).json_schema()
+    schema_dict = jsonschema_to_dataschema(json_schema)
     # Definitions of referenced ($ref) schemas are put in a
     # key called "definitions" or "$defs" by pydantic. We should delete this.
     # TODO: find a cleaner way to do this

@@ -1,9 +1,9 @@
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 from weakref import WeakSet
 from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass
 
-def class_attributes(obj: Any) -> iter:
+def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]:
     """A list of all the attributes of an object's class"""
     cls = obj.__class__
     for name in dir(cls):

@@ -21,7 +21,7 @@ from pydantic.main import create_model
 
 
 def input_model_from_signature(
-        func: callable,
+        func: Callable,
         remove_first_positional_arg: bool=False,
     ) -> BaseModel:
     """Create a pydantic model for a function's signature.
@@ -77,10 +77,10 @@ def input_model_from_signature(
         # pydantic uses `...` to represent missing defaults (i.e. required params)
         default = ... if p.default is Parameter.empty else p.default
         fields[name] = (p_type, default)
-    model = create_model(
+    model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",
         __config__ = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
-        **fields
+        **fields,
     )
     return model
 
@@ -97,7 +97,7 @@ def return_type(func: Callable, name: Optional[str]=None) -> Type:
         return type_hints["return"]
 
 
-def get_docstring(obj: Any, remove_summary=False) -> str:
+def get_docstring(obj: Any, remove_summary=False) -> Optional[str]:
     """Return the docstring of an object
 
     If `remove_newlines` is `True` (default), newlines are removed from the string.
@@ -125,7 +125,7 @@ def get_docstring(obj: Any, remove_summary=False) -> str:
     return inspect.cleandoc(ds)  # Strip spurious indentation/newlines
 
 
-def get_summary(obj: Any) -> str:
+def get_summary(obj: Any) -> Optional[str]:
     """Return the first line of the dosctring of an object
 
     :param obj: Any Python object

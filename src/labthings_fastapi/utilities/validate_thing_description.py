@@ -1,8 +1,6 @@
 from importlib.resources import files
 import json
-
 import jsonschema
-
 from .. import utilities
 
 def validate_thing_description(thing_description: dict):

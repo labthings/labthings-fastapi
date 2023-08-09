@@ -2,27 +2,31 @@
 # the command
 # datamodel-codegen  --input person.json --input-file-type jsonschema --output model.py
 # I then manually simplified it a bit, mostly by deduplicating/using inheritance.
+# It's now been fairly extensively changed, to update to pydantic 2 and use generic models.
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
-
-from pydantic import AnyUrl, BaseModel, Field, conint, RootModel, ConfigDict
+from typing import (
+    Any, Annotated, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
+)
+from pydantic import (
+    AnyUrl, BaseModel, Field, ConfigDict, AfterValidator
+)
 
 class Version(BaseModel):
     instance: str
 
 
-AnyUri = RootModel[str]
-Description = RootModel[str]
-Descriptions = RootModel[Optional[Dict[str, str]]]
-Title = RootModel[str]
-Titles = RootModel[Optional[Dict[str, str]]]
-Security = RootModel[Union[List[str], str]]
-Scopes = RootModel[Union[List[str], str]]
-TypeDeclaration = RootModel[Union[str, List[str]]]
+AnyUri = str
+Description = str
+Descriptions = Optional[Dict[str, str]]
+Title = str
+Titles = Optional[Dict[str, str]]
+Security = Union[List[str], str]
+Scopes = Union[List[str], str]
+TypeDeclaration = Union[str, List[str]]
 
 
 class Subprotocol(Enum):
@@ -30,13 +34,32 @@ class Subprotocol(Enum):
     websub = 'websub'
     sse = 'sse'
 
-THING_CONTEXT_LITERAL = Literal['https://www.w3.org/2019/wot/td/v1']
-THING_CONTEXT_URL = THING_CONTEXT_LITERAL.__args__[0]
+THING_CONTEXT_URL = 'https://www.w3.org/2022/wot/td/v1.1'
+THING_CONTEXT_URL_v1 = 'https://www.w3.org/2019/wot/td/v1'
 
 
-class ThingContext(RootModel):
-    root: Union[List[Union[AnyUri, Dict[str, Any]]], THING_CONTEXT_LITERAL]
+ThingContextType = Union[
+    List[Union[AnyUri, Dict]],
+    AnyUri,
+]
 
+
+def uses_thing_context(v: ThingContextType):
+    if not isinstance(v, list):
+        assert v is THING_CONTEXT_URL
+    else:
+        assert (
+            v[0] == THING_CONTEXT_URL
+            or v[1] == THING_CONTEXT_URL and v[0] == THING_CONTEXT_URL_v1
+        )
+
+
+
+ThingContext = Annotated[
+    ThingContextType,
+    AfterValidator
+]
+    
 
 class Type(Enum):
     boolean = 'boolean'
@@ -67,8 +90,8 @@ class DataSchema(BaseModel):
     type: Optional[Type] = None
     # The fields below should be empty unless type==Type.array
     items: Optional[Union[DataSchema, List[DataSchema]]] = None
-    maxItems: Optional[conint(ge=0)] = None
-    minItems: Optional[conint(ge=0)] = None
+    maxItems: Optional[int] = Field(None, ge=0)
+    minItems: Optional[int] = Field(None, ge=0)
     # The fields below should be empty unless type==Type.number or Type.integer
     minimum: Optional[Union[int, float]] = None
     maximum: Optional[Union[int, float]] = None
@@ -219,7 +242,7 @@ class InteractionAffordance(BaseModel):
     descriptions: Optional[Descriptions] = None
     title: Optional[Title] = None
     titles: Optional[Titles] = None
-    forms: List[Form[Op]] = Field(..., min_length=1)
+    forms: List[Form] = Field(..., min_length=1)
     uriVariables: Optional[Dict[str, DataSchema]] = None
 
 
@@ -362,7 +385,7 @@ class WotTdSchema16October2019(BaseModel):
     security: Union[str, List[str]]
     field_type: Optional[TypeDeclaration] = Field(None, alias='@type')
     field_context: ThingContext = Field(
-        ThingContext(THING_CONTEXT_URL),
+        THING_CONTEXT_URL,
         alias='@context',
     )
 
