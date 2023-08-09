@@ -54,10 +54,9 @@ def uses_thing_context(v: ThingContextType):
         )
 
 
-
 ThingContext = Annotated[
     ThingContextType,
-    AfterValidator
+    AfterValidator(uses_thing_context),
 ]
     
 
