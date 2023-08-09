@@ -59,15 +59,15 @@ class MyThing(Thing):
             self.increment_counter()
 
     counter = PropertyDescriptor(
-        type=int, 
-        default=0, 
+        model=int, 
+        initial_value=0, 
         readonly=True, 
         description="A pointless counter"
     )
 
     foo = PropertyDescriptor(
-        type=str,
-        default="Example",
+        model=str,
+        initial_value="Example",
         description="A pointless string for demo purposes."
     )
 
