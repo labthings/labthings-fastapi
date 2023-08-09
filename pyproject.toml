@@ -18,6 +18,9 @@ dependencies = [
     "jsonschema",
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=7.4.0, <8"]
+
 [project.urls]
 "Homepage" = "https://github.com/rwb27/labthings-fastapi"
 "Bug Tracker" = "https://github.com/rwb27/labthings-fastapi/issues"
