@@ -2,7 +2,8 @@
 # the command
 # datamodel-codegen  --input person.json --input-file-type jsonschema --output model.py
 # I then manually simplified it a bit, mostly by deduplicating/using inheritance.
-# It's now been fairly extensively changed, to update to pydantic 2 and use generic models.
+# It's now been fairly extensively changed, to update to pydantic 2 and use generic 
+# models.
 
 from __future__ import annotations
 

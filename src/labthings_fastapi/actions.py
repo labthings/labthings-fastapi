@@ -78,7 +78,7 @@ class Invocation(Thread):
         self._start_time: Optional[datetime.datetime] = None  # Task start time
         self._end_time: Optional[datetime.datetime] = None  # Task end time
         self._exception: Optional[Exception] = None  # Propagate exceptions helpfully
-        self._log: deque = deque(maxlen=log_len)  # Will hold log entries for this thread
+        self._log: deque = deque(maxlen=log_len)  # log entries for this thread
 
     @property
     def id(self) -> uuid.UUID:
