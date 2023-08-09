@@ -152,7 +152,7 @@ class Invocation(Thread):
 
         action = self.action
         thing = self.thing
-        kwargs = self.input.dict() or {}
+        kwargs = self.input.model_dump() or {}
         assert action is not None
         assert thing is not None
 
