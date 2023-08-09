@@ -17,7 +17,8 @@ class MyThing(Thing):
         repeats: Annotated[
             int, 
             Field(description="The number of times to try the action")
-        ], 
+        ],
+        undocumented: int,
         title: Annotated[
             str, 
             Field(description="the title of the invocation")

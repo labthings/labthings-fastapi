@@ -16,7 +16,7 @@ from typing import (
 )
 import inspect
 from inspect import Parameter, signature
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.main import create_model
 
 
@@ -75,7 +75,7 @@ def input_model_from_signature(
         # not have entries for missing annotations.
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
         # pydantic uses `...` to represent missing defaults (i.e. required params)
-        default = ... if p.default is Parameter.empty else p.default
+        default = Field(...) if p.default is Parameter.empty else p.default
         fields[name] = (p_type, default)
     model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",

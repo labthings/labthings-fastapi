@@ -14,6 +14,7 @@ class MyThing(Thing):
             int, 
             Field(description="The number of times to try the action")
         ],  # no default = required parameter
+        undocumented: int,
         title: Annotated[
             str, 
             Field(description="the title of the invocation")
