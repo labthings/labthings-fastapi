@@ -40,3 +40,5 @@ jobs:
           flags: unittests
           name: codecov-umbrella-${{ matrix.python }}
           fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
