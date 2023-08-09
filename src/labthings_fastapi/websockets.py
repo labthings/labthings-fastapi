@@ -24,15 +24,16 @@ from __future__ import annotations
 from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .thing import Thing
 
-async def relay_notifications_to_websocket(websocket: WebSocket, receive_stream: ObjectReceiveStream):
+async def relay_notifications_to_websocket(
+        websocket: WebSocket, receive_stream: ObjectReceiveStream
+    ) -> None:
     """Relay objects from a stream to a websocket as JSON
     
     Interaction affordances (events, actions) that we've registered with will
@@ -44,7 +45,9 @@ async def relay_notifications_to_websocket(websocket: WebSocket, receive_stream:
             await websocket.send_json(jsonable_encoder(item))
 
 
-async def process_messages_from_websocket(websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing):
+async def process_messages_from_websocket(
+        websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
+    ) -> None:
     """Process messages received from a websocket
     
     Currently, this will allow us to observe properties, by registering
@@ -63,7 +66,7 @@ async def process_messages_from_websocket(websocket: WebSocket, send_stream: Obj
             await send_stream.aclose()
             return
 
-async def websocket_endpoint(thing: Thing, websocket: WebSocket):
+async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
     """Handle communication to a client via websocket"""
     await websocket.accept()
     send_stream, receive_stream = create_memory_object_stream()

@@ -1,16 +1,21 @@
-from __future__ import annotations
 """
 Define an object to represent an Action, as a descriptor.
 """
-from typing import TYPE_CHECKING, Any
-from fastapi import Body, FastAPI
-from typing import Optional, Callable, Annotated
-from ..utilities.introspection import input_model_from_signature, get_docstring, get_summary, return_type
-from ..utilities.thing_description import type_to_dataschema
-from ..utilities.w3c_td_model import ActionAffordance, DataSchema, Form, ActionOp
-from ..actions import GenericInvocationModel
+from __future__ import annotations
 from functools import partial
-import inspect
+from typing import TYPE_CHECKING, Annotated, Callable, Optional
+
+from fastapi import Body, FastAPI
+
+from ..actions import GenericInvocationModel
+from ..utilities.introspection import (
+    get_docstring,
+    get_summary,
+    input_model_from_signature,
+    return_type,
+)
+from ..utilities.thing_description import type_to_dataschema
+from ..utilities.w3c_td_model import ActionAffordance, ActionOp, Form
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -51,7 +56,6 @@ class ActionDescriptor():
             func, remove_first_positional_arg=True,
         )
         self.output_model = return_type(func)
-        print(f"Creating invocation model with input: {self.input_model}, output: {self.output_model}")
         self.invocation_model = GenericInvocationModel[
             self.input_model, Optional[self.output_model]
         ]
@@ -115,13 +119,17 @@ class ActionDescriptor():
             thing.path + self.name,
             response_model=list[self.invocation_model],
             response_description=f"A list of every invocation of {self.name}.",
-            description=f"List all the invocations of {self.name}.\n {ACTION_GET_DESCRIPTION}",
+            description=(
+                f"List all the invocations of {self.name}.\n {ACTION_GET_DESCRIPTION}"
+            ),
             summary=f"All invocations of {self.name}."
         )
         def list_invocations():
             return thing.action_manager.list_invocations(self, thing, as_responses=True)
 
-    def action_affordance(self, thing: Thing, path: Optional[str]=None) -> ActionAffordance:
+    def action_affordance(
+            self, thing: Thing, path: Optional[str]=None
+        ) -> ActionAffordance:
         """Represent the property in a Thing Description."""
         path = path or thing.path
         forms = [

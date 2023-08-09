@@ -1,11 +1,7 @@
-from typing import Optional
-from labthings_fastapi.thing import Thing
-
 import time
 from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.descriptors import PropertyDescriptor
 from pydantic import Field
 
@@ -14,21 +10,31 @@ class MyThing(Thing):
     @thing_action
     def anaction(
         self, 
-        repeats: Annotated[int, Field(description="The number of times to try the action")], 
-        title: Annotated[str, Field(description="the title of the invocation - not to be confused with the action!")] = "Untitled", 
-        attempts: Annotated[Optional[list[str]], Field(description="Names for each attempt - I suggest final, Final, FINAL, last-ditch.")] = None
+        repeats: Annotated[
+            int, 
+            Field(description="The number of times to try the action")
+        ],  # no default = required parameter
+        title: Annotated[
+            str, 
+            Field(description="the title of the invocation")
+        ] = "Untitled", 
+        attempts: Annotated[
+            Optional[list[str]], 
+            Field(description="Names for each attempt - I suggest final, Final, FINAL.")
+        ] = None
     ) -> dict[str, str]:
         """Quite a complicated action
         
-        This action has lots of parameters and is designed to confuse my schema generator. I hope
-        it doesn't!
+        This action has lots of parameters and is designed to confuse my schema 
+        generator. I hope it doesn't!
         
         I might even use some Markdown here:
         
         * If this renders, it supports lists
         * With at east two items.
         """
-        self.increment_counter() # We should be able to call actions as normal Python functions
+        # We should be able to call actions as normal Python functions
+        self.increment_counter()
         return "finished!!"
     
     @thing_action
@@ -48,10 +54,19 @@ class MyThing(Thing):
             time.sleep(1)
             self.increment_counter()
 
-    counter = PropertyDescriptor(int, 0, readonly=True, description="A pointless counter")
+    counter = PropertyDescriptor(
+        type=int, 
+        default=0, 
+        readonly=True, 
+        description="A pointless counter"
+    )
 
-    foo = PropertyDescriptor(str, "Example", description="A pointless string for demo purposes.")
- 
+    foo = PropertyDescriptor(
+        type=str,
+        default="Example",
+        description="A pointless string for demo purposes."
+    )
+
 
 def test_td_validates():
     """This will raise an exception if it doesn't validate OK"""

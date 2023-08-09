@@ -11,21 +11,13 @@ future).
 The aim at this stage (July 2023) is for a minimal working example that
 enables property changes to be fed via a websocket. Events proper should
 not be a big step thereafter.
+
+Currently, this code is more or less all in `websockets.py` and 
+`descriptors/property.py` but it should get consolidated.
 """
 
 
 from __future__ import annotations
-import datetime
-import logging
-import traceback
-from collections import deque
-from enum import Enum
-from threading import Event, Thread, Lock, get_ident
-from typing import Optional, Callable, Iterable, Any, TypeVar, Generic
-import uuid
-from typing import TYPE_CHECKING
-import weakref
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException, Request
 
 class Listener():
+    pass

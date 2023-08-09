@@ -5,12 +5,11 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, Mapping, Literal
 
-from pydantic import AnyUrl, BaseModel, Extra, Field, conint, root_validator, RootModel, ConfigDict
+from pydantic import AnyUrl, BaseModel, Field, conint, RootModel, ConfigDict
 
 class Version(BaseModel):
     instance: str
@@ -59,7 +58,9 @@ class DataSchema(BaseModel):
     readOnly: Optional[bool] = None
     oneOf: Optional[list[DataSchema]] = None
     unit: Optional[str] = None
-    enum: Optional[list] = None   # was: Field(None, min_length=1, unique_items=True) but this failed with generic models
+    enum: Optional[list] = None
+    # enum was `Field(None, min_length=1, unique_items=True)` but this failed with 
+    # generic models
     format: Optional[str] = None
     const: Optional[Any] = None
     default: Optional[Any] = None
@@ -289,7 +290,9 @@ class BaseSecurityScheme(BaseModel):
 
 class NoSecurityScheme(BaseSecurityScheme):
     scheme: Literal[SecuritySchemeEnum.nosec] = SecuritySchemeEnum.nosec
-    description: Optional[Description] = Description("No security")  # TODO: check if this needs a default factory
+    description: Optional[Description] = Field(
+        default_factory=lambda: Description("No security")
+    )
 
 
 class NameAndIn(BaseModel):
@@ -358,6 +361,9 @@ class WotTdSchema16October2019(BaseModel):
     modified: Optional[datetime] = None
     security: Union[str, List[str]]
     field_type: Optional[TypeDeclaration] = Field(None, alias='@type')
-    field_context: ThingContext = Field(ThingContext(THING_CONTEXT_URL), alias='@context')
+    field_context: ThingContext = Field(
+        ThingContext(THING_CONTEXT_URL),
+        alias='@context',
+    )
 
 ThingDescription = WotTdSchema16October2019

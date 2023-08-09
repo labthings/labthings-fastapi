@@ -5,7 +5,7 @@ import traceback
 from collections import deque
 from enum import Enum
 from threading import Event, Thread, Lock, get_ident
-from typing import Optional, Callable, Iterable, Any, TypeVar, Generic
+from typing import Optional, Any, TypeVar, Generic
 import uuid
 from typing import TYPE_CHECKING
 import weakref
@@ -45,7 +45,8 @@ InvocationModel = GenericInvocationModel[Any, Any]
 class Invocation(Thread):
     """A Thread subclass that retains output values and tracks progress
     
-    TODO: In the future this should probably not be a Thread subclass, but might run in a thread anyway.
+    TODO: In the future this should probably not be a Thread subclass, but might run in
+    a thread anyway.
     """
     def __init__(
         self,
@@ -70,14 +71,14 @@ class Invocation(Thread):
         self.default_stop_timeout: float = default_stop_timeout
 
         # Private state properties
-        self._status_lock = Lock() # This Lock should be acquired before using properties below
+        self._status_lock = Lock()  # This Lock protects properties below
         self._status: InvocationStatus = InvocationStatus.PENDING  # Task status
         self._return_value: Optional[Any] = None  # Return value
         self._request_time: datetime.datetime = datetime.datetime.now()
         self._start_time: Optional[datetime.datetime] = None  # Task start time
         self._end_time: Optional[datetime.datetime] = None  # Task end time
         self._exception: Optional[Exception] = None  # Propagate exceptions helpfully
-        self._log = deque(maxlen=log_len)  # The log will hold dictionary objects with log information
+        self._log = deque(maxlen=log_len)  # Will hold log entries for this thread
 
     @property
     def id(self) -> uuid.UUID:
@@ -151,7 +152,7 @@ class Invocation(Thread):
 
         action = self.action
         thing = self.thing
-        kwargs = self.input.dict() or {} # In the future, this may also support a single positional argument
+        kwargs = self.input.dict() or {}
         assert action is not None
         assert thing is not None
 
@@ -249,7 +250,9 @@ class ActionManager:
         with self._invocations_lock:
             self._invocations[invocation.id] = invocation
         
-    def invoke_action(self, action: ActionDescriptor, thing: Thing, input: Any) -> Invocation:
+    def invoke_action(
+            self, action: ActionDescriptor, thing: Thing, input: Any
+        ) -> Invocation:
         """Invoke an action, returning the thread where it's running"""
         thread = Invocation(action, thing, input)
         self.append_invocation(thread)

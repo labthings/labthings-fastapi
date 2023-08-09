@@ -2,8 +2,8 @@ from __future__ import annotations
 from labthings_fastapi.utilities.thing_description import type_to_dataschema
 
 import json
-from pydantic import BaseModel, schema_of
-from typing import Optional, Union
+from pydantic import BaseModel
+from typing import Optional
 from labthings_fastapi.utilities.w3c_td_model import DataSchema
 
 def ds_json_dict(ds: DataSchema) -> dict:

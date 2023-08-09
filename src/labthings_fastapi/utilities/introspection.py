@@ -12,7 +12,7 @@ from functions by analysing their signatures.
 
 from collections import OrderedDict
 from typing import (
-    Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, get_type_hints
+    Any, Callable, Dict, Optional, Tuple, Type, get_type_hints
 )
 import inspect
 from inspect import Parameter, signature
@@ -49,7 +49,7 @@ def input_model_from_signature(
     """
     parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
     if remove_first_positional_arg:
-        name, parameter = next(iter((parameters.items())))  # next(iter()) gets the first item
+        name, parameter = next(iter((parameters.items())))  # get the first parameter
         if parameter.kind in (Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD):
             raise ValueError("Can't remove first positional argument: there is none.")
         del parameters[name]
@@ -71,8 +71,11 @@ def input_model_from_signature(
     type_hints = get_type_hints(func, include_extras=True)
     fields: Dict[str, Tuple[type, Any]] = {}
     for name, p in parameters.items():
+        # `type_hints` does more processing than p.annotation - but will
+        # not have entries for missing annotations.
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
-        default = ... if p.default is Parameter.empty else p.default  # convert Parameter.empty to `...`
+        # pydantic uses `...` to represent missing defaults (i.e. required params)
+        default = ... if p.default is Parameter.empty else p.default
         fields[name] = (p_type, default)
     model = create_model(
         f"{func.__name__}_input",

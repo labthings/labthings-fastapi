@@ -1,7 +1,7 @@
-from __future__ import annotations
 """
 Define an object to represent an Action, as a descriptor.
 """
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 from fastapi import Body, FastAPI
 from typing import Annotated
@@ -116,7 +116,9 @@ class PropertyDescriptor():
         def get_property():
             return self.__get__(thing)
 
-    def property_affordance(self, thing: Thing, path: Optional[str]=None) -> PropertyAffordance:
+    def property_affordance(
+            self, thing: Thing, path: Optional[str]=None
+        ) -> PropertyAffordance:
         """Represent the property in a Thing Description."""
         path = path or thing.path
         ops = [PropertyOp.readproperty]
@@ -134,8 +136,14 @@ class PropertyDescriptor():
             forms = forms,
             description = self.description,
         )
-        # We merge the data schema with the property affordance (which subclasses the DataSchema model)
-        # with the affordance second so its values take priority.
-        # Note that this works because all of the fields that get filled in by DataSchema are
-        # optional - so the PropertyAffordance is still valid without them.
-        return PropertyAffordance(**{**data_schema.model_dump(exclude_none=True), **pa.model_dump(exclude_none=True)})
+        # We merge the data schema with the property affordance (which subclasses the
+        # DataSchema model) with the affordance second so its values take priority.
+        # Note that this works because all of the fields that get filled in by
+        # DataSchema are optional - so the PropertyAffordance is still valid without
+        # them.
+        return PropertyAffordance(
+            **{
+                **data_schema.model_dump(exclude_none=True), 
+                **pa.model_dump(exclude_none=True)
+            }
+        )

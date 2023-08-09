@@ -29,7 +29,8 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
     """
     if not reference.startswith("#/"):
         raise NotImplementedError(
-            "Built-in resolver can only dereference internal JSON references (i.e. starting with #)."
+            "Built-in resolver can only dereference internal JSON references "
+            "(i.e. starting with #)."
         )
     try:
         resolved: JSONSchema = d
@@ -37,7 +38,10 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
             resolved = resolved[key]
         return resolved
     except KeyError as ke:
-        raise KeyError(f"The JSON reference {reference} was not found in the schema (original error {ke}).")
+        raise KeyError(
+            f"The JSON reference {reference} was not found in the schema "
+            f"(original error {ke})."
+        )
     
 def is_an_object(d: JSONSchema) -> bool:
     """Determine whether a JSON schema dict is an object"""
@@ -59,7 +63,7 @@ def convert_anyof(d: JSONSchema) -> JSONSchema:
     """Convert the anyof key to oneof"""
     #TODO this isn't technically JSONSchema output - oneof is not allowed...
     #TODO probably don't need to copy this...
-    if not "anyOf" in d:
+    if "anyOf" not in d:
         return d
     out: JSONSchema = d.copy()
     out["oneOf"] = out["anyOf"]
@@ -71,7 +75,8 @@ def check_recursion(depth: int, limit: int):
     """Check the recursion count is less than the limit"""
     if depth > limit:
         raise ValueError(
-            f"Recursion depth of {limit} exceeded - perhaps there is a circular reference?"
+            f"Recursion depth of {limit} exceeded - perhaps there is a circular "
+            "reference?"
         )
 
 
@@ -107,10 +112,10 @@ def jsonschema_to_dataschema(
         d = convert_object(d)
     d = convert_anyof(d)
 
-    # After checking the object isn't a reference, we now recursively check sub-dictionaries
-    # and dereference those if necessary. This could be done with a comprehension, but I
-    # am prioritising readability over speed. This code is run when generating the TD, not
-    # in time-critical situations.
+    # After checking the object isn't a reference, we now recursively check 
+    # sub-dictionaries and dereference those if necessary. This could be done with a
+    # comprehension, but I am prioritising readability over speed. This code is run when
+    # generating the TD, not in time-critical situations.
     rkwargs = {
         "root_schema": root_schema,
         "recursion_depth": recursion_depth+1,

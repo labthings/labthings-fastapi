@@ -35,7 +35,6 @@ not supported at this time.
 
 from functools import wraps, partial
 from typing import Optional, Callable
-from ..utilities.introspection import input_model_from_signature
 from ..descriptors import ActionDescriptor
 
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
