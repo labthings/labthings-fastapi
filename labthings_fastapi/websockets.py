@@ -24,10 +24,13 @@ from __future__ import annotations
 from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
 import logging
-from fastapi import APIRouter, FastAPI, WebSocket
+from fastapi import APIRouter, WebSocket
+from fastapi.responses import HTMLResponse
 from fastapi.encoders import jsonable_encoder
+from typing import TYPE_CHECKING
 
-from .thing import Thing
+if TYPE_CHECKING:
+    from .thing import Thing
 
 async def relay_notifications_to_websocket(websocket: WebSocket, receive_stream: ObjectReceiveStream):
     """Relay objects from a stream to a websocket as JSON
@@ -49,6 +52,7 @@ async def process_messages_from_websocket(websocket: WebSocket, send_stream: Obj
     """
     while True:
         data = await websocket.receive_json()
+        print(f"Got WebSocket message: {data}")
         try:
             if data["messageType"] == "addPropertyObservation":
                 for k in data["data"].keys():

@@ -12,11 +12,13 @@ import logging
 import json
 from typing import TYPE_CHECKING, Optional
 from fastapi.encoders import jsonable_encoder
+from anyio.abc import ObjectSendStream
 from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .utilities.validate_thing_description import validate_thing_description as utils_validate_td
 from .utilities.introspection import get_summary, get_docstring
+from .websockets import websocket_endpoint, WebSocket
 
 if TYPE_CHECKING:
     from .thing_server import ThingServer
@@ -45,6 +47,10 @@ class Thing:
             )
         def thing_description():
             return self.thing_description_dict()
+        
+        @server.app.websocket(self.path + "ws")
+        async def websocket(ws: WebSocket):
+            await websocket_endpoint(self, ws)
 
 
     def validate_thing_description(self):
@@ -93,4 +99,9 @@ class Thing:
         td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
 
-        
+    def observe_property(self, property_name: str, stream: ObjectSendStream):
+        """Register a stream to receive property change notifications"""
+        prop = getattr(self.__class__, property_name)
+        if not isinstance(prop, PropertyDescriptor):
+            raise KeyError(f"{property_name} is not a LabThings Property")
+        prop._observers_set(self).add(stream)

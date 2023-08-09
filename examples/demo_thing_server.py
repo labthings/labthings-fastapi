@@ -6,6 +6,7 @@ from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.descriptors import PropertyDescriptor
 from pydantic import Field
+from fastapi.responses import HTMLResponse
 
 logging.basicConfig(level=logging.INFO)
 
@@ -58,3 +59,47 @@ print(my_thing.validate_thing_description())
 thing_server.add_thing(my_thing, "/my_thing")
 
 app = thing_server.app
+
+
+
+html = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Chat</title>
+    </head>
+    <body>
+        <h1>WebSocket Chat</h1>
+        <form action="" onsubmit="sendMessage(event)">
+            <input type="text" id="messageText" autocomplete="off"/>
+            <button>Send</button>
+        </form>
+        <ul id='messages'>
+        </ul>
+        <script>
+            var ws = new WebSocket("ws://localhost:8000/my_thing/ws");
+            ws.onmessage = function(event) {
+                var messages = document.getElementById('messages')
+                var message = document.createElement('li')
+                var content = document.createTextNode(event.data)
+                message.appendChild(content)
+                messages.appendChild(message)
+            };
+            function sendMessage(event) {
+                var input = document.getElementById("messageText")
+                ws.send(input.value)
+                input.value = ''
+                event.preventDefault()
+            }
+        </script>
+    </body>
+</html>
+"""
+
+"""
+{"messageType":"addPropertyObservation","data":{"foo":true}}
+"""
+
+@app.get("/wsclient", tags=["websockets"])
+async def get():
+    return HTMLResponse(html)
