@@ -24,6 +24,9 @@ jobs:
       - name: Install Dependencies
         run: pip install -e .[dev]
 
+      - name: List directory
+        run: ls -la
+        
       - name: Lint with Ruff
         run: ruff --format=github check .
 
