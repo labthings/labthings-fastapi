@@ -24,7 +24,6 @@ dev = [
   "mypy>=0.812",
   "ruff>=0.0.283",
   "types-jsonschema",
-  "pydantic-mypy"
 ]
 
 [project.urls]
