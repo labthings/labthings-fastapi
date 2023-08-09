@@ -8,18 +8,22 @@ description = "A test implementation of LabThings using FastAPI"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
-    "fastapi[all]>=0.101.0",
-    "pydantic>=2.0.0",
-    "jsonschema",
+  "fastapi[all]>=0.101.0",
+  "pydantic>=2.0.0",
+  "jsonschema",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.4.0, <8"]
+dev = [
+  "pytest>=7.4.0, <8",
+  "mypy>=0.812",
+  "ruff>=0.0.283",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/rwb27/labthings-fastapi"
@@ -29,3 +33,5 @@ test = ["pytest>=7.4.0, <8"]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.ruff]
+target-version = "py39"

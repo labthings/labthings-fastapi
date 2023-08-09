@@ -16,9 +16,6 @@ source .venv/bin/activate # Windows: .venv/Scripts/activate
 pip install -e .
 ```
 
-## demo
-To run the demo, try:
-```
-cd examples
-uvicorn demo_thing_server:thing_server.app --reload --reload-dir=..
-```
+## Demo
+
+See the [examples folder](./examples/) for a runnable demo.
