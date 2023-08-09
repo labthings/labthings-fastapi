@@ -5,9 +5,8 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI
-from pydantic import BaseModel
-
-from ..actions import GenericInvocationModel
+from pydantic import create_model
+from ..actions import InvocationModel
 from ..utilities.introspection import (
     get_docstring,
     get_summary,
@@ -56,10 +55,12 @@ class ActionDescriptor():
             func, remove_first_positional_arg=True,
         )
         self.output_model = return_type(func)
-        # TODO: figure out why I get name-defined errors here...
-        self.invocation_model = GenericInvocationModel[
-            self.input_model, Optional[self.output_model]  # type: ignore[name-defined]
-        ]
+        self.invocation_model = create_model(
+            f"{self.name}_invocation",
+            __base__=InvocationModel,
+            input=(self.input_model, ...),
+            output=(Optional[self.output_model], None),
+        )
         self.invocation_model.__name__ = f"{self.name}_invocation"
 
     @overload
@@ -111,8 +112,7 @@ class ActionDescriptor():
         start_action.__annotations__["body"] = Annotated[self.input_model, Body()]
         app.post(
             thing.path + self.name,
-            # type: ignore[name-defined]
-            response_model=GenericInvocationModel[self.input_model, type(None)], 
+            response_model=self.invocation_model, 
             status_code=201,
             response_description="Action has been invoked (and may still be running).",
             description=f"## {self.title}\n\n {self.description} {ACTION_POST_NOTICE}",
@@ -124,10 +124,11 @@ class ActionDescriptor():
                 }
             }
         )(start_action)
-        
         @app.get(
             thing.path + self.name,
-            response_model=list[self.invocation_model],
+            response_model=list[self.invocation_model],  # type: ignore
+                # MyPy doesn't like the line above - but it works for FastAPI
+                # to generate a response model.
             response_description=f"A list of every invocation of {self.name}.",
             description=(
                 f"List all the invocations of {self.name}.\n {ACTION_GET_DESCRIPTION}"
