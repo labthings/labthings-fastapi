@@ -19,11 +19,11 @@ class FileManager:
     """Manage files created by Actions"""
     def __init__(self, invocation_id: UUID):
         self.invocation_id = invocation_id
-        self._links = {}
+        self._links: set[tuple[str, str]] = set()
         self._dir = TemporaryDirectory(prefix=f"labthings-{self.invocation_id}-")
 
     @property
-    def directory(self) -> TemporaryDirectory:
+    def directory(self) -> str:
         """Return the temporary directory for this invocation"""
         return self._dir.name
     
@@ -34,7 +34,7 @@ class FileManager:
     
     def add_link(self, rel: str, filename: str) -> None:
         """Make a file show up in the links of the Invocation"""
-        self._links[rel] = filename
+        self._links.add((rel, filename))
 
     def path(self, filename: str, rel: Optional[str]=None) -> str:
         """Return the path to a file"""
@@ -45,6 +45,6 @@ class FileManager:
     def links(self, prefix: str) -> Sequence[LinkElement]:
         """Generate links to the files managed by this FileManager"""
         links = [LinkElement(rel="files", href=prefix + "/files")]
-        for rel, filename in self._links.items():
+        for rel, filename in self._links:
             links.append(LinkElement(rel=rel, href=prefix + "/files/" + filename))
         return links

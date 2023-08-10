@@ -33,7 +33,7 @@ not supported at this time.
 """
 
 from functools import wraps, partial
-from typing import Optional, Callable, TypeVar, Any
+from typing import Optional, Callable
 from ..descriptors import ActionDescriptor, PropertyDescriptor
 from ..utilities.introspection import return_type
 
@@ -62,7 +62,7 @@ def thing_action(func: Optional[Callable]=None, **kwargs):
         return partial(mark_thing_action, **kwargs)
 
 
-def thing_property(func: Callable=None) -> PropertyDescriptor:
+def thing_property(func: Callable) -> PropertyDescriptor:
     """Mark a method of a Thing as a Property
     
     We replace the function with a `Descriptor` that's a

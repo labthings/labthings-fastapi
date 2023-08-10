@@ -14,7 +14,7 @@ class TestThing(Thing):
     
     _float = 1.0
     @thing_property
-    def floatprop(self):
+    def floatprop(self) -> float:
         return self._float
     @floatprop.setter
     def floatprop(self, value: float):

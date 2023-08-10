@@ -3,7 +3,7 @@ Define an object to represent an Action, as a descriptor.
 """
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Self, Union
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, create_model
 from fastapi import Body, FastAPI
 from anyio import from_thread
 from anyio.abc import ObjectSendStream
@@ -41,9 +41,13 @@ class PropertyDescriptor():
         if model is None:
             raise ValueError("LabThings Properties must have a type")
         if not isinstance(model, BaseModel):
-            print("Converting return type {model} to Pydantic TypeAdapter")
-            model = RootModel[model]
-        self.model = model
+            self.model = model
+        else:
+            self.model = create_model(
+                f"{model!r}", 
+                root=(model, ...), 
+                __base__=RootModel
+            )
         self.readonly = readonly
         self.observable = observable
         self.initial_value = initial_value
@@ -54,7 +58,6 @@ class PropertyDescriptor():
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
         self._observers: WeakSet[ObjectSendStream] = WeakSet()
-        print(f"created property with model {self.model}, fields {self.model.model_fields}")
 
     def __set_name__(self, owner, name: str):
         self._name = name
@@ -152,7 +155,7 @@ class PropertyDescriptor():
             description=f"## {self.title}\n\n{self.description or ''}"
         )
         def get_property():
-            return self.model(self.__get__(thing))
+            return self.__get__(thing)
 
     def property_affordance(
             self, thing: Thing, path: Optional[str]=None

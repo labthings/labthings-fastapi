@@ -57,7 +57,7 @@ class ActionDescriptor():
         self.input_model = input_model_from_signature(
             func, 
             remove_first_positional_arg=True, 
-            ignore=self.dependencies.keys()
+            ignore=list(self.dependencies.keys())
         )
         self.output_model = return_type(func)
         self.invocation_model = create_model(

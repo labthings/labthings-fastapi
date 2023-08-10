@@ -76,7 +76,7 @@ class Invocation(Thread):
 
         # Provide file management, if needed
         if FileManager in (type_ for type_, _f in self.action.dependencies.values()):
-            self._file_manager = FileManager(self.id)
+            self._file_manager: Optional[FileManager] = FileManager(self.id)
         else:
             self._file_manager = None
 

@@ -1,12 +1,9 @@
 import logging
-import time
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
-from labthings_fastapi.descriptors import PropertyDescriptor
 from labthings_fastapi.file_manager import FileManager
 from threading import RLock
-import numpy as np
 import cv2 as cv
 
 logging.basicConfig(level=logging.INFO)

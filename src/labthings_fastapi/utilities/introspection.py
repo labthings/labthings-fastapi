@@ -107,7 +107,7 @@ def return_type(func: Callable) -> Type:
     """Determine the return type of a function."""
     sig = inspect.signature(func)
     if sig.return_annotation == inspect.Signature.empty:
-        return Any
+        return Any  # type: ignore[return-value]
     else:
         # We use `get_type_hints` rather than just `sig.return_annotation`
         # because it resolves forward references, etc.
