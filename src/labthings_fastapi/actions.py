@@ -10,7 +10,10 @@ import uuid
 from typing import TYPE_CHECKING
 import weakref
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from .utilities.w3c_td_model import Links, LinkElement
+from .file_manager import FileManager
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -39,6 +42,7 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     timeCompleted: Optional[datetime.datetime]
     input: InputT
     output: OutputT
+    links: Links = None
 
 InvocationModel = GenericInvocationModel[Any, Any]
 
@@ -69,6 +73,12 @@ class Invocation(Thread):
         # Event to track if the user has requested stop
         self.stopping: Event = Event()
         self.default_stop_timeout: float = default_stop_timeout
+
+        # Provide file management, if needed
+        if FileManager in (type_ for type_, _f in self.action.dependencies.values()):
+            self._file_manager = FileManager(self.id)
+        else:
+            self._file_manager = None
 
         # Private state properties
         self._status_lock = Lock()  # This Lock protects properties below
@@ -132,7 +142,13 @@ class Invocation(Thread):
             href = str(request.url_for("action_invocation", id=self.id))
         else:
             href = f"{ACTION_INVOCATIONS_PATH}/{self.id}"
-        return InvocationModel(
+        links = [
+            LinkElement(rel="self", href=href),
+            LinkElement(rel="output", href=href + "/output"),
+        ]
+        if self._file_manager:
+            links += self._file_manager.links(href)
+        return self.action.invocation_model(
             status=self.status,
             id=self.id,
             action=self.thing.path + self.action.name,
@@ -141,7 +157,8 @@ class Invocation(Thread):
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
             input=self.input,
-            output=self.output
+            output=self.output,
+            links=links
         )
 
     def run(self):
@@ -155,6 +172,10 @@ class Invocation(Thread):
         kwargs = self.input.model_dump() or {}
         assert action is not None
         assert thing is not None
+        dependencies = {}
+        for k, (type_, _f) in self.action.dependencies.items():
+            if type_ == FileManager:
+                dependencies[k] = self._file_manager
 
         with self._status_lock:
             self._status = InvocationStatus.RUNNING
@@ -162,8 +183,8 @@ class Invocation(Thread):
 
         try:
             # The next line actually runs the action.
-            logging.info(f"Running action with kwargs: {kwargs}")
-            ret = action.__get__(thing)(**kwargs)
+            logging.info(f"Running action with kwargs: {kwargs}, dep=s: {dependencies}")
+            ret = action.__get__(thing)(**kwargs, **dependencies)
 
             with self._status_lock:
                 self._return_value = ret
@@ -291,4 +312,72 @@ class ActionManager:
                     status_code=404,
                     detail="No action invocation found with ID {id}",
                 )
+        @app.get(
+            ACTION_INVOCATIONS_PATH + "/{id}/output", 
+            response_model=Any,
+            responses={
+                404: {"description": "Invocation ID not found"},
+                503: {"description": "No result is available for this invocation"},
+            }
+        )
+        def action_invocation_result(id: uuid.UUID):
+            with self._invocations_lock:
+                try:
+                    invocation: Any = self._invocations[id]
+                except KeyError:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="No action invocation found with ID {id}",
+                    )
+                if not invocation.output:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="No result is available for this invocation",
+                    )
+                return invocation.output
+        @app.get(
+            ACTION_INVOCATIONS_PATH + "/{id}/files",
+            responses={
+                404: {"description": "Invocation ID not found"},
+                503: {"description": "No files are available for this invocation"},
+            }
+        )
+        def action_invocation_files(id: uuid.UUID) -> list[str]:
+            with self._invocations_lock:
+                try:
+                    invocation: Any = self._invocations[id]
+                except KeyError:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="No action invocation found with ID {id}",
+                    )
+                if not invocation._file_manager:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="No files are available for this invocation",
+                    )
+                return invocation._file_manager.filenames
+        @app.get(
+            ACTION_INVOCATIONS_PATH + "/{id}/files/{filename}", 
+            response_class=FileResponse,
+            responses={
+                404: {"description": "Invocation ID not found, or file not found"},
+                503: {"description": "No files are available for this invocation"},
+            }
+        )
+        def action_invocation_file(id: uuid.UUID, filename: str):
+            with self._invocations_lock:
+                try:
+                    invocation: Any = self._invocations[id]
+                except KeyError:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="No action invocation found with ID {id}",
+                    )
+                if not invocation._file_manager:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="No files are available for this invocation",
+                    )
+                return FileResponse(invocation._file_manager.path(filename))
         

@@ -36,7 +36,20 @@ class MyThing(Thing):
         """
         # We should be able to call actions as normal Python functions
         self.increment_counter()
-        return "finished!!"
+        return {"end_result": "finished!!"}
+    
+    @thing_action
+    def make_a_dict(
+        self, 
+        extra_key: Optional[str] = None,
+        extra_value: Optional[str] = None,
+    ) -> dict[str, str]:
+        """An action that returns a dict
+        """
+        out = {"key": "value"}
+        if extra_key is not None:
+            out[extra_key] = extra_value
+        return out
     
     @thing_action
     def increment_counter(self):

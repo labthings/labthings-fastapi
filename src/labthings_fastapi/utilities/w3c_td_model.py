@@ -277,6 +277,9 @@ class LinkElement(BaseModel):
     anchor: Optional[AnyUri] = None
 
 
+Links = Optional[List[LinkElement]]
+
+
 class SecuritySchemeEnum(Enum):
     nosec = 'nosec'    # was Scheme
     basic = 'basic'    # was Scheme1
@@ -375,7 +378,7 @@ class WotTdSchema16October2019(BaseModel):
     description: Optional[Description] = None
     descriptions: Optional[Descriptions] = None
     version: Optional[Version] = None
-    links: Optional[List[LinkElement]] = None
+    links: Links = None
     forms: Optional[List[Form[RootOp]]] = Field(None, min_length=1)
     base: Optional[AnyUri] = None
     securityDefinitions: Dict[str, SecurityScheme]

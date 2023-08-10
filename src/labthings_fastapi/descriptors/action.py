@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overlo
 from fastapi import Body, FastAPI
 from pydantic import create_model
 from ..actions import InvocationModel
+from ..file_manager import FileManager
 from ..utilities.introspection import (
     get_docstring,
     get_summary,
     input_model_from_signature,
     return_type,
+    function_dependencies,
 )
 from ..utilities.thing_description import type_to_dataschema
 from ..utilities.w3c_td_model import ActionAffordance, ActionOp, Form, Union
@@ -51,8 +53,11 @@ class ActionDescriptor():
     ):
         self.func = func
         self.response_timeout = response_timeout
+        self.dependencies = function_dependencies(func, [FileManager])
         self.input_model = input_model_from_signature(
-            func, remove_first_positional_arg=True,
+            func, 
+            remove_first_positional_arg=True, 
+            ignore=self.dependencies.keys()
         )
         self.output_model = return_type(func)
         self.invocation_model = create_model(
@@ -83,6 +88,9 @@ class ActionDescriptor():
         """
         if obj is None:
             return self
+        # TODO: do we attempt dependency injection here? I think not.
+        # If we want dependency injection, we should be calling the action
+        # via some sort of client object.
         return partial(self.func, obj)
     
     @property
@@ -121,7 +129,7 @@ class ActionDescriptor():
                 200: {
                     "description": "Action completed.",
                     "model": self.invocation_model,
-                }
+                },
             }
         )(start_action)
         @app.get(

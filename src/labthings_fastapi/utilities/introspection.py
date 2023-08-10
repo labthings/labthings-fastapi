@@ -12,7 +12,7 @@ from functions by analysing their signatures.
 
 from collections import OrderedDict
 from typing import (
-    Any, Callable, Dict, Optional, Tuple, Type, get_type_hints
+    Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
 )
 import inspect
 from inspect import Parameter, signature
@@ -23,6 +23,7 @@ from pydantic.main import create_model
 def input_model_from_signature(
         func: Callable,
         remove_first_positional_arg: bool=False,
+        ignore: Optional[Sequence[str]]=None,
     ) -> BaseModel:
     """Create a pydantic model for a function's signature.
     
@@ -40,11 +41,9 @@ def input_model_from_signature(
       model (this is appropriate for methods, as the first argument, 
       self, is baked in when it's called, but is present in the 
       signature).
+    * `ignore` will ignore arguments that have the specified name.
+      This is useful for e.g. dependencies that are injected by LabThings.
 
-    TODO: stop relying on ValidatedFunction.model and build it directly.
-    This isn't actually much code: ValidatedFunction is mostly concerned
-    with replicating the exact Python arguments, and we don't care (we
-    only want to allow keyword arguments anyway).
     TODO: deal with (or exclude) functions with a single positional parameter
     """
     parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
@@ -71,6 +70,8 @@ def input_model_from_signature(
     type_hints = get_type_hints(func, include_extras=True)
     fields: Dict[str, Tuple[type, Any]] = {}
     for name, p in parameters.items():
+        if ignore and name in ignore:
+            continue
         # `type_hints` does more processing than p.annotation - but will
         # not have entries for missing annotations.
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
@@ -83,6 +84,23 @@ def input_model_from_signature(
         **fields,
     )
     return model
+
+
+def function_dependencies(
+        func: Callable, dependency_types: Sequence[Type]
+    ) -> Dict[str, tuple[type, type]]:
+    """Determine whether a function's arguments require dependencies
+    
+    The return value maps argument names to a tuple of (type, full_type)
+    where `full_type` is the annotation without simplification, i.e.
+    it will include the contents of any Annotated objects.
+    """
+    type_hints = get_type_hints(func, include_extras=False)
+    full_type_hints = get_type_hints(func, include_extras=True)
+    return {
+        name: (type_, full_type_hints[name]) for name, type_ in type_hints.items()
+        if type_ in dependency_types
+    }
 
 
 def return_type(func: Callable, name: Optional[str]=None) -> Type:
