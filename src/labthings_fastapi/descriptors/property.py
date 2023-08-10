@@ -110,10 +110,24 @@ class PropertyDescriptor():
 
 
     def emit_changed_event(self, obj, value):
+        try:
+            from_thread.run(self.emit_changed_event_async, obj, value)
+        except RuntimeError:
+            if obj._labthings_blocking_portal is not None:
+                obj._labthings_blocking_portal.start_task_soon(
+                    self.emit_changed_event_async,
+                    obj,
+                    value,
+                )
+            else:
+                raise RuntimeError(
+                    "We can't emit events without a blocking portal"
+                )
+
+    async def emit_changed_event_async(self, obj, value):
         """Notify subscribers that the property has changed"""
         for observer in self._observers_set(obj):
-            from_thread.run(
-                observer.send,
+            observer.send(
                 {
                     "messageType": "propertyStatus",
                     "data": {

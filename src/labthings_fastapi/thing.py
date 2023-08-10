@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from fastapi.encoders import jsonable_encoder
 from anyio.abc import ObjectSendStream
+from anyio.from_thread import BlockingPortal
 from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from .actions import ActionManager
 class Thing:
     title: str
+    _labthings_blocking_portal: Optional[BlockingPortal] = None
 
     def attach_to_server(self, server: ThingServer, path: str):
         """Add HTTP handlers to an app for all Interaction Affordances"""
