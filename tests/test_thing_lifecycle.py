@@ -1,10 +1,7 @@
 from labthings_fastapi.descriptors import PropertyDescriptor
 from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.file_manager import FileManager
 from fastapi.testclient import TestClient
 from labthings_fastapi.thing_server import ThingServer
-from temp_client import poll_task, get_link
 
 class TestThing(Thing):
     alive = PropertyDescriptor(bool, False, description="Is the thing alive?")
