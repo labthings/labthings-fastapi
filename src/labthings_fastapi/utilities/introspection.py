@@ -103,14 +103,14 @@ def function_dependencies(
     }
 
 
-def return_type(func: Callable, name: Optional[str]=None) -> Type:
+def return_type(func: Callable) -> Type:
     """Determine the return type of a function."""
     sig = inspect.signature(func)
     if sig.return_annotation == inspect.Signature.empty:
-        return type(None)
+        return Any
     else:
         # We use `get_type_hints` rather than just `sig.return_annotation`
-        # because it resolves forward references, removes annotations, etc.
+        # because it resolves forward references, etc.
         type_hints = get_type_hints(func, include_extras=True)
         return type_hints["return"]
 

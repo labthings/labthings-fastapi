@@ -2,9 +2,9 @@
 Define an object to represent an Action, as a descriptor.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Self, Union
+from pydantic import BaseModel, RootModel
 from fastapi import Body, FastAPI
-from typing import Annotated
 from anyio import from_thread
 from anyio.abc import ObjectSendStream
 from weakref import WeakSet
@@ -12,8 +12,10 @@ from ..utilities import labthings_data
 from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..utilities.thing_description import type_to_dataschema
 
+
 if TYPE_CHECKING:
     from ..thing import Thing
+
 
 class PropertyDescriptor():
     """A property that can be accessed via the HTTP API
@@ -25,20 +27,34 @@ class PropertyDescriptor():
     readonly: bool = False
     def __init__(
             self, 
-            model: type, 
+            model: Union[BaseModel, type], 
             initial_value: Any = None,
             readonly: bool = False,
+            observable: bool = False,
             description: Optional[str] = None,
             title: Optional[str] = None,
+            getter: Optional[Callable] = None,
+            setter: Optional[Callable] = None,
         ):
+        if getter and initial_value is not None:
+            raise ValueError("getter and an initial value are mutually exclusive.")
+        if model is None:
+            raise ValueError("LabThings Properties must have a type")
+        if not isinstance(model, BaseModel):
+            print("Converting return type {model} to Pydantic TypeAdapter")
+            model = RootModel[model]
         self.model = model
         self.readonly = readonly
+        self.observable = observable
         self.initial_value = initial_value
         self.description = description
         self.title = title
+        self._setter = setter
+        self._getter = getter
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
         self._observers: WeakSet[ObjectSendStream] = WeakSet()
+        print(f"created property with model {self.model}, fields {self.model.model_fields}")
 
     def __set_name__(self, owner, name: str):
         self._name = name
@@ -50,14 +66,34 @@ class PropertyDescriptor():
 
         If `obj` is none (i.e. we are getting the attribute of the class), 
         we return the descriptor.
+
+        If no getter is set, we'll return either the initial value, or the value
+        from the object's __dict__, i.e. we behave like a variable.
+
+        If a getter is set, we will use it, unless the property is observable, at
+        which point the getter is only ever used once, to set the initial value.
         """
         if obj is None:
             return self
-        return obj.__dict__.get(self.name, self.initial_value)
+        try:
+            if self._getter and not self.observable:
+                # if there's a getter and the property isn't observable, use it
+                return self._getter(obj)
+            # otherwise, behave like a variable and return our value
+            return obj.__dict__[self.name]
+        except KeyError:
+            if self._getter:
+                # if we get to here, the property should be observable, so cache
+                obj.__dict__[self.name] = self._getter(obj)
+                return obj.__dict__[self.name]
+            else:
+                return self.initial_value
     
     def __set__(self, obj, value):
         """Set the property's value"""
         obj.__dict__[self.name] = value
+        if self._setter:
+            self._setter(obj, value)
         self.emit_changed_event(obj, value)
 
 
@@ -96,6 +132,8 @@ class PropertyDescriptor():
         # the function to the decorator.
         if not self.readonly:
             def set_property(body): # We'll annotate body later
+                if isinstance(body, RootModel):
+                    body = body.root
                 return self.__set__(thing, body)
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.post(
@@ -114,7 +152,7 @@ class PropertyDescriptor():
             description=f"## {self.title}\n\n{self.description or ''}"
         )
         def get_property():
-            return self.__get__(thing)
+            return self.model(self.__get__(thing))
 
     def property_affordance(
             self, thing: Thing, path: Optional[str]=None
@@ -147,3 +185,19 @@ class PropertyDescriptor():
                 **pa.model_dump(exclude_none=True)
             }
         )
+    
+    def getter(self, func: Callable) -> Self:
+        """set the function that gets the property's value"""
+        self._getter = func
+        return self
+    
+    def setter(self, func: Callable) -> Self:
+        """Decorator to set the property's value
+        
+        PropertyDescriptors are variabes - so they will return the value they hold
+        when they are accessed. However, they can run code when they are set: this
+        decorator sets a function as that code.
+        """
+        self._setter = func
+        self.readonly = False
+        return self

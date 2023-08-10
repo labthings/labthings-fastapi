@@ -1,7 +1,7 @@
 import logging
 import time
 from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
+from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.descriptors import PropertyDescriptor
 from labthings_fastapi.file_manager import FileManager
@@ -45,10 +45,20 @@ class OpenCVCamera(Thing):
                 "image.jpg is available from the links property of this Invocation "
                 "(see ./files)"
             )
+    
+    @thing_property
+    def exposure(self) -> float:
+        with self._cap_lock:
+            return self._cap.get(cv.CAP_PROP_EXPOSURE)
+    @exposure.setter
+    def exposure(self, value):
+        with self._cap_lock:
+            self._cap.set(cv.CAP_PROP_EXPOSURE, value)
 
     
 thing_server = ThingServer()
 my_thing = OpenCVCamera()
+print(my_thing.__class__.exposure)
 print(my_thing.validate_thing_description())
 thing_server.add_thing(my_thing, "/camera")
 

@@ -22,9 +22,8 @@ various options.
 ## Properties
 
 As with Actions, Properties can be declared by decorating either a function, or
-an attribute, with `@thing_property`. You can use the decorator either on an
-attribute (in which case, it will function like a regular attribute in Python,
-but be accessible over the network), or on a function (in which case that
+an attribute, with `@thing_property`. You can use the decorator either on
+a function (in which case that
 function acts as the "getter" just like with Python's `@property` decorator).
 
 ## Events
@@ -34,8 +33,9 @@ not supported at this time.
 """
 
 from functools import wraps, partial
-from typing import Optional, Callable
-from ..descriptors import ActionDescriptor
+from typing import Optional, Callable, TypeVar, Any
+from ..descriptors import ActionDescriptor, PropertyDescriptor
+from ..utilities.introspection import return_type
 
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
     """Mark a method of a Thing as an Action
@@ -60,3 +60,22 @@ def thing_action(func: Optional[Callable]=None, **kwargs):
         return mark_thing_action(func, **kwargs)
     else:
         return partial(mark_thing_action, **kwargs)
+
+
+def thing_property(func: Callable=None) -> PropertyDescriptor:
+    """Mark a method of a Thing as a Property
+    
+    We replace the function with a `Descriptor` that's a
+    subclass of `PropertyDescriptor`
+
+    TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+    """
+    class PropertyDescriptorSubclass(PropertyDescriptor):
+        def __get__(self, obj, objtype=None):
+            return super().__get__(obj, objtype)
+    return PropertyDescriptorSubclass(
+        return_type(func),
+        readonly=True,
+        observable=False,
+        getter=func,
+    )
