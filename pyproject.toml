@@ -16,6 +16,7 @@ dependencies = [
   "fastapi[all]>=0.101.0",
   "pydantic>=2.0.0",
   "jsonschema",
+  "typing_extensions",
 ]
 
 [project.optional-dependencies]
