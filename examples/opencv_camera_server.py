@@ -1,29 +1,242 @@
 import logging
+import threading
+
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, StreamingResponse
+from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.file_manager import FileManager
+from typing import Optional, AsyncContextManager
+from collections.abc import AsyncGenerator
+from functools import partial
+from dataclasses import dataclass
+from datetime import datetime
+from contextlib import contextmanager, asynccontextmanager
+import anyio
+from anyio.from_thread import BlockingPortal
+from io import BytesIO
 from threading import RLock
 import cv2 as cv
 
 logging.basicConfig(level=logging.INFO)
 
+
+@dataclass
+class RingbufferEntry:
+    """A single entry in a ringbuffer"""
+    frame: BytesIO
+    timestamp: datetime
+    index: int
+    readers: int = 0
+
+
+class MJPEGStreamResponse(StreamingResponse):
+    media_type = "multipart/x-mixed-replace; boundary=frame"
+
+
+class MJPEGStream:
+    def __init__(self, ringbuffer_size: int = 10):
+        self._lock = threading.Lock()
+        self.condition = anyio.Condition()
+        self._streaming = False
+        self.reset(ringbuffer_size=ringbuffer_size)
+
+    def reset(self, ringbuffer_size: Optional[int] = None):
+        """Reset the stream and optionally change the ringbuffer size"""
+        with self._lock:
+            self._streaming = True
+            n = ringbuffer_size or len(self._ringbuffer)
+            self._ringbuffer = [
+                RingbufferEntry(
+                    frame=BytesIO(),
+                    index=-1,
+                    timestamp=datetime.min,
+                ) 
+                for i in range(n)
+            ]
+            self.last_frame_i = -1
+
+    def stop(self):
+        """Stop the stream"""
+        with self._lock:
+            self._streaming = False
+
+    async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
+        """Return the `i`th frame acquired by the camera"""
+        if i<0:
+            raise ValueError("i must be >= 0")
+        if i < self.last_frame_i - len(self._ringbuffer) + 2:
+            raise ValueError("the ith frame has been overwritten")
+        if i>self.last_frame_i:
+            # TODO: await the ith frame
+            raise ValueError("the ith frame has not yet been acquired")
+        entry = self._ringbuffer[i % len(self._ringbuffer)]
+        if entry.index != i:
+            raise ValueError("the ith frame has been overwritten")
+        return entry
+    
+    @asynccontextmanager
+    async def buffer_for_reading(self, i: int) -> AsyncContextManager[BytesIO]:
+        """Yields the ith frame as a BytesIO object"""
+        entry = await self.ringbuffer_entry(i)
+        try:
+            entry.readers += 1
+            yield entry.frame
+        finally:
+            entry.readers -= 1
+
+    async def next_frame_bytes(self) -> bytes:
+        """Wait for the next frame, and return its value"""
+        async with self.condition:
+            await self.condition.wait()
+            i = self.last_frame_i
+        async with self.buffer_for_reading(i) as buffer:
+            return buffer.getvalue()
+
+    async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
+        """A generator that yields frames as bytes"""
+        while self._streaming:
+            try:
+                yield await self.next_frame_bytes()
+            except Exception as e:
+                logging.error(f"Error in stream: {e}, stream stopped")
+                return
+    
+    async def mjpeg_async_generator(self) -> AsyncGenerator[bytes, None]:
+        """A generator yielding an MJPEG stream"""
+        async for frame in self.frame_async_generator():
+            yield b"--frame\r\n"
+            yield b"Content-Type: image/jpeg\r\n\r\n"
+            yield frame
+            yield b"\r\n"
+
+    @contextmanager
+    def next_buffer_for_writing(self, portal: BlockingPortal):
+        """Return the next buffer in the ringbuffer to write to"""
+        with self._lock:
+            entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
+            if entry.readers > 0:
+                raise RuntimeError("Cannot write to ringbuffer while it is being read")
+            entry.timestamp = datetime.now()
+            entry.frame.seek(0)
+            entry.frame.truncate()
+            yield entry.frame
+            entry.frame.seek(0)
+            entry.index = self.last_frame_i + 1
+            portal.start_task_soon(self.notify_new_frame, entry.index)
+
+    async def notify_new_frame(self, i):
+        """Notify any waiting tasks that a new frame is available"""
+        async with self.condition:
+            self.last_frame_i = i
+            self.condition.notify_all()
+
+class MJPEGStreamDescriptor:
+    """A descriptor that returns a MJPEGStream object when accessed"""
+    def __init__(self, **kwargs):
+        self._kwargs = kwargs
+
+    def __set_name__(self, owner, name):
+        self.name = name
+
+    def __get__(self, obj, type=None) -> MJPEGStream:
+        """The value of the property
+
+        If `obj` is none (i.e. we are getting the attribute of the class), 
+        we return the descriptor.
+
+        If no getter is set, we'll return either the initial value, or the value
+        from the object's __dict__, i.e. we behave like a variable.
+
+        If a getter is set, we will use it, unless the property is observable, at
+        which point the getter is only ever used once, to set the initial value.
+        """
+        if obj is None:
+            return self
+        try:
+            return obj.__dict__[self.name]
+        except KeyError:
+            obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
+            return obj.__dict__[self.name]
+        
+    async def stream_response(self, thing: Thing) -> MJPEGStreamResponse:
+        gen = self.__get__(thing).mjpeg_async_generator()
+        return MJPEGStreamResponse(gen)
+    
+    async def viewer_page(self, url: str) -> HTMLResponse:
+        return HTMLResponse(
+            f"<html><body><img src='{url}'></body></html>"
+        )
+
+
+    def add_to_fastapi(self, app: FastAPI, thing: Thing):
+        """Add the stream to the FastAPI app"""
+        app.get(
+            f"{thing.path}{self.name}",
+            response_class=MJPEGStreamResponse,
+        )(partial(self.stream_response,thing))
+        app.get(
+            f"{thing.path}{self.name}/viewer",
+            response_class=HTMLResponse,
+        )(partial(self.viewer_page,f"{thing.path}{self.name}"))
+    
+
 class OpenCVCamera(Thing):
     """A Thing that represents an OpenCV camera"""
     def __init__(self, device_index: int = 0):
         self.device_index = device_index
+        self._stream_thread: Optional[threading.Thread] = None
         
     def __enter__(self):
         self._cap = cv.VideoCapture(self.device_index)
         self._cap_lock = RLock()
         if not self._cap.isOpened():
             raise IOError(f"Cannot open camera with device index {self.device_index}")
+        self.start_streaming()
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
+        self.stop_streaming()
         self._cap.release()
         del self._cap
         del self._cap_lock
+
+    def start_streaming(self):
+        print("starting stream...")
+        if self._stream_thread is not None:
+            raise RuntimeError("Stream thread already running")
+        self._stream_thread = threading.Thread(target=self._stream_thread_fn)
+        self._continue_streaming = True
+        self._stream_thread.start()
+        print("started")
+
+    def stop_streaming(self):
+        print("stopping stream...")
+        if self._stream_thread is None:
+            raise RuntimeError("Stream thread not running")
+        self._continue_streaming = False
+        self.mjpeg_stream.stop()
+        print("waiting for stream to join")
+        self._stream_thread.join()
+        print("stream stopped.")
+        self._stream_thread = None
+
+    def _stream_thread_fn(self):
+        while self._continue_streaming:
+            with self._cap_lock:
+                ret, frame = self._cap.read()
+                if not ret:
+                    logging.error("Could not read frame from camera")
+                    continue
+            success, array = cv.imencode(".jpg", frame)
+            if success:
+                with self.mjpeg_stream.next_buffer_for_writing(
+                    self._labthings_blocking_portal
+                ) as buffer:
+                    buffer.write(array.tobytes())
+                self.last_frame_index = self.mjpeg_stream.last_frame_i
 
     @thing_action
     def snap_image(self, file_manager: FileManager) -> str:
@@ -52,11 +265,14 @@ class OpenCVCamera(Thing):
         with self._cap_lock:
             self._cap.set(cv.CAP_PROP_EXPOSURE, value)
 
+    last_frame_index = PropertyDescriptor(int, initial_value=-1)
+
+    mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
+
     
 thing_server = ThingServer()
 my_thing = OpenCVCamera()
-print(my_thing.__class__.exposure)
-print(my_thing.validate_thing_description())
+my_thing.validate_thing_description()
 thing_server.add_thing(my_thing, "/camera")
 
 app = thing_server.app

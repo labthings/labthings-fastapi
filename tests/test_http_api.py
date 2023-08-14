@@ -11,7 +11,7 @@ server.add_thing(my_thing, "/my_thing")
 def test_property_get_and_set():
     with TestClient(server.app) as client:
         test_str = "A silly test string"
-        r = client.post("/my_thing/foo", json=test_str)
+        client.post("/my_thing/foo", json=test_str)
         after_value = client.get("/my_thing/foo")
         assert after_value.json() == test_str
 
