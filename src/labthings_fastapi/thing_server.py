@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterable, Optional
 from fastapi import FastAPI
 from anyio.from_thread import BlockingPortal
-from contextlib import asynccontextmanager, AbstractContextManager, ExitStack
+from contextlib import asynccontextmanager, AsyncExitStack
 from .actions import ActionManager
 
 if TYPE_CHECKING:
@@ -37,21 +37,23 @@ class ThingServer:
         This does two important things:
         * It sets up the blocking portal so background threads can run async code
           (important for events)
-        * It manages setup/teardown code for Things, if they are context managers
+        * It runs setup/teardown code for Things.
         """
         async with BlockingPortal() as portal:
+            # We attach a blocking portal to each thing, so that threaded code can
+            # make callbacks to async code (needed for events etc.)
             for thing in self.things:
                 if thing._labthings_blocking_portal is not None:
                     raise RuntimeError("Things may only ever have one blocking portal")
                 thing._labthings_blocking_portal = portal
-            contextmanagers = [
-                t for t in self.things 
-                if isinstance(t, AbstractContextManager)
-            ]
-            with ExitStack() as stack:
-                for thing in contextmanagers:
-                    stack.enter_context(thing)
+            # we __aenter__ and __aexit__ each Thing, which will in turn call the
+            # synchronous __enter__ and __exit__ methods if they exist, to initialise
+            # and shut down the hardware. NB we must make sure the blocking portal
+            # is present when this happens, in case we are dealing with threads.
+            async with AsyncExitStack() as stack:
+                for thing in self.things:
+                    await stack.enter_async_context(thing)
                 yield
             for thing in self.things:
+                # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
-

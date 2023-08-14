@@ -56,7 +56,6 @@ async def process_messages_from_websocket(
     while True:
         try:
             data = await websocket.receive_json()
-            print(f"Got WebSocket message: {data}")
             if data["messageType"] == "addPropertyObservation":
                 for k in data["data"].keys():
                     thing.observe_property(k, send_stream)

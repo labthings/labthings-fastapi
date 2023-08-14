@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Union
 from typing_extensions import Self
 from pydantic import BaseModel, RootModel, create_model
 from fastapi import Body, FastAPI
-from anyio import from_thread
 from anyio.abc import ObjectSendStream
 from weakref import WeakSet
 from ..utilities import labthings_data
@@ -109,25 +108,24 @@ class PropertyDescriptor():
         return ld.property_observers[self.name]
 
 
-    def emit_changed_event(self, obj, value):
-        try:
-            from_thread.run(self.emit_changed_event_async, obj, value)
-        except RuntimeError:
-            if obj._labthings_blocking_portal is not None:
-                obj._labthings_blocking_portal.start_task_soon(
-                    self.emit_changed_event_async,
-                    obj,
-                    value,
-                )
-            else:
-                raise RuntimeError(
-                    "We can't emit events without a blocking portal"
-                )
+    def emit_changed_event(self, obj: Thing, value: Any) -> None:
+        """Notify subscribers that the property has changed
+        
+        NB this function **must** be run from a thread, not the event loop.
+        """
+        runner = obj._labthings_blocking_portal
+        if not runner:
+            raise RuntimeError("Can't emit without a blocking portal")
+        runner.start_task_soon(
+            self.emit_changed_event_async,
+            obj,
+            value,
+        )
 
     async def emit_changed_event_async(self, obj, value):
         """Notify subscribers that the property has changed"""
         for observer in self._observers_set(obj):
-            observer.send(
+            await observer.send(
                 {
                     "messageType": "propertyStatus",
                     "data": {

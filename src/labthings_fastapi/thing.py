@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Optional
 from fastapi.encoders import jsonable_encoder
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
+from anyio.to_thread import run_sync
 from .descriptors import ActionDescriptor, PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -25,8 +26,59 @@ if TYPE_CHECKING:
     from .thing_server import ThingServer
     from .actions import ActionManager
 class Thing:
+    """Represents a Thing, as defined by the Web of Things standard.
+    
+    This class should encapsulate the code that runs a piece of hardware, or provides
+    a particular function - it will correspond to a path on the server, and a Thing
+    Description document.
+    
+    Your Thing should be a subclass of Thing - note that we don't define `__init__` so
+    you are free to initialise as you like and don't need to call `super().__init__`.
+    
+    ## Subclassing Notes
+    
+    * `__init__`: You should accept any arguments you need to configure the Thing 
+      in `__init__`. Don't initialise any hardware at this time, as your Thing may
+      be instantiated quite early, or even at import time.
+    * `__enter__(self)` and `__exit__(self, exc_t, exc_v, exc_tb)` are where you
+      should start and stop communications with the hardware. This is Python's standard
+      "context manager" protocol. The arguments of `__exit__` will be `None` unless
+      an exception has occurred. You should be safe to ignore them, and just include
+      code that will close down your hardware. It's equivalent to a `finally:` block.
+    * Properties and Actions are defined using decorators: the `@thing_action` decorator
+      declares a method to be an action, which will run when it's triggered, and the
+      `@thing_property` decorator (or `PropertyDescriptor` descriptor) does the same for
+      a property. See the documentation on those functions for more detail.
+    * `title` will be used in various places as the human-readable name of your Thing,
+      so it makes sense to set this in a subclass.
+
+    There are various LabThings methods that you should avoid overriding unless you know
+    what you are doing: anything not mentioned above that's defined in `Thing` is
+    probably best left along. They may in time be collected together into a single
+    object to avoid namespace clashes.
+    """
     title: str
     _labthings_blocking_portal: Optional[BlockingPortal] = None
+
+    async def __aenter__(self):
+        """Context management is used to set up/close the thing.
+        
+        As things (currently) do everything with threaded code, we define
+        async __aenter__ and __aexit__ wrappers to call the synchronous
+        code, if it exists.
+        """
+        if hasattr(self, "__enter__"):
+            return await run_sync(self.__enter__)
+        else:
+            return self
+
+    async def __aexit__(self, exc_t, exc_v, exc_tb):
+        """Wrap context management functions, if they exist.
+        
+        See __aenter__ docs for more details.
+        """
+        if hasattr(self, "__exit__"):
+            return await run_sync(self.__exit__, exc_t, exc_v, exc_tb)
 
     def attach_to_server(self, server: ThingServer, path: str):
         """Add HTTP handlers to an app for all Interaction Affordances"""
