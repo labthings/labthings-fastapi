@@ -13,7 +13,7 @@ from collections.abc import AsyncGenerator
 from functools import partial
 from dataclasses import dataclass
 from datetime import datetime
-from contextlib import contextmanager, asynccontextmanager
+from contextlib import asynccontextmanager
 import anyio
 from anyio.from_thread import BlockingPortal
 from threading import RLock
