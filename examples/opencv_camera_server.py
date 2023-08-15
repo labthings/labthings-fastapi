@@ -16,7 +16,6 @@ from datetime import datetime
 from contextlib import contextmanager, asynccontextmanager
 import anyio
 from anyio.from_thread import BlockingPortal
-from io import BytesIO
 from threading import RLock
 import cv2 as cv
 
@@ -26,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 @dataclass
 class RingbufferEntry:
     """A single entry in a ringbuffer"""
-    frame: BytesIO
+    frame: bytes
     timestamp: datetime
     index: int
     readers: int = 0
@@ -34,6 +33,30 @@ class RingbufferEntry:
 
 class MJPEGStreamResponse(StreamingResponse):
     media_type = "multipart/x-mixed-replace; boundary=frame"
+    def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
+        """A StreamingResponse that streams an MJPEG stream
+        
+        This response is initialised with an async generator that yields `bytes`
+        objects, each of which is a JPEG file. We add the --frame markers and mime
+        types that enable it to work in an `img` tag.
+        
+        NB the `status_code` argument is used by FastAPI to set the status code of 
+        the response in OpenAPI.
+        """
+        self.frame_async_generator = gen
+        StreamingResponse.__init__(
+            self,
+            self.mjpeg_async_generator(),
+            media_type=self.media_type,
+            status_code=status_code,
+        )
+
+    async def mjpeg_async_generator(self) -> AsyncGenerator[bytes, None]:
+        """A generator yielding an MJPEG stream"""
+        async for frame in self.frame_async_generator:
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+            yield frame
+            yield b"\r\n"
 
 
 class MJPEGStream:
@@ -50,7 +73,7 @@ class MJPEGStream:
             n = ringbuffer_size or len(self._ringbuffer)
             self._ringbuffer = [
                 RingbufferEntry(
-                    frame=BytesIO(),
+                    frame=b"",
                     index=-1,
                     timestamp=datetime.min,
                 ) 
@@ -78,8 +101,8 @@ class MJPEGStream:
         return entry
     
     @asynccontextmanager
-    async def buffer_for_reading(self, i: int) -> AsyncContextManager[BytesIO]:
-        """Yields the ith frame as a BytesIO object"""
+    async def buffer_for_reading(self, i: int) -> AsyncContextManager[bytes]:
+        """Yields the ith frame as a bytes object"""
         entry = await self.ringbuffer_entry(i)
         try:
             entry.readers += 1
@@ -87,43 +110,35 @@ class MJPEGStream:
         finally:
             entry.readers -= 1
 
-    async def next_frame_bytes(self) -> bytes:
-        """Wait for the next frame, and return its value"""
+    async def next_frame(self) -> int:
+        """Wait for the next frame, and return its index"""
         async with self.condition:
             await self.condition.wait()
-            i = self.last_frame_i
-        async with self.buffer_for_reading(i) as buffer:
-            return buffer.getvalue()
+            return self.last_frame_i
 
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """A generator that yields frames as bytes"""
         while self._streaming:
             try:
-                yield await self.next_frame_bytes()
+                i = await self.next_frame()
+                async with self.buffer_for_reading(i) as frame:
+                    yield frame
             except Exception as e:
                 logging.error(f"Error in stream: {e}, stream stopped")
                 return
-    
-    async def mjpeg_async_generator(self) -> AsyncGenerator[bytes, None]:
-        """A generator yielding an MJPEG stream"""
-        async for frame in self.frame_async_generator():
-            yield b"--frame\r\n"
-            yield b"Content-Type: image/jpeg\r\n\r\n"
-            yield frame
-            yield b"\r\n"
+            
+    async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
+        """Return a StreamingResponse that streams an MJPEG stream"""
+        return MJPEGStreamResponse(self.frame_async_generator())
 
-    @contextmanager
-    def next_buffer_for_writing(self, portal: BlockingPortal):
+    def add_frame(self, frame: bytes, portal: BlockingPortal):
         """Return the next buffer in the ringbuffer to write to"""
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
             if entry.readers > 0:
                 raise RuntimeError("Cannot write to ringbuffer while it is being read")
             entry.timestamp = datetime.now()
-            entry.frame.seek(0)
-            entry.frame.truncate()
-            yield entry.frame
-            entry.frame.seek(0)
+            entry.frame = frame
             entry.index = self.last_frame_i + 1
             portal.start_task_soon(self.notify_new_frame, entry.index)
 
@@ -160,23 +175,18 @@ class MJPEGStreamDescriptor:
         except KeyError:
             obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
             return obj.__dict__[self.name]
-        
-    async def stream_response(self, thing: Thing) -> MJPEGStreamResponse:
-        gen = self.__get__(thing).mjpeg_async_generator()
-        return MJPEGStreamResponse(gen)
     
     async def viewer_page(self, url: str) -> HTMLResponse:
         return HTMLResponse(
             f"<html><body><img src='{url}'></body></html>"
         )
 
-
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add the stream to the FastAPI app"""
         app.get(
             f"{thing.path}{self.name}",
             response_class=MJPEGStreamResponse,
-        )(partial(self.stream_response,thing))
+        )(self.__get__(thing).mjpeg_stream_response)
         app.get(
             f"{thing.path}{self.name}/viewer",
             response_class=HTMLResponse,
@@ -232,10 +242,10 @@ class OpenCVCamera(Thing):
                     continue
             success, array = cv.imencode(".jpg", frame)
             if success:
-                with self.mjpeg_stream.next_buffer_for_writing(
-                    self._labthings_blocking_portal
-                ) as buffer:
-                    buffer.write(array.tobytes())
+                self.mjpeg_stream.add_frame(
+                    frame=array.tobytes(),
+                    portal=self._labthings_blocking_portal,
+                )
                 self.last_frame_index = self.mjpeg_stream.last_frame_i
 
     @thing_action
