@@ -56,8 +56,8 @@ class MJPEGStream:
         self._lock = threading.Lock()
         self.condition = anyio.Condition()
         self._streaming = False
-        self.reset(ringbuffer_size=ringbuffer_size)
         self._ringbuffer: list[RingbufferEntry] = []
+        self.reset(ringbuffer_size=ringbuffer_size)
 
     def reset(self, ringbuffer_size: Optional[int] = None):
         """Reset the stream and optionally change the ringbuffer size"""
