@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, HTMLResponse
-from typing import AsyncGenerator, Optional, AsyncContextManager, TYPE_CHECKING
+from typing import AsyncGenerator, AsyncIterator, Literal, Optional, AsyncContextManager, TYPE_CHECKING, Union, overload
+from typing_extensions import Self
 from contextlib import asynccontextmanager
 import threading
 import anyio
@@ -56,6 +57,7 @@ class MJPEGStream:
         self.condition = anyio.Condition()
         self._streaming = False
         self.reset(ringbuffer_size=ringbuffer_size)
+        self._ringbuffer: list[RingbufferEntry] = []
 
     def reset(self, ringbuffer_size: Optional[int] = None):
         """Reset the stream and optionally change the ringbuffer size"""
@@ -92,7 +94,7 @@ class MJPEGStream:
         return entry
     
     @asynccontextmanager
-    async def buffer_for_reading(self, i: int) -> AsyncContextManager[bytes]:
+    async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
         """Yields the ith frame as a bytes object"""
         entry = await self.ringbuffer_entry(i)
         try:
@@ -147,7 +149,13 @@ class MJPEGStreamDescriptor:
     def __set_name__(self, owner, name):
         self.name = name
 
-    def __get__(self, obj, type=None) -> MJPEGStream:
+    @overload
+    def __get__(self, obj: Literal[None], type=None) -> Self:
+        ...
+    @overload
+    def __get__(self, obj: Thing, type=None) -> MJPEGStream:
+        ...
+    def __get__(self, obj: Optional[Thing], type=None) -> Union[MJPEGStream, Self]:
         """The value of the property
 
         If `obj` is none (i.e. we are getting the attribute of the class), 
