@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, HTMLResponse
 from typing import AsyncGenerator, Optional, AsyncContextManager, TYPE_CHECKING
 from contextlib import asynccontextmanager
-from functools import partial
 import threading
 import anyio
 from anyio.from_thread import BlockingPortal
@@ -168,7 +167,7 @@ class MJPEGStreamDescriptor:
             obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
             return obj.__dict__[self.name]
     
-    async def viewer_page(self, url: str) -> HTMLResponse:  # A return annotation confuses pydantic...?
+    async def viewer_page(self, url: str) -> HTMLResponse:
         return HTMLResponse(
             f"<html><body><img src='{url}'></body></html>"
         )

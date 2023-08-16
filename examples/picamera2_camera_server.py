@@ -1,25 +1,21 @@
 import logging
-import threading
 import time
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
 from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.file_manager import FileManager
-from typing import Iterator, Optional
+from typing import Iterator
 from contextlib import contextmanager
 from anyio.from_thread import BlockingPortal
 from threading import RLock
 import picamera2
 from picamera2 import Picamera2
-from picamera2.encoders import MJPEGEncoder, H264Encoder, Quality, Encoder
-from picamera2.outputs import Output, FileOutput
+from picamera2.encoders import MJPEGEncoder, Quality
+from picamera2.outputs import Output
 from labthings_fastapi.outputs.mjpeg_stream import MJPEGStreamDescriptor, MJPEGStream
 from labthings_fastapi.utilities import get_blocking_portal
-from libcamera import ColorSpace
 
 
 logging.basicConfig(level=logging.INFO)
@@ -59,8 +55,16 @@ class StreamingPiCamera2(Thing):
         initial_value=(3280, 2464),
         description="Resolution to use for still images (by default)",
     )
-    mjpeg_bitrate = PropertyDescriptor(int, 0, description="Bitrate for MJPEG stream (best left at 0)")
-    stream_active = PropertyDescriptor(bool, False, description="Whether the MJPEG stream is active", observable=True)
+    mjpeg_bitrate = PropertyDescriptor(
+        int, 
+        initial_value=0, 
+        description="Bitrate for MJPEG stream (best left at 0)"
+    )
+    stream_active = PropertyDescriptor(
+        bool, 
+        initial_value=False,
+        description="Whether the MJPEG stream is active", observable=True
+    )
     mjpeg_stream = MJPEGStreamDescriptor()
     
     def __enter__(self):
@@ -82,7 +86,10 @@ class StreamingPiCamera2(Thing):
 
     def start_streaming(self) -> None:
         """
-        Sets the camera resolution to the video/stream resolution, and starts recording if the stream should be active.
+        Start the MJPEG stream
+        
+        Sets the camera resolution to the video/stream resolution, and starts recording
+        if the stream should be active.
         """
         with self.picamera() as picam:
             #TODO: Filip: can we use the lores output to keep preview stream going
@@ -97,12 +104,16 @@ class StreamingPiCamera2(Thing):
                     #colour_space=ColorSpace.Rec709(),
                 )
                 picam.configure(stream_config)
-                print("Starting picamera MJPEG stream...")
-                # Start recording on stream port
+                logging.info("Starting picamera MJPEG stream...")
                 picam.start_recording(
-                        MJPEGEncoder(self.mjpeg_bitrate if self.mjpeg_bitrate > 0 else None),
-                        PicameraStreamOutput(self.mjpeg_stream, get_blocking_portal(self)),
-                        Quality.HIGH #TODO: use provided quality
+                    MJPEGEncoder(
+                        self.mjpeg_bitrate if self.mjpeg_bitrate > 0 else None,
+                    ),
+                    PicameraStreamOutput(
+                        self.mjpeg_stream, 
+                        get_blocking_portal(self),
+                    ),
+                    Quality.HIGH #TODO: use provided quality
                 )
             except Exception as e:
                 logging.info("Error while starting preview:")
@@ -146,12 +157,10 @@ class StreamingPiCamera2(Thing):
     
     @thing_property
     def exposure(self) -> float:
-        with self._cap_lock:
-            return self._cap.get(cv.CAP_PROP_EXPOSURE)
+        raise NotImplementedError()
     @exposure.setter
     def exposure(self, value):
-        with self._cap_lock:
-            self._cap.set(cv.CAP_PROP_EXPOSURE, value)
+        raise NotImplementedError()
 
     last_frame_index = PropertyDescriptor(int, initial_value=-1)
 
