@@ -71,6 +71,21 @@ def convert_anyof(d: JSONSchema) -> JSONSchema:
     return out
 
 
+def convert_prefixitems(d: JSONSchema) -> JSONSchema:
+    """Convert the prefixitems key to items
+    
+    JSONSchema 2019 (as used by thing description) used
+    `items` with a list of values in the same way that JSONSchema
+    now uses `prefixitems`
+    """
+    if "prefixItems" not in d:
+        return d
+    out: JSONSchema = d.copy()
+    out["items"] = out["prefixItems"]
+    del out["prefixItems"]
+    return out
+
+
 def check_recursion(depth: int, limit: int):
     """Check the recursion count is less than the limit"""
     if depth > limit:
@@ -111,6 +126,7 @@ def jsonschema_to_dataschema(
     if is_an_object(d):
         d = convert_object(d)
     d = convert_anyof(d)
+    d = convert_prefixitems(d)
 
     # After checking the object isn't a reference, we now recursively check 
     # sub-dictionaries and dereference those if necessary. This could be done with a
