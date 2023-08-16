@@ -58,6 +58,9 @@ class PropertyDescriptor():
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
         self._observers: WeakSet[ObjectSendStream] = WeakSet()
+        # Try to generate a DataSchema, so that we can raise an error that's easy to
+        # link to the offending PropertyDescriptor
+        type_to_dataschema(self.model)
 
     def __set_name__(self, owner, name: str):
         self._name = name
