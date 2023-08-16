@@ -13,7 +13,7 @@ from fastapi.encoders import jsonable_encoder
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
-from .descriptors import ActionDescriptor, PropertyDescriptor
+from .descriptors import PropertyDescriptor
 from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .utilities.validate_thing_description import (
@@ -128,9 +128,9 @@ class Thing:
         properties = {}
         actions = {}
         for name, item in class_attributes(self):
-            if isinstance(item, PropertyDescriptor):
+            if hasattr(item, "property_affordance"):
                 properties[name] = item.property_affordance(self, path)
-            if isinstance(item, ActionDescriptor):
+            if hasattr(item, "action_affordance"):
                 actions[name] = (item.action_affordance(self, path))
 
         return ThingDescription(

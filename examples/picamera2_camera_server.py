@@ -1,12 +1,15 @@
+from __future__ import annotations
 import logging
 import time
+
+from pydantic import BaseModel, BeforeValidator
 
 from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.file_manager import FileManager
-from typing import Iterator
+from typing import Annotated, Any, Iterator, Optional
 from contextlib import contextmanager
 from anyio.from_thread import BlockingPortal
 from threading import RLock
@@ -19,6 +22,32 @@ from labthings_fastapi.utilities import get_blocking_portal
 
 
 logging.basicConfig(level=logging.INFO)
+
+class PicameraControl(PropertyDescriptor):
+    def __init__(
+            self,
+            control_name: str,
+            model: type=float,
+            description: Optional[str]=None
+        ):
+        """A property descriptor controlling a picamera control"""
+        PropertyDescriptor.__init__(
+            self, model, observable=False, description=description
+        )
+        self.control_name = control_name
+        self._getter
+
+    def _getter(self, obj: StreamingPiCamera2):
+        print(f"getting {self.control_name} from {obj}")
+        with obj.picamera() as cam:
+            ret = cam.capture_metadata()[self.control_name]
+            print(f"Trying to return camera control {self.control_name} as `{ret}`")
+            return ret
+        
+    def _setter(self, obj: StreamingPiCamera2, value: Any):
+        with obj.picamera() as cam:
+            setattr(cam.controls, self.control_name, value)
+    
 
 class PicameraStreamOutput(Output):
     """An Output class that sends frames to a stream"""
@@ -37,6 +66,16 @@ class PicameraStreamOutput(Output):
     def outputframe(self, frame, _keyframe=True, _timestamp=None):
         """Add a frame to the stream's ringbuffer"""
         self.stream.add_frame(frame, self.portal)
+
+
+class SensorMode(BaseModel):
+    unpacked: str
+    bit_depth: int
+    size: tuple[int, int]
+    fps: float
+    crop_limits: tuple[int, int, int, int]
+    exposure_limits: tuple[Optional[int], Optional[int], Optional[int]]
+    format: Annotated[str, BeforeValidator(repr)]
 
 
 class StreamingPiCamera2(Thing):
@@ -66,10 +105,34 @@ class StreamingPiCamera2(Thing):
         description="Whether the MJPEG stream is active", observable=True
     )
     mjpeg_stream = MJPEGStreamDescriptor()
+    analogue_gain = PicameraControl(
+        "AnalogueGain",
+        float
+    )
+    colour_gains = PicameraControl(
+        "ColourGains",
+        tuple[float, float]
+    )
+    colour_correction_matrix = PicameraControl(
+        "ColourCorrectionMatrix",
+        tuple[float, float, float, float, float, float, float, float, float]
+    )
+    exposure_time = PicameraControl(
+        "ExposureTime", 
+        int, 
+        description="The exposure time in microseconds"
+    )
+    exposure_time = PicameraControl(
+        "ExposureTime", 
+        int, 
+        description="The exposure time in microseconds"
+    )
+    sensor_modes = PropertyDescriptor(list[SensorMode], readonly=True)
     
     def __enter__(self):
         self._picamera = picamera2.Picamera2(camera_num=self.device_index)
         self._picamera_lock = RLock()
+        self.populate_sensor_modes()
         self.start_streaming()
         return self
     
@@ -77,6 +140,10 @@ class StreamingPiCamera2(Thing):
     def picamera(self) -> Iterator[Picamera2]:
         with self._picamera_lock:
             yield self._picamera
+
+    def populate_sensor_modes(self):
+        with self.picamera() as cam:
+            self.sensor_modes = cam.sensor_modes
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop_streaming()

@@ -53,8 +53,9 @@ class PropertyDescriptor():
         self.initial_value = initial_value
         self.description = description
         self.title = title
-        self._setter = setter
-        self._getter = getter
+        # The lines below allow _getter and _setter to be specified by subclasses
+        self._setter = setter or getattr(self, "_setter", None)
+        self._getter = getter or getattr(self, "_getter", None)
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
         self._observers: WeakSet[ObjectSendStream] = WeakSet()
