@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI
-from pydantic import Field, create_model
+from pydantic import create_model
 from ..actions import InvocationModel
 from ..file_manager import FileManager
 from ..utilities.introspection import (

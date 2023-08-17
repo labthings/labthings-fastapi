@@ -42,7 +42,7 @@ def input_model_from_signature(
         func: Callable,
         remove_first_positional_arg: bool=False,
         ignore: Optional[Sequence[str]]=None,
-    ) -> BaseModel:
+    ) -> type[BaseModel]:
     """Create a pydantic model for a function's signature.
     
     This is deliberately quite a lot more basic than 
