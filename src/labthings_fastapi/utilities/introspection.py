@@ -16,8 +16,26 @@ from typing import (
 )
 import inspect
 from inspect import Parameter, signature
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.main import create_model
+
+
+class EmptyObject(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class StrictEmptyObject(EmptyObject):
+    model_config = ConfigDict(extra="forbid")
+
+
+class EmptyInput(RootModel):
+    root: Optional[EmptyObject] = None
+    model_config = ConfigDict(extra="forbid")
+
+
+class StrictEmptyInput(EmptyInput):
+    root: Optional[StrictEmptyObject] = None
+    model_config = ConfigDict(extra="forbid")
 
 
 def input_model_from_signature(
@@ -65,13 +83,16 @@ def input_model_from_signature(
         )
     
     # The line below determines if we accept arbitrary extra parameters (**kwargs)
-    takes_v_kwargs = any(p.kind == Parameter.VAR_KEYWORD for p in parameters.values())
+    takes_v_kwargs = False  # will be updated later
     # fields is a dictionary of tuples of (type, default) that defines the input model
     type_hints = get_type_hints(func, include_extras=True)
     fields: Dict[str, Tuple[type, Any]] = {}
     for name, p in parameters.items():
         if ignore and name in ignore:
             continue
+        if p.kind == Parameter.VAR_KEYWORD:
+            takes_v_kwargs = True  # we accept arbitrary extra arguments
+            continue  # **kwargs should not appear in the schema
         # `type_hints` does more processing than p.annotation - but will
         # not have entries for missing annotations.
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
@@ -80,9 +101,12 @@ def input_model_from_signature(
         fields[name] = (p_type, default)
     model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",
-        __config__ = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
+        model_config = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
         **fields,
     )
+    # If there are no fields, we use a RootModel to allow none as well as {}
+    if len(fields) == 0:
+        return EmptyInput if takes_v_kwargs else StrictEmptyInput
     return model
 
 

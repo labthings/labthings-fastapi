@@ -14,11 +14,9 @@ from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
 from .descriptors import PropertyDescriptor
-from .utilities.w3c_td_model import ThingDescription, NoSecurityScheme
+from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
-from .utilities.validate_thing_description import (
-    validate_thing_description as utils_validate_td
-)
+from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint, WebSocket
 
@@ -110,7 +108,7 @@ class Thing:
     def validate_thing_description(self):
         """Raise an exception if the thing description is not valid"""
         td = self.thing_description_dict()
-        return utils_validate_td(td)
+        return validation.validate_thing_description(td)
 
     _cached_thing_description: Optional[tuple[str, ThingDescription]] = None
     def thing_description(self, path: Optional[str] = None) -> ThingDescription:

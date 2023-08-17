@@ -5,18 +5,20 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI
-from pydantic import create_model
+from pydantic import Field, create_model
 from ..actions import InvocationModel
 from ..file_manager import FileManager
 from ..utilities.introspection import (
+    EmptyInput,
+    StrictEmptyInput,
     get_docstring,
     get_summary,
     input_model_from_signature,
     return_type,
     function_dependencies,
 )
-from ..utilities.thing_description import type_to_dataschema
-from ..utilities.w3c_td_model import ActionAffordance, ActionOp, Form, Union
+from ..thing_description import type_to_dataschema
+from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -117,7 +119,16 @@ class ActionDescriptor():
         # the function to the decorator.
         def start_action(body): # We'll annotate body later
             return thing.action_manager.invoke_action(self, thing, body).response()
-        start_action.__annotations__["body"] = Annotated[self.input_model, Body()]
+        if issubclass(self.input_model, EmptyInput):
+            annotation = Body(default_factory=StrictEmptyInput)
+        else:
+            annotation = Body()
+        start_action.__annotations__["body"] = Annotated[self.input_model, annotation]
+        # if issubclass(self.input_model, EmptyInput):
+        #     # If empty input is acceptable, allow it to be called with no body.
+        #     existing_defaults = start_action.__defaults__ or ()
+        #     extra_default = (Field(default_factory=StrictEmptyInput),) 
+        #     start_action.__defaults__ = extra_default + existing_defaults
         app.post(
             thing.path + self.name,
             response_model=self.invocation_model, 

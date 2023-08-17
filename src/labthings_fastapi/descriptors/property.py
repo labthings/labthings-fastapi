@@ -9,8 +9,8 @@ from fastapi import Body, FastAPI
 from anyio.abc import ObjectSendStream
 from weakref import WeakSet
 from ..utilities import labthings_data
-from ..utilities.w3c_td_model import PropertyAffordance, Form, DataSchema, PropertyOp
-from ..utilities.thing_description import type_to_dataschema
+from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
+from ..thing_description import type_to_dataschema
 
 
 if TYPE_CHECKING:

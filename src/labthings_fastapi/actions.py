@@ -12,7 +12,9 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from .utilities.w3c_td_model import Links, LinkElement
+
+from labthings_fastapi.utilities.introspection import EmptyInput
+from .thing_description.model import Links, LinkElement
 from .file_manager import FileManager
 
 if TYPE_CHECKING:
@@ -56,7 +58,7 @@ class Invocation(Thread):
         self,
         action: ActionDescriptor,
         thing: Thing,
-        input: Optional[dict[str, Any]] = None,
+        input: Optional[BaseModel] = None,
         default_stop_timeout: float = 5,
         log_len: int = 1000,
     ):
@@ -65,7 +67,7 @@ class Invocation(Thread):
         # keep track of the corresponding ActionDescriptor
         self.action_ref = weakref.ref(action)
         self.thing_ref = weakref.ref(thing)
-        self.input = input
+        self.input = input if input is not None else EmptyInput()
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
         self._ID = uuid.uuid4()  # Task ID

@@ -1,10 +1,25 @@
+"""
+Thing Description module
+
+This module supports the generation of Thing Descriptions. Currently, the top
+level function lives in `labthings_fastapi.thing.Thing.thing_description()`,
+but most of the supporting code is in this submodule.
+
+A Pydantic model implementing the Thing Description is in `.model`, and this
+is used to generate our TDs - it helps make sure any TD errors get caught when
+they are generated in Python, which makes them much easier to debug.
+
+We also use the JSONSchema provided by W3C to validate the TDs we generate, in
+`.validation`, as a double-check that we are standards-compliant.
+"""
+
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional, Union
 import json
 
 from pydantic import TypeAdapter, ValidationError, BaseModel
-from .w3c_td_model import DataSchema
+from .model import DataSchema
 
 
 JSONSchema = dict[str, Any]  # A type to represent JSONSchema
@@ -60,9 +75,13 @@ def convert_object(d: JSONSchema) -> JSONSchema:
 
 
 def convert_anyof(d: JSONSchema) -> JSONSchema:
-    """Convert the anyof key to oneof"""
-    #TODO this isn't technically JSONSchema output - oneof is not allowed...
-    #TODO probably don't need to copy this...
+    """Convert the anyof key to oneof
+    
+    JSONSchema makes a distinction between "anyof" and "oneof", where the former
+    means "any of these fields can be present" and the latter means "exactly one
+    of these fields must be present". Thing Description does not have this 
+    distinction, so we convert anyof to oneof.
+    """
     if "anyOf" not in d:
         return d
     out: JSONSchema = d.copy()
@@ -76,15 +95,34 @@ def convert_prefixitems(d: JSONSchema) -> JSONSchema:
     
     JSONSchema 2019 (as used by thing description) used
     `items` with a list of values in the same way that JSONSchema
-    now uses `prefixitems`
+    now uses `prefixitems`. 
+
+    JSONSchema 2020 uses `items` to mean the same as `additionalItems`
+    in JSONSchema 2019 - but Thing Description doesn't support the
+    `additionalItems` keyword. This will result in us overwriting
+    additional items, and we raise a ValueError if that happens.
+
+    This behaviour may be relaxed in the future.
     """
     if "prefixItems" not in d:
         return d
     out: JSONSchema = d.copy()
+    if "items" in out:
+        raise ValueError(f"Overwrote the `items` key on {out}.")
     out["items"] = out["prefixItems"]
     del out["prefixItems"]
     return out
 
+
+def convert_additionalproperties(d: JSONSchema) -> JSONSchema:
+    """Move additionalProperties into properties, or remove it"""
+    if "additionalProperties" not in d:
+        return d
+    out: JSONSchema = d.copy()
+    if "properties" in out and "additionalProperties" not in out["properties"]:
+        out["properties"]["additionalProperties"] = out["additionalProperties"]
+    del out["additionalProperties"]
+    return out
 
 def check_recursion(depth: int, limit: int):
     """Check the recursion count is less than the limit"""
@@ -127,6 +165,7 @@ def jsonschema_to_dataschema(
         d = convert_object(d)
     d = convert_anyof(d)
     d = convert_prefixitems(d)
+    d = convert_additionalproperties(d)
 
     # After checking the object isn't a reference, we now recursively check 
     # sub-dictionaries and dereference those if necessary. This could be done with a
@@ -184,6 +223,8 @@ def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
         print(
             "Error while constructing DataSchema from the "
             "following dictionary:\n" +
-            json.dumps(schema_dict, indent=2)
+            json.dumps(schema_dict, indent=2) +
+            "Before conversion, the JSONSchema was:\n" +
+            json.dumps(json_schema, indent=2)
         )
         raise ve

@@ -12,7 +12,7 @@ from __future__ import annotations
 from uuid import UUID
 from tempfile import TemporaryDirectory
 from typing import Sequence, Optional
-from .utilities.w3c_td_model import LinkElement
+from .thing_description.model import LinkElement
 import os
 
 class FileManager:

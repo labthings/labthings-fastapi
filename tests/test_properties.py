@@ -8,6 +8,7 @@ from pytest import raises
 
 class TestThing(Thing):
     boolprop = PropertyDescriptor(bool, False, description="A boolean property")
+    stringprop = PropertyDescriptor(str, "foo", description="A string property")
 
     _undoc = None
     @thing_property
@@ -35,6 +36,14 @@ class TestThing(Thing):
 thing = TestThing()
 server = ThingServer()
 server.add_thing(thing, "/thing")
+
+
+def test_property_get_and_set():
+    with TestClient(server.app) as client:
+        test_str = "A silly test string"
+        client.post("/thing/stringprop", json=test_str)
+        after_value = client.get("/thing/stringprop")
+        assert after_value.json() == test_str
 
 
 def test_propertydescriptor():
