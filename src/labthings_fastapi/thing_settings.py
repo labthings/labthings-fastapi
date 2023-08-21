@@ -16,7 +16,7 @@ class ReactiveDict:
     def __init__(self, data: Mapping=None, name: str=None, callback=None):
         self.name = name if name is not None else ""
         self.callbacks = WeakSet()
-        self.data: dict[Any, Any] = {}
+        self._data: dict[Any, Any] = {}
         self.replace(data)
         if callback:
             self.callbacks.add(callback)
@@ -64,7 +64,7 @@ class ReactiveDict:
 
     def replace(self, data: Mapping):
         """Erase all data, then update from the supplied mapping"""
-        self.data: dict[Any, Any] = {}
+        self._data: dict[Any, Any] = {}
         self.update(data=data)
 
     @property
