@@ -4,13 +4,16 @@ from fastapi import FastAPI
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
 from .actions import ActionManager
+from .thing_settings import ThingSettings
+import os.path
 
 if TYPE_CHECKING:
     from .thing import Thing
 
 class ThingServer:
-    def __init__(self, app: Optional[FastAPI]=None):
+    def __init__(self, app: Optional[FastAPI]=None, settings_folder: str=None):
         self.app = app or FastAPI(lifespan=self.lifespan)
+        self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
         self._things: dict[str, Thing] = {}
@@ -28,6 +31,10 @@ class ThingServer:
         if path in self._things:
             raise KeyError(f"{path} has already been added to this thing server.")
         self._things[path] = thing
+        # TODO: check for illegal things in `path` - potential security issue.
+        settings_folder = os.path.join(self.settings_folder, path.lstrip("\\/"))  # path will start with "/"
+        os.makedirs(settings_folder, exist_ok=True)
+        thing._labthings_thing_settings = ThingSettings(os.path.join(settings_folder, "settings.json"))
         thing.attach_to_server(self, path)
 
     @asynccontextmanager

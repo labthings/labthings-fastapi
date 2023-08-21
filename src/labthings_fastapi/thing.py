@@ -19,6 +19,7 @@ from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint, WebSocket
+from .thing_settings import ThingSettings
 
 if TYPE_CHECKING:
     from .thing_server import ThingServer
@@ -104,6 +105,18 @@ class Thing:
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
 
+    _labthings_thing_settings: Optional[ThingSettings] = None
+    @property
+    def thing_settings(self) -> ThingSettings:
+        """A dictionary that can be used to persist settings between runs"""
+        if self._labthings_thing_settings is None:
+            raise RuntimeError(
+                "Settings may not be accessed before we are attached to the server."
+            )
+        return self._labthings_thing_settings
+    @thing_settings.setter
+    def thing_settings(self, newsettings: ThingSettings):
+        self.thing_settings.replace(newsettings)
 
     def validate_thing_description(self):
         """Raise an exception if the thing description is not valid"""
