@@ -11,7 +11,11 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 class ThingServer:
-    def __init__(self, app: Optional[FastAPI]=None, settings_folder: str=None):
+    def __init__(
+            self,
+            app: Optional[FastAPI]=None,
+            settings_folder: Optional[str]=None
+        ):
         self.app = app or FastAPI(lifespan=self.lifespan)
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
@@ -32,9 +36,11 @@ class ThingServer:
             raise KeyError(f"{path} has already been added to this thing server.")
         self._things[path] = thing
         # TODO: check for illegal things in `path` - potential security issue.
-        settings_folder = os.path.join(self.settings_folder, path.lstrip("\\/"))  # path will start with "/"
+        settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
         os.makedirs(settings_folder, exist_ok=True)
-        thing._labthings_thing_settings = ThingSettings(os.path.join(settings_folder, "settings.json"))
+        thing._labthings_thing_settings = ThingSettings(
+            os.path.join(settings_folder, "settings.json")
+        )
         thing.attach_to_server(self, path)
 
     @asynccontextmanager

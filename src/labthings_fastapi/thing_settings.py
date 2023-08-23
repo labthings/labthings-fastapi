@@ -8,16 +8,22 @@ import json
 import os
 import os.path
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from weakref import WeakSet
 
 
-class ReactiveDict:
-    def __init__(self, data: Mapping=None, name: str=None, callback=None):
+class ReactiveDict(Mapping):
+    def __init__(
+            self,
+            data: Optional[Mapping]=None,
+            name: Optional[str]=None,
+            callback: Optional[Callable]=None
+        ):
         self.name = name if name is not None else ""
-        self.callbacks = WeakSet()
+        self.callbacks: WeakSet[Callable] = WeakSet()
         self._data: dict[Any, Any] = {}
-        self.replace(data)
+        if data:
+            self.replace(data)
         if callback:
             self.callbacks.add(callback)
 
@@ -32,8 +38,8 @@ class ReactiveDict:
         """Propagate updates from children up to the parent object"""
         built_path = child.name
         if path:
-            build_path += f"/{path}"
-        self.notify_callbacks(self, path=built_path)
+            built_path += f"/{path}"
+        self.notify_callbacks(path=built_path)
     
     def __setitem__(self, key, item):
         self._data[key] = item
@@ -57,14 +63,18 @@ class ReactiveDict:
             raise ValueError("Config files must be Objects (key-value mappings)")
         for k, v in data.items():
             if isinstance(v, Mapping):
-                self._data[k] = ReactiveDict(v, name=f"{k}", callback=self.child_callback)
+                self._data[k] = ReactiveDict(
+                    v,
+                    name=f"{k}",
+                    callback=self.child_callback
+                )
             else:
                 self._data[k] = v
         self.notify_callbacks()
 
     def replace(self, data: Mapping):
         """Erase all data, then update from the supplied mapping"""
-        self._data: dict[Any, Any] = {}
+        self._data = {}
         self.update(data=data)
 
     @property
