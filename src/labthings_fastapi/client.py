@@ -6,8 +6,7 @@ Description.
 """
 
 from __future__ import annotations
-import json
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 import httpx
 
 from pydantic import BaseModel
@@ -53,9 +52,11 @@ def property_descriptor(
                     obj: Optional[ThingClient]=None,
                     _objtype: Optional[type[ThingClient]]=None
                 ):
+                if obj is None:
+                    return self
                 return obj.get_property(self.name)
             __get__.__annotations__["return"] = model
-            P.__get__ = __get__
+            P.__get__ = __get__  # type: ignore[attr-defined]
         if writeable:
             def __set__(
                     self,
@@ -64,7 +65,7 @@ def property_descriptor(
                 ):
                 obj.set_property(self.name, value)
             __set__.__annotations__["value"] = model
-            P.__set__ = __set__
+            P.__set__ = __set__  # type: ignore[attr-defined]
         if description:
             P.__doc__ = description
         return P()
