@@ -37,11 +37,11 @@ class ReactiveDict:
     
     def __setitem__(self, key, item):
         self._data[key] = item
-        self.notify_callbacks(key=key)
+        self.notify_callbacks(path=key)
     
     def __delitem__(self, key):
         del self._data[key]
-        self.notify_callbacks(key=key)
+        self.notify_callbacks(path=key)
 
 
     def __iter__(self):
@@ -71,7 +71,7 @@ class ReactiveDict:
     def dict(self):
         """Return a regular, non-reactive dict of the data"""
         out = self._data.copy()
-        for k, v in out:
+        for k, v in self._data.items():
             if isinstance(v, ReactiveDict):
                 out[k] = v.dict()
         return out
@@ -90,4 +90,4 @@ class ThingSettings(ReactiveDict):
     def write_to_file(self, *args, **kwargs):
         """Persist the dictionary to a file"""
         with open(self.filename, "w") as f:
-            json.dump(self.dict, f)
+            json.dump(self.dict, f, indent=4)
