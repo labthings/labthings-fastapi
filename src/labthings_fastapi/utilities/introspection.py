@@ -30,12 +30,10 @@ class StrictEmptyObject(EmptyObject):
 
 class EmptyInput(RootModel):
     root: Optional[EmptyObject] = None
-    model_config = ConfigDict(extra="forbid")
 
 
 class StrictEmptyInput(EmptyInput):
     root: Optional[StrictEmptyObject] = None
-    model_config = ConfigDict(extra="forbid")
 
 
 def input_model_from_signature(
