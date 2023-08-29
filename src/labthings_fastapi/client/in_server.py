@@ -23,8 +23,8 @@ from fastapi import Request
 
 class DirectThingClient:
     __globals__ = globals()  # "bake in" globals so dependency injection works
-    thing_class: type[Thing] = None
-    thing_path: Optional[str] = None
+    thing_class: type[Thing]
+    thing_path: str
     def __init__(self, request: Request):
         """Wrapper for a Thing that makes it work like a ThingClient
         
@@ -77,12 +77,13 @@ def property_descriptor(
         return P()
 
 
-def add_action(cls: type[DirectThingClient], action_name: str, function: callable):
+def add_action(
+    cls: type[DirectThingClient], name: str, action: ActionDescriptor):
     """Add an action to a DirectThingClient subclass"""
-    @wraps(function)
+    @wraps(action.func)
     def action_method(self, **kwargs):
-        return getattr(self._wrapped_thing, action_name)(**kwargs)
-    setattr(cls, action_name, action_method)
+        return getattr(self._wrapped_thing, name)(**kwargs)
+    setattr(cls, name, action_method)
 
 
 def add_property(

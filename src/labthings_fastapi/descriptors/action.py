@@ -146,7 +146,9 @@ class ActionDescriptor():
         sig = inspect.signature(start_action)
         params = [p for p in sig.parameters.values() if p.name != "dependencies"]
         params += self.dependency_params
-        start_action.__signature__ = sig.replace(parameters=params)
+        start_action.__signature__ = sig.replace(  # type: ignore[attr-defined]
+            parameters=params
+        )
         # Now we can add the endpoint to the app.
         app.post(
             thing.path + self.name,

@@ -3,12 +3,10 @@ This tests Things that depend on other Things
 """
 from fastapi.testclient import TestClient
 from fastapi import Depends, Request
-import pytest
 from labthings_fastapi.client.in_server import direct_thing_client
 from labthings_fastapi.thing_server import ThingServer
-from temp_client import poll_task, get_link
-import time
-from typing import Optional, Annotated
+from temp_client import poll_task
+from typing import Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 

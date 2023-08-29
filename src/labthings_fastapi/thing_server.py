@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 
-_thing_servers = WeakSet()
+_thing_servers: WeakSet[ThingServer] = WeakSet()
 def find_thing_server(app: FastAPI) -> ThingServer:
     """Find the ThingServer associated with an app"""
     for server in _thing_servers:
@@ -26,10 +26,9 @@ def find_thing_server(app: FastAPI) -> ThingServer:
 class ThingServer:
     def __init__(
             self,
-            app: Optional[FastAPI]=None,
             settings_folder: Optional[str]=None
         ):
-        self.app = app or FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan)
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
@@ -37,6 +36,8 @@ class ThingServer:
         self.blocking_portal: Optional[BlockingPortal] = None
         global _thing_servers
         _thing_servers.add(self)
+
+    app: FastAPI
 
     @property
     def things(self) -> Mapping[str, Thing]:
