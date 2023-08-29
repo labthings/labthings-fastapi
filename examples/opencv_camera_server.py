@@ -7,7 +7,7 @@ from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.thing_server import ThingServer
-from labthings_fastapi.file_manager import FileManager
+from labthings_fastapi.file_manager import FileManagerDep
 from typing import Optional, AsyncContextManager
 from collections.abc import AsyncGenerator
 from functools import partial
@@ -249,7 +249,7 @@ class OpenCVCamera(Thing):
                 self.last_frame_index = self.mjpeg_stream.last_frame_i
 
     @thing_action
-    def snap_image(self, file_manager: FileManager) -> str:
+    def snap_image(self, file_manager: FileManagerDep) -> str:
         """Acquire one image from the camera.
 
         This action cannot run if the camera is in use by a background thread, for

@@ -9,18 +9,26 @@ handle finding a temporary storage location, and making it possible to retrieve 
 files via the Invocation object.
 """
 from __future__ import annotations
-from uuid import UUID
 from tempfile import TemporaryDirectory
-from typing import Sequence, Optional
+from typing import Annotated, Sequence, Optional
+
+from fastapi import Depends, Request
+
 from .thing_description.model import LinkElement
 import os
 
+from .dependencies.invocation_id import InvocationID
+
 class FileManager:
-    """Manage files created by Actions"""
-    def __init__(self, invocation_id: UUID):
+    """Manage files created by Actions"""  
+    __globals__ = globals()  # "bake in" globals so dependency injection works
+    def __init__(self, invocation_id: InvocationID, request: Request):
         self.invocation_id = invocation_id
         self._links: set[tuple[str, str]] = set()
         self._dir = TemporaryDirectory(prefix=f"labthings-{self.invocation_id}-")
+        request.state.file_manager = self  
+        # The request state will be used to hold onto the FileManager after
+        # the action has finished
 
     @property
     def directory(self) -> str:
@@ -48,3 +56,5 @@ class FileManager:
         for rel, filename in self._links:
             links.append(LinkElement(rel=rel, href=prefix + "/files/" + filename))
         return links
+    
+FileManagerDep = Annotated[FileManager, Depends()]

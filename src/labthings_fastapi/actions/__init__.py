@@ -3,9 +3,8 @@ import datetime
 import logging
 import traceback
 from collections import deque
-from enum import Enum
 from threading import Event, Thread, Lock, get_ident
-from typing import Optional, Any, TypeVar, Generic
+from typing import Optional, Any
 import uuid
 from typing import TYPE_CHECKING
 import weakref
@@ -14,39 +13,17 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from labthings_fastapi.utilities.introspection import EmptyInput
-from .thing_description.model import Links, LinkElement
-from .file_manager import FileManager
+from ..thing_description.model import LinkElement
+from ..file_manager import FileManager
+from .invocation_model import InvocationModel, InvocationStatus
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
-    from .descriptors import ActionDescriptor
-    from .thing import Thing
+    from ..descriptors import ActionDescriptor
+    from ..thing import Thing
 
 ACTION_INVOCATIONS_PATH = "/action_invocations"
 
-class InvocationStatus(Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    ERROR = "error"
-
-
-InputT = TypeVar("InputT")
-OutputT = TypeVar("OutputT")
-class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
-    status: InvocationStatus
-    id: uuid.UUID
-    action: str
-    href: str
-    timeStarted: Optional[datetime.datetime]
-    timeRequested: Optional[datetime.datetime]
-    timeCompleted: Optional[datetime.datetime]
-    input: InputT
-    output: OutputT
-    links: Links = None
-
-InvocationModel = GenericInvocationModel[Any, Any]
 
 class Invocation(Thread):
     """A Thread subclass that retains output values and tracks progress
@@ -59,8 +36,10 @@ class Invocation(Thread):
         action: ActionDescriptor,
         thing: Thing,
         input: Optional[BaseModel] = None,
+        dependencies: Optional[dict[str, Any]] = None,
         default_stop_timeout: float = 5,
         log_len: int = 1000,
+        id: Optional[uuid.UUID] = None,
     ):
         Thread.__init__(self, daemon=True)
 
@@ -68,19 +47,18 @@ class Invocation(Thread):
         self.action_ref = weakref.ref(action)
         self.thing_ref = weakref.ref(thing)
         self.input = input if input is not None else EmptyInput()
+        self.dependencies = dependencies if dependencies is not None else {}
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
-        self._ID = uuid.uuid4()  # Task ID
+        self._ID = id if id is not None else uuid.uuid4()  # Task ID
 
         # Event to track if the user has requested stop
         self.stopping: Event = Event()
         self.default_stop_timeout: float = default_stop_timeout
 
-        # Provide file management, if needed
-        if FileManager in (type_ for type_, _f in self.action.dependencies.values()):
-            self._file_manager: Optional[FileManager] = FileManager(self.id)
-        else:
-            self._file_manager = None
+        # This is added post-hoc by the FastAPI endpoint, in
+        # `ActionDescriptor.add_to_fastapi`
+        self._file_manager: Optional[FileManager] = None
 
         # Private state properties
         self._status_lock = Lock()  # This Lock protects properties below
@@ -174,10 +152,6 @@ class Invocation(Thread):
         kwargs = self.input.model_dump() or {}
         assert action is not None
         assert thing is not None
-        dependencies = {}
-        for k, (type_, _f) in self.action.dependencies.items():
-            if type_ == FileManager:
-                dependencies[k] = self._file_manager
 
         with self._status_lock:
             self._status = InvocationStatus.RUNNING
@@ -185,8 +159,7 @@ class Invocation(Thread):
 
         try:
             # The next line actually runs the action.
-            logging.info(f"Running action with kwargs: {kwargs}, dep=s: {dependencies}")
-            ret = action.__get__(thing)(**kwargs, **dependencies)
+            ret = action.__get__(thing)(**kwargs, **self.dependencies)
 
             with self._status_lock:
                 self._return_value = ret
@@ -199,7 +172,6 @@ class Invocation(Thread):
             logging.error(traceback.format_exc())
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
-                self._return_value = str(e)
                 self._exception = e
             raise e
         finally:
@@ -274,10 +246,21 @@ class ActionManager:
             self._invocations[invocation.id] = invocation
         
     def invoke_action(
-            self, action: ActionDescriptor, thing: Thing, input: Any
+            self,
+            action: ActionDescriptor,
+            thing: Thing,
+            id: uuid.UUID,
+            input: Any,
+            dependencies: dict[str, Any],
         ) -> Invocation:
         """Invoke an action, returning the thread where it's running"""
-        thread = Invocation(action, thing, input)
+        thread = Invocation(
+            action=action,
+            thing=thing,
+            input=input,
+            dependencies=dependencies,
+            id=id,
+        )
         self.append_invocation(thread)
         thread.start()
         return thread

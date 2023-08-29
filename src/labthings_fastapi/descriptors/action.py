@@ -3,19 +3,20 @@ Define an object to represent an Action, as a descriptor.
 """
 from __future__ import annotations
 from functools import partial
+import inspect
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Request
 from pydantic import create_model
 from ..actions import InvocationModel
-from ..file_manager import FileManager
+from ..dependencies.invocation_id import InvocationID
 from ..utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
+    fastapi_dependency_params,
     get_docstring,
     get_summary,
     input_model_from_signature,
     return_type,
-    function_dependencies,
 )
 from ..thing_description import type_to_dataschema
 from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
@@ -55,11 +56,11 @@ class ActionDescriptor():
     ):
         self.func = func
         self.response_timeout = response_timeout
-        self.dependencies = function_dependencies(func, [FileManager])
+        self.dependency_params = fastapi_dependency_params(func)
         self.input_model = input_model_from_signature(
             func, 
             remove_first_positional_arg=True, 
-            ignore=list(self.dependencies.keys())
+            ignore=[p.name for p in self.dependency_params]
         )
         self.output_model = return_type(func)
         self.invocation_model = create_model(
@@ -117,18 +118,36 @@ class ActionDescriptor():
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
-        def start_action(body): # We'll annotate body later
-            return thing.action_manager.invoke_action(self, thing, body).response()
+        def start_action(request: Request, body, id: InvocationID, **dependencies):
+            try:
+                action = thing.action_manager.invoke_action(
+                    action=self,
+                    thing=thing,
+                    input=body,
+                    dependencies=dependencies,
+                    id=id,
+                )
+                return action.response()
+            finally:
+                try:
+                    action._file_manager = request.state.file_manager
+                except AttributeError:
+                    pass  # This probably means there was no FileManager created.
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)
         else:
             annotation = Body()
         start_action.__annotations__["body"] = Annotated[self.input_model, annotation]
-        # if issubclass(self.input_model, EmptyInput):
-        #     # If empty input is acceptable, allow it to be called with no body.
-        #     existing_defaults = start_action.__defaults__ or ()
-        #     extra_default = (Field(default_factory=StrictEmptyInput),) 
-        #     start_action.__defaults__ = extra_default + existing_defaults
+        # The block below passes through parameters of the action function that are
+        # FastAPI dependencies, so they can be properly injected.
+        # It also removes the `**dependencies` parameter from the signature.
+        # This means that `dependencies` is a dict mapping parameter names to
+        # **resolved** dependency objects.
+        sig = inspect.signature(start_action)
+        params = [p for p in sig.parameters.values() if p.name != "dependencies"]
+        params += self.dependency_params
+        start_action.__signature__ = sig.replace(parameters=params)
+        # Now we can add the endpoint to the app.
         app.post(
             thing.path + self.name,
             response_model=self.invocation_model, 

@@ -128,7 +128,6 @@ def test_no_args():
 
 
 def test_only_kwargs():
-    print(thing.__class__.action_with_only_kwargs.input_model)
     with TestClient(server.app) as client:
         run = action_partial(client, "/thing/action_with_only_kwargs")
         run({})  # an empty dict should be OK
@@ -148,6 +147,7 @@ def test_varargs():
 def test_action_output():
     with TestClient(server.app) as client:
         r = client.post("/thing/make_a_dict", json={})
+        r.raise_for_status()
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "completed"
         assert invocation["output"] == {"key": "value"}

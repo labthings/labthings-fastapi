@@ -18,6 +18,7 @@ import inspect
 from inspect import Parameter, signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.main import create_model
+from fastapi.dependencies.utils import analyze_param, get_typed_signature
 
 
 class EmptyObject(BaseModel):
@@ -123,6 +124,27 @@ def function_dependencies(
         name: (type_, full_type_hints[name]) for name, type_ in type_hints.items()
         if type_ in dependency_types
     }
+
+
+def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
+    """Find the arguments of a function that are FastAPI dependencies
+    
+    This allows us to "pass through" the full power of the FastAPI dependency
+    injection system to thing actions.
+    """
+    # TODO: this currently ignores path parameters
+    sig = get_typed_signature(func)
+    dependencies = []
+    for param_name, param in sig.parameters.items():
+        type_annotation, depends, param_field = analyze_param(
+            param_name=param_name,
+            annotation=param.annotation,
+            value=param.default,
+            is_path_param=False,
+        )
+        if depends is not None:
+            dependencies.append(param)
+    return dependencies
 
 
 def return_type(func: Callable) -> Type:

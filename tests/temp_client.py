@@ -11,6 +11,8 @@ def task_href(t):
 
 def poll_task(client, task):
     """Poll a task until it finishes, and return the return value"""
+    if "status" not in task:
+        raise ValueError(f"task has no status: {task}")
     while task["status"] in ACTION_RUNNING_KEYWORDS:
         r = client.get(task_href(task))
         r.raise_for_status()

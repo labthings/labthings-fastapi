@@ -12,6 +12,16 @@ def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]:
     """A list of all the attributes of an object's class"""
     cls = obj.__class__
     for name in dir(cls):
+        if name.startswith("__"):
+            continue
+        yield name, getattr(cls, name)
+
+
+def attributes(cls: Any) -> Iterable[tuple[str, Any]]:
+    """A list of all the attributes of an object not starting with `__`"""
+    for name in dir(cls):
+        if name.startswith("__"):
+            continue
         yield name, getattr(cls, name)
 
 
