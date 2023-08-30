@@ -8,7 +8,7 @@ from pydantic import BaseModel, RootModel, create_model
 from fastapi import Body, FastAPI
 from anyio.abc import ObjectSendStream
 from weakref import WeakSet
-from ..utilities import labthings_data
+from ..utilities import labthings_data, wrap_plain_types_in_rootmodel
 from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..thing_description import type_to_dataschema
 
@@ -40,16 +40,7 @@ class PropertyDescriptor():
             raise ValueError("getter and an initial value are mutually exclusive.")
         if model is None:
             raise ValueError("LabThings Properties must have a type")
-        print(f"Initialising property with model: {model}")
-        try:
-            assert issubclass(model, BaseModel)
-            self.model = model
-        except (TypeError, AssertionError):
-            self.model = create_model(
-                f"{model!r}", 
-                root=(model, ...), 
-                __base__=RootModel
-            )
+        self.model = wrap_plain_types_in_rootmodel(model)
         self.readonly = readonly
         self.observable = observable
         self.initial_value = initial_value
@@ -60,7 +51,6 @@ class PropertyDescriptor():
         self._getter = getter or getattr(self, "_getter", None)
         if self.description and not self.title:
             self.title = self.description.partition("\n")[0]
-        self._observers: WeakSet[ObjectSendStream] = WeakSet()
         # Try to generate a DataSchema, so that we can raise an error that's easy to
         # link to the offending PropertyDescriptor
         type_to_dataschema(self.model)

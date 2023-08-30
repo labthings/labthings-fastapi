@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Iterable, TYPE_CHECKING, Optional
 from weakref import WeakSet
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
 from anyio.from_thread import BlockingPortal
 
@@ -42,3 +42,22 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
 def get_blocking_portal(obj: Thing) -> Optional[BlockingPortal]:
     """Retrieve a blocking portal from a Thing"""
     return obj._labthings_blocking_portal
+
+
+def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
+    """Ensure a type is a subclass of BaseModel.
+    
+    If a `BaseModel` subclass is passed to this function, we will pass it
+    through unchanged. Otherwise, we wrap the type in a RootModel.
+    In the future, we may explicitly check that the argument is a type
+    and not a model instance.
+    """
+    try:  # This needs to be a `try` as basic types are not classes
+        assert issubclass(model, BaseModel)
+        return model
+    except (TypeError, AssertionError):
+        return create_model(
+            f"{model!r}", 
+            root=(model, ...), 
+            __base__=RootModel
+        )
