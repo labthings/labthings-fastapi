@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import RootModel, BaseModel
+from pydantic import BaseModel
 import numpy as np
 
 from labthings_fastapi.types.numpy import NDArray

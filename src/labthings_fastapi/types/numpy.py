@@ -20,7 +20,6 @@ Complex numbers are currently not supported, again this is left for the future.
 from __future__ import annotations
 import numpy as np
 from pydantic import (
-    BeforeValidator,
     PlainSerializer,
     PlainValidator,
     RootModel,
