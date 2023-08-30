@@ -4,11 +4,10 @@ This allows dependencies that are called by threaded code to send things back
 to the async event loop.
 """
 from __future__ import annotations
-import uuid
 from typing import Annotated
 from fastapi import Depends, Request
 from anyio.from_thread import BlockingPortal as RealBlockingPortal
-from ..thing_server import find_thing_server, ThingServer
+from ..thing_server import find_thing_server
 
 
 def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
@@ -20,4 +19,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     return find_thing_server(request.app).blocking_portal
 
 
-BlockingPortal = Annotated[RealBlockingPortal, Depends(blocking_portal_from_thing_server)]
+BlockingPortal = Annotated[
+    RealBlockingPortal,
+    Depends(blocking_portal_from_thing_server)
+]
