@@ -16,7 +16,10 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     This is for use as a FastAPI dependency, to allow other dependencies to
     access the invocation ID. Useful for e.g. file management.
     """
-    return find_thing_server(request.app).blocking_portal
+    portal = find_thing_server(request.app).blocking_portal
+    if portal is None:
+        raise RuntimeError("Could not get the blocking portal from the server.")
+    return portal
 
 
 BlockingPortal = Annotated[

@@ -26,6 +26,7 @@ dev = [
   "mypy>=0.812",
   "ruff>=0.0.283",
   "types-jsonschema",
+  "numpy~=1.20",
 ]
 
 [project.urls]
@@ -40,4 +41,4 @@ build-backend = "setuptools.build_meta"
 target-version = "py39"
 
 [tool.mypy]
-plugins = ["pydantic.mypy"]
+plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
