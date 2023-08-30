@@ -23,9 +23,7 @@ from pydantic import (
     RootModel,
     WithJsonSchema,
 )
-import pydantic.json_schema
-from enum import StrEnum
-from typing import Annotated, Dict, List, Optional, Tuple, Union
+from typing import Annotated, List, Union
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
