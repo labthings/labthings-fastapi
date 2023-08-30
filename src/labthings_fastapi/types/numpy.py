@@ -14,12 +14,15 @@ def double(arr: NDArray) -> NDArray:
 The implementation is not super elegant: it isn't recursive so has only been
 defined for up to 6d arrays. Specifying the dimensionality might be a nice
 touch, but is left for the future.
+
+Complex numbers are currently not supported, again this is left for the future.
 """
 from __future__ import annotations
 import numpy as np
 from pydantic import (
     BeforeValidator,
     PlainSerializer,
+    PlainValidator,
     RootModel,
     WithJsonSchema,
 )
@@ -28,7 +31,7 @@ from typing import Annotated, List, Union
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
 # but the below gets the job done for now.
-Number = Union[int, float, complex]
+Number = Union[int, float]
 NestedListOfNumbers = Union[
     Number,
     List[Number],
@@ -50,14 +53,14 @@ def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
     """
     return arr.tolist()
 
-def listoflists_to_np(lol: NestedListOfNumbers) -> np.ndarray:
-    """Convert a list of lists to a numpy array"""
+def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
+    """Convert a list of lists to a numpy array (or pass-through ndarrays)"""
     return np.asarray(lol)
 
 # Define an annotated type so Pydantic can cope with numpy
 NDArray = Annotated[
     np.ndarray,
-    BeforeValidator(listoflists_to_np),
+    PlainValidator(listoflists_to_np),
     PlainSerializer(np_to_listoflists, when_used="json-unless-none"),
     WithJsonSchema(NestedListOfNumbersModel.model_json_schema(), mode="validation"),
 ]
