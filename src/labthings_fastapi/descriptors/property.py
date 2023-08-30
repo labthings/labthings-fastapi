@@ -23,11 +23,11 @@ class PropertyDescriptor():
     By default, a PropertyDescriptor is "dumb", i.e. it acts just like
     a normal variable.
     """
-    model: BaseModel
+    model: type[BaseModel]
     readonly: bool = False
     def __init__(
             self, 
-            model: Union[BaseModel, type], 
+            model: type,
             initial_value: Any = None,
             readonly: bool = False,
             observable: bool = False,
