@@ -85,6 +85,7 @@ class ThingServer:
         * It runs setup/teardown code for Things.
         """
         async with BlockingPortal() as portal:
+            self.blocking_portal = portal
             # We attach a blocking portal to each thing, so that threaded code can
             # make callbacks to async code (needed for events etc.)
             for thing in self.things.values():
@@ -102,3 +103,4 @@ class ThingServer:
             for thing in self.things.values():
                 # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
+        self.blocking_portal = None
