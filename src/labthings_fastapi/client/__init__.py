@@ -60,7 +60,7 @@ class ThingClient:
     def invoke_action(self, path: str, **kwargs):
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
-        poll_task(self.client, r.json())
+        return poll_task(self.client, r.json())
 
 
 class PropertyClientDescriptor:
