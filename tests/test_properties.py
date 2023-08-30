@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from labthings_fastapi.thing_server import ThingServer
 from threading import Thread
 from pytest import raises
+from pydantic import BaseModel
 
 class TestThing(Thing):
     boolprop = PropertyDescriptor(bool, False, description="A boolean property")
@@ -37,6 +38,16 @@ thing = TestThing()
 server = ThingServer()
 server.add_thing(thing, "/thing")
 
+def test_instantiation_with_type():
+    prop = PropertyDescriptor(bool, False)
+    assert issubclass(prop.model, BaseModel)
+
+def test_instantiation_with_model():
+    class MyModel(BaseModel):
+        a: int = 1
+        b: float = 2.0
+    prop = PropertyDescriptor(MyModel, MyModel())
+    assert prop.model is MyModel
 
 def test_property_get_and_set():
     with TestClient(server.app) as client:
@@ -44,7 +55,6 @@ def test_property_get_and_set():
         client.post("/thing/stringprop", json=test_str)
         after_value = client.get("/thing/stringprop")
         assert after_value.json() == test_str
-
 
 def test_propertydescriptor():
     with TestClient(server.app) as client:

@@ -23,7 +23,7 @@ class PropertyDescriptor():
     By default, a PropertyDescriptor is "dumb", i.e. it acts just like
     a normal variable.
     """
-    model: type
+    model: BaseModel
     readonly: bool = False
     def __init__(
             self, 
@@ -40,9 +40,11 @@ class PropertyDescriptor():
             raise ValueError("getter and an initial value are mutually exclusive.")
         if model is None:
             raise ValueError("LabThings Properties must have a type")
-        if not isinstance(model, BaseModel):
+        print(f"Initialising property with model: {model}")
+        try:
+            assert issubclass(model, BaseModel)
             self.model = model
-        else:
+        except (TypeError, AssertionError):
             self.model = create_model(
                 f"{model!r}", 
                 root=(model, ...), 
@@ -126,7 +128,7 @@ class PropertyDescriptor():
             value,
         )
 
-    async def emit_changed_event_async(self, obj, value):
+    async def emit_changed_event_async(self, obj: Thing, value: Any):
         """Notify subscribers that the property has changed"""
         for observer in self._observers_set(obj):
             await observer.send(
