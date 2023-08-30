@@ -2,11 +2,10 @@
 Define an object to represent an Action, as a descriptor.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
 from typing_extensions import Self
-from pydantic import BaseModel, RootModel, create_model
+from pydantic import BaseModel, RootModel
 from fastapi import Body, FastAPI
-from anyio.abc import ObjectSendStream
 from weakref import WeakSet
 from ..utilities import labthings_data, wrap_plain_types_in_rootmodel
 from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
