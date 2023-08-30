@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import Optional, Sequence, TypeVar
+import os.path
 from fastapi import FastAPI
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
@@ -8,10 +9,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from .actions import ActionManager
 from .thing_settings import ThingSettings
-import os.path
-
-if TYPE_CHECKING:
-    from .thing import Thing
+from .thing import Thing
 
 
 _thing_servers: WeakSet[ThingServer] = WeakSet()
@@ -38,11 +36,29 @@ class ThingServer:
         _thing_servers.add(self)
 
     app: FastAPI
+    action_manager: ActionManager
 
     @property
     def things(self) -> Mapping[str, Thing]:
         """Return a dictionary of all the things"""
         return MappingProxyType(self._things)
+    
+    ThingInstance = TypeVar("ThingInstance", bound=Thing)
+    def things_by_class(self, cls: type[ThingInstance]) -> Sequence[ThingInstance]:
+        """Return all Things attached to this server matching a class"""
+        return [t for t in self.things.values() if isinstance(t, cls)]
+    
+    def thing_by_class(self, cls: type[ThingInstance]) -> ThingInstance:
+        """The Thing attached to this server matching a given class.
+        
+        A RuntimeError will be raised if there is not exactly one matching Thing.
+        """
+        instances = self.things_by_class(cls)
+        if len(instances) == 1:
+            return instances[0]
+        raise RuntimeError(
+            f"There are {len(instances)} Things of class {cls}, expected 1."
+        )
     
     def add_thing(self, thing: Thing, path: str):
         """Add a thing to the server"""
