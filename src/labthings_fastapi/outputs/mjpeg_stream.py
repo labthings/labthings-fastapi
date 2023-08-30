@@ -128,6 +128,8 @@ class MJPEGStream:
 
     def add_frame(self, frame: bytes, portal: BlockingPortal):
         """Return the next buffer in the ringbuffer to write to"""
+        assert frame[0]==0xFF and frame[1]==0xD8, ValueError("Invalid JPEG")
+        assert frame[-2]==0xFF and frame[-1]==0xD9, ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
             if entry.readers > 0:
