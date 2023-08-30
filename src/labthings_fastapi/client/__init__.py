@@ -6,6 +6,7 @@ Description.
 """
 
 from __future__ import annotations
+import time
 from typing import Any, Optional, Union
 import httpx
 from urllib.parse import urlparse, urljoin
@@ -26,12 +27,15 @@ def task_href(t):
     return get_link(t, "self")["href"]
 
 
-def poll_task(client, task, interval=0.5):
+def poll_task(client, task, interval=0.5, first_interval=0.05):
     """Poll a task until it finishes, and return the return value"""
+    first_time = True
     while task["status"] in ACTION_RUNNING_KEYWORDS:
+        time.sleep(first_interval if first_time else interval)
         r = client.get(task_href(task))
         r.raise_for_status()
         task = r.json()
+        first_time = False
     return task
 
 
