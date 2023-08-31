@@ -20,12 +20,16 @@ Complex numbers are currently not supported, again this is left for the future.
 from __future__ import annotations
 import numpy as np
 from pydantic import (
+    ConfigDict,
     PlainSerializer,
     PlainValidator,
     RootModel,
+    SerializerFunctionWrapHandler,
     WithJsonSchema,
+    WrapSerializer,
 )
-from typing import Annotated, List, Union
+from typing import Annotated, Any, List, Union
+from collections.abc import Mapping, Sequence
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
@@ -63,3 +67,22 @@ NDArray = Annotated[
     PlainSerializer(np_to_listoflists, when_used="json-unless-none"),
     WithJsonSchema(NestedListOfNumbersModel.model_json_schema(), mode="validation"),
 ]
+
+def denumpify(v: Any) -> Any:
+    """Convert any numpy array in a dict into a list"""
+    if isinstance(v, np.ndarray):
+        return v.tolist()
+    elif isinstance(v, Mapping):
+        return {k: denumpify(vv) for k, vv in v.items()}
+    elif isinstance(v, Sequence):
+        return [denumpify(vv) for vv in v]
+    else:
+        return v
+
+def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
+    """A Pydantic wrap serializer to denumpify mappings before serialization"""
+    return nxt(denumpify(v))
+
+class DenumpifyingDict(RootModel):
+    root: Annotated[Mapping, WrapSerializer(denumpify_serializer)]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
