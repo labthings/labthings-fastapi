@@ -83,7 +83,7 @@ class ReactiveDict(Mapping):
         out = self._data.copy()
         for k, v in self._data.items():
             if isinstance(v, ReactiveDict):
-                out[k] = v.dict()
+                out[k] = v.dict
         return out
 
 
