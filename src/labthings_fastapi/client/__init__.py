@@ -22,6 +22,11 @@ def get_link(obj: dict, rel: str) -> str:
     return next(link for link in obj["links"] if link["rel"] == rel)
 
 
+def get_link_href(obj: dict, rel: str) -> str:
+    """Retrieve the `href` from an object's `links` list, by its `rel` attribute"""
+    return get_link(obj, rel)["href"]
+
+
 def task_href(t):
     """Extract the endpoint address from a task dictionary"""
     return get_link(t, "self")["href"]
@@ -65,6 +70,13 @@ class ThingClient:
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
         return poll_task(self.client, r.json())
+    
+    def follow_link(self, response: dict, rel: str) -> httpx.Response:
+        """Follow a link in a response object, by its `rel` attribute"""
+        href = get_link_href(response, rel)
+        r = self.client.get(href)
+        r.raise_for_status()
+        return r
 
 
 class PropertyClientDescriptor:
