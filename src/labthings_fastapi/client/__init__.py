@@ -8,6 +8,7 @@ Description.
 from __future__ import annotations
 import time
 from typing import Any, Optional, Union
+from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
 
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
 
-def get_link(obj: dict, rel: str) -> str:
+def get_link(obj: dict, rel: str) -> Mapping:
     """Retrieve a link from an object's `links` list, by its `rel` attribute"""
     return next(link for link in obj["links"] if link["rel"] == rel)
 

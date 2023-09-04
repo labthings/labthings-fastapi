@@ -4,7 +4,6 @@ from collections.abc import Mapping
 
 from fastapi import Depends, Request
 
-from ..thing import Thing
 from ..thing_server import find_thing_server
 
 
