@@ -21,4 +21,4 @@ def get_thing_states(
     metadata = {k:  v.thing_state for k, v in server.things.items()}
     return metadata
 
-ThingStates = Annotated(Mapping[str, Any], Depends(get_thing_states))
+ThingStates = Annotated[Mapping[str, Any], Depends(get_thing_states)]
