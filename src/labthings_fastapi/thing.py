@@ -9,6 +9,7 @@ will do in the future...
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
+from collections.abc import Mapping
 from fastapi.encoders import jsonable_encoder
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
@@ -117,6 +118,26 @@ class Thing:
     @thing_settings.setter
     def thing_settings(self, newsettings: ThingSettings):
         self.thing_settings.replace(newsettings)
+
+    _labthings_thing_state: Optional[dict] = None
+    @property
+    def thing_state(self) -> Mapping:
+        """Return a dictionary summarising our current state
+        
+        This is intended to be an easy way to collect metadata from a Thing that
+        summarises its state. It might be used, for example, to record metadata
+        along with each reading/image/etc. when an instrument is saving data.
+
+        It's best to populate this automatically so it can always be accessed. If
+        it requires calls e.g. to a serial instrument, bear in mind it may be called
+        quite often and shouldn't take too long.
+
+        Some measure of cacheing here is a nice aim for the future, but not yet
+        implemented.
+        """
+        if self._labthings_thing_state is None:
+            self._labthings_thing_state = {}
+        return self._labthings_thing_state
 
     def validate_thing_description(self):
         """Raise an exception if the thing description is not valid"""
