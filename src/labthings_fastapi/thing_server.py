@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, Sequence, TypeVar
 import os.path
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
 from weakref import WeakSet
@@ -27,6 +28,7 @@ class ThingServer:
             settings_folder: Optional[str]=None
         ):
         self.app = FastAPI(lifespan=self.lifespan)
+        self.set_cors_middleware()
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
@@ -37,6 +39,15 @@ class ThingServer:
 
     app: FastAPI
     action_manager: ActionManager
+
+    def set_cors_middleware(self) -> None:
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     @property
     def things(self) -> Mapping[str, Thing]:
