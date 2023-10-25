@@ -56,6 +56,10 @@ class Invocation(Thread):
         self.stopping: Event = Event()
         self.default_stop_timeout: float = default_stop_timeout
 
+        # How long to keep the invocation after it finishes
+        self.retention_time = action.retention_time
+        self.expiry_time: Optional[datetime.datetime] = None
+
         # This is added post-hoc by the FastAPI endpoint, in
         # `ActionDescriptor.add_to_fastapi`
         self._file_manager: Optional[FileManager] = None
@@ -177,6 +181,10 @@ class Invocation(Thread):
         finally:
             with self._status_lock:
                 self._end_time = datetime.datetime.now()
+                self.expiry_time = self._end_time + datetime.timedelta(
+                    seconds=self.retention_time,
+                )
+            logging.info(f"Action invocation {self.id} will expire in {self.retention_time}s, i.e. at {self.expiry_time}")
             logging.getLogger().removeHandler(handler)  # Stop logging this thread
             # If we don't remove the log handler, it's a memory leak.
 
@@ -271,12 +279,24 @@ class ActionManager:
             thing: Optional[Thing] = None,
             as_responses: bool = False,
             request: Optional[Request] = None) -> list[InvocationModel]:
+        """All of the invocations currently managed"""
         return [
             i.response(request=request) if as_responses else i 
             for i in self.invocations
             if thing is None or i.thing == thing
             if action is None or i.action==action
         ]
+    
+    def expire_invocations(self):
+        """Delete invocations that have passed their expiry time"""
+        to_delete = []
+        with self._invocations_lock:
+            for k, v in self._invocations.items():
+                if v.expiry_time is not None and v.expiry_time < datetime.datetime.now():
+                    to_delete.append(k)
+            logging.info(f"Deleting invocations {to_delete} as they have expired")
+            for k in to_delete:
+                del self._invocations[k]
     
     def attach_to_app(self, app: FastAPI):
         """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""

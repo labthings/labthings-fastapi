@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import partial
 import inspect
 from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
-from fastapi import Body, FastAPI, Request
+from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
 from ..dependencies.invocation_id import InvocationID
@@ -53,9 +53,11 @@ class ActionDescriptor():
         self, 
         func: Callable,
         response_timeout: float = 1,
+        retention_time: float = 300,
     ):
         self.func = func
         self.response_timeout = response_timeout
+        self.retention_time = retention_time
         self.dependency_params = fastapi_dependency_params(func)
         self.input_model = input_model_from_signature(
             func, 
@@ -118,7 +120,12 @@ class ActionDescriptor():
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
-        def start_action(request: Request, body, id: InvocationID, **dependencies):
+        def start_action(
+                request: Request,
+                body,
+                id: InvocationID,
+                background_tasks: BackgroundTasks,
+                **dependencies):
             try:
                 action = thing.action_manager.invoke_action(
                     action=self,
@@ -127,6 +134,7 @@ class ActionDescriptor():
                     dependencies=dependencies,
                     id=id,
                 )
+                background_tasks.add_task(thing.action_manager.expire_invocations)
                 return action.response()
             finally:
                 try:
