@@ -32,6 +32,7 @@ class ThingServer:
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
+        self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
         global _thing_servers
@@ -115,3 +116,18 @@ class ThingServer:
                 # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
         self.blocking_portal = None
+
+    def add_things_view_to_app(self):
+        """Add an endpoint that shows the list of attached things."""
+        thing_server = self
+        @self.app.get("/thing_descriptions/")
+        def thing_descriptions() -> Mapping[str, Mapping]:
+            """A dictionary of all the things available from this server"""
+            return {
+                path: thing.thing_description(path)
+                for path, thing in thing_server.things.items()
+            }
+        @self.app.get("/things/")
+        def thing_paths() -> Sequence[str]:
+            """A dictionary of all the things available from this server"""
+            return list(thing_server.things.keys())
