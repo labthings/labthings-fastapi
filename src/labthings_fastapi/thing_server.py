@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Sequence, TypeVar
 import os.path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
@@ -11,6 +11,7 @@ from types import MappingProxyType
 from .actions import ActionManager
 from .thing_settings import ThingSettings
 from .thing import Thing
+from .thing_description.model import ThingDescription
 
 
 _thing_servers: WeakSet[ThingServer] = WeakSet()
@@ -120,14 +121,21 @@ class ThingServer:
     def add_things_view_to_app(self):
         """Add an endpoint that shows the list of attached things."""
         thing_server = self
-        @self.app.get("/thing_descriptions/")
-        def thing_descriptions() -> Mapping[str, Mapping]:
+        @self.app.get(
+                "/thing_descriptions/",
+                response_model_exclude_none=True,
+                response_model_by_alias=True,
+            )
+        def thing_descriptions(request: Request) -> Mapping[str, ThingDescription]:
             """A dictionary of all the things available from this server"""
             return {
-                path: thing.thing_description(path)
+                path: thing.thing_description(path, base=str(request.base_url))
                 for path, thing in thing_server.things.items()
             }
         @self.app.get("/things/")
-        def thing_paths() -> Sequence[str]:
-            """A dictionary of all the things available from this server"""
-            return list(thing_server.things.keys())
+        def thing_paths(request: Request) -> Mapping[str, str]:
+            """A list of URLs pointing to the Thing Descriptions of each Thing on the server."""
+            return {
+                t: f"{str(request.base_url).rstrip('/')}{t}" 
+                for t in thing_server.things.keys()
+            }

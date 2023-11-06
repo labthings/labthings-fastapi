@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
 from fastapi.encoders import jsonable_encoder
+from fastapi import Request
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
@@ -97,10 +98,12 @@ class Thing:
         @server.app.get(
                 self.path, 
                 summary=get_summary(self.thing_description),
-                description=get_docstring(self.thing_description)
+                description=get_docstring(self.thing_description),
+                response_model_exclude_none=True,
+                response_model_by_alias=True,
             )
-        def thing_description():
-            return self.thing_description_dict()
+        def thing_description(request: Request) -> ThingDescription:
+            return self.thing_description(base=str(request.base_url))
         
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket):
@@ -144,8 +147,8 @@ class Thing:
         td = self.thing_description_dict()
         return validation.validate_thing_description(td)
 
-    _cached_thing_description: Optional[tuple[str, ThingDescription]] = None
-    def thing_description(self, path: Optional[str] = None) -> ThingDescription:
+    _cached_thing_description: Optional[tuple[str, str, ThingDescription]] = None
+    def thing_description(self, path: Optional[str] = None, base: Optional[str] = None) -> ThingDescription:
         """A w3c Thing Description representing this thing
         
         The w3c Web of Things working group defined a standard representation
@@ -154,8 +157,12 @@ class Thing:
         representation of the Thing Description for this Thing.
         """
         path = path or getattr(self, "path", "{base_uri}")
-        if self._cached_thing_description and self._cached_thing_description[0] == path:
-            return self._cached_thing_description[1]
+        if (
+            self._cached_thing_description 
+            and self._cached_thing_description[0] == path
+            and self._cached_thing_description[1] == base
+        ):
+            return self._cached_thing_description[2]
         
         properties = {}
         actions = {}
@@ -165,15 +172,22 @@ class Thing:
             if hasattr(item, "action_affordance"):
                 actions[name] = (item.action_affordance(self, path))
 
-        return ThingDescription(
+        td = ThingDescription(
             title=getattr(self, "title", self.__class__.__name__),
             properties=properties,
             actions=actions,
             security="no_security",
             securityDefinitions={"no_security": NoSecurityScheme()},
+            base=base,
         )
+        self._cached_thing_description = (path, base, td)
+        return td
     
-    def thing_description_dict(self, path: Optional[str] = None) -> dict:
+    def thing_description_dict(
+            self,
+            path: Optional[str] = None,
+            base: Optional[str] = None,
+        ) -> dict:
         """A w3c Thing Description representing this thing, as a simple dict
         
         The w3c Web of Things working group defined a standard representation
@@ -181,7 +195,7 @@ class Thing:
         properties, and events that it exposes. This endpoint delivers a JSON
         representation of the Thing Description for this Thing.
         """
-        td: ThingDescription = self.thing_description(path=path)
+        td: ThingDescription = self.thing_description(path=path, base=base)
         td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
 
