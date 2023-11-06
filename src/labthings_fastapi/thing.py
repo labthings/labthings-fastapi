@@ -60,6 +60,7 @@ class Thing:
     """
     title: str
     _labthings_blocking_portal: Optional[BlockingPortal] = None
+    path: Optional[str]
 
     async def __aenter__(self):
         """Context management is used to set up/close the thing.
@@ -147,8 +148,12 @@ class Thing:
         td = self.thing_description_dict()
         return validation.validate_thing_description(td)
 
-    _cached_thing_description: Optional[tuple[str, str, ThingDescription]] = None
-    def thing_description(self, path: Optional[str] = None, base: Optional[str] = None) -> ThingDescription:
+    _cached_thing_description: Optional[
+        tuple[Optional[str], Optional[str], ThingDescription]
+    ] = None
+    def thing_description(
+            self, path: Optional[str] = None, base: Optional[str] = None
+        ) -> ThingDescription:
         """A w3c Thing Description representing this thing
         
         The w3c Web of Things working group defined a standard representation
