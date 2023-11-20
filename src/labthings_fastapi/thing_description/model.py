@@ -29,6 +29,9 @@ Security = Union[List[str], str]
 Scopes = Union[List[str], str]
 TypeDeclaration = Union[str, List[str]]
 
+# From the spec, TypeDeclaration should be in:
+# boolean, integer, number, string, object,
+# array, or null
 
 class Subprotocol(Enum):
     longpoll = 'longpoll'

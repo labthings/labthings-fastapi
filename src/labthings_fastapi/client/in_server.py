@@ -9,8 +9,9 @@ This module may get moved in the near future.
 """
 from __future__ import annotations
 from functools import wraps
+import inspect
 import logging
-from typing import Any, Optional, Union
+from typing import Any, Mapping, Optional, Union
 from pydantic import BaseModel
 from labthings_fastapi.descriptors.action import ActionDescriptor
 
@@ -25,7 +26,7 @@ class DirectThingClient:
     __globals__ = globals()  # "bake in" globals so dependency injection works
     thing_class: type[Thing]
     thing_path: str
-    def __init__(self, request: Request):
+    def __init__(self, request: Request, **dependencies: Mapping[str, Any]):
         """Wrapper for a Thing that makes it work like a ThingClient
         
         This class is designed to be used as a FastAPI dependency, and will retrieve a
@@ -34,6 +35,8 @@ class DirectThingClient:
         """
         server = find_thing_server(request.app)
         self._wrapped_thing = server.things[self.thing_path]
+        self._request = request
+        self._dependencies = dependencies
 
 def property_descriptor(
         property_name: str,
@@ -82,8 +85,28 @@ def add_action(
     """Add an action to a DirectThingClient subclass"""
     @wraps(action.func)
     def action_method(self, **kwargs):
-        return getattr(self._wrapped_thing, name)(**kwargs)
+        dependency_kwargs = {
+            param.name: self._dependencies[param.name]
+            for param in action.dependency_params
+        }
+        kwargs_and_deps = {**kwargs, **dependency_kwargs}
+        return getattr(self._wrapped_thing, name)(**kwargs_and_deps)
     setattr(cls, name, action_method)
+    # We collect up all the dependencies, so that we can
+    # resolve them when we create the client.
+    for param in action.dependency_params:
+        included = False
+        for existing_param in cls._dependency_params:
+            if existing_param.name == param.name:
+                # Currently, each name may only have one annotation, across
+                # all actions - this is a limitation we should fix.
+                if existing_param.annotation != param.annotation:
+                    raise ValueError(
+                        f"Conflicting dependency injection for {param.name}"
+                    )
+                included = True
+        if not included:
+            cls._dependency_params.append(param)
 
 
 def add_property(
@@ -104,20 +127,27 @@ def add_property(
             )
         )
     
-def direct_thing_client(thing_class: type[Thing], thing_path: str):
+def direct_thing_client(
+        thing_class: type[Thing],
+        thing_path: str,
+        actions: Optional[list[str]]=None,
+    ):
     """Create a DirectThingClient from a Thing class and a path
     
     This is a class, not an instance: it's designed to be a FastAPI dependency.
     """
     class Client(DirectThingClient):
-        pass
+        _dependency_params = []
     Client.thing_class = thing_class
     Client.thing_path = thing_path
     for name, item in attributes(thing_class):
         if isinstance(item, PropertyDescriptor):
             # TODO: What about properties that don't use descriptors? Fall back to http?
             add_property(Client, name, item)
-        elif isinstance(item, ActionDescriptor):
+        elif (
+                isinstance(item, ActionDescriptor)
+                and (actions is None or name in actions)
+            ):
             add_action(Client, name, item)
         else:
             for affordance in ["property", "action", "event"]:
@@ -126,4 +156,13 @@ def direct_thing_client(thing_class: type[Thing], thing_path: str):
                         f"DirectThingClient doesn't support custom afforcances, "
                         f"ignoring {name}"
                     )
+    # This block of code makes dependencies show up in __init__ so
+    # they get resolved. It's more or less copied from the `action` descriptor.
+    sig = inspect.signature(Client.__init__)
+    params = [p for p in sig.parameters.values() if p.name != "dependencies"]
+    params += Client._dependency_params
+    Client.__init__.__signature__ = sig.replace(  # type: ignore[attr-defined]
+        parameters=params
+    )
+    
     return Client
