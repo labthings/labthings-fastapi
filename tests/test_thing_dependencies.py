@@ -44,6 +44,39 @@ def test_interthing_dependency():
         assert invocation["status"] == "completed"
         assert invocation["output"] == ThingOne.ACTION_ONE_RESULT
 
+
+def test_interthing_dependency_with_dependencies():
+    """Test that a Thing can depend on another Thing
+    
+    This uses the internal thing client mechanism, and requires
+    dependency injection for the called action
+    """
+    ThingOneClient = direct_thing_client_dependency(ThingOne, "/thing_one/")
+
+    class ThingTwo(Thing):
+        @thing_action
+        def action_two(self, thing_one: ThingOneClient) -> str:
+            """An action that needs a ThingOne"""
+            return thing_one.action_one()
+        
+    ThingTwoClient = direct_thing_client_dependency(ThingTwo, "/thing_two/")
+        
+    class ThingThree(Thing):
+        @thing_action
+        def action_three(self, thing_two: ThingTwoClient) -> str:
+            """An action that needs a ThingTwo"""
+            return thing_two.action_two()
+
+    server = ThingServer()
+    server.add_thing(ThingOne(), "/thing_one")
+    server.add_thing(ThingTwo(), "/thing_two")
+    server.add_thing(ThingThree(), "/thing_three")
+    with TestClient(server.app) as client:
+        r = client.post("/thing_three/action_three")
+        invocation = poll_task(client, r.json())
+        assert invocation["status"] == "completed"
+        assert invocation["output"] == ThingOne.ACTION_ONE_RESULT
+
 def test_raw_interthing_dependency():
     """Test that a Thing can depend on another Thing
     
