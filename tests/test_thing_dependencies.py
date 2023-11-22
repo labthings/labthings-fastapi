@@ -45,6 +45,7 @@ class ThingThree(Thing):
     @thing_action
     def action_three(self, thing_two: ThingTwoDep) -> str:
         """An action that needs a ThingTwo"""
+        # Note that we don't have to supply the ThingOne dependency
         return thing_two.action_two()
 
 
