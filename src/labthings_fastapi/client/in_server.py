@@ -127,7 +127,7 @@ def add_property(
             )
         )
     
-def direct_thing_client(
+def direct_thing_client_class(
         thing_class: type[Thing],
         thing_path: str,
         actions: Optional[list[str]]=None,
@@ -136,10 +136,29 @@ def direct_thing_client(
     
     This is a class, not an instance: it's designed to be a FastAPI dependency.
     """
-    class Client(DirectThingClient):
-        _dependency_params = []
-    Client.thing_class = thing_class
-    Client.thing_path = thing_path
+    def init_proxy(self, request: Request, **dependencies: Mapping[str, Any]):
+        f"""A client for {thing_class} at {thing_path}"""
+        # NB this definition isimportant, as we must modify its signature.
+        # Inheriting __init__ means we'll accidentally modify the signature
+        # of `DirectThingClient` with bad results.
+        DirectThingClient.__init__(self, request, **dependencies)
+
+    # Using a class definition gets confused by the scope of the function
+    # arguments - this is equivalent to a class definition but all the
+    # arguments are evaluated in the right scope.
+    Client = type(
+        f"{thing_class.__name__}DirectClient",
+        (DirectThingClient, ),
+        {
+            "thing_class": thing_class,
+            "thing_path": thing_path,
+            "_dependency_params": [],
+            "__doc__": f"A client for {thing_class} at {thing_path}",
+            "__init__": init_proxy,
+        }
+    )
+    # TODO: it might be neater to add these to the attribute dict above.
+    # That might also get rid of the _dependency_params list
     for name, item in attributes(thing_class):
         if isinstance(item, PropertyDescriptor):
             # TODO: What about properties that don't use descriptors? Fall back to http?
@@ -164,5 +183,4 @@ def direct_thing_client(
     Client.__init__.__signature__ = sig.replace(  # type: ignore[attr-defined]
         parameters=params
     )
-    
     return Client

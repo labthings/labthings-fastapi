@@ -184,7 +184,6 @@ class Invocation(Thread):
                 self.expiry_time = self._end_time + datetime.timedelta(
                     seconds=self.retention_time,
                 )
-            logging.info(f"Action invocation {self.id} will expire in {self.retention_time}s, i.e. at {self.expiry_time}")
             logging.getLogger().removeHandler(handler)  # Stop logging this thread
             # If we don't remove the log handler, it's a memory leak.
 
@@ -292,8 +291,9 @@ class ActionManager:
         to_delete = []
         with self._invocations_lock:
             for k, v in self._invocations.items():
-                if v.expiry_time is not None and v.expiry_time < datetime.datetime.now():
-                    to_delete.append(k)
+                if v.expiry_time is not None:
+                    if v.expiry_time < datetime.datetime.now():
+                        to_delete.append(k)
             logging.info(f"Deleting invocations {to_delete} as they have expired")
             for k in to_delete:
                 del self._invocations[k]
