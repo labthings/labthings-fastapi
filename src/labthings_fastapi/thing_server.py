@@ -134,7 +134,7 @@ class ThingServer:
             }
         @self.app.get("/things/")
         def thing_paths(request: Request) -> Mapping[str, str]:
-            """A list of URLs pointing to the Thing Descriptions of each Thing on the server."""
+            """URLs pointing to the Thing Descriptions of each Thing."""
             return {
                 t: f"{str(request.base_url).rstrip('/')}{t}" 
                 for t in thing_server.things.keys()
