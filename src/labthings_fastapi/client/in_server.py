@@ -81,7 +81,11 @@ def property_descriptor(
 
 
 def add_action(
-    cls: type[DirectThingClient], name: str, action: ActionDescriptor):
+        attrs: dict[str, Any],
+        dependencies: list[inspect.Parameter],
+        name: str,
+        action: ActionDescriptor
+    ) -> None:
     """Add an action to a DirectThingClient subclass"""
     @wraps(action.func)
     def action_method(self, **kwargs):
@@ -91,12 +95,12 @@ def add_action(
         }
         kwargs_and_deps = {**kwargs, **dependency_kwargs}
         return getattr(self._wrapped_thing, name)(**kwargs_and_deps)
-    setattr(cls, name, action_method)
+    attrs[name] = action_method
     # We collect up all the dependencies, so that we can
     # resolve them when we create the client.
     for param in action.dependency_params:
         included = False
-        for existing_param in cls._dependency_params:
+        for existing_param in dependencies:
             if existing_param.name == param.name:
                 # Currently, each name may only have one annotation, across
                 # all actions - this is a limitation we should fix.
@@ -106,25 +110,21 @@ def add_action(
                     )
                 included = True
         if not included:
-            cls._dependency_params.append(param)
+            dependencies.append(param)
 
 
 def add_property(
-        cls: type[DirectThingClient],
+        attrs: dict[str, Any],
         property_name: str,
         property: PropertyDescriptor
-    ):
+    ) -> None:
     """Add a property to a DirectThingClient subclass"""
-    setattr(
-            cls,
+    attrs[property_name] = property_descriptor(
             property_name,
-            property_descriptor(
-                property_name,
-                property.model,
-                description = property.description,
-                writeable = not property.readonly,
-                readable = True,  #TODO: make this configurable in PropertyDescriptor
-            )
+            property.model,
+            description = property.description,
+            writeable = not property.readonly,
+            readable = True,  #TODO: make this configurable in PropertyDescriptor
         )
     
 def direct_thing_client_class(
@@ -146,28 +146,23 @@ def direct_thing_client_class(
     # Using a class definition gets confused by the scope of the function
     # arguments - this is equivalent to a class definition but all the
     # arguments are evaluated in the right scope.
-    Client = type(
-        f"{thing_class.__name__}DirectClient",
-        (DirectThingClient, ),
-        {
-            "thing_class": thing_class,
-            "thing_path": thing_path,
-            "_dependency_params": [],
-            "__doc__": f"A client for {thing_class} at {thing_path}",
-            "__init__": init_proxy,
-        }
-    )
-    # TODO: it might be neater to add these to the attribute dict above.
-    # That might also get rid of the _dependency_params list
+    client_attrs = {
+        "thing_class": thing_class,
+        "thing_path": thing_path,
+        "_dependency_params": [],
+        "__doc__": f"A client for {thing_class} at {thing_path}",
+        "__init__": init_proxy,
+    }
+    dependencies: list[inspect.Parameter] = []
     for name, item in attributes(thing_class):
         if isinstance(item, PropertyDescriptor):
             # TODO: What about properties that don't use descriptors? Fall back to http?
-            add_property(Client, name, item)
+            add_property(client_attrs, name, item)
         elif (
                 isinstance(item, ActionDescriptor)
                 and (actions is None or name in actions)
             ):
-            add_action(Client, name, item)
+            add_action(client_attrs, dependencies, name, item)
         else:
             for affordance in ["property", "action", "event"]:
                 if hasattr(item, f"{affordance}_affordance"):
@@ -177,10 +172,13 @@ def direct_thing_client_class(
                     )
     # This block of code makes dependencies show up in __init__ so
     # they get resolved. It's more or less copied from the `action` descriptor.
-    sig = inspect.signature(Client.__init__)
+    sig = inspect.signature(init_proxy)
     params = [p for p in sig.parameters.values() if p.name != "dependencies"]
-    params += Client._dependency_params
-    Client.__init__.__signature__ = sig.replace(  # type: ignore[attr-defined]
-        parameters=params
+    init_proxy.__signature__ = sig.replace(  # type: ignore[attr-defined]
+        parameters=params + dependencies
     )
-    return Client
+    return type(
+        f"{thing_class.__name__}DirectClient",
+        (DirectThingClient, ),
+        client_attrs
+    )
