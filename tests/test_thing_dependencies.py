@@ -4,6 +4,7 @@ This tests Things that depend on other Things
 import inspect
 from fastapi.testclient import TestClient
 from fastapi import Request
+import pytest
 from labthings_fastapi.thing_server import ThingServer
 from temp_client import poll_task
 from labthings_fastapi.thing import Thing
@@ -133,6 +134,29 @@ def test_raw_interthing_dependency():
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "completed"
         assert invocation["output"] == ThingOne.ACTION_ONE_RESULT
+
+
+def test_conflicting_dependencies():
+    """Dependencies are stored by argument name, and can't be duplicated.
+    We check here that an error is raised if the same argument name is used
+    for two different dependencies.
+
+    This also checks that dependencies on the same class but different
+    actions are recognised as "different".
+    """
+    ThingTwoDepNoActions = direct_thing_client_dependency(ThingTwo, "/thing_two/", [])
+
+    class ThingFour(Thing):
+        @thing_action
+        def action_four(self, thing_two: ThingTwoDepNoActions) -> str:
+            return str(thing_two)
+
+        @thing_action
+        def action_five(self, thing_two: ThingTwoDep) -> str:
+            return thing_two.action_two()
+
+    with pytest.raises(ValueError):
+        direct_thing_client_dependency(ThingFour, "/thing_four/")
 
 
 def check_request():

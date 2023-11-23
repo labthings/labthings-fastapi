@@ -60,24 +60,22 @@ def property_descriptor(
         type = model
         path = property_path or property_name
 
+    def __get__(
+        self,
+        obj: Optional[DirectThingClient] = None,
+        _objtype: Optional[type[DirectThingClient]] = None,
+    ):
+        if obj is None:
+            return self
+        return getattr(obj._wrapped_thing, self.name)
+
+    def __set__(self, obj: DirectThingClient, value: Any):
+        setattr(obj, self.name, value)
+
     if readable:
-
-        def __get__(
-            self,
-            obj: Optional[DirectThingClient] = None,
-            _objtype: Optional[type[DirectThingClient]] = None,
-        ):
-            if obj is None:
-                return self
-            return getattr(obj._wrapped_thing, self.name)
-
         __get__.__annotations__["return"] = model
         P.__get__ = __get__  # type: ignore[attr-defined]
     if writeable:
-
-        def __set__(self, obj: DirectThingClient, value: Any):
-            setattr(obj, self.name, value)
-
         __set__.__annotations__["value"] = model
         P.__set__ = __set__  # type: ignore[attr-defined]
     if description:
@@ -91,7 +89,10 @@ def add_action(
     name: str,
     action: ActionDescriptor,
 ) -> None:
-    """Add an action to a DirectThingClient subclass"""
+    """Generates an action method and adds it to an attrs dict
+
+    FastAPI Dependencies are appended to the `dependencies` list.
+    """
 
     @wraps(action.func)
     def action_method(self, **kwargs):
@@ -156,7 +157,6 @@ def direct_thing_client_class(
     client_attrs = {
         "thing_class": thing_class,
         "thing_path": thing_path,
-        "_dependency_params": [],
         "__doc__": f"A client for {thing_class} at {thing_path}",
         "__init__": init_proxy,
     }
@@ -165,15 +165,16 @@ def direct_thing_client_class(
         if isinstance(item, PropertyDescriptor):
             # TODO: What about properties that don't use descriptors? Fall back to http?
             add_property(client_attrs, name, item)
-        elif isinstance(item, ActionDescriptor) and (
-            actions is None or name in actions
-        ):
-            add_action(client_attrs, dependencies, name, item)
+        elif isinstance(item, ActionDescriptor):
+            if actions is None or name in actions:
+                add_action(client_attrs, dependencies, name, item)
+            else:
+                continue  # Ignore actions that aren't in the list
         else:
             for affordance in ["property", "action", "event"]:
                 if hasattr(item, f"{affordance}_affordance"):
                     logging.warning(
-                        f"DirectThingClient doesn't support custom afforcances, "
+                        f"DirectThingClient doesn't support custom affordances, "
                         f"ignoring {name}"
                     )
     # This block of code makes dependencies show up in __init__ so
