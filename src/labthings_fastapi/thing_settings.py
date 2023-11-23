@@ -14,11 +14,11 @@ from weakref import WeakSet
 
 class ReactiveDict(Mapping):
     def __init__(
-            self,
-            data: Optional[Mapping]=None,
-            name: Optional[str]=None,
-            callback: Optional[Callable]=None
-        ):
+        self,
+        data: Optional[Mapping] = None,
+        name: Optional[str] = None,
+        callback: Optional[Callable] = None,
+    ):
         self.name = name if name is not None else ""
         self.callbacks: WeakSet[Callable] = WeakSet()
         self._data: dict[Any, Any] = {}
@@ -29,26 +29,25 @@ class ReactiveDict(Mapping):
 
     def __getitem__(self, key):
         return self._data[key]
-    
+
     def notify_callbacks(self, path=None):
         for c in self.callbacks:
             c(self, path)
-    
-    def child_callback(self, child: ReactiveDict, path: Any=None):
+
+    def child_callback(self, child: ReactiveDict, path: Any = None):
         """Propagate updates from children up to the parent object"""
         built_path = child.name
         if path:
             built_path += f"/{path}"
         self.notify_callbacks(path=built_path)
-    
+
     def __setitem__(self, key, item):
         self._data[key] = item
         self.notify_callbacks(path=key)
-    
+
     def __delitem__(self, key):
         del self._data[key]
         self.notify_callbacks(path=key)
-
 
     def __iter__(self):
         for k in self._data.keys():
@@ -56,7 +55,7 @@ class ReactiveDict(Mapping):
 
     def __len__(self):
         return len(self._data)
-    
+
     def update(self, data: Mapping):
         """Update many key-value pairs at once"""
         if not isinstance(data, Mapping):
@@ -64,9 +63,7 @@ class ReactiveDict(Mapping):
         for k, v in data.items():
             if isinstance(v, Mapping):
                 self._data[k] = ReactiveDict(
-                    v,
-                    name=f"{k}",
-                    callback=self.child_callback
+                    v, name=f"{k}", callback=self.child_callback
                 )
             else:
                 self._data[k] = v

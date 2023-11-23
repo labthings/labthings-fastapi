@@ -5,9 +5,10 @@ from .. import thing_description
 import time
 import logging
 
+
 def validate_thing_description(td: dict) -> None:
     """Validate a Thing Description.
-    
+
     This accepts a dictionary (usually generated from
     `labthings_fastapi.thing_description.model.ThingDescription.model_dump()`
     ) and validates it against the JSON schema for Thing Descriptions. This is
@@ -16,7 +17,7 @@ def validate_thing_description(td: dict) -> None:
     """
     start = time.time()
     td_file = files(thing_description).joinpath("td-json-schema-validation.json")
-    with td_file.open('r') as f:
+    with td_file.open("r") as f:
         schema = json.load(f)
     loaded_schema = time.time()
     # Check the schema itself is valid

@@ -12,7 +12,7 @@ from ..thing_server import find_thing_server
 
 def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     """Return a UUID for an action invocation
-    
+
     This is for use as a FastAPI dependency, to allow other dependencies to
     access the invocation ID. Useful for e.g. file management.
     """
@@ -23,6 +23,5 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
 
 
 BlockingPortal = Annotated[
-    RealBlockingPortal,
-    Depends(blocking_portal_from_thing_server)
+    RealBlockingPortal, Depends(blocking_portal_from_thing_server)
 ]

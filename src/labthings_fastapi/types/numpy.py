@@ -45,20 +45,25 @@ NestedListOfNumbers = Union[
     List[List[List[List[List[List[Number]]]]]],
     List[List[List[List[List[List[List]]]]]],
 ]
+
+
 class NestedListOfNumbersModel(RootModel):
     root: NestedListOfNumbers
 
+
 def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
     """Convert a numpy array to a list of lists
-    
+
     NB this will not be quick! Large arrays will be much better
     serialised by dumping to base64 encoding or similar.
     """
     return arr.tolist()
 
+
 def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
     """Convert a list of lists to a numpy array (or pass-through ndarrays)"""
     return np.asarray(lol)
+
 
 # Define an annotated type so Pydantic can cope with numpy
 NDArray = Annotated[
@@ -67,6 +72,7 @@ NDArray = Annotated[
     PlainSerializer(np_to_listoflists, when_used="json-unless-none"),
     WithJsonSchema(NestedListOfNumbersModel.model_json_schema(), mode="validation"),
 ]
+
 
 def denumpify(v: Any) -> Any:
     """Convert any numpy array in a dict into a list"""
@@ -79,9 +85,11 @@ def denumpify(v: Any) -> Any:
     else:
         return v
 
+
 def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
     """A Pydantic wrap serializer to denumpify mappings before serialization"""
     return nxt(denumpify(v))
+
 
 class DenumpifyingDict(RootModel):
     root: Annotated[Mapping, WrapSerializer(denumpify_serializer)]

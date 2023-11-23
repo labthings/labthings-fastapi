@@ -27,10 +27,11 @@ ACTION_INVOCATIONS_PATH = "/action_invocations"
 
 class Invocation(Thread):
     """A Thread subclass that retains output values and tracks progress
-    
+
     TODO: In the future this should probably not be a Thread subclass, but might run in
     a thread anyway.
     """
+
     def __init__(
         self,
         action: ActionDescriptor,
@@ -112,15 +113,15 @@ class Invocation(Thread):
         """
         with self._status_lock:
             return self._status
-    
+
     @property
     def action(self):
         return self.action_ref()
-    
+
     @property
     def thing(self):
         return self.thing_ref()
-    
+
     def response(self, request: Optional[Request] = None):
         if request:
             href = str(request.url_for("action_invocation", id=self.id))
@@ -142,7 +143,7 @@ class Invocation(Thread):
             timeRequested=self._request_time,
             input=self.input,
             output=self.output,
-            links=links
+            links=links,
         )
 
     def run(self):
@@ -235,10 +236,9 @@ class ThreadLogHandler(logging.Handler):
             self.dest.append(record)
 
 
-
 class ActionManager:
-    """A class to manage a collection of actions
-    """
+    """A class to manage a collection of actions"""
+
     def __init__(self):
         self._invocations = {}
         self._invocations_lock = Lock()
@@ -247,19 +247,19 @@ class ActionManager:
     def invocations(self):
         with self._invocations_lock:
             return list(self._invocations.values())
-        
+
     def append_invocation(self, invocation: Invocation):
         with self._invocations_lock:
             self._invocations[invocation.id] = invocation
-        
+
     def invoke_action(
-            self,
-            action: ActionDescriptor,
-            thing: Thing,
-            id: uuid.UUID,
-            input: Any,
-            dependencies: dict[str, Any],
-        ) -> Invocation:
+        self,
+        action: ActionDescriptor,
+        thing: Thing,
+        id: uuid.UUID,
+        input: Any,
+        dependencies: dict[str, Any],
+    ) -> Invocation:
         """Invoke an action, returning the thread where it's running"""
         thread = Invocation(
             action=action,
@@ -271,21 +271,22 @@ class ActionManager:
         self.append_invocation(thread)
         thread.start()
         return thread
-    
+
     def list_invocations(
-            self, 
-            action: Optional[ActionDescriptor] = None, 
-            thing: Optional[Thing] = None,
-            as_responses: bool = False,
-            request: Optional[Request] = None) -> list[InvocationModel]:
+        self,
+        action: Optional[ActionDescriptor] = None,
+        thing: Optional[Thing] = None,
+        as_responses: bool = False,
+        request: Optional[Request] = None,
+    ) -> list[InvocationModel]:
         """All of the invocations currently managed"""
         return [
-            i.response(request=request) if as_responses else i 
+            i.response(request=request) if as_responses else i
             for i in self.invocations
             if thing is None or i.thing == thing
-            if action is None or i.action==action
+            if action is None or i.action == action
         ]
-    
+
     def expire_invocations(self):
         """Delete invocations that have passed their expiry time"""
         to_delete = []
@@ -297,16 +298,18 @@ class ActionManager:
             logging.info(f"Deleting invocations {to_delete} as they have expired")
             for k in to_delete:
                 del self._invocations[k]
-    
+
     def attach_to_app(self, app: FastAPI):
         """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""
+
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
         def list_all_invocations(request: Request):
             return self.list_invocations(as_responses=True, request=request)
+
         @app.get(
-            ACTION_INVOCATIONS_PATH + "/{id}", 
+            ACTION_INVOCATIONS_PATH + "/{id}",
             response_model=InvocationModel,
-            responses={404: {"description": "Invocation ID not found"}}
+            responses={404: {"description": "Invocation ID not found"}},
         )
         def action_invocation(id: uuid.UUID, request: Request):
             try:
@@ -317,13 +320,14 @@ class ActionManager:
                     status_code=404,
                     detail="No action invocation found with ID {id}",
                 )
+
         @app.get(
-            ACTION_INVOCATIONS_PATH + "/{id}/output", 
+            ACTION_INVOCATIONS_PATH + "/{id}/output",
             response_model=Any,
             responses={
                 404: {"description": "Invocation ID not found"},
                 503: {"description": "No result is available for this invocation"},
-            }
+            },
         )
         def action_invocation_result(id: uuid.UUID):
             with self._invocations_lock:
@@ -340,12 +344,13 @@ class ActionManager:
                         detail="No result is available for this invocation",
                     )
                 return invocation.output
+
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}/files",
             responses={
                 404: {"description": "Invocation ID not found"},
                 503: {"description": "No files are available for this invocation"},
-            }
+            },
         )
         def action_invocation_files(id: uuid.UUID) -> list[str]:
             with self._invocations_lock:
@@ -362,13 +367,14 @@ class ActionManager:
                         detail="No files are available for this invocation",
                     )
                 return invocation._file_manager.filenames
+
         @app.get(
-            ACTION_INVOCATIONS_PATH + "/{id}/files/{filename}", 
+            ACTION_INVOCATIONS_PATH + "/{id}/files/{filename}",
             response_class=FileResponse,
             responses={
                 404: {"description": "Invocation ID not found, or file not found"},
                 503: {"description": "No files are available for this invocation"},
-            }
+            },
         )
         def action_invocation_file(id: uuid.UUID, filename: str):
             with self._invocations_lock:
@@ -385,4 +391,3 @@ class ActionManager:
                         detail="No files are available for this invocation",
                     )
                 return FileResponse(invocation._file_manager.path(filename))
-        

@@ -16,30 +16,35 @@ from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 
 class ThingOne(Thing):
     ACTION_ONE_RESULT = "Action one result!"
+
     @thing_action
     def action_one(self) -> str:
         """An action that takes no arguments"""
         return self.action_one_internal()
-    
+
     def action_one_internal(self) -> str:
         return self.ACTION_ONE_RESULT
+
 
 print("Making ThingOneClient")
 ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
 print("Done")
+
 
 class ThingTwo(Thing):
     @thing_action
     def action_two(self, thing_one: ThingOneDep) -> str:
         """An action that needs a ThingOne"""
         return thing_one.action_one()
-    
+
     @thing_action
     def action_two_a(self, thing_one: ThingOneDep) -> str:
-       """Another action that needs a ThingOne"""
-       return thing_one.action_one()
-    
+        """Another action that needs a ThingOne"""
+        return thing_one.action_one()
+
+
 ThingTwoDep = direct_thing_client_dependency(ThingTwo, "/thing_two/")
+
 
 class ThingThree(Thing):
     @thing_action
@@ -76,7 +81,7 @@ def test_direct_thing_dependency():
 
 def test_interthing_dependency():
     """Test that a Thing can depend on another Thing
-    
+
     This uses the internal thing client mechanism.
     """
     server = ThingServer()
@@ -91,7 +96,7 @@ def test_interthing_dependency():
 
 def test_interthing_dependency_with_dependencies():
     """Test that a Thing can depend on another Thing
-    
+
     This uses the internal thing client mechanism, and requires
     dependency injection for the called action
     """
@@ -106,9 +111,10 @@ def test_interthing_dependency_with_dependencies():
         assert invocation["status"] == "completed"
         assert invocation["output"] == ThingOne.ACTION_ONE_RESULT
 
+
 def test_raw_interthing_dependency():
     """Test that a Thing can depend on another Thing
-    
+
     This uses the internal thing client mechanism.
     """
     ThingOneDep = raw_thing_dependency(ThingOne)
@@ -128,15 +134,18 @@ def test_raw_interthing_dependency():
         assert invocation["status"] == "completed"
         assert invocation["output"] == ThingOne.ACTION_ONE_RESULT
 
+
 def check_request():
     """Check that the `Request` object has the same `app` as the server
-    
+
     This is mostly just verifying that there's nothing funky in between the
     Starlette `Request` object and the FastAPI `app`."""
     server = ThingServer()
+
     @server.app.get("/check_request_app/")
     def check_request_app(request: Request) -> bool:
         return request.app is server.app
+
     with TestClient(server.app) as client:
         r = client.get("/check_request_app/")
         assert r.json() is True

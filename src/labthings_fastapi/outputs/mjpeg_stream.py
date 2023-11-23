@@ -4,7 +4,13 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, HTMLResponse
 from typing import (
-    AsyncGenerator, AsyncIterator, Literal, Optional, TYPE_CHECKING, Union, overload
+    AsyncGenerator,
+    AsyncIterator,
+    Literal,
+    Optional,
+    TYPE_CHECKING,
+    Union,
+    overload,
 )
 from typing_extensions import Self
 from contextlib import asynccontextmanager
@@ -16,9 +22,11 @@ import logging
 if TYPE_CHECKING:
     from ..thing import Thing
 
+
 @dataclass
 class RingbufferEntry:
     """A single entry in a ringbuffer"""
+
     frame: bytes
     timestamp: datetime
     index: int
@@ -27,14 +35,15 @@ class RingbufferEntry:
 
 class MJPEGStreamResponse(StreamingResponse):
     media_type = "multipart/x-mixed-replace; boundary=frame"
+
     def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
         """A StreamingResponse that streams an MJPEG stream
-        
+
         This response is initialised with an async generator that yields `bytes`
         objects, each of which is a JPEG file. We add the --frame markers and mime
         types that enable it to work in an `img` tag.
-        
-        NB the `status_code` argument is used by FastAPI to set the status code of 
+
+        NB the `status_code` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
         """
         self.frame_async_generator = gen
@@ -71,7 +80,7 @@ class MJPEGStream:
                     frame=b"",
                     index=-1,
                     timestamp=datetime.min,
-                ) 
+                )
                 for i in range(n)
             ]
             self.last_frame_i = -1
@@ -83,18 +92,18 @@ class MJPEGStream:
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the `i`th frame acquired by the camera"""
-        if i<0:
+        if i < 0:
             raise ValueError("i must be >= 0")
         if i < self.last_frame_i - len(self._ringbuffer) + 2:
             raise ValueError("the ith frame has been overwritten")
-        if i>self.last_frame_i:
+        if i > self.last_frame_i:
             # TODO: await the ith frame
             raise ValueError("the ith frame has not yet been acquired")
         entry = self._ringbuffer[i % len(self._ringbuffer)]
         if entry.index != i:
             raise ValueError("the ith frame has been overwritten")
         return entry
-    
+
     @asynccontextmanager
     async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
         """Yields the ith frame as a bytes object"""
@@ -121,15 +130,15 @@ class MJPEGStream:
             except Exception as e:
                 logging.error(f"Error in stream: {e}, stream stopped")
                 return
-            
+
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
         """Return a StreamingResponse that streams an MJPEG stream"""
         return MJPEGStreamResponse(self.frame_async_generator())
 
     def add_frame(self, frame: bytes, portal: BlockingPortal):
         """Return the next buffer in the ringbuffer to write to"""
-        assert frame[0]==0xFF and frame[1]==0xD8, ValueError("Invalid JPEG")
-        assert frame[-2]==0xFF and frame[-1]==0xD9, ValueError("Invalid JPEG")
+        assert frame[0] == 0xFF and frame[1] == 0xD8, ValueError("Invalid JPEG")
+        assert frame[-2] == 0xFF and frame[-1] == 0xD9, ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
             if entry.readers > 0:
@@ -145,8 +154,10 @@ class MJPEGStream:
             self.last_frame_i = i
             self.condition.notify_all()
 
+
 class MJPEGStreamDescriptor:
     """A descriptor that returns a MJPEGStream object when accessed"""
+
     def __init__(self, **kwargs):
         self._kwargs = kwargs
 
@@ -156,13 +167,15 @@ class MJPEGStreamDescriptor:
     @overload
     def __get__(self, obj: Literal[None], type=None) -> Self:
         ...
+
     @overload
     def __get__(self, obj: Thing, type=None) -> MJPEGStream:
         ...
+
     def __get__(self, obj: Optional[Thing], type=None) -> Union[MJPEGStream, Self]:
         """The value of the property
 
-        If `obj` is none (i.e. we are getting the attribute of the class), 
+        If `obj` is none (i.e. we are getting the attribute of the class),
         we return the descriptor.
 
         If no getter is set, we'll return either the initial value, or the value
@@ -178,11 +191,9 @@ class MJPEGStreamDescriptor:
         except KeyError:
             obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
             return obj.__dict__[self.name]
-    
+
     async def viewer_page(self, url: str) -> HTMLResponse:
-        return HTMLResponse(
-            f"<html><body><img src='{url}'></body></html>"
-        )
+        return HTMLResponse(f"<html><body><img src='{url}'></body></html>")
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add the stream to the FastAPI app"""
@@ -190,10 +201,10 @@ class MJPEGStreamDescriptor:
             f"{thing.path}{self.name}",
             response_class=MJPEGStreamResponse,
         )(self.__get__(thing).mjpeg_stream_response)
+
         @app.get(
             f"{thing.path}{self.name}/viewer",
             response_class=HTMLResponse,
         )
         async def viewer_page():
             return await self.viewer_page(f"{thing.path}{self.name}")
-    

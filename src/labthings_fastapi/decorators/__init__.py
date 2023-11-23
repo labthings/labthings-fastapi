@@ -37,19 +37,23 @@ from typing import Optional, Callable
 from ..descriptors import ActionDescriptor, PropertyDescriptor
 from ..utilities.introspection import return_type
 
+
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
     """Mark a method of a Thing as an Action
-    
+
     We replace the function with a `Descriptor` that's a
     subclass of `ActionDescriptor`
     """
+
     class ActionDescriptorSubclass(ActionDescriptor):
         pass
+
     return ActionDescriptorSubclass(func, **kwargs)
 
+
 @wraps(mark_thing_action)
-def thing_action(func: Optional[Callable]=None, **kwargs):
-    # This can be used with or without arguments. 
+def thing_action(func: Optional[Callable] = None, **kwargs):
+    # This can be used with or without arguments.
     # If we're being used without arguments, we will
     # have a non-None value for `func` and defaults
     # for the arguments.
@@ -64,15 +68,17 @@ def thing_action(func: Optional[Callable]=None, **kwargs):
 
 def thing_property(func: Callable) -> PropertyDescriptor:
     """Mark a method of a Thing as a Property
-    
+
     We replace the function with a `Descriptor` that's a
     subclass of `PropertyDescriptor`
 
     TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
     """
+
     class PropertyDescriptorSubclass(PropertyDescriptor):
         def __get__(self, obj, objtype=None):
             return super().__get__(obj, objtype)
+
     return PropertyDescriptorSubclass(
         return_type(func),
         readonly=True,

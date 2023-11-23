@@ -19,14 +19,17 @@ import os
 
 from .dependencies.invocation_id import InvocationID
 
+
 class FileManager:
-    """Manage files created by Actions"""  
+    """Manage files created by Actions"""
+
     __globals__ = globals()  # "bake in" globals so dependency injection works
+
     def __init__(self, invocation_id: InvocationID, request: Request):
         self.invocation_id = invocation_id
         self._links: set[tuple[str, str]] = set()
         self._dir = TemporaryDirectory(prefix=f"labthings-{self.invocation_id}-")
-        request.state.file_manager = self  
+        request.state.file_manager = self
         # The request state will be used to hold onto the FileManager after
         # the action has finished
 
@@ -34,27 +37,28 @@ class FileManager:
     def directory(self) -> str:
         """Return the temporary directory for this invocation"""
         return self._dir.name
-    
+
     @property
     def filenames(self) -> list[str]:
         """A list of files currently being managed by this FileManager"""
         return os.listdir(self.directory)
-    
+
     def add_link(self, rel: str, filename: str) -> None:
         """Make a file show up in the links of the Invocation"""
         self._links.add((rel, filename))
 
-    def path(self, filename: str, rel: Optional[str]=None) -> str:
+    def path(self, filename: str, rel: Optional[str] = None) -> str:
         """Return the path to a file"""
         if rel is not None:
             self.add_link(rel, filename)
         return os.path.join(self.directory, filename)
-    
+
     def links(self, prefix: str) -> Sequence[LinkElement]:
         """Generate links to the files managed by this FileManager"""
         links = [LinkElement(rel="files", href=prefix + "/files")]
         for rel, filename in self._links:
             links.append(LinkElement(rel=rel, href=prefix + "/files/" + filename))
         return links
-    
+
+
 FileManagerDep = Annotated[FileManager, Depends()]

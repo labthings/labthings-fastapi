@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from labthings_fastapi.thing_description.model import Links
 
+
 class InvocationStatus(Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -18,6 +19,8 @@ class InvocationStatus(Enum):
 
 InputT = TypeVar("InputT")
 OutputT = TypeVar("OutputT")
+
+
 class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     status: InvocationStatus
     id: uuid.UUID
@@ -29,5 +32,6 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     input: InputT
     output: OutputT
     links: Links = None
+
 
 InvocationModel = GenericInvocationModel[Any, Any]

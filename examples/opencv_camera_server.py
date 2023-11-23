@@ -25,6 +25,7 @@ logging.basicConfig(level=logging.INFO)
 @dataclass
 class RingbufferEntry:
     """A single entry in a ringbuffer"""
+
     frame: bytes
     timestamp: datetime
     index: int
@@ -33,14 +34,15 @@ class RingbufferEntry:
 
 class MJPEGStreamResponse(StreamingResponse):
     media_type = "multipart/x-mixed-replace; boundary=frame"
+
     def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
         """A StreamingResponse that streams an MJPEG stream
-        
+
         This response is initialised with an async generator that yields `bytes`
         objects, each of which is a JPEG file. We add the --frame markers and mime
         types that enable it to work in an `img` tag.
-        
-        NB the `status_code` argument is used by FastAPI to set the status code of 
+
+        NB the `status_code` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
         """
         self.frame_async_generator = gen
@@ -76,7 +78,7 @@ class MJPEGStream:
                     frame=b"",
                     index=-1,
                     timestamp=datetime.min,
-                ) 
+                )
                 for i in range(n)
             ]
             self.last_frame_i = -1
@@ -88,18 +90,18 @@ class MJPEGStream:
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the `i`th frame acquired by the camera"""
-        if i<0:
+        if i < 0:
             raise ValueError("i must be >= 0")
         if i < self.last_frame_i - len(self._ringbuffer) + 2:
             raise ValueError("the ith frame has been overwritten")
-        if i>self.last_frame_i:
+        if i > self.last_frame_i:
             # TODO: await the ith frame
             raise ValueError("the ith frame has not yet been acquired")
         entry = self._ringbuffer[i % len(self._ringbuffer)]
         if entry.index != i:
             raise ValueError("the ith frame has been overwritten")
         return entry
-    
+
     @asynccontextmanager
     async def buffer_for_reading(self, i: int) -> AsyncContextManager[bytes]:
         """Yields the ith frame as a bytes object"""
@@ -126,7 +128,7 @@ class MJPEGStream:
             except Exception as e:
                 logging.error(f"Error in stream: {e}, stream stopped")
                 return
-            
+
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
         """Return a StreamingResponse that streams an MJPEG stream"""
         return MJPEGStreamResponse(self.frame_async_generator())
@@ -148,8 +150,10 @@ class MJPEGStream:
             self.last_frame_i = i
             self.condition.notify_all()
 
+
 class MJPEGStreamDescriptor:
     """A descriptor that returns a MJPEGStream object when accessed"""
+
     def __init__(self, **kwargs):
         self._kwargs = kwargs
 
@@ -159,7 +163,7 @@ class MJPEGStreamDescriptor:
     def __get__(self, obj, type=None) -> MJPEGStream:
         """The value of the property
 
-        If `obj` is none (i.e. we are getting the attribute of the class), 
+        If `obj` is none (i.e. we are getting the attribute of the class),
         we return the descriptor.
 
         If no getter is set, we'll return either the initial value, or the value
@@ -175,11 +179,9 @@ class MJPEGStreamDescriptor:
         except KeyError:
             obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
             return obj.__dict__[self.name]
-    
+
     async def viewer_page(self, url: str) -> HTMLResponse:
-        return HTMLResponse(
-            f"<html><body><img src='{url}'></body></html>"
-        )
+        return HTMLResponse(f"<html><body><img src='{url}'></body></html>")
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add the stream to the FastAPI app"""
@@ -190,15 +192,16 @@ class MJPEGStreamDescriptor:
         app.get(
             f"{thing.path}{self.name}/viewer",
             response_class=HTMLResponse,
-        )(partial(self.viewer_page,f"{thing.path}{self.name}"))
-    
+        )(partial(self.viewer_page, f"{thing.path}{self.name}"))
+
 
 class OpenCVCamera(Thing):
     """A Thing that represents an OpenCV camera"""
+
     def __init__(self, device_index: int = 0):
         self.device_index = device_index
         self._stream_thread: Optional[threading.Thread] = None
-        
+
     def __enter__(self):
         self._cap = cv.VideoCapture(self.device_index)
         self._cap_lock = RLock()
@@ -206,7 +209,7 @@ class OpenCVCamera(Thing):
             raise IOError(f"Cannot open camera with device index {self.device_index}")
         self.start_streaming()
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop_streaming()
         self._cap.release()
@@ -265,11 +268,12 @@ class OpenCVCamera(Thing):
                 "image.jpg is available from the links property of this Invocation "
                 "(see ./files)"
             )
-    
+
     @thing_property
     def exposure(self) -> float:
         with self._cap_lock:
             return self._cap.get(cv.CAP_PROP_EXPOSURE)
+
     @exposure.setter
     def exposure(self, value):
         with self._cap_lock:
@@ -279,7 +283,7 @@ class OpenCVCamera(Thing):
 
     mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
 
-    
+
 thing_server = ThingServer()
 my_thing = OpenCVCamera()
 my_thing.validate_thing_description()
