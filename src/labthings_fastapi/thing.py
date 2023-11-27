@@ -26,19 +26,21 @@ from .thing_settings import ThingSettings
 if TYPE_CHECKING:
     from .thing_server import ThingServer
     from .actions import ActionManager
+
+
 class Thing:
     """Represents a Thing, as defined by the Web of Things standard.
-    
+
     This class should encapsulate the code that runs a piece of hardware, or provides
     a particular function - it will correspond to a path on the server, and a Thing
     Description document.
-    
+
     Your Thing should be a subclass of Thing - note that we don't define `__init__` so
     you are free to initialise as you like and don't need to call `super().__init__`.
-    
+
     ## Subclassing Notes
-    
-    * `__init__`: You should accept any arguments you need to configure the Thing 
+
+    * `__init__`: You should accept any arguments you need to configure the Thing
       in `__init__`. Don't initialise any hardware at this time, as your Thing may
       be instantiated quite early, or even at import time.
     * `__enter__(self)` and `__exit__(self, exc_t, exc_v, exc_tb)` are where you
@@ -58,13 +60,14 @@ class Thing:
     probably best left along. They may in time be collected together into a single
     object to avoid namespace clashes.
     """
+
     title: str
     _labthings_blocking_portal: Optional[BlockingPortal] = None
     path: Optional[str]
 
     async def __aenter__(self):
         """Context management is used to set up/close the thing.
-        
+
         As things (currently) do everything with threaded code, we define
         async __aenter__ and __aexit__ wrappers to call the synchronous
         code, if it exists.
@@ -76,7 +79,7 @@ class Thing:
 
     async def __aexit__(self, exc_t, exc_v, exc_tb):
         """Wrap context management functions, if they exist.
-        
+
         See __aenter__ docs for more details.
         """
         if hasattr(self, "__exit__"):
@@ -97,20 +100,21 @@ class Thing:
                 pass
 
         @server.app.get(
-                self.path, 
-                summary=get_summary(self.thing_description),
-                description=get_docstring(self.thing_description),
-                response_model_exclude_none=True,
-                response_model_by_alias=True,
-            )
+            self.path,
+            summary=get_summary(self.thing_description),
+            description=get_docstring(self.thing_description),
+            response_model_exclude_none=True,
+            response_model_by_alias=True,
+        )
         def thing_description(request: Request) -> ThingDescription:
             return self.thing_description(base=str(request.base_url))
-        
+
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
 
     _labthings_thing_settings: Optional[ThingSettings] = None
+
     @property
     def thing_settings(self) -> ThingSettings:
         """A dictionary that can be used to persist settings between runs"""
@@ -119,15 +123,17 @@ class Thing:
                 "Settings may not be accessed before we are attached to the server."
             )
         return self._labthings_thing_settings
+
     @thing_settings.setter
     def thing_settings(self, newsettings: ThingSettings):
         self.thing_settings.replace(newsettings)
 
     _labthings_thing_state: Optional[dict] = None
+
     @property
     def thing_state(self) -> Mapping:
         """Return a dictionary summarising our current state
-        
+
         This is intended to be an easy way to collect metadata from a Thing that
         summarises its state. It might be used, for example, to record metadata
         along with each reading/image/etc. when an instrument is saving data.
@@ -151,11 +157,12 @@ class Thing:
     _cached_thing_description: Optional[
         tuple[Optional[str], Optional[str], ThingDescription]
     ] = None
+
     def thing_description(
-            self, path: Optional[str] = None, base: Optional[str] = None
-        ) -> ThingDescription:
+        self, path: Optional[str] = None, base: Optional[str] = None
+    ) -> ThingDescription:
         """A w3c Thing Description representing this thing
-        
+
         The w3c Web of Things working group defined a standard representation
         of a Thing, which provides a high-level description of the actions,
         properties, and events that it exposes. This endpoint delivers a JSON
@@ -163,19 +170,19 @@ class Thing:
         """
         path = path or getattr(self, "path", "{base_uri}")
         if (
-            self._cached_thing_description 
+            self._cached_thing_description
             and self._cached_thing_description[0] == path
             and self._cached_thing_description[1] == base
         ):
             return self._cached_thing_description[2]
-        
+
         properties = {}
         actions = {}
         for name, item in class_attributes(self):
             if hasattr(item, "property_affordance"):
                 properties[name] = item.property_affordance(self, path)
             if hasattr(item, "action_affordance"):
-                actions[name] = (item.action_affordance(self, path))
+                actions[name] = item.action_affordance(self, path)
 
         td = ThingDescription(
             title=getattr(self, "title", self.__class__.__name__),
@@ -187,14 +194,14 @@ class Thing:
         )
         self._cached_thing_description = (path, base, td)
         return td
-    
+
     def thing_description_dict(
-            self,
-            path: Optional[str] = None,
-            base: Optional[str] = None,
-        ) -> dict:
+        self,
+        path: Optional[str] = None,
+        base: Optional[str] = None,
+    ) -> dict:
         """A w3c Thing Description representing this thing, as a simple dict
-        
+
         The w3c Web of Things working group defined a standard representation
         of a Thing, which provides a high-level description of the actions,
         properties, and events that it exposes. This endpoint delivers a JSON

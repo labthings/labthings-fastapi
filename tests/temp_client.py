@@ -4,13 +4,16 @@ import time
 
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
+
 def get_link(obj: dict, rel: str) -> str:
     """Retrieve a link from an object's `links` list, by its `rel` attribute"""
     return next(link for link in obj["links"] if link["rel"] == rel)
 
+
 def task_href(t):
     """Extract the endpoint address from a task dictionary"""
     return get_link(t, "self")["href"]
+
 
 def poll_task(client, task, interval=0.001):
     """Poll a task until it finishes, and return the return value"""

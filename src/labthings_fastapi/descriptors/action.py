@@ -48,9 +48,9 @@ using the link included in each action.
 """
 
 
-class ActionDescriptor():
+class ActionDescriptor:
     def __init__(
-        self, 
+        self,
         func: Callable,
         response_timeout: float = 1,
         retention_time: float = 300,
@@ -60,9 +60,9 @@ class ActionDescriptor():
         self.retention_time = retention_time
         self.dependency_params = fastapi_dependency_params(func)
         self.input_model = input_model_from_signature(
-            func, 
-            remove_first_positional_arg=True, 
-            ignore=[p.name for p in self.dependency_params]
+            func,
+            remove_first_positional_arg=True,
+            ignore=[p.name for p in self.dependency_params],
         )
         self.output_model = return_type(func)
         self.invocation_model = create_model(
@@ -76,14 +76,16 @@ class ActionDescriptor():
     @overload
     def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor:
         ...
+
     @overload
     def __get__(self, obj: Thing, type=None) -> Callable:
         ...
+
     def __get__(
-            self, obj: Optional[Thing], type=None
-        ) -> Union[ActionDescriptor, Callable]:
+        self, obj: Optional[Thing], type=None
+    ) -> Union[ActionDescriptor, Callable]:
         """The function, bound to an object as for a normal method.
-        
+
         This currently doesn't validate the arguments, though it may do so
         in future. In its present form, this is equivalent to a regular
         Python method, i.e. all we do is supply the first argument, `self`.
@@ -97,35 +99,37 @@ class ActionDescriptor():
         # If we want dependency injection, we should be calling the action
         # via some sort of client object.
         return partial(self.func, obj)
-    
+
     @property
     def name(self):
         """The name of the wrapped function"""
         return self.func.__name__
-    
+
     @property
     def title(self):
         """A human-readable title"""
         return get_summary(self.func) or self.name
-    
+
     @property
     def description(self):
         """A description of the action"""
         return get_docstring(self.func, remove_summary=True)
-    
+
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add this action to a FastAPI app, bound to a particular Thing."""
-        # We can't use the decorator in the usual way, because we'd need to 
+
+        # We can't use the decorator in the usual way, because we'd need to
         # annotate the type of `body` with `self.model` which is only defined
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
-                request: Request,
-                body,
-                id: InvocationID,
-                background_tasks: BackgroundTasks,
-                **dependencies):
+            request: Request,
+            body,
+            id: InvocationID,
+            background_tasks: BackgroundTasks,
+            **dependencies,
+        ):
             try:
                 action = thing.action_manager.invoke_action(
                     action=self,
@@ -141,6 +145,7 @@ class ActionDescriptor():
                     action._file_manager = request.state.file_manager
                 except AttributeError:
                     pass  # This probably means there was no FileManager created.
+
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)
         else:
@@ -160,7 +165,7 @@ class ActionDescriptor():
         # Now we can add the endpoint to the app.
         app.post(
             thing.path + self.name,
-            response_model=self.invocation_model, 
+            response_model=self.invocation_model,
             status_code=201,
             response_description="Action has been invoked (and may still be running).",
             description=f"## {self.title}\n\n {self.description} {ACTION_POST_NOTICE}",
@@ -170,37 +175,35 @@ class ActionDescriptor():
                     "description": "Action completed.",
                     "model": self.invocation_model,
                 },
-            }
+            },
         )(start_action)
+
         @app.get(
             thing.path + self.name,
             response_model=list[self.invocation_model],  # type: ignore
-                # MyPy doesn't like the line above - but it works for FastAPI
-                # to generate a response model.
+            # MyPy doesn't like the line above - but it works for FastAPI
+            # to generate a response model.
             response_description=f"A list of every invocation of {self.name}.",
             description=(
                 f"List all the invocations of {self.name}.\n {ACTION_GET_DESCRIPTION}"
             ),
-            summary=f"All invocations of {self.name}."
+            summary=f"All invocations of {self.name}.",
         )
         def list_invocations():
             return thing.action_manager.list_invocations(self, thing, as_responses=True)
 
     def action_affordance(
-            self, thing: Thing, path: Optional[str]=None
-        ) -> ActionAffordance:
+        self, thing: Thing, path: Optional[str] = None
+    ) -> ActionAffordance:
         """Represent the property in a Thing Description."""
         path = path or thing.path
         forms = [
-            Form[ActionOp](
-                href = path + self.name,
-                op = [ActionOp.invokeaction]
-            ),
+            Form[ActionOp](href=path + self.name, op=[ActionOp.invokeaction]),
         ]
         return ActionAffordance(
-            title = self.title,
-            forms = forms,
-            description = self.description,
+            title=self.title,
+            forms=forms,
+            description=self.description,
             input=type_to_dataschema(self.input_model, title=f"{self.name}_input"),
             output=type_to_dataschema(self.output_model, title=f"{self.name}_output"),
         )

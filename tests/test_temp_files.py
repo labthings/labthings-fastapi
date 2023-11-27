@@ -5,22 +5,22 @@ from fastapi.testclient import TestClient
 from labthings_fastapi.thing_server import ThingServer
 from temp_client import poll_task, get_link
 
+
 class FileThing(Thing):
     @thing_action
     def write_message_file(
-        self, 
+        self,
         file_manager: FileManagerDep,
         message: str = "Hello World",
     ) -> dict[str, str]:
-        """Write a message to a file.
-        """
+        """Write a message to a file."""
         # We should be able to call actions as normal Python functions
         with open(file_manager.path("message.txt", rel="message_file"), "w") as f:
             f.write(message)
         with open(file_manager.path("message2.txt"), "w") as f:
             f.write(message)
         return {"filename": "message.txt"}
-    
+
 
 thing = FileThing()
 server = ThingServer()
@@ -40,6 +40,7 @@ def test_action_output():
     r = client.get(get_link(invocation, "message_file")["href"])
     assert r.status_code == 200
     assert r.text == "Hello World"
+
 
 if __name__ == "__main__":
     test_td_validates()

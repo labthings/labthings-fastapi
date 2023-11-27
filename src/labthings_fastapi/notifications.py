@@ -19,5 +19,6 @@ Currently, this code is more or less all in `websockets.py` and
 
 from __future__ import annotations
 
-class Listener():
+
+class Listener:
     pass

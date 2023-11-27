@@ -7,7 +7,7 @@ from fastapi import Depends
 
 def invocation_id() -> uuid.UUID:
     """Return a UUID for an action invocation
-    
+
     This is for use as a FastAPI dependency, to allow other dependencies to
     access the invocation ID. Useful for e.g. file management.
     """

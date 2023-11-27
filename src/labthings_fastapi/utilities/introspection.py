@@ -11,9 +11,7 @@ from functions by analysing their signatures.
 """
 
 from collections import OrderedDict
-from typing import (
-    Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
-)
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
 import inspect
 from inspect import Parameter, signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
@@ -38,25 +36,25 @@ class StrictEmptyInput(EmptyInput):
 
 
 def input_model_from_signature(
-        func: Callable,
-        remove_first_positional_arg: bool=False,
-        ignore: Optional[Sequence[str]]=None,
-    ) -> type[BaseModel]:
+    func: Callable,
+    remove_first_positional_arg: bool = False,
+    ignore: Optional[Sequence[str]] = None,
+) -> type[BaseModel]:
     """Create a pydantic model for a function's signature.
-    
-    This is deliberately quite a lot more basic than 
+
+    This is deliberately quite a lot more basic than
     `pydantic.decorator.ValidatedFunction` because it is designed
-    to handle JSON input. That means that we don't want positional 
+    to handle JSON input. That means that we don't want positional
     arguments, unless there's exactly one (in which case we have a
     single value, not an object, and this may or may not be supported).
 
     This will fail for position-only arguments, though that may change
-    in the future. 
-    
+    in the future.
+
     Parameters:
-    * `remove_first_positional_arg` removes the first argument from the 
-      model (this is appropriate for methods, as the first argument, 
-      self, is baked in when it's called, but is present in the 
+    * `remove_first_positional_arg` removes the first argument from the
+      model (this is appropriate for methods, as the first argument,
+      self, is baked in when it's called, but is present in the
       signature).
     * `ignore` will ignore arguments that have the specified name.
       This is useful for e.g. dependencies that are injected by LabThings.
@@ -80,7 +78,7 @@ def input_model_from_signature(
         raise TypeError(
             f"{func.__name__} has positional-only arguments which are not supported."
         )
-    
+
     # The line below determines if we accept arbitrary extra parameters (**kwargs)
     takes_v_kwargs = False  # will be updated later
     # fields is a dictionary of tuples of (type, default) that defines the input model
@@ -100,7 +98,7 @@ def input_model_from_signature(
         fields[name] = (p_type, default)
     model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",
-        model_config = ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
+        model_config=ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
         **fields,
     )
     # If there are no fields, we use a RootModel to allow none as well as {}
@@ -110,10 +108,10 @@ def input_model_from_signature(
 
 
 def function_dependencies(
-        func: Callable, dependency_types: Sequence[Type]
-    ) -> Dict[str, tuple[type, type]]:
+    func: Callable, dependency_types: Sequence[Type]
+) -> Dict[str, tuple[type, type]]:
     """Determine whether a function's arguments require dependencies
-    
+
     The return value maps argument names to a tuple of (type, full_type)
     where `full_type` is the annotation without simplification, i.e.
     it will include the contents of any Annotated objects.
@@ -121,14 +119,15 @@ def function_dependencies(
     type_hints = get_type_hints(func, include_extras=False)
     full_type_hints = get_type_hints(func, include_extras=True)
     return {
-        name: (type_, full_type_hints[name]) for name, type_ in type_hints.items()
+        name: (type_, full_type_hints[name])
+        for name, type_ in type_hints.items()
         if type_ in dependency_types
     }
 
 
 def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     """Find the arguments of a function that are FastAPI dependencies
-    
+
     This allows us to "pass through" the full power of the FastAPI dependency
     injection system to thing actions.
     """
@@ -199,5 +198,3 @@ def get_summary(obj: Any) -> Optional[str]:
         return docs.partition("\n")[0].strip()
     else:
         return None
-    
-

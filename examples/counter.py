@@ -11,9 +11,9 @@ class TestThing(Thing):
     @thing_action
     def increment_counter(self):
         """Increment the counter property
-        
+
         This action doesn't do very much - all it does, in fact,
-        is increment the counter (which may be read using the 
+        is increment the counter (which may be read using the
         `counter` property).
         """
         self.counter += 1
@@ -26,12 +26,9 @@ class TestThing(Thing):
             self.increment_counter()
 
     counter = PropertyDescriptor(
-        model=int, 
-        initial_value=0, 
-        readonly=True, 
-        description="A pointless counter"
+        model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
+
 
 server = ThingServer()
 server.add_thing(TestThing(), "/test")
-

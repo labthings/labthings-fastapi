@@ -15,6 +15,8 @@ from .thing_description.model import ThingDescription
 
 
 _thing_servers: WeakSet[ThingServer] = WeakSet()
+
+
 def find_thing_server(app: FastAPI) -> ThingServer:
     """Find the ThingServer associated with an app"""
     for server in _thing_servers:
@@ -24,10 +26,7 @@ def find_thing_server(app: FastAPI) -> ThingServer:
 
 
 class ThingServer:
-    def __init__(
-            self,
-            settings_folder: Optional[str]=None
-        ):
+    def __init__(self, settings_folder: Optional[str] = None):
         self.app = FastAPI(lifespan=self.lifespan)
         self.set_cors_middleware()
         self.settings_folder = settings_folder or "./settings"
@@ -55,15 +54,16 @@ class ThingServer:
     def things(self) -> Mapping[str, Thing]:
         """Return a dictionary of all the things"""
         return MappingProxyType(self._things)
-    
+
     ThingInstance = TypeVar("ThingInstance", bound=Thing)
+
     def things_by_class(self, cls: type[ThingInstance]) -> Sequence[ThingInstance]:
         """Return all Things attached to this server matching a class"""
         return [t for t in self.things.values() if isinstance(t, cls)]
-    
+
     def thing_by_class(self, cls: type[ThingInstance]) -> ThingInstance:
         """The Thing attached to this server matching a given class.
-        
+
         A RuntimeError will be raised if there is not exactly one matching Thing.
         """
         instances = self.things_by_class(cls)
@@ -72,7 +72,7 @@ class ThingServer:
         raise RuntimeError(
             f"There are {len(instances)} Things of class {cls}, expected 1."
         )
-    
+
     def add_thing(self, thing: Thing, path: str):
         """Add a thing to the server"""
         if not path.endswith("/"):
@@ -91,7 +91,7 @@ class ThingServer:
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
         """Manage set up and tear down
-        
+
         This does two important things:
         * It sets up the blocking portal so background threads can run async code
           (important for events)
@@ -121,21 +121,23 @@ class ThingServer:
     def add_things_view_to_app(self):
         """Add an endpoint that shows the list of attached things."""
         thing_server = self
+
         @self.app.get(
-                "/thing_descriptions/",
-                response_model_exclude_none=True,
-                response_model_by_alias=True,
-            )
+            "/thing_descriptions/",
+            response_model_exclude_none=True,
+            response_model_by_alias=True,
+        )
         def thing_descriptions(request: Request) -> Mapping[str, ThingDescription]:
             """A dictionary of all the things available from this server"""
             return {
                 path: thing.thing_description(path, base=str(request.base_url))
                 for path, thing in thing_server.things.items()
             }
+
         @self.app.get("/things/")
         def thing_paths(request: Request) -> Mapping[str, str]:
-            """A list of URLs pointing to the Thing Descriptions of each Thing on the server."""
+            """URLs pointing to the Thing Descriptions of each Thing."""
             return {
-                t: f"{str(request.base_url).rstrip('/')}{t}" 
+                t: f"{str(request.base_url).rstrip('/')}{t}"
                 for t in thing_server.things.keys()
             }

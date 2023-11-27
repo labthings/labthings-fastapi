@@ -31,11 +31,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .thing import Thing
 
+
 async def relay_notifications_to_websocket(
-        websocket: WebSocket, receive_stream: ObjectReceiveStream
-    ) -> None:
+    websocket: WebSocket, receive_stream: ObjectReceiveStream
+) -> None:
     """Relay objects from a stream to a websocket as JSON
-    
+
     Interaction affordances (events, actions) that we've registered with will
     post messages to the queue: this function takes those messages from the
     queue and passes them to the websocket.
@@ -46,10 +47,10 @@ async def relay_notifications_to_websocket(
 
 
 async def process_messages_from_websocket(
-        websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
-    ) -> None:
+    websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
+) -> None:
     """Process messages received from a websocket
-    
+
     Currently, this will allow us to observe properties, by registering
     (or de-registering) for those properties.
     """
@@ -64,6 +65,7 @@ async def process_messages_from_websocket(
         except WebSocketDisconnect:
             await send_stream.aclose()
             return
+
 
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
     """Handle communication to a client via websocket"""

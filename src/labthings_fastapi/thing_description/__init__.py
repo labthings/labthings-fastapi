@@ -27,7 +27,7 @@ JSONSchema = dict[str, Any]  # A type to represent JSONSchema
 
 def is_a_reference(d: JSONSchema) -> bool:
     """Return True if a JSONSchema dict is a reference
-    
+
     JSON Schema references are one-element dictionaries with
     a single key, `$ref`.  `pydantic` sometimes breaks this
     rule and so I don't check that it's a single key.
@@ -37,7 +37,7 @@ def is_a_reference(d: JSONSchema) -> bool:
 
 def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
     """Look up a reference in a JSONSchema
-    
+
     This first asserts the reference is local (i.e. starts with #
     so it's relative to the current file), then looks up
     each path component in turn.
@@ -57,7 +57,8 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
             f"The JSON reference {reference} was not found in the schema "
             f"(original error {ke})."
         )
-    
+
+
 def is_an_object(d: JSONSchema) -> bool:
     """Determine whether a JSON schema dict is an object"""
     return "type" in d and d["type"] == "object"
@@ -76,10 +77,10 @@ def convert_object(d: JSONSchema) -> JSONSchema:
 
 def convert_anyof(d: JSONSchema) -> JSONSchema:
     """Convert the anyof key to oneof
-    
+
     JSONSchema makes a distinction between "anyof" and "oneof", where the former
     means "any of these fields can be present" and the latter means "exactly one
-    of these fields must be present". Thing Description does not have this 
+    of these fields must be present". Thing Description does not have this
     distinction, so we convert anyof to oneof.
     """
     if "anyOf" not in d:
@@ -92,10 +93,10 @@ def convert_anyof(d: JSONSchema) -> JSONSchema:
 
 def convert_prefixitems(d: JSONSchema) -> JSONSchema:
     """Convert the prefixitems key to items
-    
+
     JSONSchema 2019 (as used by thing description) used
     `items` with a list of values in the same way that JSONSchema
-    now uses `prefixitems`. 
+    now uses `prefixitems`.
 
     JSONSchema 2020 uses `items` to mean the same as `additionalItems`
     in JSONSchema 2019 - but Thing Description doesn't support the
@@ -124,6 +125,7 @@ def convert_additionalproperties(d: JSONSchema) -> JSONSchema:
     del out["additionalProperties"]
     return out
 
+
 def check_recursion(depth: int, limit: int):
     """Check the recursion count is less than the limit"""
     if depth > limit:
@@ -134,13 +136,13 @@ def check_recursion(depth: int, limit: int):
 
 
 def jsonschema_to_dataschema(
-        d: JSONSchema, 
-        root_schema: Optional[JSONSchema] = None,
-        recursion_depth: int = 0,
-        recursion_limit: int = 99,
-    ) -> JSONSchema:
+    d: JSONSchema,
+    root_schema: Optional[JSONSchema] = None,
+    recursion_depth: int = 0,
+    recursion_limit: int = 99,
+) -> JSONSchema:
     """remove references and change field formats
-    
+
     JSONSchema allows schemas to be replaced with `{"$ref": "#/path/to/schema"}`.
     Thing Description does not allow this. `dereference_jsonschema_dict` takes a
     `dict` representation of a JSON Schema document, and replaces all the
@@ -150,7 +152,7 @@ def jsonschema_to_dataschema(
     called `oneOf` by Thing Description.  It's possible to achieve the same thing
     in the specific case of array elements, by setting `items` to a list of
     `DataSchema` objects. This function does not yet do that conversion.
-    
+
     This generates a copy of the document, to avoid messing up `pydantic`'s cache.
     """
     root_schema = root_schema or d
@@ -160,20 +162,20 @@ def jsonschema_to_dataschema(
         d = look_up_reference(d["$ref"], root_schema)
         recursion_depth += 1
         check_recursion(recursion_depth, recursion_limit)
-    
+
     if is_an_object(d):
         d = convert_object(d)
     d = convert_anyof(d)
     d = convert_prefixitems(d)
     d = convert_additionalproperties(d)
 
-    # After checking the object isn't a reference, we now recursively check 
+    # After checking the object isn't a reference, we now recursively check
     # sub-dictionaries and dereference those if necessary. This could be done with a
     # comprehension, but I am prioritising readability over speed. This code is run when
     # generating the TD, not in time-critical situations.
     rkwargs: dict[str, Any] = {
         "root_schema": root_schema,
-        "recursion_depth": recursion_depth+1,
+        "recursion_depth": recursion_depth + 1,
         "recursion_limit": recursion_limit,
     }
     output: JSONSchema = {}
@@ -192,7 +194,7 @@ def jsonschema_to_dataschema(
 
 def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
     """Convert a Python type to a Thing Description DataSchema
-    
+
     This makes use of pydantic's `schema_of` function to create a
     json schema, then applies some fixes to make a DataSchema
     as per the Thing Description (because Thing Description is
@@ -200,7 +202,7 @@ def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
 
     Additional keyword arguments are added to the DataSchema,
     and will override the fields generated from the type that
-    is passed in. Typically you'll want to use this for the 
+    is passed in. Typically you'll want to use this for the
     `title` field.
     """
     if isinstance(t, BaseModel):
@@ -222,9 +224,9 @@ def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
     except ValidationError as ve:
         print(
             "Error while constructing DataSchema from the "
-            "following dictionary:\n" +
-            json.dumps(schema_dict, indent=2) +
-            "Before conversion, the JSONSchema was:\n" +
-            json.dumps(json_schema, indent=2)
+            "following dictionary:\n"
+            + json.dumps(schema_dict, indent=2)
+            + "Before conversion, the JSONSchema was:\n"
+            + json.dumps(json_schema, indent=2)
         )
         raise ve

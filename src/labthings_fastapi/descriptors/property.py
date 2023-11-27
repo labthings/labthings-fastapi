@@ -16,25 +16,27 @@ if TYPE_CHECKING:
     from ..thing import Thing
 
 
-class PropertyDescriptor():
+class PropertyDescriptor:
     """A property that can be accessed via the HTTP API
-    
+
     By default, a PropertyDescriptor is "dumb", i.e. it acts just like
     a normal variable.
     """
+
     model: type[BaseModel]
     readonly: bool = False
+
     def __init__(
-            self, 
-            model: type,
-            initial_value: Any = None,
-            readonly: bool = False,
-            observable: bool = False,
-            description: Optional[str] = None,
-            title: Optional[str] = None,
-            getter: Optional[Callable] = None,
-            setter: Optional[Callable] = None,
-        ):
+        self,
+        model: type,
+        initial_value: Any = None,
+        readonly: bool = False,
+        observable: bool = False,
+        description: Optional[str] = None,
+        title: Optional[str] = None,
+        getter: Optional[Callable] = None,
+        setter: Optional[Callable] = None,
+    ):
         if getter and initial_value is not None:
             raise ValueError("getter and an initial value are mutually exclusive.")
         if model is None:
@@ -62,7 +64,7 @@ class PropertyDescriptor():
     def __get__(self, obj, type=None) -> Any:
         """The value of the property
 
-        If `obj` is none (i.e. we are getting the attribute of the class), 
+        If `obj` is none (i.e. we are getting the attribute of the class),
         we return the descriptor.
 
         If no getter is set, we'll return either the initial value, or the value
@@ -86,14 +88,13 @@ class PropertyDescriptor():
                 return obj.__dict__[self.name]
             else:
                 return self.initial_value
-    
+
     def __set__(self, obj, value):
         """Set the property's value"""
         obj.__dict__[self.name] = value
         if self._setter:
             self._setter(obj, value)
         self.emit_changed_event(obj, value)
-
 
     def _observers_set(self, obj):
         """A set used to notify changes"""
@@ -102,10 +103,9 @@ class PropertyDescriptor():
             ld.property_observers[self.name] = WeakSet()
         return ld.property_observers[self.name]
 
-
     def emit_changed_event(self, obj: Thing, value: Any) -> None:
         """Notify subscribers that the property has changed
-        
+
         NB this function **must** be run from a thread, not the event loop.
         """
         runner = obj._labthings_blocking_portal
@@ -121,53 +121,50 @@ class PropertyDescriptor():
         """Notify subscribers that the property has changed"""
         for observer in self._observers_set(obj):
             await observer.send(
-                {
-                    "messageType": "propertyStatus",
-                    "data": {
-                        self._name: value
-                    }
-                }
+                {"messageType": "propertyStatus", "data": {self._name: value}}
             )
-    
+
     @property
     def name(self):
         """The name of the property"""
         return self._name
-    
+
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add this action to a FastAPI app, bound to a particular Thing."""
-        # We can't use the decorator in the usual way, because we'd need to 
+        # We can't use the decorator in the usual way, because we'd need to
         # annotate the type of `body` with `self.model` which is only defined
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         if not self.readonly:
-            def set_property(body): # We'll annotate body later
+
+            def set_property(body):  # We'll annotate body later
                 if isinstance(body, RootModel):
                     body = body.root
                 return self.__set__(thing, body)
+
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.post(
                 thing.path + self.name,
                 status_code=201,
                 response_description="Property set successfully",
                 summary=f"Set {self.title}",
-                description=f"## {self.title}\n\n{self.description or ''}"
+                description=f"## {self.title}\n\n{self.description or ''}",
             )(set_property)
-        
+
         @app.get(
             thing.path + self.name,
             response_model=self.model,
             response_description=f"Value of {self.name}",
             summary=self.title,
-            description=f"## {self.title}\n\n{self.description or ''}"
+            description=f"## {self.title}\n\n{self.description or ''}",
         )
         def get_property():
             return self.__get__(thing)
 
     def property_affordance(
-            self, thing: Thing, path: Optional[str]=None
-        ) -> PropertyAffordance:
+        self, thing: Thing, path: Optional[str] = None
+    ) -> PropertyAffordance:
         """Represent the property in a Thing Description."""
         path = path or thing.path
         ops = [PropertyOp.readproperty]
@@ -175,15 +172,15 @@ class PropertyDescriptor():
             ops.append(PropertyOp.writeproperty)
         forms = [
             Form[PropertyOp](
-                href = path + self.name,
-                op = ops,
+                href=path + self.name,
+                op=ops,
             ),
         ]
         data_schema: DataSchema = type_to_dataschema(self.model)
         pa: PropertyAffordance = PropertyAffordance(
-            title = self.title,
-            forms = forms,
-            description = self.description,
+            title=self.title,
+            forms=forms,
+            description=self.description,
         )
         # We merge the data schema with the property affordance (which subclasses the
         # DataSchema model) with the affordance second so its values take priority.
@@ -192,19 +189,19 @@ class PropertyDescriptor():
         # them.
         return PropertyAffordance(
             **{
-                **data_schema.model_dump(exclude_none=True), 
-                **pa.model_dump(exclude_none=True)
+                **data_schema.model_dump(exclude_none=True),
+                **pa.model_dump(exclude_none=True),
             }
         )
-    
+
     def getter(self, func: Callable) -> Self:
         """set the function that gets the property's value"""
         self._getter = func
         return self
-    
+
     def setter(self, func: Callable) -> Self:
         """Decorator to set the property's value
-        
+
         PropertyDescriptors are variabes - so they will return the value they hold
         when they are accessed. However, they can run code when they are set: this
         decorator sets a function as that code.

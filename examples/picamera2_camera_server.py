@@ -23,13 +23,11 @@ from labthings_fastapi.utilities import get_blocking_portal
 
 logging.basicConfig(level=logging.INFO)
 
+
 class PicameraControl(PropertyDescriptor):
     def __init__(
-            self,
-            control_name: str,
-            model: type=float,
-            description: Optional[str]=None
-        ):
+        self, control_name: str, model: type = float, description: Optional[str] = None
+    ):
         """A property descriptor controlling a picamera control"""
         PropertyDescriptor.__init__(
             self, model, observable=False, description=description
@@ -43,20 +41,21 @@ class PicameraControl(PropertyDescriptor):
             ret = cam.capture_metadata()[self.control_name]
             print(f"Trying to return camera control {self.control_name} as `{ret}`")
             return ret
-        
+
     def _setter(self, obj: StreamingPiCamera2, value: Any):
         with obj.picamera() as cam:
             setattr(cam.controls, self.control_name, value)
-    
+
 
 class PicameraStreamOutput(Output):
     """An Output class that sends frames to a stream"""
+
     def __init__(self, stream: MJPEGStream, portal: BlockingPortal):
         """Create an output that puts frames in an MJPEGStream
-        
+
         We need to pass the stream object, and also the blocking portal, because
         new frame notifications happen in the anyio event loop and frames are
-        sent from a thread. The blocking portal enables thread-to-async 
+        sent from a thread. The blocking portal enables thread-to-async
         communication.
         """
         Output.__init__(self)
@@ -80,6 +79,7 @@ class SensorMode(BaseModel):
 
 class StreamingPiCamera2(Thing):
     """A Thing that represents an OpenCV camera"""
+
     def __init__(self, device_index: int = 0):
         self.device_index = device_index
         self.camera_configs: dict[str, dict] = {}
@@ -95,47 +95,36 @@ class StreamingPiCamera2(Thing):
         description="Resolution to use for still images (by default)",
     )
     mjpeg_bitrate = PropertyDescriptor(
-        int, 
-        initial_value=0, 
-        description="Bitrate for MJPEG stream (best left at 0)"
+        int, initial_value=0, description="Bitrate for MJPEG stream (best left at 0)"
     )
     stream_active = PropertyDescriptor(
-        bool, 
+        bool,
         initial_value=False,
-        description="Whether the MJPEG stream is active", observable=True
+        description="Whether the MJPEG stream is active",
+        observable=True,
     )
     mjpeg_stream = MJPEGStreamDescriptor()
-    analogue_gain = PicameraControl(
-        "AnalogueGain",
-        float
-    )
-    colour_gains = PicameraControl(
-        "ColourGains",
-        tuple[float, float]
-    )
+    analogue_gain = PicameraControl("AnalogueGain", float)
+    colour_gains = PicameraControl("ColourGains", tuple[float, float])
     colour_correction_matrix = PicameraControl(
         "ColourCorrectionMatrix",
-        tuple[float, float, float, float, float, float, float, float, float]
+        tuple[float, float, float, float, float, float, float, float, float],
     )
     exposure_time = PicameraControl(
-        "ExposureTime", 
-        int, 
-        description="The exposure time in microseconds"
+        "ExposureTime", int, description="The exposure time in microseconds"
     )
     exposure_time = PicameraControl(
-        "ExposureTime", 
-        int, 
-        description="The exposure time in microseconds"
+        "ExposureTime", int, description="The exposure time in microseconds"
     )
     sensor_modes = PropertyDescriptor(list[SensorMode], readonly=True)
-    
+
     def __enter__(self):
         self._picamera = picamera2.Picamera2(camera_num=self.device_index)
         self._picamera_lock = RLock()
         self.populate_sensor_modes()
         self.start_streaming()
         return self
-    
+
     @contextmanager
     def picamera(self) -> Iterator[Picamera2]:
         with self._picamera_lock:
@@ -154,13 +143,13 @@ class StreamingPiCamera2(Thing):
     def start_streaming(self) -> None:
         """
         Start the MJPEG stream
-        
+
         Sets the camera resolution to the video/stream resolution, and starts recording
         if the stream should be active.
         """
         with self.picamera() as picam:
-            #TODO: Filip: can we use the lores output to keep preview stream going
-            #while recording? According to picamera2 docs 4.2.1.6 this should work
+            # TODO: Filip: can we use the lores output to keep preview stream going
+            # while recording? According to picamera2 docs 4.2.1.6 this should work
             try:
                 if picam.started:
                     picam.stop()
@@ -168,7 +157,7 @@ class StreamingPiCamera2(Thing):
                     picam.encoder.stop()
                 stream_config = picam.create_video_configuration(
                     main={"size": self.stream_resolution},
-                    #colour_space=ColorSpace.Rec709(),
+                    # colour_space=ColorSpace.Rec709(),
                 )
                 picam.configure(stream_config)
                 logging.info("Starting picamera MJPEG stream...")
@@ -177,10 +166,10 @@ class StreamingPiCamera2(Thing):
                         self.mjpeg_bitrate if self.mjpeg_bitrate > 0 else None,
                     ),
                     PicameraStreamOutput(
-                        self.mjpeg_stream, 
+                        self.mjpeg_stream,
                         get_blocking_portal(self),
                     ),
-                    Quality.HIGH #TODO: use provided quality
+                    Quality.HIGH,  # TODO: use provided quality
                 )
             except Exception as e:
                 logging.info("Error while starting preview:")
@@ -221,10 +210,11 @@ class StreamingPiCamera2(Thing):
         example if a preview stream is running.
         """
         raise NotImplementedError
-    
+
     @thing_property
     def exposure(self) -> float:
         raise NotImplementedError()
+
     @exposure.setter
     def exposure(self, value):
         raise NotImplementedError()
@@ -233,7 +223,7 @@ class StreamingPiCamera2(Thing):
 
     mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
 
-    
+
 thing_server = ThingServer()
 my_thing = StreamingPiCamera2()
 my_thing.validate_thing_description()
