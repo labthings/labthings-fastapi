@@ -4,7 +4,7 @@ Define an object to represent an Action, as a descriptor.
 from __future__ import annotations
 from functools import partial
 import inspect
-from typing import TYPE_CHECKING, Annotated, Callable, Optional, Literal, overload
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
@@ -165,7 +165,7 @@ class ActionDescriptor:
         )
         # We construct a responses dictionary that allows us to specify the model or
         # the media type of the returned file. Not yet actually used.
-        responses = {
+        responses: dict[int | str, dict[str, Any]] = {
             200: {  # TODO: This does not currently get used
                 "description": "Action completed.",
                 "content": {

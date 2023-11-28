@@ -29,17 +29,40 @@ from tempfile import TemporaryDirectory
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, create_model
 from pydantic_core import PydanticUndefined
+from typing_extensions import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class BlobOutputProtocol(Protocol):
+    """A Protocol for a BlobOutput object"""
+
+    @property
+    def media_type(self) -> str:
+        pass
+
+    @property
+    def content(self) -> bytes:
+        pass
+
+    def save(self, filename: str) -> None:
+        ...
+
+    def open(self) -> io.IOBase:
+        ...
+
+
+class ServerSideBlobOutputProtocol(BlobOutputProtocol, Protocol):
+    """A BlobOutput protocol for server-side use, i.e. including `response()`"""
+
+    def response(self) -> Response:
+        ...
 
 
 def is_blob_output(obj: Any) -> bool:
     """Check if a class is a BlobOutput"""
-    for attr in (
-        "media_type",
-        "content",
-        "save",
-        "open",
-        "response",
-    ):
+    # We do this based on the protocol - but because I've used properties in the protocol,
+    # I can't just use issubclass.
+    for attr in ServerSideBlobOutputProtocol.__protocol_attrs__:  # type: ignore[attr-defined]
         if not hasattr(obj, attr):
             return False
     return True
@@ -60,9 +83,9 @@ class BlobOutputModel(BaseModel):
 def get_model_media_type(model: type) -> Optional[str]:
     """Return the media type of a BlobOutput model"""
     if is_blob_output(model):
-        return model.media_type
+        return model.media_type  # type: ignore[attr-defined] # (checked for in is_blob_output)
     try:
-        media_type = model.model_fields["media_type"].default
+        media_type = model.model_fields["media_type"].default  # type: ignore[attr-defined]
         if media_type is PydanticUndefined:
             return None
         return media_type
@@ -73,7 +96,7 @@ def get_model_media_type(model: type) -> Optional[str]:
     return None
 
 
-def blob_output_model(media_type: str) -> type[BlobOutput]:
+def blob_output_model(media_type: str) -> type[BlobOutputModel]:
     """Create a BlobOutput subclass for a given media type"""
     if "'" in media_type or "\\" in media_type:
         raise ValueError("media_type must not contain single quotes or backslashes")
@@ -96,11 +119,11 @@ def blob_to_model(output_type: type) -> type:
     does not automatically process the actual output of the function.
     """
     if is_blob_output(output_type):
-        return blob_output_model(output_type.media_type)
+        return blob_output_model(output_type.media_type)  # type: ignore[attr-defined]
     return output_type
 
 
-def blob_to_link(output: Any, ouput_href: str) -> Mapping[str, str]:
+def blob_to_link(output: Any, output_href: str) -> Mapping[str, str]:
     """If the argument is a BlobOutput, convert it to a link.
 
     Actions that return BlobOutput subclasses can't embed their output in a
@@ -114,7 +137,7 @@ def blob_to_link(output: Any, ouput_href: str) -> Mapping[str, str]:
     if is_blob_output(output):
         return {
             "media_type": output.media_type,
-            "href": ouput_href,
+            "href": output_href,
         }
     return output
 
