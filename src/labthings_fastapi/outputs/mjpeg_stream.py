@@ -13,6 +13,7 @@ from typing import (
     overload,
 )
 from typing_extensions import Self
+from copy import copy
 from contextlib import asynccontextmanager
 import threading
 import anyio
@@ -119,6 +120,16 @@ class MJPEGStream:
         async with self.condition:
             await self.condition.wait()
             return self.last_frame_i
+        
+    async def grab_frame(self) -> bytes:
+        """Wait for the next frame, and return it
+        
+        This copies the frame for safety, so we can release the
+        read lock on the buffer.
+        """
+        i = await self.next_frame()
+        async with self.buffer_for_reading(i) as frame:
+            return copy(frame)
 
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """A generator that yields frames as bytes"""
