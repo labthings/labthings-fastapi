@@ -120,20 +120,20 @@ class MJPEGStream:
         async with self.condition:
             await self.condition.wait()
             return self.last_frame_i
-        
+
     async def grab_frame(self) -> bytes:
         """Wait for the next frame, and return it
-        
+
         This copies the frame for safety, so we can release the
         read lock on the buffer.
         """
         i = await self.next_frame()
         async with self.buffer_for_reading(i) as frame:
             return copy(frame)
-    
+
     async def next_frame_size(self) -> int:
         """Wait for the next frame and return its size
-        
+
         This is useful if you want to use JPEG size as a sharpness metric.
         """
         i = await self.next_frame()
