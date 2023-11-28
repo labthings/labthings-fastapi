@@ -130,6 +130,15 @@ class MJPEGStream:
         i = await self.next_frame()
         async with self.buffer_for_reading(i) as frame:
             return copy(frame)
+    
+    async def next_frame_size(self) -> int:
+        """Wait for the next frame and return its size
+        
+        This is useful if you want to use JPEG size as a sharpness metric.
+        """
+        i = await self.next_frame()
+        async with self.buffer_for_reading(i) as frame:
+            return len(frame)
 
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """A generator that yields frames as bytes"""
