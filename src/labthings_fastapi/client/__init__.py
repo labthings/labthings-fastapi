@@ -8,11 +8,14 @@ Description.
 from __future__ import annotations
 import time
 from typing import Any, Optional, Union
+from typing_extensions import Self  # 3.9, 3.10 compatibility
 from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
 
 from pydantic import BaseModel
+
+from .outputs import ClientBlobOutput
 
 
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
@@ -52,12 +55,12 @@ class ThingClient:
     so this class will be minimally useful on its own.
     """
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, client: Optional[httpx.Client] = None):
         parsed = urlparse(base_url)
         server = f"{parsed.scheme}://{parsed.netloc}"
         self.server = server
         self.path = parsed.path
-        self.client = httpx.Client(base_url=server)
+        self.client = client or httpx.Client(base_url=server)
 
     def get_property(self, path: str) -> Any:
         r = self.client.get(urljoin(self.path, path))
@@ -71,7 +74,21 @@ class ThingClient:
     def invoke_action(self, path: str, **kwargs):
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
-        return poll_task(self.client, r.json())
+        task = poll_task(self.client, r.json())
+        if task["status"] == "completed":
+            if (
+                isinstance(task["output"], Mapping)
+                and "href" in task["output"]
+                and "media_type" in task["output"]
+            ):
+                return ClientBlobOutput(
+                    media_type=task["output"]["media_type"],
+                    href=task["output"]["href"],
+                    client=self.client,
+                )
+            return task["output"]
+        else:
+            raise RuntimeError(f"Action did not complete successfully: {task}")
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
         """Follow a link in a response object, by its `rel` attribute"""
@@ -79,6 +96,42 @@ class ThingClient:
         r = self.client.get(href)
         r.raise_for_status()
         return r
+
+    @classmethod
+    def from_url(
+        cls, thing_url: str, client: Optional[httpx.Client] = None, **kwargs
+    ) -> Self:
+        """Create a ThingClient from a URL
+
+        This will dynamically create a subclass with properties and actions,
+        and return an instance of that subclass pointing at the Thing URL.
+
+        Additional `kwargs` will be passed to the subclass constructor, in
+        particular you may pass a `client` object (useful for testing).
+        """
+        td_client = client or httpx
+        r = td_client.get(thing_url)
+        r.raise_for_status()
+        subclass = cls.subclass_from_td(r.json())
+        return subclass(thing_url, client=client, **kwargs)
+
+    @classmethod
+    def subclass_from_td(cls, thing_description: dict) -> type[Self]:
+        """Create a ThingClient subclass from a Thing Description"""
+
+        class Client(cls):  # type: ignore[valid-type, misc]
+            # mypy wants the superclass to be statically type-able, but
+            # this isn't possible (for now) if we are to be able to
+            # use this class method on `ThingClient` subclasses, i.e.
+            # to provide customisation but also add methods from a
+            # Thing Description.
+            pass
+
+        for name, p in thing_description["properties"].items():
+            add_property(Client, name, p)
+        for name, a in thing_description["actions"].items():
+            add_action(Client, name, a)
+        return Client
 
 
 class PropertyClientDescriptor:
@@ -151,23 +204,3 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict):
             readable=not property.get("writeOnly", False),
         ),
     )
-
-
-def thing_client_class(thing_description: dict):
-    """Create a ThingClient from a Thing Description"""
-
-    class Client(ThingClient):
-        pass
-
-    for name, p in thing_description["properties"].items():
-        add_property(Client, name, p)
-    for name, a in thing_description["actions"].items():
-        add_action(Client, name, a)
-    return Client
-
-
-def thing_client_from_url(thing_url: str) -> ThingClient:
-    """Create a ThingClient from a URL"""
-    r = httpx.get(thing_url)
-    r.raise_for_status()
-    return thing_client_class(r.json())(thing_url)

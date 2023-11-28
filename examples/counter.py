@@ -9,7 +9,7 @@ class TestThing(Thing):
     """A test thing with a counter property and a couple of actions"""
 
     @thing_action
-    def increment_counter(self):
+    def increment_counter(self) -> None:
         """Increment the counter property
 
         This action doesn't do very much - all it does, in fact,
@@ -19,7 +19,7 @@ class TestThing(Thing):
         self.counter += 1
 
     @thing_action
-    def slowly_increase_counter(self):
+    def slowly_increase_counter(self) -> None:
         """Increment the counter slowly over a minute"""
         for i in range(60):
             time.sleep(1)

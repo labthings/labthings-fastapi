@@ -27,9 +27,7 @@ class ThingOne(Thing):
         return self.ACTION_ONE_RESULT
 
 
-print("Making ThingOneClient")
 ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
-print("Done")
 
 
 class ThingTwo(Thing):

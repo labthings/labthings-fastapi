@@ -151,3 +151,10 @@ def test_action_output():
         assert invocation["output"] == {"key": "value"}
         r = client.get(get_link(invocation, "output")["href"])
         assert r.json() == {"key": "value"}
+
+
+def test_openapi():
+    """Check the OpenAPI docs are generated OK"""
+    with TestClient(server.app) as client:
+        r = client.get("/openapi.json")
+        r.raise_for_status()

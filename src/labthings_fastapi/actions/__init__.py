@@ -11,6 +11,7 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from labthings_fastapi.outputs.blob import blob_to_link
 
 from labthings_fastapi.utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
@@ -142,7 +143,7 @@ class Invocation(Thread):
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
             input=self.input,
-            output=self.output,
+            output=blob_to_link(self.output, href + "/output"),
             links=links,
         )
 
@@ -325,11 +326,22 @@ class ActionManager:
             ACTION_INVOCATIONS_PATH + "/{id}/output",
             response_model=Any,
             responses={
+                200: {
+                    "description": "Action invocation output",
+                    "content": {
+                        "*/*": {},
+                    },
+                },
                 404: {"description": "Invocation ID not found"},
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_result(id: uuid.UUID):
+        def action_invocation_output(id: uuid.UUID):
+            """Get the output of an action invocation
+
+            This returns just the "output" component of the action invocation. If the
+            output is a file, it will return the file.
+            """
             with self._invocations_lock:
                 try:
                     invocation: Any = self._invocations[id]
@@ -343,6 +355,11 @@ class ActionManager:
                         status_code=503,
                         detail="No result is available for this invocation",
                     )
+                if hasattr(invocation.output, "response") and callable(
+                    invocation.output.response
+                ):
+                    # TODO: honour "accept" header
+                    return invocation.output.response()
                 return invocation.output
 
         @app.get(
