@@ -4,11 +4,12 @@ This tests Things that depend on other Things
 import os
 from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
+import pytest
 from labthings_fastapi.thing_server import ThingServer
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
-from labthings_fastapi.outputs.blob import BlobOutput
+from labthings_fastapi.outputs.blob import BlobOutput, blob_output_model
 from labthings_fastapi.client import ThingClient
 
 
@@ -42,6 +43,14 @@ class ThingTwo(Thing):
         """An action that checks the output of ThingOne"""
         check_both_actions(thing_one)
         return True
+
+
+def test_blob_output_model():
+    """Check we can't put dodgy values into a blob output model"""
+    with pytest.raises(ValueError):
+        blob_output_model(media_type="text/plain\\'DROP TABLES")
+    M = blob_output_model(media_type="text/plain")
+    assert M(href="http://example/").media_type == "text/plain"
 
 
 def test_blob_output_client():
