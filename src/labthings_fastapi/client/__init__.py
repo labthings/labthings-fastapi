@@ -14,6 +14,8 @@ from urllib.parse import urlparse, urljoin
 
 from pydantic import BaseModel
 
+from .outputs import ClientBlobOutput
+
 
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
@@ -71,7 +73,21 @@ class ThingClient:
     def invoke_action(self, path: str, **kwargs):
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
-        return poll_task(self.client, r.json())
+        task = poll_task(self.client, r.json())
+        if task["status"] == "completed":
+            if (
+                isinstance(task["output"], Mapping)
+                and "href" in task["output"]
+                and "media_type" in task["output"]
+            ):
+                return ClientBlobOutput(
+                    media_type=task["output"]["media_type"],
+                    href=task["output"]["href"],
+                    client=self.client,
+                )
+            return task["output"]
+        else:
+            raise RuntimeError(f"Action did not complete successfully: {task}")
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
         """Follow a link in a response object, by its `rel` attribute"""
@@ -81,7 +97,9 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, **kwargs) -> Self:
+    def from_url(
+        cls, thing_url: str, client: Optional[httpx.Client] = None, **kwargs
+    ) -> Self:
         """Create a ThingClient from a URL
 
         This will dynamically create a subclass with properties and actions,
@@ -90,10 +108,11 @@ class ThingClient:
         Additional `kwargs` will be passed to the subclass constructor, in
         particular you may pass a `client` object (useful for testing).
         """
-        r = httpx.get(thing_url)
+        td_client = client or httpx
+        r = td_client.get(thing_url)
         r.raise_for_status()
         subclass = cls.subclass_from_td(r.json())
-        return subclass(thing_url, **kwargs)
+        return subclass(thing_url, client=client, **kwargs)
 
     @classmethod
     def subclass_from_td(cls, thing_description: dict) -> type[Self]:
