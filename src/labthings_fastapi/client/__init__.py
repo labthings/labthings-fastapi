@@ -7,7 +7,8 @@ Description.
 
 from __future__ import annotations
 import time
-from typing import Any, Optional, Union, Self
+from typing import Any, Optional, Union
+from typing_extensions import Self  # 3.9, 3.10 compatibility
 from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
