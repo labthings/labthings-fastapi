@@ -22,10 +22,13 @@ deal with this.
 from __future__ import annotations
 import io
 import os
-from typing import Any
+import shutil
+from typing import Any, Literal, Mapping, Optional
 from tempfile import TemporaryDirectory
 
 from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, create_model
+from pydantic_core import PydanticUndefined
 
 
 def is_blob_output(obj: Any) -> bool:
@@ -33,13 +36,87 @@ def is_blob_output(obj: Any) -> bool:
     for attr in (
         "media_type",
         "content",
-        "save_to_file",
+        "save",
         "open",
         "response",
     ):
         if not hasattr(obj, attr):
             return False
     return True
+
+
+class BlobOutputModel(BaseModel):
+    """A Pydantic model describing a BlobOutput"""
+
+    media_type: str
+    href: str
+    rel: Literal["output"] = "output"
+    description: str = (
+        "The output from this action is not serialised to JSON, so it must be "
+        "retrieved as a file. This link will return the file."
+    )
+
+
+def get_model_media_type(model: type) -> Optional[str]:
+    """Return the media type of a BlobOutput model"""
+    if is_blob_output(model):
+        return model.media_type
+    try:
+        media_type = model.model_fields["media_type"].default
+        if media_type is PydanticUndefined:
+            return None
+        return media_type
+    except KeyError:  # If there's no media_type field, ignore it
+        pass
+    except AttributeError:  # If it's not a Pydantic model, ignore it
+        pass
+    return None
+
+
+def blob_output_model(media_type: str) -> type[BlobOutput]:
+    """Create a BlobOutput subclass for a given media type"""
+    if "'" in media_type or "\\" in media_type:
+        raise ValueError("media_type must not contain single quotes or backslashes")
+    return create_model(
+        f"blob_output_{media_type.replace('/', '_')}",
+        __base__=BlobOutputModel,
+        media_type=(eval(f"Literal[r'{media_type}']"), media_type),
+    )
+
+
+def blob_to_model(output_type: type) -> type:
+    """Substitute BlobOutputModel for BlobOutput subclasses
+
+    This function converts BlobOutput classes to a Pydantic model, so
+    that the output is a JSON object containing the media type and a link.
+    NB this uses "duck typing", so the class need only expose the necessary
+    attributes.
+
+    NB this *only* converts the `output_model` of an `ActionDescriptor`, it
+    does not automatically process the actual output of the function.
+    """
+    if is_blob_output(output_type):
+        return blob_output_model(output_type.media_type)
+    return output_type
+
+
+def blob_to_link(output: Any, ouput_href: str) -> Mapping[str, str]:
+    """If the argument is a BlobOutput, convert it to a link.
+
+    Actions that return BlobOutput subclasses can't embed their output in a
+    JSON response, so we convert them to a link. This function does that.
+    Following the link will download the output as a file. We return a
+    dictionary rather than a BlobOutput object so that the output model
+    is used (which checks the media type for us).
+
+    NB this uses "duck typing" so may become stricter in the future.
+    """
+    if is_blob_output(output):
+        return {
+            "media_type": output.media_type,
+            "href": ouput_href,
+        }
+    return output
 
 
 NEITHER_BYTES_NOR_FILE = NotImplementedError(
@@ -81,7 +158,7 @@ class BlobOutput:
                 return f.read()
         raise NEITHER_BYTES_NOR_FILE
 
-    def save_to_file(self, filepath: str) -> None:
+    def save(self, filepath: str) -> None:
         """Save the output to a file.
 
         This may remove the need to hold the output in memory.
@@ -89,11 +166,10 @@ class BlobOutput:
         if hasattr(self, "_bytes"):
             with open(filepath, "wb") as f:
                 f.write(self._bytes)
-        if hasattr(self, "_file_path"):
-            import shutil
-
+        elif hasattr(self, "_file_path"):
             shutil.copyfile(self._file_path, filepath)
-        raise NEITHER_BYTES_NOR_FILE
+        else:
+            raise NEITHER_BYTES_NOR_FILE
 
     def open(self) -> io.IOBase:
         """Open the output as a binary file-like object."""

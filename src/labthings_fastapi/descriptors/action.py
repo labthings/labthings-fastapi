@@ -18,6 +18,7 @@ from ..utilities.introspection import (
     input_model_from_signature,
     return_type,
 )
+from ..outputs.blob import blob_to_model, get_model_media_type
 from ..thing_description import type_to_dataschema
 from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
 
@@ -64,7 +65,7 @@ class ActionDescriptor:
             remove_first_positional_arg=True,
             ignore=[p.name for p in self.dependency_params],
         )
-        self.output_model = return_type(func)
+        self.output_model = blob_to_model(return_type(func))
         self.invocation_model = create_model(
             f"{self.name}_invocation",
             __base__=InvocationModel,
@@ -139,7 +140,7 @@ class ActionDescriptor:
                     id=id,
                 )
                 background_tasks.add_task(thing.action_manager.expire_invocations)
-                return action.response()
+                return action.response(request=request)
             finally:
                 try:
                     action._file_manager = request.state.file_manager
@@ -162,6 +163,24 @@ class ActionDescriptor:
         start_action.__signature__ = sig.replace(  # type: ignore[attr-defined]
             parameters=params
         )
+        # We construct a responses dictionary that allows us to specify the model or
+        # the media type of the returned file. Not yet actually used.
+        responses = {
+            200: {  # TODO: This does not currently get used
+                "description": "Action completed.",
+                "content": {
+                    "application/json": {},
+                },
+            },
+        }
+        try:
+            responses[200]["model"] = self.output_model
+            pass
+        except AttributeError:
+            print(f"Failed to generate response model for action {self.name}")
+        # Add an additional media type if we may return a file
+        if get_model_media_type(self.output_model):
+            responses[200]["content"][get_model_media_type(self.output_model)] = {}
         # Now we can add the endpoint to the app.
         app.post(
             thing.path + self.name,
@@ -170,12 +189,7 @@ class ActionDescriptor:
             response_description="Action has been invoked (and may still be running).",
             description=f"## {self.title}\n\n {self.description} {ACTION_POST_NOTICE}",
             summary=self.title,
-            responses={
-                200: {
-                    "description": "Action completed.",
-                    "model": self.invocation_model,
-                },
-            },
+            responses=responses,
         )(start_action)
 
         @app.get(
