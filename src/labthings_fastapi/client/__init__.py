@@ -68,7 +68,7 @@ class ThingClient:
         return r.json()
 
     def set_property(self, path: str, value: Any):
-        r = self.client.post(urljoin(self.path, path), json=value)
+        r = self.client.put(urljoin(self.path, path), json=value)
         r.raise_for_status()
 
     def invoke_action(self, path: str, **kwargs):
