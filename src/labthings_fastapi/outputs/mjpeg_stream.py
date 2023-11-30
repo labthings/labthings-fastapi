@@ -120,6 +120,16 @@ class MJPEGStream:
         async with self.condition:
             await self.condition.wait()
             return self.last_frame_i
+        
+    async def grab_frame(self) -> bytes:
+        """Wait for the next frame, and return it
+        
+        This copies the frame for safety, so we can release the
+        read lock on the buffer.
+        """
+        i = await self.next_frame()
+        async with self.buffer_for_reading(i) as frame:
+            return frame.copy()
 
     async def grab_frame(self) -> bytes:
         """Wait for the next frame, and return it
