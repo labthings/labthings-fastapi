@@ -14,7 +14,7 @@ def test_websocket_observeproperty():
                 {"messageType": "addPropertyObservation", "data": {"foo": True}}
             )
             test_str = "Abcdef"
-            client.post("/my_thing/foo", json=test_str)
+            client.put("/my_thing/foo", json=test_str)
             message = ws.receive_json(mode="text")
             assert message["data"]["foo"] == test_str
             ws.close(1000)

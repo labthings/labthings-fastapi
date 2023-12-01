@@ -99,7 +99,7 @@ def test_sync_action():
         client.put("/thing/boolprop", json=False)
         r = client.get("/thing/boolprop")
         assert r.json() is False
-        r = client.put("/thing/toggle_boolprop", json={})
+        r = client.post("/thing/toggle_boolprop", json={})
         assert r.status_code in [200, 201]
         r = client.get("/thing/boolprop")
         assert r.json() is True
@@ -110,7 +110,7 @@ def test_setting_from_thread():
         client.put("/thing/boolprop", json=False)
         r = client.get("/thing/boolprop")
         assert r.json() is False
-        r = client.put("/thing/toggle_boolprop_from_thread", json={})
+        r = client.post("/thing/toggle_boolprop_from_thread", json={})
         assert r.status_code in [200, 201]
         r = client.get("/thing/boolprop")
         assert r.json() is True
