@@ -144,7 +144,7 @@ class PropertyDescriptor:
                 return self.__set__(thing, body)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
-            app.post(
+            app.put(
                 thing.path + self.name,
                 status_code=201,
                 response_description="Property set successfully",

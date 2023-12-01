@@ -60,7 +60,7 @@ def test_instantiation_with_model():
 def test_property_get_and_set():
     with TestClient(server.app) as client:
         test_str = "A silly test string"
-        client.post("/thing/stringprop", json=test_str)
+        client.put("/thing/stringprop", json=test_str)
         after_value = client.get("/thing/stringprop")
         assert after_value.json() == test_str
 
@@ -69,7 +69,7 @@ def test_propertydescriptor():
     with TestClient(server.app) as client:
         r = client.get("/thing/boolprop")
         assert r.json() is False
-        client.post("/thing/boolprop", json=True)
+        client.put("/thing/boolprop", json=True)
         r = client.get("/thing/boolprop")
         assert r.json() is True
 
@@ -78,7 +78,7 @@ def test_decorator_with_no_annotation():
     with TestClient(server.app) as client:
         r = client.get("/thing/undoc")
         assert r.json() is None
-        r = client.post("/thing/undoc", json="foo")
+        r = client.put("/thing/undoc", json="foo")
         assert r.status_code != 200
 
 
@@ -86,17 +86,17 @@ def test_readwrite_with_getter_and_setter():
     with TestClient(server.app) as client:
         r = client.get("/thing/floatprop")
         assert r.json() == 1.0
-        r = client.post("/thing/floatprop", json=2.0)
+        r = client.put("/thing/floatprop", json=2.0)
         assert r.status_code == 201
         r = client.get("/thing/floatprop")
         assert r.json() == 2.0
-        r = client.post("/thing/floatprop", json="foo")
+        r = client.put("/thing/floatprop", json="foo")
         assert r.status_code != 200
 
 
 def test_sync_action():
     with TestClient(server.app) as client:
-        client.post("/thing/boolprop", json=False)
+        client.put("/thing/boolprop", json=False)
         r = client.get("/thing/boolprop")
         assert r.json() is False
         r = client.post("/thing/toggle_boolprop", json={})
@@ -107,7 +107,7 @@ def test_sync_action():
 
 def test_setting_from_thread():
     with TestClient(server.app) as client:
-        client.post("/thing/boolprop", json=False)
+        client.put("/thing/boolprop", json=False)
         r = client.get("/thing/boolprop")
         assert r.json() is False
         r = client.post("/thing/toggle_boolprop_from_thread", json={})
