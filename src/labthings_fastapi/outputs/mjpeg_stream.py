@@ -161,8 +161,11 @@ class MJPEGStream:
         assert frame[-2] == 0xFF and frame[-1] == 0xD9, ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
-            if entry.readers > 0:
-                raise RuntimeError("Cannot write to ringbuffer while it is being read")
+            # entry.readers was intended to allow me to use the camera's
+            # framebuffers directly. As it is, we are already copying to a 
+            # bytes object, so this check is unnecessary.
+            #if entry.readers > 0:
+            #    raise RuntimeError("Cannot write to ringbuffer while it is being read")
             entry.timestamp = datetime.now()
             entry.frame = frame
             entry.index = self.last_frame_i + 1
