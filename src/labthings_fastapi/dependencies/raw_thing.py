@@ -11,7 +11,7 @@ ThingInstance = TypeVar("ThingInstance", bound=Thing)
 
 
 def find_raw_thing_by_class(
-    cls: type[ThingInstance]
+    cls: type[ThingInstance],
 ) -> Callable[[Request], ThingInstance]:
     """Generate a dependency that locates the instance of a specific Thing subclass
 
