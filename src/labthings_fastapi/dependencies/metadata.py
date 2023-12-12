@@ -7,27 +7,9 @@ from fastapi import Depends, Request
 from ..thing_server import find_thing_server
 
 
-def get_thing_states(request: Request) -> dict:
+def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
     """A dependency to retrieve summary metadata from all Things in this server.
 
-    This is intended to make it easy for a Thing to summarise the other Things
-    it's associated with, for example it's used to populate the UserComment
-    EXIF field in the OpenFlexure Microscope.
-
-    This function evaluates metadata and provides the dependent function with
-    a dictionary. For a version that provides a callable to execute later,
-    see `thing_states_getter`.
-    """
-    get_metadata = thing_states_getter(request)
-    return get_metadata()
-
-
-ThingStates = Annotated[Mapping[str, Any], Depends(get_thing_states)]
-
-
-def thing_states_getter(request: Request) -> Callable[..., Mapping[str, Any]]:
-    """A dependency to retrieve summary metadata from all Things in this server.
-    
     This is intended to make it easy for a Thing to summarise the other Things
     it's associated with, for example it's used to populate the UserComment
     EXIF field in the OpenFlexure Microscope.
@@ -40,10 +22,14 @@ def thing_states_getter(request: Request) -> Callable[..., Mapping[str, Any]]:
     changes, you should use this version.
     """
     server = find_thing_server(request.app)
+
     def get_metadata():
         """Retrieve metadata from each Thing"""
         return {k: v.thing_state for k, v in server.things.items()}
+
     return get_metadata
 
 
-GetThingStates = Annotated[Callable[..., Mapping[str, Any]], Depends(thing_states_getter)]
+GetThingStates = Annotated[
+    Callable[[], Mapping[str, Any]], Depends(thing_states_getter)
+]

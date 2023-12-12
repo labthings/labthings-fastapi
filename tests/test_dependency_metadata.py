@@ -10,6 +10,7 @@ from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
 from labthings_fastapi.dependencies.metadata import GetThingStates
 
+
 class ThingOne(Thing):
     def __init__(self):
         Thing.__init__(self)
@@ -18,37 +19,36 @@ class ThingOne(Thing):
     @thing_property
     def a(self):
         return self._a
+
     @a.setter
     def a(self, value):
         self._a = value
-    
+
     @property
     def thing_state(self):
         return {"a": self.a}
-    
+
 
 ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
-    
+
 
 class ThingTwo(Thing):
-    A_VALUES = [1,2,3]
+    A_VALUES = [1, 2, 3]
 
     @property
     def thing_state(self):
         return {"a": 1}
-    
+
     @thing_action
     def count_and_watch(
-        self,
-        thing_one: ThingOneDep,
-        get_metadata: GetThingStates
+        self, thing_one: ThingOneDep, get_metadata: GetThingStates
     ) -> Mapping[str, Mapping[str, Any]]:
         metadata = {}
         for a in self.A_VALUES:
             thing_one.a = a
             metadata[f"a_{a}"] = get_metadata()
         return metadata
-        
+
 
 def test_fresh_metadata():
     server = ThingServer()
