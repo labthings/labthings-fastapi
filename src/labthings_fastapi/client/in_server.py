@@ -70,7 +70,7 @@ def property_descriptor(
         return getattr(obj._wrapped_thing, self.name)
 
     def __set__(self, obj: DirectThingClient, value: Any):
-        setattr(obj, self.name, value)
+        setattr(obj._wrapped_thing, self.name, value)
 
     if readable:
         __get__.__annotations__["return"] = model
