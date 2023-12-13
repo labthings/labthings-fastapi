@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import Optional, Sequence, TypeVar
 import os.path
 from fastapi import FastAPI, Request
@@ -113,9 +114,21 @@ class ThingServer:
                 for thing in self.things.values():
                     await stack.enter_async_context(thing)
                 yield
-            for thing in self.things.values():
+            for name, thing in self.things.items():
                 # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
+                try:
+                    if thing._labthings_thing_settings:
+                        thing._labthings_thing_settings.write_to_file()
+                except PermissionError:
+                    logging.warning(
+                        f"Could not write {name} settings to disk: permission error."
+                    )
+                except FileNotFoundError:
+                    logging.warning(
+                        f"Could not write {name} settings, folder not found"
+                    )
+
         self.blocking_portal = None
 
     def add_things_view_to_app(self):
