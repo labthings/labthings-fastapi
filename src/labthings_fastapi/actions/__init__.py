@@ -3,8 +3,8 @@ import datetime
 import logging
 import traceback
 from collections import deque
-from threading import Event, Thread, Lock, get_ident
-from typing import Optional, Any
+from threading import Event, Thread, Lock
+from typing import MutableSequence, Optional, Any
 import uuid
 from typing import TYPE_CHECKING
 import weakref
@@ -17,6 +17,7 @@ from labthings_fastapi.utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
 from ..file_manager import FileManager
 from .invocation_model import InvocationModel, InvocationStatus
+from ..dependencies.invocation_logger import invocation_logger
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -145,13 +146,15 @@ class Invocation(Thread):
             input=self.input,
             output=blob_to_link(self.output, href + "/output"),
             links=links,
+            log=self.log,
         )
 
     def run(self):
         """Overrides default threading.Thread run() method"""
         # Capture just this thread's log messages
-        handler = ThreadLogHandler(self, self._log, self._status_lock)
-        logging.getLogger().addHandler(handler)
+        handler = DequeLogHandler(dest=self._log, lock=self._status_lock)
+        logger = invocation_logger(self.id)
+        logger.addHandler(handler)
 
         action = self.action
         thing = self.thing
@@ -190,11 +193,10 @@ class Invocation(Thread):
             # If we don't remove the log handler, it's a memory leak.
 
 
-class ThreadLogHandler(logging.Handler):
+class DequeLogHandler(logging.Handler):
     def __init__(
         self,
-        thread: Invocation,
-        dest: deque,
+        dest: MutableSequence,
         lock: Lock,
         level=logging.INFO,
     ):
@@ -217,19 +219,8 @@ class ThreadLogHandler(logging.Handler):
         """
         logging.Handler.__init__(self)
         self.setLevel(level)
-        self.thread_ident = thread.ident
         self.dest = dest
-        self.addFilter(self.check_thread)
-
-    def check_thread(self, *_):
-        """Determine if a thread matches the desired record
-
-        :param record:
-
-        """
-        if get_ident() == self.thread_ident:
-            return 1
-        return 0
+        self.lock = lock
 
     def emit(self, record):
         """Save a log record to the destination deque"""
