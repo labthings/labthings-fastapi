@@ -31,7 +31,6 @@ class RingbufferEntry:
     frame: bytes
     timestamp: datetime
     index: int
-    readers: int = 0
 
 
 class MJPEGStreamResponse(StreamingResponse):
@@ -109,11 +108,7 @@ class MJPEGStream:
     async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
         """Yields the ith frame as a bytes object"""
         entry = await self.ringbuffer_entry(i)
-        try:
-            entry.readers += 1
-            yield entry.frame
-        finally:
-            entry.readers -= 1
+        yield entry.frame
 
     async def next_frame(self) -> int:
         """Wait for the next frame, and return its index"""
@@ -161,8 +156,6 @@ class MJPEGStream:
         assert frame[-2] == 0xFF and frame[-1] == 0xD9, ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
-            if entry.readers > 0:
-                raise RuntimeError("Cannot write to ringbuffer while it is being read")
             entry.timestamp = datetime.now()
             entry.frame = frame
             entry.index = self.last_frame_i + 1
