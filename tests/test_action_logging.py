@@ -6,7 +6,7 @@ from labthings_fastapi.thing_server import ThingServer
 from temp_client import poll_task
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.dependencies.invocation_logger import InvocationLogger
+from labthings_fastapi.dependencies.invocation import InvocationLogger
 
 
 class ThingOne(Thing):

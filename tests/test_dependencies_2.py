@@ -17,7 +17,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
-from labthings_fastapi.dependencies.invocation_id import InvocationID, invocation_id
+from labthings_fastapi.dependencies.invocation import InvocationID, invocation_id
 from labthings_fastapi.file_manager import FileManager
 from uuid import UUID
 

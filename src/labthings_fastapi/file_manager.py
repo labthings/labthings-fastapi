@@ -17,7 +17,7 @@ from fastapi import Depends, Request
 from .thing_description.model import LinkElement
 import os
 
-from .dependencies.invocation_id import InvocationID
+from .dependencies.invocation import InvocationID
 
 
 class FileManager:
