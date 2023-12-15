@@ -17,7 +17,11 @@ from labthings_fastapi.utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
 from ..file_manager import FileManager
 from .invocation_model import InvocationModel, InvocationStatus
-from ..dependencies.invocation_logger import invocation_logger
+from ..dependencies.invocation import (
+    CancelHook,
+    InvocationCancelledError,
+    invocation_logger,
+)
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -43,6 +47,7 @@ class Invocation(Thread):
         default_stop_timeout: float = 5,
         log_len: int = 1000,
         id: Optional[uuid.UUID] = None,
+        cancel_hook: Optional[CancelHook] = None,
     ):
         Thread.__init__(self, daemon=True)
 
@@ -51,6 +56,7 @@ class Invocation(Thread):
         self.thing_ref = weakref.ref(thing)
         self.input = input if input is not None else EmptyInput()
         self.dependencies = dependencies if dependencies is not None else {}
+        self.cancel_hook = cancel_hook
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
         self._ID = id if id is not None else uuid.uuid4()  # Task ID
@@ -124,6 +130,15 @@ class Invocation(Thread):
     def thing(self):
         return self.thing_ref()
 
+    def cancel(self):
+        """Cancel the task by requesting the code to stop
+
+        This is very much not guaranteed to work: the action must use
+        a CancelHook dependency and periodically check it.
+        """
+        if self.cancel_hook is not None:
+            self.cancel_hook.set()
+
     def response(self, request: Optional[Request] = None):
         if request:
             href = str(request.url_for("action_invocation", id=self.id))
@@ -173,7 +188,7 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
-        except SystemExit as e:
+        except InvocationCancelledError as e:
             logging.error(e)
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
@@ -251,6 +266,7 @@ class ActionManager:
         id: uuid.UUID,
         input: Any,
         dependencies: dict[str, Any],
+        cancel_hook: CancelHook,
     ) -> Invocation:
         """Invoke an action, returning the thread where it's running"""
         thread = Invocation(
@@ -259,6 +275,7 @@ class ActionManager:
             input=input,
             dependencies=dependencies,
             id=id,
+            cancel_hook=cancel_hook,
         )
         self.append_invocation(thread)
         thread.start()
@@ -352,6 +369,40 @@ class ActionManager:
                     # TODO: honour "accept" header
                     return invocation.output.response()
                 return invocation.output
+
+        @app.delete(
+            ACTION_INVOCATIONS_PATH + "/{id}",
+            response_model=None,
+            responses={
+                200: {
+                    "description": "Cancel request sent",
+                },
+                404: {"description": "Invocation ID not found"},
+                503: {"description": "Invocation may not be cancelled"},
+            },
+        )
+        def delete_invocation(id: uuid.UUID) -> None:
+            """Cancel an action invocation"""
+            with self._invocations_lock:
+                try:
+                    invocation: Any = self._invocations[id]
+                except KeyError:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="No action invocation found with ID {id}",
+                    )
+                if invocation.status not in [
+                    InvocationStatus.RUNNING,
+                    InvocationStatus.PENDING,
+                ]:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            f"The invocation is {invocation.status} "
+                            "and may not be cancelled."
+                        ),
+                    )
+                invocation.cancel()
 
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}/files",

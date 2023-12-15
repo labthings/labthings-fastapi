@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, o
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
-from ..dependencies.invocation_id import InvocationID
+from ..dependencies.invocation import CancelHook, InvocationID
 from ..utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
@@ -128,6 +128,7 @@ class ActionDescriptor:
             request: Request,
             body,
             id: InvocationID,
+            cancel_hook: CancelHook,
             background_tasks: BackgroundTasks,
             **dependencies,
         ):
@@ -138,6 +139,7 @@ class ActionDescriptor:
                     input=body,
                     dependencies=dependencies,
                     id=id,
+                    cancel_hook=cancel_hook,
                 )
                 background_tasks.add_task(thing.action_manager.expire_invocations)
                 return action.response(request=request)
