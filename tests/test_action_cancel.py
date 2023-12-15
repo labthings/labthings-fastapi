@@ -15,7 +15,7 @@ class ThingOne(Thing):
     counter = PropertyDescriptor(int, 0, observable=False)
 
     @thing_action
-    def count_slowly(self, cancel: CancelHook, n: int=10):
+    def count_slowly(self, cancel: CancelHook, n: int = 10):
         for i in range(n):
             cancel.sleep(0.1)
             self.counter += 1
