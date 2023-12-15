@@ -28,6 +28,7 @@ def test_invocation_logging():
         r = client.post("/thing_one/count_slowly")
         r.raise_for_status()
         dr = client.delete(task_href(r.json()))
+        dr.raise_for_status()
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "cancelled"
     assert thing_one.counter < 9
