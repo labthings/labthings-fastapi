@@ -59,7 +59,7 @@ class PropertyDescriptor:
         self._name = name
         if not self.title:
             self.title = name
-    
+
     @property
     def title(self):
         """A human-readable title"""
