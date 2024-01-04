@@ -74,7 +74,7 @@ class EndpointDescriptor:
 
     @property
     def description(self):
-        """A description of the action"""
+        """A description of the endpoint"""
         return get_docstring(self.func, remove_summary=True)
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
