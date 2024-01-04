@@ -79,7 +79,6 @@ class EndpointDescriptor:
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
         bound_function = partial(self.func, thing)
-        bound_function.__name__ = self.func.__name__
         # NB the line above can't use self.__get__ as wraps() confuses FastAPI
         kwargs = {  # Auto-populate description and summary
             "description": f"## {self.title}\n\n {self.description}",

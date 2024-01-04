@@ -57,8 +57,6 @@ class PropertyDescriptor:
 
     def __set_name__(self, owner, name: str):
         self._name = name
-        if not self.title:
-            self.title = name
 
     @property
     def title(self):
