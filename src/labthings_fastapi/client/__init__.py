@@ -48,6 +48,12 @@ def poll_task(client, task, interval=0.5, first_interval=0.05):
     return task
 
 
+def cancel_task(client, task):
+    """Poll a task until it finishes, and return the return value"""
+    r = client.delete(task_href(task))
+    r.raise_for_status()
+
+
 class ThingClient:
     """A client for a LabThings-FastAPI Thing
 
@@ -74,7 +80,11 @@ class ThingClient:
     def invoke_action(self, path: str, **kwargs):
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
-        task = poll_task(self.client, r.json())
+        try:
+            task = poll_task(self.client, r.json())
+        except KeyboardInterrupt:
+            cancel_task(self.client, r.json())
+            task = poll_task(self.client, r.json())
         if task["status"] == "completed":
             if (
                 isinstance(task["output"], Mapping)
