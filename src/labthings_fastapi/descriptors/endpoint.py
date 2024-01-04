@@ -1,5 +1,5 @@
 from __future__ import annotations
-from functools import partial
+from functools import partial, wraps
 
 from labthings_fastapi.utilities.introspection import get_docstring, get_summary
 
@@ -55,7 +55,7 @@ class EndpointDescriptor:
         # TODO: do we attempt dependency injection here? I think not.
         # If we want dependency injection, we should be calling the action
         # via some sort of client object.
-        return partial(self.func, obj)
+        return wraps(self.func)(partial(self.func, obj))
 
     @property
     def name(self):
@@ -82,4 +82,9 @@ class EndpointDescriptor:
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
         bound_function = self.__get__(thing)
-        fastapi_endpoint(thing.path + self.path, **self.kwargs)(bound_function)
+        kwargs = {  # Auto-populate description and summary
+            "description": f"## {self.title}\n\n {self.description}",
+            "summary": self.title,
+        }
+        kwargs.update(self.kwargs)
+        fastapi_endpoint(thing.path + self.path, **kwargs)(bound_function)
