@@ -70,7 +70,7 @@ async def process_messages_from_websocket(
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
     """Handle communication to a client via websocket"""
     await websocket.accept()
-    send_stream, receive_stream = create_memory_object_stream()
+    send_stream, receive_stream = create_memory_object_stream[dict]()
     async with create_task_group() as tg:
         tg.start_soon(relay_notifications_to_websocket, websocket, receive_stream)
         tg.start_soon(process_messages_from_websocket, websocket, send_stream, thing)
