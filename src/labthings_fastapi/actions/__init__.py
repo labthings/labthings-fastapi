@@ -167,7 +167,7 @@ class Invocation(Thread):
     def run(self):
         """Overrides default threading.Thread run() method"""
         # Capture just this thread's log messages
-        handler = DequeLogHandler(dest=self._log, lock=self._status_lock)
+        handler = DequeLogHandler(dest=self._log)
         logger = invocation_logger(self.id)
         logger.addHandler(handler)
 
@@ -212,7 +212,6 @@ class DequeLogHandler(logging.Handler):
     def __init__(
         self,
         dest: MutableSequence,
-        lock: Lock,
         level=logging.INFO,
     ):
         """Set up a log handler that appends messages to a list.
@@ -222,9 +221,9 @@ class DequeLogHandler(logging.Handler):
         Only log entries from the specified thread will be
         saved.
 
-        ``dest`` should specify a list, to which we will append
-        each log entry as it comes in.  If none is specified, a
-        new list will be created.
+        ``dest`` should specify a deque, to which we will append
+        each log entry as it comes in. This is assumed to be thread
+        safe.
 
         NB this log handler does not currently rotate or truncate
         the list - so if you use it on a thread that produces a
@@ -235,12 +234,10 @@ class DequeLogHandler(logging.Handler):
         logging.Handler.__init__(self)
         self.setLevel(level)
         self.dest = dest
-        self.lock = lock
 
     def emit(self, record):
         """Save a log record to the destination deque"""
-        with self.lock:
-            self.dest.append(record)
+        self.dest.append(record)
 
 
 class ActionManager:

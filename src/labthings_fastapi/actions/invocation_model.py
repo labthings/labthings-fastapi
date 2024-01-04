@@ -21,7 +21,7 @@ class InvocationStatus(Enum):
 class LogRecordModel(BaseModel):
     """A model to serialise logging.LogRecord objects"""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
 
     message: str
     levelname: str
@@ -36,6 +36,7 @@ class LogRecordModel(BaseModel):
         if not hasattr(data, "message"):
             if isinstance(data, logging.LogRecord):
                 data.message = data.getMessage()
+        return data
 
 
 InputT = TypeVar("InputT")

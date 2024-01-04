@@ -20,8 +20,13 @@ InvocationID = Annotated[uuid.UUID, Depends(invocation_id)]
 
 
 def invocation_logger(id: InvocationID) -> logging.Logger:
-    """Retrieve a logger object for an action invocation"""
-    return logging.getLogger(f"labthings_fastapi.actions.{id}")
+    """Retrieve a logger object for an action invocation
+
+    This will have a level of at least INFO.
+    """
+    logger = logging.getLogger(f"labthings_fastapi.actions.{id}")
+    logger.setLevel(logging.INFO)
+    return logger
 
 
 InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]
