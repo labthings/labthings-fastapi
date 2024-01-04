@@ -34,7 +34,12 @@ not supported at this time.
 
 from functools import wraps, partial
 from typing import Optional, Callable
-from ..descriptors import ActionDescriptor, PropertyDescriptor, EndpointDescriptor, HTTPMethod
+from ..descriptors import (
+    ActionDescriptor,
+    PropertyDescriptor,
+    EndpointDescriptor,
+    HTTPMethod,
+)
 from ..utilities.introspection import return_type
 
 
@@ -87,10 +92,10 @@ def thing_property(func: Callable) -> PropertyDescriptor:
     )
 
 
-def fastapi_endpoint(method: HTTPMethod, path: Optional[str]=None, **kwargs):
+def fastapi_endpoint(method: HTTPMethod, path: Optional[str] = None, **kwargs):
     """Add a function to FastAPI as an endpoint"""
+
     def decorator(func):
-        return EndpointDescriptor(
-            func, http_method=method, path=path, **kwargs
-        )
+        return EndpointDescriptor(func, http_method=method, path=path, **kwargs)
+
     return decorator

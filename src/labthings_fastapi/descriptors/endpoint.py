@@ -2,9 +2,17 @@ from __future__ import annotations
 from functools import partial
 
 from labthings_fastapi.utilities.introspection import get_docstring, get_summary
-"""A descriptor to allow Things to easily add other endpoints"""
 
-from typing import Callable, Literal, Mapping, Optional, Self, Union, overload, TYPE_CHECKING
+from typing import (
+    Callable,
+    Literal,
+    Mapping,
+    Optional,
+    Self,
+    Union,
+    overload,
+    TYPE_CHECKING,
+)
 from fastapi import FastAPI
 
 if TYPE_CHECKING:
@@ -12,7 +20,10 @@ if TYPE_CHECKING:
 
 HTTPMethod = Literal["get", "post", "put", "delete"]
 
+
 class EndpointDescriptor:
+    """A descriptor to allow Things to easily add other endpoints"""
+
     def __init__(
         self,
         func: Callable,
@@ -33,11 +44,9 @@ class EndpointDescriptor:
     def __get__(self, obj: Thing, type=None) -> Callable:
         ...
 
-    def __get__(
-        self, obj: Optional[Thing], type=None
-    ) -> Union[Self, Callable]:
+    def __get__(self, obj: Optional[Thing], type=None) -> Union[Self, Callable]:
         """The function, bound to an object as for a normal method.
-        
+
         If `obj` is None, the descriptor is returned, so we can get
         the descriptor conveniently as an attribute of the class.
         """
@@ -52,7 +61,7 @@ class EndpointDescriptor:
     def name(self):
         """The name of the wrapped function"""
         return self.func.__name__
-    
+
     @property
     def path(self):
         """The path of the endpoint (relative to the Thing)"""
