@@ -17,6 +17,7 @@ dependencies = [
   "pydantic>=2.0.0",
   "jsonschema",
   "typing_extensions",
+  "anyio ~=4.0",
 ]
 
 [project.optional-dependencies]

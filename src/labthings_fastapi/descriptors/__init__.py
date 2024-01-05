@@ -1,5 +1,4 @@
-from .action import ActionDescriptor
-from .property import PropertyDescriptor
-
-__all__ = ["ActionDescriptor", "PropertyDescriptor"]
-_ignore_unused_imports = [ActionDescriptor, PropertyDescriptor]
+from .action import ActionDescriptor as ActionDescriptor
+from .property import PropertyDescriptor as PropertyDescriptor
+from .endpoint import EndpointDescriptor as EndpointDescriptor
+from .endpoint import HTTPMethod as HTTPMethod

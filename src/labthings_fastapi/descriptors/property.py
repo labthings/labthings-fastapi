@@ -4,6 +4,7 @@ Define an object to represent an Action, as a descriptor.
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
 from typing_extensions import Self
+from labthings_fastapi.utilities.introspection import get_summary, get_docstring
 from pydantic import BaseModel, RootModel
 from fastapi import Body, FastAPI
 from weakref import WeakSet
@@ -45,21 +46,31 @@ class PropertyDescriptor:
         self.readonly = readonly
         self.observable = observable
         self.initial_value = initial_value
-        self.description = description
-        self.title = title
+        self._description = description
+        self._title = title
         # The lines below allow _getter and _setter to be specified by subclasses
         self._setter = setter or getattr(self, "_setter", None)
         self._getter = getter or getattr(self, "_getter", None)
-        if self.description and not self.title:
-            self.title = self.description.partition("\n")[0]
         # Try to generate a DataSchema, so that we can raise an error that's easy to
         # link to the offending PropertyDescriptor
         type_to_dataschema(self.model)
 
     def __set_name__(self, owner, name: str):
         self._name = name
-        if not self.title:
-            self.title = name
+
+    @property
+    def title(self):
+        """A human-readable title"""
+        if self._title:
+            return self._title
+        if self._getter and get_summary(self._getter):
+            return get_summary(self._getter)
+        return self.name
+
+    @property
+    def description(self):
+        """A description of the property"""
+        return self._description or get_docstring(self._getter, remove_summary=True)
 
     def __get__(self, obj, type=None) -> Any:
         """The value of the property
