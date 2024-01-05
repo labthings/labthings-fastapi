@@ -8,11 +8,11 @@ from typing import (
     Literal,
     Mapping,
     Optional,
-    Self,
     Union,
     overload,
     TYPE_CHECKING,
 )
+from typing_extensions import Self  # 3.9, 3.10 compatibility
 from fastapi import FastAPI
 
 if TYPE_CHECKING:
