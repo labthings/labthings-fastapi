@@ -20,6 +20,9 @@ class TestBlobOutput(BlobOutput):
 class ThingOne(Thing):
     ACTION_ONE_RESULT = b"Action one result!"
 
+    def __init__(self):
+        self._temp_directory = TemporaryDirectory()
+
     @thing_action
     def action_one(self) -> TestBlobOutput:
         """An action that makes a blob response from bytes"""
@@ -27,11 +30,19 @@ class ThingOne(Thing):
 
     @thing_action
     def action_two(self) -> TestBlobOutput:
-        """An action that makes a blob response from a file"""
+        """An action that makes a blob response from a file and tempdir"""
         td = TemporaryDirectory()
         with open(os.path.join(td.name, "serverside"), "wb") as f:
             f.write(self.ACTION_ONE_RESULT)
         return TestBlobOutput.from_temporary_directory(td, "serverside")
+
+    @thing_action
+    def action_three(self) -> TestBlobOutput:
+        """An action that makes a blob response from a file"""
+        fpath = os.path.join(self._temp_directory.name, "serverside")
+        with open(fpath, "wb") as f:
+            f.write(self.ACTION_ONE_RESULT)
+        return TestBlobOutput.from_file(fpath)
 
 
 ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
@@ -41,7 +52,7 @@ class ThingTwo(Thing):
     @thing_action
     def check_both(self, thing_one: ThingOneDep) -> bool:
         """An action that checks the output of ThingOne"""
-        check_both_actions(thing_one)
+        check_actions(thing_one)
         return True
 
 
@@ -62,13 +73,13 @@ def test_blob_output_client():
     server.add_thing(ThingOne(), "/thing_one")
     with TestClient(server.app) as client:
         tc = ThingClient.from_url("/thing_one/", client=client)
-        check_both_actions(tc)
+        check_actions(tc)
 
 
 def test_blob_output_direct():
     """This should mirror `test_blob_output_inserver` but with helpful errors"""
     thing = ThingOne()
-    check_both_actions(thing)
+    check_actions(thing)
 
 
 def test_blob_output_inserver():
@@ -94,8 +105,8 @@ def check_blob(output, expected_content: bytes):
         assert f.read() == expected_content
 
 
-def check_both_actions(thing):
+def check_actions(thing):
     """Check that both action_one and action_two work"""
-    for action in (thing.action_one, thing.action_two):
+    for action in (thing.action_one, thing.action_two, thing.action_three):
         output = action()
         check_blob(output, ThingOne.ACTION_ONE_RESULT)

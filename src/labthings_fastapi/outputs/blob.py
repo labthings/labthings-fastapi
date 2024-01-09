@@ -29,7 +29,7 @@ from tempfile import TemporaryDirectory
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, create_model
 from pydantic_core import PydanticUndefined
-from typing_extensions import Protocol, runtime_checkable
+from typing_extensions import Self, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -203,16 +203,14 @@ class BlobOutput:
         raise NEITHER_BYTES_NOR_FILE
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> BlobOutput:
+    def from_bytes(cls, data: bytes) -> Self:
         """Create a BlobOutput from a bytes object"""
         obj = cls()
         obj._bytes = data
         return obj
 
     @classmethod
-    def from_temporary_directory(
-        cls, folder: TemporaryDirectory, file: str
-    ) -> BlobOutput:
+    def from_temporary_directory(cls, folder: TemporaryDirectory, file: str) -> Self:
         """Create a BlobOutput from a file in a temporary directory
 
         The TemporaryDirectory object will persist as long as this BlobOutput does,
@@ -222,6 +220,21 @@ class BlobOutput:
         obj = cls()
         obj._file_path = os.path.join(folder.name, file)
         obj._temporary_directory = folder
+        return obj
+
+    @classmethod
+    def from_file(cls, file: str) -> Self:
+        """Create a BlobOutput from a regular file
+
+        The file should exist for at least as long as the BlobOutput does; this
+        is assumed to be the case and nothing is done to ensure it's not
+        temporary. If you are using temporary files, consider creating your
+        BlobOutput with `from_temporary_directory` instead.
+        """
+        if not os.path.exists(file):
+            raise IOError("Tried to return a file that doesn't exist.")
+        obj = cls()
+        obj._file_path = file
         return obj
 
     def response(self):
