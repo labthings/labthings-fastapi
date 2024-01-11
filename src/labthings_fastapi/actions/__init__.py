@@ -1,7 +1,6 @@
 from __future__ import annotations
 import datetime
 import logging
-import traceback
 from collections import deque
 from threading import Event, Thread, Lock
 from typing import MutableSequence, Optional, Any
@@ -188,12 +187,12 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
-        except InvocationCancelledError as e:
-            logging.error(e)
+        except InvocationCancelledError:
+            logger.error(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
         except Exception as e:  # skipcq: PYL-W0703
-            logging.error(traceback.format_exc())
+            logger.exception(e)
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
@@ -204,8 +203,8 @@ class Invocation(Thread):
                 self.expiry_time = self._end_time + datetime.timedelta(
                     seconds=self.retention_time,
                 )
-            logging.getLogger().removeHandler(handler)  # Stop logging this thread
-            # If we don't remove the log handler, it's a memory leak.
+            logger.removeHandler(handler)  # Stop saving logs
+            # If we don't remove the log handler, it's a circular ref/memory leak.
 
 
 class DequeLogHandler(logging.Handler):
