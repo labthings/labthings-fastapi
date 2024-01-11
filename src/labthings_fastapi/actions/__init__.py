@@ -1,7 +1,6 @@
 from __future__ import annotations
 import datetime
 import logging
-import traceback
 from collections import deque
 from threading import Event, Thread, Lock
 from typing import MutableSequence, Optional, Any
@@ -188,7 +187,7 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
-        except InvocationCancelledError as e:
+        except InvocationCancelledError:
             logger.error(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
