@@ -49,3 +49,36 @@ def test_logrecordmodel():
     )
     m = LogRecordModel.model_validate(record, from_attributes=True)
     assert m.levelname == record.levelname
+
+
+def test_logrecord_args():
+    record = logging.LogRecord(
+        name="recordName",
+        level=logging.INFO,
+        pathname="dummy/path",
+        lineno=0,
+        msg="mambo number %d",
+        args=(5,),
+        exc_info=None,
+    )
+    m = LogRecordModel.model_validate(record, from_attributes=True)
+    assert m.message == record.getMessage()
+
+
+def test_logrecord_too_many_args():
+    """Calling getMessage() will raise an error - but it should still validate
+
+    If it doesn't validate, it will cause every subsequent call to the action's
+    invocation record to return a 500 error.
+    """
+    record = logging.LogRecord(
+        name="recordName",
+        level=logging.INFO,
+        pathname="dummy/path",
+        lineno=0,
+        msg="mambo number %d",
+        args=(5, 6),
+        exc_info=None,
+    )
+    m = LogRecordModel.model_validate(record, from_attributes=True)
+    assert m.message.startswith("Error")

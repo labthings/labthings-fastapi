@@ -35,7 +35,17 @@ class LogRecordModel(BaseModel):
     def generate_message(cls, data: Any):
         if not hasattr(data, "message"):
             if isinstance(data, logging.LogRecord):
-                data.message = data.getMessage()
+                try:
+                    data.message = data.getMessage()
+                except (ValueError, TypeError) as e:
+                    # too many args causes an error - but errors
+                    # in validation can be a problem for us:
+                    # it will cause 500 errors when retrieving
+                    # the invocation.
+                    # This way, you can find and fix the source.
+                    data.message = (
+                        f"Error constructing message ({e}) " f"from {data!r}."
+                    )
         return data
 
 
