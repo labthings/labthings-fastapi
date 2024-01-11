@@ -81,4 +81,4 @@ def test_logrecord_too_many_args():
         exc_info=None,
     )
     m = LogRecordModel.model_validate(record, from_attributes=True)
-    assert m.message.startsWith("Error")
+    assert m.message.startswith("Error")
