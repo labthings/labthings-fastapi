@@ -29,6 +29,10 @@ dev = [
   "types-jsonschema",
   "numpy~=1.20",
 ]
+docs = [
+  "sphinx-autoapi>=3.0.0, <4",
+  "sphinx-rtd-theme>=2.0.0, <3",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/rwb27/labthings-fastapi"
