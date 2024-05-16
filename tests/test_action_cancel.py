@@ -1,6 +1,7 @@
 """
 This tests the log that is returned in an action invocation
 """
+
 import uuid
 from fastapi.testclient import TestClient
 from labthings_fastapi.thing_server import ThingServer

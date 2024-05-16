@@ -1,4 +1,5 @@
 """FastAPI dependency for an invocation ID"""
+
 from __future__ import annotations
 import uuid
 from typing import Annotated

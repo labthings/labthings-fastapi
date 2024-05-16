@@ -92,7 +92,7 @@ class MJPEGStream:
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the ith frame acquired by the camera
-        
+
         :param i: The index of the frame to read
         """
         if i < 0:
@@ -110,7 +110,7 @@ class MJPEGStream:
     @asynccontextmanager
     async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
         """Yields the ith frame as a bytes object
-        
+
         :param i: The index of the frame to read
         """
         entry = await self.ringbuffer_entry(i)
@@ -158,7 +158,7 @@ class MJPEGStream:
 
     def add_frame(self, frame: bytes, portal: BlockingPortal):
         """Return the next buffer in the ringbuffer to write to
-        
+
         :param frame: The frame to add
         :param portal: The blocking portal to use for scheduling tasks.
             This is necessary because tasks are handled asynchronously.
@@ -191,12 +191,10 @@ class MJPEGStreamDescriptor:
         self.name = name
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self:
-        ...
+    def __get__(self, obj: Literal[None], type=None) -> Self: ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> MJPEGStream:
-        ...
+    def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...
 
     def __get__(self, obj: Optional[Thing], type=None) -> Union[MJPEGStream, Self]:
         """The value of the property

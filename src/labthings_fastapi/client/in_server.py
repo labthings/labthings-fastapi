@@ -7,6 +7,7 @@ hints work.
 This module may get moved in the near future.
 
 """
+
 from __future__ import annotations
 from functools import wraps
 import inspect

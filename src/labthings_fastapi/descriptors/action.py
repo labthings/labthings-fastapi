@@ -1,10 +1,20 @@
 """
 Define an object to represent an Action, as a descriptor.
 """
+
 from __future__ import annotations
 from functools import partial
 import inspect
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, Union, overload
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Optional,
+    Literal,
+    Union,
+    overload,
+)
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
@@ -75,12 +85,10 @@ class ActionDescriptor:
         self.invocation_model.__name__ = f"{self.name}_invocation"
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor:
-        ...
+    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor: ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable:
-        ...
+    def __get__(self, obj: Thing, type=None) -> Callable: ...
 
     def __get__(
         self, obj: Optional[Thing], type=None

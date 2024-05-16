@@ -3,6 +3,7 @@
 This allows dependencies that are called by threaded code to send things back
 to the async event loop.
 """
+
 from __future__ import annotations
 from typing import Annotated
 from fastapi import Depends, Request

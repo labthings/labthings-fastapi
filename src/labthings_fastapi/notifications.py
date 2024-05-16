@@ -12,10 +12,9 @@ The aim at this stage (July 2023) is for a minimal working example that
 enables property changes to be fed via a websocket. Events proper should
 not be a big step thereafter.
 
-Currently, this code is more or less all in `websockets.py` and 
+Currently, this code is more or less all in `websockets.py` and
 `descriptors/property.py` but it should get consolidated.
 """
-
 
 from __future__ import annotations
 

@@ -37,12 +37,10 @@ class EndpointDescriptor:
         self.kwargs = kwargs
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self:
-        ...
+    def __get__(self, obj: Literal[None], type=None) -> Self: ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable:
-        ...
+    def __get__(self, obj: Thing, type=None) -> Callable: ...
 
     def __get__(self, obj: Optional[Thing], type=None) -> Union[Self, Callable]:
         """The function, bound to an object as for a normal method.

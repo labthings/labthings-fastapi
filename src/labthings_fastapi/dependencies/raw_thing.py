@@ -63,7 +63,7 @@ def raw_thing_dependency(cls: type[ThingInstance]) -> type[ThingInstance]:
     prompts FastAPI to supply the instance of the class.
 
     Usage:
-    
+
     ```{code-block} python
 
     from my_other_thing import MyOtherThing as MyOtherThingClass

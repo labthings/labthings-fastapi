@@ -19,7 +19,6 @@ with a single Thing instance. This may change in the future.
 (c) Richard Bowman July 2023, released under GNU-LGPL-3.0
 """
 
-
 from __future__ import annotations
 from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import ObjectReceiveStream, ObjectSendStream

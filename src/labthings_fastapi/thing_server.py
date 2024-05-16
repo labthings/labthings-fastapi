@@ -94,7 +94,7 @@ class ThingServer:
         """Manage set up and tear down
 
         This does two important things:
-        
+
         * It sets up the blocking portal so background threads can run async code
           (important for events)
         * It runs setup/teardown code for Things.

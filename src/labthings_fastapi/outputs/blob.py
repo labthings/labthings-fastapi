@@ -44,18 +44,15 @@ class BlobOutputProtocol(Protocol):
     def content(self) -> bytes:
         pass
 
-    def save(self, filename: str) -> None:
-        ...
+    def save(self, filename: str) -> None: ...
 
-    def open(self) -> io.IOBase:
-        ...
+    def open(self) -> io.IOBase: ...
 
 
 class ServerSideBlobOutputProtocol(BlobOutputProtocol, Protocol):
     """A BlobOutput protocol for server-side use, i.e. including `response()`"""
 
-    def response(self) -> Response:
-        ...
+    def response(self) -> Response: ...
 
 
 def is_blob_output(obj: Any) -> bool:

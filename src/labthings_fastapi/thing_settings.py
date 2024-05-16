@@ -3,6 +3,7 @@ Settings management for things
 
 ThingSettings is a dictionary-like object that manages settings for one Thing
 """
+
 from __future__ import annotations
 import json
 import os
