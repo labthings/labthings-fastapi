@@ -9,7 +9,7 @@ effectively.
 
 If you have a complex datatype, it's recommended to use a `pydantic` model
 to describe it - this is often the case for complicated properties or events.
-For actions, a model is created automatically based on the function's 
+For actions, a model is created automatically based on the function's
 signature: if you want to add descriptions or validators to individual
 arguments, you may use `pydantic.Field` to do this.
 

@@ -13,6 +13,7 @@ The tests in this module were written while I was figuring this out: they mostly
 test things from FastAPI that obviously work, but I will leave them in here as
 mitigation against something changing in the future.
 """
+
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient

@@ -1,6 +1,7 @@
 """
 This tests Things that depend on other Things
 """
+
 import os
 from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient

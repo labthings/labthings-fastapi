@@ -43,7 +43,7 @@ class MJPEGStreamResponse(StreamingResponse):
         objects, each of which is a JPEG file. We add the --frame markers and mime
         types that enable it to work in an `img` tag.
 
-        NB the `status_code` argument is used by FastAPI to set the status code of
+        NB the ``status_code`` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
         """
         self.frame_async_generator = gen
@@ -91,7 +91,10 @@ class MJPEGStream:
             self._streaming = False
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
-        """Return the `i`th frame acquired by the camera"""
+        """Return the ith frame acquired by the camera
+
+        :param i: The index of the frame to read
+        """
         if i < 0:
             raise ValueError("i must be >= 0")
         if i < self.last_frame_i - len(self._ringbuffer) + 2:
@@ -106,7 +109,10 @@ class MJPEGStream:
 
     @asynccontextmanager
     async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
-        """Yields the ith frame as a bytes object"""
+        """Yields the ith frame as a bytes object
+
+        :param i: The index of the frame to read
+        """
         entry = await self.ringbuffer_entry(i)
         yield entry.frame
 
@@ -151,7 +157,14 @@ class MJPEGStream:
         return MJPEGStreamResponse(self.frame_async_generator())
 
     def add_frame(self, frame: bytes, portal: BlockingPortal):
-        """Return the next buffer in the ringbuffer to write to"""
+        """Return the next buffer in the ringbuffer to write to
+
+        :param frame: The frame to add
+        :param portal: The blocking portal to use for scheduling tasks.
+            This is necessary because tasks are handled asynchronously.
+            The blocking portal may be obtained with a dependency, in
+            `labthings_fastapi.dependencies.blocking_portal.BlockingPortal`.
+        """
         assert frame[0] == 0xFF and frame[1] == 0xD8, ValueError("Invalid JPEG")
         assert frame[-2] == 0xFF and frame[-1] == 0xD9, ValueError("Invalid JPEG")
         with self._lock:
@@ -178,21 +191,19 @@ class MJPEGStreamDescriptor:
         self.name = name
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self:
-        ...
+    def __get__(self, obj: Literal[None], type=None) -> Self: ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> MJPEGStream:
-        ...
+    def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...
 
     def __get__(self, obj: Optional[Thing], type=None) -> Union[MJPEGStream, Self]:
         """The value of the property
 
-        If `obj` is none (i.e. we are getting the attribute of the class),
+        If ``obj`` is none (i.e. we are getting the attribute of the class),
         we return the descriptor.
 
         If no getter is set, we'll return either the initial value, or the value
-        from the object's __dict__, i.e. we behave like a variable.
+        from the object's ``__dict__``, i.e. we behave like a variable.
 
         If a getter is set, we will use it, unless the property is observable, at
         which point the getter is only ever used once, to set the initial value.

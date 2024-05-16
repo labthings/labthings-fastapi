@@ -8,6 +8,7 @@ The FileManager class is responsible for managing files created by actions. It w
 handle finding a temporary storage location, and making it possible to retrieve the
 files via the Invocation object.
 """
+
 from __future__ import annotations
 from tempfile import TemporaryDirectory
 from typing import Annotated, Sequence, Optional

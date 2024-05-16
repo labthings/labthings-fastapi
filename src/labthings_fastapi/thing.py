@@ -2,7 +2,7 @@
 The `Thing` class enables most of the functionality of this library,
 and is the way in to most of its features. In the future, we might
 support a stub version of the class in a separate package, so
-that instrument control libraries can be LabThings compatible 
+that instrument control libraries can be LabThings compatible
 without a hard dependency on LabThings. But that is something we
 will do in the future...
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
 from fastapi.encoders import jsonable_encoder
-from fastapi import Request
+from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
@@ -20,7 +20,7 @@ from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint, WebSocket
+from .websockets import websocket_endpoint
 from .thing_settings import ThingSettings
 
 if TYPE_CHECKING:

@@ -3,6 +3,7 @@
 This allows dependencies that are called by threaded code to send things back
 to the async event loop.
 """
+
 from __future__ import annotations
 from typing import Annotated
 from fastapi import Depends, Request
@@ -25,3 +26,9 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
 BlockingPortal = Annotated[
     RealBlockingPortal, Depends(blocking_portal_from_thing_server)
 ]
+"""
+A ready-made dependency type for a blocking portal. If you use an argument with
+type `BlockingPortal`, FastAPI will automatically inject the blocking portal.
+This is simply shorthand for {class}`anyio.from_thread.BlockingPortal` annotated with
+`Depends(blocking_portal_from_thing_server)`.
+"""

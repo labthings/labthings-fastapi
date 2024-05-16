@@ -1,6 +1,7 @@
 """
 Define an object to represent an Action, as a descriptor.
 """
+
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
 from typing_extensions import Self

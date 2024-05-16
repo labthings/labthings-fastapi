@@ -17,6 +17,7 @@ touch, but is left for the future.
 
 Complex numbers are currently not supported, again this is left for the future.
 """
+
 from __future__ import annotations
 import numpy as np
 from pydantic import (
