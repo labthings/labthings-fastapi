@@ -12,6 +12,7 @@ You can install `labthings-fastapi` using `pip`:
 Then, paste the following into a python file, ``counter.py``:
 
 .. code-block:: python
+    
     import time
     from labthings_fastapi.thing import Thing
     from labthings_fastapi.decorators import thing_action

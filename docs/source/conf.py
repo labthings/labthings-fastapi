@@ -15,19 +15,23 @@ release = '0.0.1'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    "myst_parser",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.autodoc",
-    "autoapi.extension",
+    #"sphinx.ext.napoleon",
+    "autodoc2",
     "sphinx_rtd_theme",
 ]
 
 templates_path = ['_templates']
 exclude_patterns = []
 
-autoapi_dirs = ["../../src/labthings_fastapi"]
-autoapi_ignore = []
+autodoc2_packages = ["../../src/labthings_fastapi"]
+autodoc2_render_plugin = "myst"
 
-autoapi_generate_api_docs = False
+#autoapi_dirs = ["../../src/labthings_fastapi"]
+#autoapi_ignore = []
+#autoapi_generate_api_docs = True
+#autoapi_keep_files = True
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
