@@ -108,15 +108,14 @@ class Invocation(Thread):
         """
         Current running status of the thread.
 
-        ==============  =============================================
-        Status          Meaning
-        ==============  =============================================
-        ``pending``     Not yet started
-        ``running``     Currently in-progress
-        ``completed``   Finished without error
-        ``cancelled``   Thread stopped after a cancel request
-        ``error``       Exception occured in thread
-        ==============  =============================================
+        | Status         | Meaning |
+        |----------------|---------|
+        | ``pending``    | Not yet started |
+        | ``running``    | Currently in-progress |
+        | ``completed``  | Finished without error |
+        | ``cancelled``  | Thread stopped after a cancel request |
+        | ``error``      | Exception occured in thread |
+
         """
         with self._status_lock:
             return self._status

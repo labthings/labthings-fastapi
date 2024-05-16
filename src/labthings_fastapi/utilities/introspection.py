@@ -51,13 +51,13 @@ def input_model_from_signature(
     This will fail for position-only arguments, though that may change
     in the future.
 
-    Parameters:
-    * `remove_first_positional_arg` removes the first argument from the
-      model (this is appropriate for methods, as the first argument,
-      self, is baked in when it's called, but is present in the
-      signature).
-    * `ignore` will ignore arguments that have the specified name.
-      This is useful for e.g. dependencies that are injected by LabThings.
+    :param remove_first_positional_arg: Remove the first argument from the
+        model (this is appropriate for methods, as the first argument,
+        self, is baked in when it's called, but is present in the
+        signature).
+    :param ignore: Ignore arguments that have the specified name.
+        This is useful for e.g. dependencies that are injected by LabThings.
+    :returns: A pydantic model class describing the input parameters
 
     TODO: deal with (or exclude) functions with a single positional parameter
     """

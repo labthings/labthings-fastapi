@@ -4,7 +4,7 @@ Define an object to represent an Action, as a descriptor.
 from __future__ import annotations
 from functools import partial
 import inspect
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, overload
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, Union, overload
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
@@ -20,7 +20,7 @@ from ..utilities.introspection import (
 )
 from ..outputs.blob import blob_to_model, get_model_media_type
 from ..thing_description import type_to_dataschema
-from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
+from ..thing_description.model import ActionAffordance, ActionOp, Form
 
 if TYPE_CHECKING:
     from ..thing import Thing
