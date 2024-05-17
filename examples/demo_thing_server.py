@@ -115,10 +115,16 @@ html = """
 """
 
 """
-{"messageType":"addPropertyObservation","data":{"foo":true}}
+{"messageType":"addPropertyObservation","data":{"foo":true, "counter":true}}
+{"messageType":"addActionObservation","data":{"increment_counter":true}}
 """
 
 
 @app.get("/wsclient", tags=["websockets"])
 async def get():
     return HTMLResponse(html)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
