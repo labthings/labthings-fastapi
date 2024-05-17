@@ -145,9 +145,10 @@ class ActionDescriptor:
 
     async def emit_changed_event_async(self, obj: Thing, value: Any):
         """Notify subscribers that the action status has changed"""
+        action_name = self.name 
         for observer in self._observers_set(obj):
             await observer.send(
-                {"messageType": "actionStatus", "data": {"action": value}}
+                {"messageType": "actionStatus", "data": {"action name": action_name, "status": value}}
             )
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
