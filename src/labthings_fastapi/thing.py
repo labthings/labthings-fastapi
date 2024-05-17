@@ -11,16 +11,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
 from fastapi.encoders import jsonable_encoder
-from fastapi import Request, WebSocket
+from fastapi import Request
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
-from .descriptors import PropertyDescriptor
+from .descriptors import PropertyDescriptor, ActionDescriptor
 from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint
+from .websockets import websocket_endpoint, WebSocket
 from .thing_settings import ThingSettings
 
 if TYPE_CHECKING:
@@ -217,3 +217,11 @@ class Thing:
         if not isinstance(prop, PropertyDescriptor):
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
+
+    def observe_action(self, action_name: str, stream: ObjectSendStream):
+        """Register a stream to receive action status change notifications"""
+        action = getattr(self.__class__, action_name)
+        if not isinstance(action, ActionDescriptor):
+            raise KeyError(f"{action_name} is not an LabThings Action")
+        observers = action._observers_set(self)
+        observers.add(stream)

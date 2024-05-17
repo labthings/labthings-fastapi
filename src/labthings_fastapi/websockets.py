@@ -59,6 +59,9 @@ async def process_messages_from_websocket(
             if data["messageType"] == "addPropertyObservation":
                 for k in data["data"].keys():
                     thing.observe_property(k, send_stream)
+            if data["messageType"] == "addActionObservation":
+                for k in data["data"].keys():
+                    thing.observe_action(k, send_stream)
         except KeyError as e:
             logging.error(f"Got a bad websocket message: {data}, caused KeyError({e})")
         except WebSocketDisconnect:
