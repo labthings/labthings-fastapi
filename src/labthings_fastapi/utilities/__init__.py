@@ -32,6 +32,7 @@ LABTHINGS_DICT_KEY = "__labthings"
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class LabThingsObjectData:
     property_observers: Dict[str, WeakSet] = Field(default_factory=dict)
+    action_observers: Dict[str, WeakSet] = Field(default_factory=dict)
 
 
 def labthings_data(obj: Thing) -> LabThingsObjectData:

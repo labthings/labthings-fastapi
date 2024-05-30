@@ -108,14 +108,15 @@ class Invocation(Thread):
         """
         Current running status of the thread.
 
-        | Status         | Meaning |
-        |----------------|---------|
-        | ``pending``    | Not yet started |
-        | ``running``    | Currently in-progress |
-        | ``completed``  | Finished without error |
-        | ``cancelled``  | Thread stopped after a cancel request |
-        | ``error``      | Exception occured in thread |
-
+        ==============  =============================================
+        Status          Meaning
+        ==============  =============================================
+        ``pending``     Not yet started
+        ``running``     Currently in-progress
+        ``completed``   Finished without error
+        ``cancelled``   Thread stopped after a cancel request
+        ``error``       Exception occured in thread
+        ==============  =============================================
         """
         with self._status_lock:
             return self._status
@@ -164,6 +165,8 @@ class Invocation(Thread):
 
     def run(self):
         """Overrides default threading.Thread run() method"""
+        self.action.emit_changed_event(self.thing, self._status)
+
         # Capture just this thread's log messages
         handler = DequeLogHandler(dest=self._log)
         logger = invocation_logger(self.id)
@@ -178,6 +181,7 @@ class Invocation(Thread):
         with self._status_lock:
             self._status = InvocationStatus.RUNNING
             self._start_time = datetime.datetime.now()
+            self.action.emit_changed_event(self.thing, self._status)
 
         try:
             # The next line actually runs the action.
@@ -186,15 +190,18 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
+                self.action.emit_changed_event(self.thing, self._status)
         except InvocationCancelledError:
             logger.error(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
+                self.action.emit_changed_event(self.thing, self._status)
         except Exception as e:  # skipcq: PYL-W0703
             logger.exception(e)
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
+                self.action.emit_changed_event(self.thing, self._status)
             raise e
         finally:
             with self._status_lock:
