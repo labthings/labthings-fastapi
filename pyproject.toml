@@ -1,6 +1,6 @@
 [project]
 name = "labthings-fastapi"
-version = "0.0.1"
+version = "0.0.2"
 authors = [
   { name="Richard Bowman", email="richard.bowman@cantab.net" },
 ]
@@ -17,6 +17,7 @@ dependencies = [
   "jsonschema",
   "typing_extensions",
   "anyio ~=4.0",
+  "httpx",
 ]
 
 [project.optional-dependencies]
