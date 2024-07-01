@@ -22,7 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=7.4.0, <8",
+  "pytest>=8.2.2, <9",
   "pytest-cov",
   "mypy>=1.6.1, <2",
   "ruff>=0.1.3",
