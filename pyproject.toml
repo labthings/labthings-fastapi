@@ -46,3 +46,6 @@ target-version = "py39"
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
+
+[project.scripts]
+labthings-server = "labthings_fastapi.server.cli:serve_from_cli"
