@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, get_link
 import time
 from typing import Optional, Annotated

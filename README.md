@@ -32,7 +32,7 @@ You can install this repository with `pip`, either clone it and run `pip install
 
 ## Developer notes
 
-The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.0.1` yet so it's still subject to summary rearrangement.
+The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement.
 
 ## Demo
 

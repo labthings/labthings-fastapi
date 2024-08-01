@@ -2,7 +2,7 @@ import time
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.descriptors import PropertyDescriptor
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 
 
 class TestThing(Thing):

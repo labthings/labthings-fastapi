@@ -6,7 +6,7 @@ import os
 from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 import pytest
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.dependencies.thing import direct_thing_client_dependency

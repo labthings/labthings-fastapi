@@ -2,7 +2,7 @@ from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.file_manager import FileManagerDep
 from fastapi.testclient import TestClient
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, get_link
 
 

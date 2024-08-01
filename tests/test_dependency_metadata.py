@@ -4,7 +4,7 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 
 from typing import Any, Mapping
 from fastapi.testclient import TestClient
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from temp_client import poll_task
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property

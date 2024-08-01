@@ -7,7 +7,7 @@ from pydantic import BaseModel, BeforeValidator
 from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from labthings_fastapi.file_manager import FileManagerDep
 from typing import Annotated, Any, Iterator, Optional
 from contextlib import contextmanager

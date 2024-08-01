@@ -4,7 +4,7 @@ from typing import Annotated, Callable, TypeVar
 from fastapi import Depends, Request
 
 from ..thing import Thing
-from ..thing_server import find_thing_server
+from ..server import find_thing_server
 
 
 ThingInstance = TypeVar("ThingInstance", bound=Thing)

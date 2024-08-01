@@ -3,7 +3,7 @@ import time
 from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 from labthings_fastapi.descriptors import PropertyDescriptor
 from pydantic import Field
 from fastapi.responses import HTMLResponse
