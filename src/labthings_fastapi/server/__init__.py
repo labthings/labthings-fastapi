@@ -172,8 +172,9 @@ def server_from_config(config: dict) -> ThingServer:
             cls = object_reference_to_object(thing["class"])
         except ImportError as e:
             raise ImportError(
-                f"Could not import {thing['class']}, which was"
-                f"specified as the class for {path}. {e}"
+                f"Could not import {thing['class']}, which was "
+                f"specified as the class for {path}. The error is "
+                f"printed below:\n\n{e}"
             )
         instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
         assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"

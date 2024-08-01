@@ -5,12 +5,14 @@ Example Thing subclasses, used for testing and demonstration purposes.
 import time
 from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
+from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.descriptors import PropertyDescriptor
 from pydantic import Field
 
 
 class MyThing(Thing):
+    """An example Thing with a few affordances"""
+
     @thing_action
     def anaction(
         self,
@@ -47,9 +49,9 @@ class MyThing(Thing):
         self,
         extra_key: Optional[str] = None,
         extra_value: Optional[str] = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | None]:
         """An action that returns a dict"""
-        out = {"key": "value"}
+        out: dict[str, str | None] = {"key": "value"}
         if extra_key is not None:
             out[extra_key] = extra_value
         return out
@@ -80,3 +82,34 @@ class MyThing(Thing):
         initial_value="Example",
         description="A pointless string for demo purposes.",
     )
+
+
+class ThingWithBrokenAffordances(Thing):
+    """A Thing that raises exceptions in actions/properites"""
+
+    @thing_action
+    def broken_action(self):
+        """An action that raises an exception"""
+        raise RuntimeError("This is a broken action")
+
+    @thing_property
+    def broken_property(self):
+        """A property that raises an exception"""
+        raise RuntimeError("This is a broken property")
+
+
+class ThingThatCantInstantiate(Thing):
+    """A Thing that raises an exception in __init__"""
+
+    def __init__(self):
+        raise RuntimeError("This thing can't be instantiated")
+
+
+class ThingThatCantStart(Thing):
+    """A Thing that raises an exception in __enter__"""
+
+    def __enter__(self):
+        raise RuntimeError("This thing can't start")
+
+    def __exit__(self, exc_t, exc_v, exc_tb):
+        pass

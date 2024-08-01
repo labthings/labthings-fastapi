@@ -19,7 +19,7 @@ def object_reference_to_object(object_reference: str):
                 obj = getattr(obj, attr)
             except AttributeError:
                 raise ImportError(
-                    f"Cannot import name {attr} from {obj}"
-                    f"when loading {object_reference}"
+                    f"Cannot import name {attr} from {obj} "
+                    f"when loading '{object_reference}'"
                 )
     return obj

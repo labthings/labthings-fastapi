@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 import json
 
 import uvicorn
@@ -6,7 +6,7 @@ import uvicorn
 from . import ThingServer, server_from_config
 
 
-def parse_args(argv: list[str] | None = None) -> dict[str, str]:
+def parse_args(argv: list[str] | None = None) -> Namespace:
     """Process command line arguments for the server"""
     parser = ArgumentParser()
     parser.add_argument("-c", "--config", type=str, help="Path to configuration file")
@@ -24,7 +24,7 @@ def parse_args(argv: list[str] | None = None) -> dict[str, str]:
     return args
 
 
-def config_from_args(args: dict) -> dict:
+def config_from_args(args: Namespace) -> dict:
     """Process arguments and return a config dictionary"""
     if args.config:
         try:
