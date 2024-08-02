@@ -40,6 +40,7 @@ class ThingServer:
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
+        self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers
         _thing_servers.add(self)
 
@@ -176,7 +177,10 @@ def server_from_config(config: dict) -> ThingServer:
                 f"specified as the class for {path}. The error is "
                 f"printed below:\n\n{e}"
             )
-        instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
+        try:
+            instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
+        except Exception as e:
+            raise e
         assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"
         server.add_thing(instance, path)
     return server
