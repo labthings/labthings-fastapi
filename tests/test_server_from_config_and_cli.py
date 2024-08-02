@@ -1,8 +1,7 @@
 import json
 import multiprocessing
+import sys
 import tempfile
-import time
-import traceback
 
 from pytest import raises
 
@@ -10,39 +9,61 @@ from labthings_fastapi.server import server_from_config, ThingServer
 from labthings_fastapi.server.cli import serve_from_cli
 
 
-class ProcessPropagatingExceptions(multiprocessing.Process):
-    """A process that remembers exceptons, and raises them on join()
+def monitored_target(target, conn, *args, **kwargs):
+    """Monitor stdout and exceptions from a function"""
+    # The lines below copy stdout messages to a pipe
+    # which allows us to monitor STDOUT and STDERR
+    for output, name in [(sys.stdout, "stdout"), (sys.stderr, "stderr")]:
+
+        def write_wrapper(message):
+            conn.send((name, message))
+
+        output.write = write_wrapper
+
+    try:
+        ret = target(*args, **kwargs)
+        conn.send(("success", ret))
+    except Exception as e:
+        conn.send(("exception", e))
+    except SystemExit as e:
+        conn.send(("exit", e))
+
+
+class MonitoredProcess(multiprocessing.Process):
+    """A process that monitors stdout and propagates exceptions to `join()`
 
     With thanks to:
     https://stackoverflow.com/questions/63758186
     """
 
-    def __init__(self, *args, **kwargs):
-        multiprocessing.Process.__init__(self, *args, **kwargs)
+    def __init__(self, target=None, **kwargs):
         self._pconn, self._cconn = multiprocessing.Pipe()
-        self._exception = None
+        args = (target, self._cconn) + kwargs.pop("args", ())
+        multiprocessing.Process.__init__(
+            self, target=monitored_target, args=args, **kwargs
+        )
 
-    def run(self):
+    def run_monitored(self, terminate_outputs=[], timeout=10):
+        """Run the process, monitoring stdout and exceptions"""
+        self.start()
         try:
-            multiprocessing.Process.run(self)
-            self._cconn.send(None)
-        except Exception as e:
-            tb = traceback.format_exc()
-            self._cconn.send((e, tb))
-
-    @property
-    def exception(self):
-        if self._pconn.poll():
-            self._exception = self._pconn.recv()
-        return self._exception
-
-    def join(self):
-        try:
-            if self.exception:
-                e, _tb = self.exception
-                raise e
+            while self._pconn.poll(timeout):
+                event, m = self._pconn.recv()
+                if event == "success":
+                    return m
+                elif event in ("exception", "exit"):
+                    raise m
+                elif event in ("stdout", "stderr"):
+                    print(f"{event.upper()}: {m}")
+                    if any(output in m for output in terminate_outputs):
+                        self.terminate()
+                        break
+                else:
+                    raise RuntimeError(f"Unknown event: {event}, {m!r}")
+            else:
+                raise TimeoutError("Timed out waiting for process output")
         finally:
-            multiprocessing.Process.join(self)
+            self.join()
 
 
 CONFIG = {
@@ -64,13 +85,8 @@ def test_server_from_config():
 
 def check_serve_from_cli(args: list[str] = []):
     """Check we can create a server from the command line"""
-    p = ProcessPropagatingExceptions(
-        target=serve_from_cli, args=(args,)
-    )
-    p.start()
-    time.sleep(1)
-    p.terminate()
-    p.join()
+    p = MonitoredProcess(target=serve_from_cli, args=(args,))
+    p.run_monitored(terminate_outputs=["Application startup complete"])
 
 
 def test_serve_from_cli_with_config_json():
@@ -101,3 +117,7 @@ def test_serve_with_no_config():
     """
     with raises(RuntimeError):
         check_serve_from_cli([])
+
+
+if __name__ == "__main__":
+    test_serve_from_cli_with_config_json()
