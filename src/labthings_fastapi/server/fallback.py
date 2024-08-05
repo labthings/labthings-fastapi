@@ -3,7 +3,16 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
 
-app = FastAPI()
+
+class FallbackApp(FastAPI):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.labthings_config = None
+        self.labthings_server = None
+        self.labthings_error = None
+
+
+app = FallbackApp()
 
 ERROR_PAGE = """
 <!DOCTYPE html>
@@ -26,10 +35,6 @@ ERROR_PAGE = """
 </body>
 </html>
 """
-
-app.labthings_config = None
-app.labthings_server = None
-app.labthings_error = None
 
 
 @app.get("/")
