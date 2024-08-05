@@ -9,7 +9,7 @@ import uvicorn
 from . import ThingServer, server_from_config
 
 
-def parse_args(argv: list[str] | None = None) -> Namespace:
+def parse_args(argv: Optional[list[str]] = None) -> Namespace:
     """Process command line arguments for the server"""
     parser = ArgumentParser()
     parser.add_argument("-c", "--config", type=str, help="Path to configuration file")
@@ -51,7 +51,7 @@ def config_from_args(args: Namespace) -> dict:
     return config
 
 
-def serve_from_cli(argv: list[str] | None = None, dry_run=False):
+def serve_from_cli(argv: Optional[list[str]] = None, dry_run=False):
     """Start the server from the command line"""
     args = parse_args(argv)
     try:

@@ -49,9 +49,9 @@ class MyThing(Thing):
         self,
         extra_key: Optional[str] = None,
         extra_value: Optional[str] = None,
-    ) -> dict[str, str | None]:
+    ) -> dict[str, Optional[str]]:
         """An action that returns a dict"""
-        out: dict[str, str | None] = {"key": "value"}
+        out: dict[str, Optional[str]] = {"key": "value"}
         if extra_key is not None:
             out[extra_key] = extra_value
         return out
