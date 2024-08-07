@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, Namespace
+from typing import Optional
 import json
 
 from labthings_fastapi.utilities.object_reference_to_object import (
