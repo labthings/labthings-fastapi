@@ -67,10 +67,10 @@ class MyThing(Thing):
         self.counter += 1
 
     @thing_action
-    def slowly_increase_counter(self):
+    def slowly_increase_counter(self, increments=60, delay=1):
         """Increment the counter slowly over a minute"""
-        for i in range(60):
-            time.sleep(1)
+        for i in range(increments):
+            time.sleep(delay)
             self.increment_counter()
 
     counter = PropertyDescriptor(
@@ -82,6 +82,16 @@ class MyThing(Thing):
         initial_value="Example",
         description="A pointless string for demo purposes.",
     )
+
+    @thing_action
+    def action_without_arguments(self) -> None:
+        """An action that takes no arguments"""
+        pass
+
+    @thing_action
+    def action_with_only_kwargs(self, **kwargs) -> None:
+        """An action that takes **kwargs"""
+        pass
 
 
 class ThingWithBrokenAffordances(Thing):
