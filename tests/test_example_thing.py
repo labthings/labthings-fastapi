@@ -9,10 +9,11 @@ import pytest
 
 class DummyBlockingPortal:
     """A dummy blocking portal for testing
-    
+
     This is a blocking portal that doesn't actually do anything.
     In the future, we should improve LabThings so this is not required.
     """
+
     def start_task_soon(self, func, *args, **kwargs):
         pass
 
