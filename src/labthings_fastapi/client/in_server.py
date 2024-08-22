@@ -20,7 +20,7 @@ from labthings_fastapi.descriptors.property import PropertyDescriptor
 from labthings_fastapi.utilities import attributes
 from . import PropertyClientDescriptor
 from ..thing import Thing
-from ..thing_server import find_thing_server
+from ..server import find_thing_server
 from fastapi import Request
 
 

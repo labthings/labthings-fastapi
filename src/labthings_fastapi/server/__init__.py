@@ -9,10 +9,14 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from weakref import WeakSet
 from collections.abc import Mapping
 from types import MappingProxyType
-from .actions import ActionManager
-from .thing_settings import ThingSettings
-from .thing import Thing
-from .thing_description.model import ThingDescription
+
+from labthings_fastapi.utilities.object_reference_to_object import (
+    object_reference_to_object,
+)
+from ..actions import ActionManager
+from ..thing_settings import ThingSettings
+from ..thing import Thing
+from ..thing_description.model import ThingDescription
 
 
 _thing_servers: WeakSet[ThingServer] = WeakSet()
@@ -36,6 +40,7 @@ class ThingServer:
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
+        self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers
         _thing_servers.add(self)
 
@@ -156,3 +161,26 @@ class ThingServer:
                 t: f"{str(request.base_url).rstrip('/')}{t}"
                 for t in thing_server.things.keys()
             }
+
+
+def server_from_config(config: dict) -> ThingServer:
+    """Create a ThingServer from a configuration dictionary"""
+    server = ThingServer(config.get("settings_folder", None))
+    for path, thing in config.get("things", {}).items():
+        if isinstance(thing, str):
+            thing = {"class": thing}
+        try:
+            cls = object_reference_to_object(thing["class"])
+        except ImportError as e:
+            raise ImportError(
+                f"Could not import {thing['class']}, which was "
+                f"specified as the class for {path}. The error is "
+                f"printed below:\n\n{e}"
+            )
+        try:
+            instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
+        except Exception as e:
+            raise e
+        assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"
+        server.add_thing(instance, path)
+    return server

@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
-from labthings_fastapi.thing_server import ThingServer
-from test_thing import MyThing
+from labthings_fastapi.server import ThingServer
+from labthings_fastapi.example_things import MyThing
 
 my_thing = MyThing()
 server = ThingServer()

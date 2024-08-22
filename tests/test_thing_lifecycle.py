@@ -1,7 +1,7 @@
 from labthings_fastapi.descriptors import PropertyDescriptor
 from labthings_fastapi.thing import Thing
 from fastapi.testclient import TestClient
-from labthings_fastapi.thing_server import ThingServer
+from labthings_fastapi.server import ThingServer
 
 
 class TestThing(Thing):

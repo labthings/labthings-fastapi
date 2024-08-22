@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 from fastapi import Depends, Request
 
-from ..thing_server import find_thing_server
+from ..server import find_thing_server
 
 
 def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:

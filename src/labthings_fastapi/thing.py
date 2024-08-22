@@ -24,7 +24,7 @@ from .websockets import websocket_endpoint
 from .thing_settings import ThingSettings
 
 if TYPE_CHECKING:
-    from .thing_server import ThingServer
+    from .server import ThingServer
     from .actions import ActionManager
 
 
