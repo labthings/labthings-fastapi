@@ -135,13 +135,13 @@ def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     sig = get_typed_signature(func)
     dependencies = []
     for param_name, param in sig.parameters.items():
-        type_annotation, depends, param_field = analyze_param(
+        param_details = analyze_param(
             param_name=param_name,
             annotation=param.annotation,
             value=param.default,
             is_path_param=False,
         )
-        if depends is not None:
+        if param_details.depends is not None:
             dependencies.append(param)
     return dependencies
 

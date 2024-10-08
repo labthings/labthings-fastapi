@@ -22,57 +22,19 @@ from __future__ import annotations
 import numpy as np
 from pydantic import (
     ConfigDict,
-    PlainSerializer,
-    PlainValidator,
     RootModel,
     SerializerFunctionWrapHandler,
-    WithJsonSchema,
     WrapSerializer,
 )
-from typing import Annotated, Any, List, Union
+from typing import Annotated, Any, Union
+from typing_extensions import TypeAlias
 from collections.abc import Mapping, Sequence
 
-# Define a nested list of floats with 0-6 dimensions
-# This would be most elegantly defined as a recursive type
-# but the below gets the job done for now.
-Number = Union[int, float]
-NestedListOfNumbers = Union[
-    Number,
-    List[Number],
-    List[List[Number]],
-    List[List[List[Number]]],
-    List[List[List[List[Number]]]],
-    List[List[List[List[List[Number]]]]],
-    List[List[List[List[List[List[Number]]]]]],
-    List[List[List[List[List[List[List]]]]]],
-]
+from pydantic_numpy.typing import NpNDArray  # type: ignore
 
-
-class NestedListOfNumbersModel(RootModel):
-    root: NestedListOfNumbers
-
-
-def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
-    """Convert a numpy array to a list of lists
-
-    NB this will not be quick! Large arrays will be much better
-    serialised by dumping to base64 encoding or similar.
-    """
-    return arr.tolist()
-
-
-def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
-    """Convert a list of lists to a numpy array (or pass-through ndarrays)"""
-    return np.asarray(lol)
-
-
-# Define an annotated type so Pydantic can cope with numpy
-NDArray = Annotated[
-    np.ndarray,
-    PlainValidator(listoflists_to_np),
-    PlainSerializer(np_to_listoflists, when_used="json-unless-none"),
-    WithJsonSchema(NestedListOfNumbersModel.model_json_schema(), mode="validation"),
-]
+# This is here for backwards compatibility. Ideally, we should just
+# use types from `pydantic_numpy.typing` directly.
+NDArray: TypeAlias = Union[NpNDArray, int, float]
 
 
 def denumpify(v: Any) -> Any:
