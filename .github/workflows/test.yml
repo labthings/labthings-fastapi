@@ -37,7 +37,6 @@ jobs:
         with:
           github-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
           lcov-file: "./coverage.lcov"
-          base-lcov-file: "./base-coverage.lcov"
           send-summary-comment: true
           show-annotations: "warning"
       
