@@ -61,7 +61,7 @@ def test_websocket_observeaction():
             )
 
             # Trigger the slowly_increase_counter action
-            client.post("/my_thing/slowly_increase_counter", json={"interval": 0})
+            client.post("/my_thing/slowly_increase_counter", json={"delay": 0})
 
             # Listen for WebSocket messages and check for the completed action
             action_completed = False

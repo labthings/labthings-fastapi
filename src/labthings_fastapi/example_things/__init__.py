@@ -67,10 +67,10 @@ class MyThing(Thing):
         self.counter += 1
 
     @thing_action
-    def slowly_increase_counter(self, interval: float = 1.0):
+    def slowly_increase_counter(self, increments: int = 60, delay: float = 1):
         """Increment the counter slowly over a minute"""
-        for i in range(60):
-            time.sleep(interval)
+        for i in range(increments):
+            time.sleep(delay)
             self.increment_counter()
 
     counter = PropertyDescriptor(
