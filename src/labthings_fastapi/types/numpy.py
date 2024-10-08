@@ -26,7 +26,8 @@ from pydantic import (
     SerializerFunctionWrapHandler,
     WrapSerializer,
 )
-from typing import Annotated, Any, Union, TypeAlias
+from typing import Annotated, Any, Union
+from typing_extensions import TypeAlias
 from collections.abc import Mapping, Sequence
 
 from pydantic_numpy.typing import NpNDArray  # type: ignore
