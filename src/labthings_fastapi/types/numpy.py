@@ -29,7 +29,7 @@ from pydantic import (
 from typing import Annotated, Any, Union, TypeAlias
 from collections.abc import Mapping, Sequence
 
-from pydantic_numpy.typing import NpNDArray
+from pydantic_numpy.typing import NpNDArray  # type: ignore
 
 # This is here for backwards compatibility. Ideally, we should just
 # use types from `pydantic_numpy.typing` directly.

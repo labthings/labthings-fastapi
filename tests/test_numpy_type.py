@@ -29,17 +29,21 @@ def check_field_works_with_ndarray(data):
     m.model_json_schema()
     m.model_dump_json()
 
+
 def test_1d():
     check_field_works_with_list([1])
     check_field_works_with_list([1, 2, 3])
     check_field_works_with_list(np.arange(10))
 
+
 def test_3d():
     check_field_works_with_list([[[1]]])
     check_field_works_with_list([[[2]]])
 
+
 def test_2d():
     check_field_works_with_list([[1, 2]])
+
 
 def test_0d():
     class Model(BaseModel):
