@@ -34,12 +34,13 @@ jobs:
       - name: Test with pytest
         run: pytest --cov=src --cov-report=xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      - name: Generate Code Coverage report
+        id: code-coverage
+        uses: barecheck/code-coverage-action@v1
         with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella-${{ matrix.python }}
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          lcov-file: "./coverage.xml"
+          base-lcov-file: "./base-coverage.info"
+          send-summary-comment: true
+          show-annotations: "warning"
+
