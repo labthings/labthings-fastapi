@@ -5,16 +5,7 @@ Define an object to represent an Action, as a descriptor.
 from __future__ import annotations
 from functools import partial
 import inspect
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Callable,
-    Optional,
-    Literal,
-    Union,
-    overload,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, overload
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
@@ -30,7 +21,10 @@ from ..utilities.introspection import (
 )
 from ..outputs.blob import blob_to_model, get_model_media_type
 from ..thing_description import type_to_dataschema
-from ..thing_description.model import ActionAffordance, ActionOp, Form
+from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
+
+from weakref import WeakSet
+from ..utilities import labthings_data, get_blocking_portal
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -123,6 +117,42 @@ class ActionDescriptor:
     def description(self):
         """A description of the action"""
         return get_docstring(self.func, remove_summary=True)
+
+    def _observers_set(self, obj):
+        """A set used to notify changes"""
+        ld = labthings_data(obj)
+        if self.name not in ld.action_observers:
+            ld.action_observers[self.name] = WeakSet()
+        return ld.action_observers[self.name]
+
+    def emit_changed_event(self, obj, status):
+        """Notify subscribers that the action status has changed
+
+        NB this function **must** be run from a thread, not the event loop.
+        """
+        try:
+            runner = get_blocking_portal(obj)
+            if not runner:
+                raise RuntimeError("Can't emit without a blocking portal")
+            runner.start_task_soon(
+                self.emit_changed_event_async,
+                obj,
+                status,
+            )
+        except Exception:
+            # TODO: in the unit test, the get_blockint_port throws exception
+            ...
+
+    async def emit_changed_event_async(self, obj: Thing, value: Any):
+        """Notify subscribers that the action status has changed"""
+        action_name = self.name
+        for observer in self._observers_set(obj):
+            await observer.send(
+                {
+                    "messageType": "actionStatus",
+                    "data": {"action name": action_name, "status": value},
+                }
+            )
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
         """Add this action to a FastAPI app, bound to a particular Thing."""
