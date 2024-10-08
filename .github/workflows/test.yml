@@ -1,10 +1,33 @@
 name: Test
 
 on:
-  - workflow_call
-  - push
+  - pull_request
 
 jobs:
+  base_coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+
+      - name: Install Dependencies
+        run: pip install -e .[dev,server]
+
+      - name: Test with pytest
+        run: |
+          pytest --cov=src --cov-report=lcov
+          mv coverage.lcov base-coverage.lcov
+
+      - name: Upload code coverage for base branch
+        uses: actions/upload-artifact@v3
+        with:
+          name: base-coverage.lcov
+          path: ./base-coverage.lcov
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -31,14 +54,36 @@ jobs:
       - name: Test with pytest
         run: pytest --cov=src --cov-report=lcov
 
+      - name: Upload code coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage.lcov
+          path: ./coverage.lcov
+      
+      - name: Analyse with MyPy
+        run: mypy src
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: [base_coverage, test]
+    steps:
+      - name: Download code coverage report
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage.lcov
+
+      - name: Download code coverage report for base branch
+        uses: actions/download-artifact@v3
+        with:
+          name: base-coverage.lcov
+        
       - name: Generate Code Coverage report
         id: code-coverage
         uses: barecheck/code-coverage-action@v1
         with:
-          github-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
           lcov-file: "./coverage.lcov"
+          base-lcov-file: "./base-coverage.lcov"
+          minimum-ratio: 0
           send-summary-comment: true
           show-annotations: "warning"
-      
-      - name: Analyse with MyPy
-        run: mypy src
