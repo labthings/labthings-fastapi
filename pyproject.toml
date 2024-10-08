@@ -30,7 +30,7 @@ dev = [
   "numpy~=1.20",
 ]
 server = [
-  "fastapi[all]>=0.104.0", # NB must match FastAPI above
+  "fastapi[all]>=0.115.0",
   "zeroconf >=0.28.0",
 ]
 
