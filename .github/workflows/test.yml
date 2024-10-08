@@ -28,19 +28,18 @@ jobs:
       - name: Format with Ruff
         run: ruff format --check .
 
-      - name: Analyse with MyPy
-        run: mypy src
-
       - name: Test with pytest
-        run: pytest --cov=src --cov-report=xml
+        run: pytest --cov=src --cov-report=lcov
 
       - name: Generate Code Coverage report
         id: code-coverage
         uses: barecheck/code-coverage-action@v1
         with:
-          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
-          lcov-file: "./coverage.xml"
-          base-lcov-file: "./base-coverage.info"
+          github-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          lcov-file: "./coverage.lcov"
+          base-lcov-file: "./base-coverage.lcov"
           send-summary-comment: true
           show-annotations: "warning"
-
+      
+      - name: Analyse with MyPy
+        run: mypy src
