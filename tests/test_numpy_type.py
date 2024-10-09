@@ -69,6 +69,7 @@ def test_thing_description():
     thing = MyNumpyThing()
     assert thing.validate_thing_description() is None
 
+
 def test_denumpifying_dict():
     d = DenumpifyingDict(
         root={
@@ -76,6 +77,7 @@ def test_denumpifying_dict():
             "b": [np.arange(10), np.arange(10)],
             "c": {"ca": np.array([1, 2, 3])},
             "d": {"da": [np.arange(10), np.arange(10)]},
-        })
+        }
+    )
     d.model_dump()
     d.model_dump_json()
