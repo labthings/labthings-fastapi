@@ -58,10 +58,12 @@ def test_0d():
     m.model_json_schema()
     m.model_dump_json()
 
+
 class MyNumpyThing(Thing):
     @thing_action
     def action_with_arrays(self, a: NDArray) -> NDArray:
         return a * 2
+
 
 def test_thing_description():
     thing = MyNumpyThing()
