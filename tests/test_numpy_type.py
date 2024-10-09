@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 import numpy as np
 
-from labthings_fastapi.types.numpy import NDArray
+from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 
@@ -68,3 +68,14 @@ class MyNumpyThing(Thing):
 def test_thing_description():
     thing = MyNumpyThing()
     assert thing.validate_thing_description() is None
+
+def test_denumpifying_dict():
+    d = DenumpifyingDict(
+        root={
+            "a": np.array([1, 2, 3]),
+            "b": [np.arange(10), np.arange(10)],
+            "c": {"ca": np.array([1, 2, 3])},
+            "d": {"da": [np.arange(10), np.arange(10)]},
+        })
+    d.model_dump()
+    d.model_dump_json()
