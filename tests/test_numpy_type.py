@@ -77,7 +77,12 @@ def test_denumpifying_dict():
             "b": [np.arange(10), np.arange(10)],
             "c": {"ca": np.array([1, 2, 3])},
             "d": {"da": [np.arange(10), np.arange(10)]},
+            "e": None,
+            "f": 1,
         }
     )
-    d.model_dump()
+    dump = d.model_dump()
+    assert dump["a"] == [1, 2, 3]
+    assert dump["e"] is None
+    assert dump["f"] == 1
     d.model_dump_json()
