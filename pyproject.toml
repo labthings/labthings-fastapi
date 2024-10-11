@@ -1,6 +1,6 @@
 [project]
 name = "labthings-fastapi"
-version = "0.0.5"
+version = "0.0.6"
 authors = [
   { name="Richard Bowman", email="richard.bowman@cantab.net" },
 ]
@@ -15,7 +15,6 @@ classifiers = [
 dependencies = [
   "pydantic>=2.0.0",
   "numpy>=1.20",
-  "pydantic_numpy>=6.0",
   "jsonschema",
   "typing_extensions",
   "anyio ~=4.0",
