@@ -10,6 +10,7 @@ from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
 from ..dependencies.invocation import CancelHook, InvocationID
+from ..dependencies.action_manager import ActionManagerContextDep
 from ..utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
@@ -163,6 +164,7 @@ class ActionDescriptor:
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
+            action_manager: ActionManagerContextDep,
             request: Request,
             body,
             id: InvocationID,
@@ -171,7 +173,7 @@ class ActionDescriptor:
             **dependencies,
         ):
             try:
-                action = thing.action_manager.invoke_action(
+                action = action_manager.invoke_action(
                     action=self,
                     thing=thing,
                     input=body,
@@ -179,7 +181,7 @@ class ActionDescriptor:
                     id=id,
                     cancel_hook=cancel_hook,
                 )
-                background_tasks.add_task(thing.action_manager.expire_invocations)
+                background_tasks.add_task(action_manager.expire_invocations)
                 return action.response(request=request)
             finally:
                 try:
@@ -243,8 +245,8 @@ class ActionDescriptor:
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations():
-            return thing.action_manager.list_invocations(self, thing, as_responses=True)
+        def list_invocations(action_manager: ActionManagerContextDep):
+            return action_manager.list_invocations(self, thing, as_responses=True)
 
     def action_affordance(
         self, thing: Thing, path: Optional[str] = None

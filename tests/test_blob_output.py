@@ -4,18 +4,18 @@ This tests Things that depend on other Things
 
 import os
 from tempfile import TemporaryDirectory
+
 from fastapi.testclient import TestClient
 import pytest
 from labthings_fastapi.server import ThingServer
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
-from labthings_fastapi.outputs.blob import BlobOutput, blob_output_model
+from labthings_fastapi.outputs.blob import blob_output_model, blob_type
 from labthings_fastapi.client import ThingClient
 
 
-class TestBlobOutput(BlobOutput):
-    media_type = "text/plain"
+TextBlob = blob_type(media_type="text/plain")
 
 
 class ThingOne(Thing):
@@ -25,25 +25,30 @@ class ThingOne(Thing):
         self._temp_directory = TemporaryDirectory()
 
     @thing_action
-    def action_one(self) -> TestBlobOutput:
+    def action_one(self) -> TextBlob:
         """An action that makes a blob response from bytes"""
-        return TestBlobOutput.from_bytes(self.ACTION_ONE_RESULT)
+        return TextBlob.from_bytes(self.ACTION_ONE_RESULT)
 
     @thing_action
-    def action_two(self) -> TestBlobOutput:
+    def action_two(self) -> TextBlob:
         """An action that makes a blob response from a file and tempdir"""
         td = TemporaryDirectory()
         with open(os.path.join(td.name, "serverside"), "wb") as f:
             f.write(self.ACTION_ONE_RESULT)
-        return TestBlobOutput.from_temporary_directory(td, "serverside")
+        return TextBlob.from_temporary_directory(td, "serverside")
 
     @thing_action
-    def action_three(self) -> TestBlobOutput:
+    def action_three(self) -> TextBlob:
         """An action that makes a blob response from a file"""
         fpath = os.path.join(self._temp_directory.name, "serverside")
         with open(fpath, "wb") as f:
             f.write(self.ACTION_ONE_RESULT)
-        return TestBlobOutput.from_file(fpath)
+        return TextBlob.from_file(fpath)
+
+    @thing_action
+    def passthrough_blob(self, blob: TextBlob) -> TextBlob:
+        """An action that passes through a blob response"""
+        return blob
 
 
 ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
@@ -54,6 +59,14 @@ class ThingTwo(Thing):
     def check_both(self, thing_one: ThingOneDep) -> bool:
         """An action that checks the output of ThingOne"""
         check_actions(thing_one)
+        return True
+
+    @thing_action
+    def check_passthrough(self, thing_one: ThingOneDep) -> bool:
+        """An action that checks the passthrough of ThingOne"""
+        output = thing_one.action_one()
+        passthrough = thing_one.passthrough_blob(blob=output)
+        assert passthrough.content == ThingOne.ACTION_ONE_RESULT
         return True
 
 
@@ -111,3 +124,28 @@ def check_actions(thing):
     for action in (thing.action_one, thing.action_two, thing.action_three):
         output = action()
         check_blob(output, ThingOne.ACTION_ONE_RESULT)
+
+
+def test_blob_input():
+    """Check that blobs can be used as input."""
+    server = ThingServer()
+    server.add_thing(ThingOne(), "/thing_one")
+    server.add_thing(ThingTwo(), "/thing_two")
+    with TestClient(server.app) as client:
+        tc = ThingClient.from_url("/thing_one/", client=client)
+        output = tc.action_one()
+        print(f"Output is {output}")
+        assert output is not None
+
+        # Check that the blob can be passed from one action to another,
+        # via the client
+        passthrough = tc.passthrough_blob(blob=output)
+        print(f"Output is {passthrough}")
+        assert passthrough.content == ThingOne.ACTION_ONE_RESULT
+
+        # Check that the same thing works on the server side
+        tc2 = ThingClient.from_url("/thing_two/", client=client)
+        assert tc2.check_passthrough() is True
+
+
+# TODO: check that the stub serialiser isn't being used

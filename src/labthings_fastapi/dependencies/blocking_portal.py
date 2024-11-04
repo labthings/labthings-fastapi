@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Annotated
 from fastapi import Depends, Request
 from anyio.from_thread import BlockingPortal as RealBlockingPortal
-from ..server import find_thing_server
+from .thing_server import find_thing_server
 
 
 def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:

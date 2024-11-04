@@ -22,14 +22,35 @@ deal with this.
 from __future__ import annotations
 import io
 import os
+import re
 import shutil
-from typing import Any, Literal, Mapping, Optional
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Mapping,
+    Optional,
+    TypeAlias,
+    Union,
+    TYPE_CHECKING,
+)
 from tempfile import TemporaryDirectory
+import uuid
 
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel, create_model
+from pydantic import (
+    BaseModel,
+    PlainSerializer,
+    PlainValidator,
+    WithJsonSchema,
+    create_model,
+)
 from pydantic_core import PydanticUndefined
+from starlette.exceptions import HTTPException
 from typing_extensions import Self, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from labthings_fastapi.actions import ActionManager
 
 
 @runtime_checkable
@@ -120,7 +141,7 @@ def blob_to_model(output_type: type) -> type:
     return output_type
 
 
-def blob_to_link(output: Any, output_href: str) -> Mapping[str, str]:
+def blob_to_link(output: Any, output_href: str) -> Any:
     """If the argument is a BlobOutput, convert it to a link.
 
     Actions that return BlobOutput subclasses can't embed their output in a
@@ -137,6 +158,16 @@ def blob_to_link(output: Any, output_href: str) -> Mapping[str, str]:
             "href": output_href,
         }
     return output
+
+
+def blob_to_dict(blob: BlobOutput) -> Mapping[str, str]:
+    """Convert a BlobOutput to a dictionary
+
+    This function is used to convert a BlobOutput object to a dictionary, so that
+    it can be serialised to JSON. It currently only serialises outputs of actions
+    correctly, and relies on a context variable being set, usually with a dependency.
+    """
+    return {"error": "BlobOutput objects should not be serialised yet"}
 
 
 NEITHER_BYTES_NOR_FILE = NotImplementedError(
@@ -241,3 +272,76 @@ class BlobOutput:
         if hasattr(self, "_file_path"):
             return FileResponse(self._file_path, media_type=self.media_type)
         raise NEITHER_BYTES_NOR_FILE
+
+
+def retrieve_blob_output(
+    blob_model: BlobOutputModel, action_manager: ActionManager
+) -> BlobOutput:
+    """Retrieve a BlobOutput from a BlobOutputModel
+
+    This function is intended to be used by the server to retrieve a BlobOutput
+    object from a BlobOutputModel. It will use the `href` field to retrieve the
+    output from the action manager, and return a BlobOutput object.
+    """
+    if blob_model.rel != "output":
+        raise ValueError("Currently, blobs must be action outputs.")
+    print(f"Retrieving invocation ID from string {blob_model.href}")
+    m = re.search(r"action_invocations/([0-9a-z\-]+)/output", blob_model.href)
+    try:
+        if not m:
+            raise HTTPException(
+                status_code=404, detail="Could not find invocation ID in href"
+            )
+        invocation_id = uuid.UUID(m.group(1))
+        output = action_manager.get_invocation(invocation_id).output
+    except KeyError:
+        raise HTTPException(
+            status_code=404, detail=f"Invocation {invocation_id} not found"
+        )
+    assert isinstance(output, BlobOutput)
+    assert output.media_type == blob_model.media_type
+    return output
+
+
+def ensure_blob_output(obj: Union[BlobOutput, BlobOutputModel, Mapping]) -> BlobOutput:
+    """Convert a BlobOutputModel or dict to a BlobOutput
+
+    This function is used as a `pydantic` validator. `BlobOutput` objects are
+    passed through unchanged, `BlobOutputModel` objects are converted to a
+    `BlobOutput` object, and dictionaries are converted to a `BlobOutput` object
+    via a `BlobOutputModel`.
+    """
+    if isinstance(obj, BlobOutput):
+        return obj
+    from labthings_fastapi.dependencies.action_manager import ActionManagerContext
+
+    if isinstance(obj, BlobOutputModel):
+        return retrieve_blob_output(obj, ActionManagerContext.get())
+    if isinstance(obj, Mapping):
+        return retrieve_blob_output(BlobOutputModel(**obj), ActionManagerContext.get())
+    raise ValueError("Object is not a BlobOutput or BlobOutputModel")
+
+
+Blob: TypeAlias = Annotated[
+    BlobOutput,
+    PlainValidator(ensure_blob_output),
+    PlainSerializer(blob_to_link, when_used="json-unless-none"),
+    WithJsonSchema(BlobOutputModel.model_json_schema(), mode="validation"),
+]
+
+
+def blob_type(media_type: str) -> type[BlobOutput]:
+    """Create a BlobOutput subclass for a given media type"""
+    my_media_type = media_type  # Ensure media type is remembered in a closure,
+
+    # for the class definition below
+    class BlobOutputSubclass(BlobOutput):
+        media_type = my_media_type
+
+    model = blob_output_model(media_type)
+    return Annotated[  # type: ignore[return-value]
+        BlobOutputSubclass,
+        PlainValidator(ensure_blob_output),
+        PlainSerializer(blob_to_dict, when_used="json-unless-none"),
+        WithJsonSchema(model.model_json_schema(), mode="validation"),
+    ]

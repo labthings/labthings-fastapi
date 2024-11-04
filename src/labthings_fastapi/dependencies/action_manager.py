@@ -33,9 +33,7 @@ def action_manager_from_thing_server(request: Request) -> ActionManager:
     return action_manager
 
 
-ActionManagerDep = Annotated[
-    ActionManager, Depends(action_manager_from_thing_server)
-]
+ActionManagerDep = Annotated[ActionManager, Depends(action_manager_from_thing_server)]
 """
 A ready-made dependency type for the `ActionManager` object.
 """
@@ -46,11 +44,13 @@ ActionManagerContext = ContextVar[ActionManager]("ActionManagerContext")
 
 async def make_action_manager_context_available(action_manager: ActionManagerDep):
     """Make the Action Manager available in the context
-    
+
     The action manager may be accessed using `ActionManagerContext.get()`.
     """
     ActionManagerContext.set(action_manager)
     yield action_manager
 
 
-ActionManagerContextDep: TypeAlias = Annotated[ActionManager, Depends(make_action_manager_context_available)]
+ActionManagerContextDep: TypeAlias = Annotated[
+    ActionManager, Depends(make_action_manager_context_available)
+]
