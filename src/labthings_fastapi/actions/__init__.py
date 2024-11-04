@@ -282,6 +282,11 @@ class ActionManager:
         self.append_invocation(thread)
         thread.start()
         return thread
+    
+    def get_invocation(self, id: uuid.UUID) -> Invocation:
+        """Retrieve an invocation by ID"""
+        with self._invocations_lock:
+            return self._invocations[id]
 
     def list_invocations(
         self,
