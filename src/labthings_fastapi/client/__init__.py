@@ -72,6 +72,10 @@ class ThingClient:
         r.raise_for_status()
 
     def invoke_action(self, path: str, **kwargs):
+        "Invoke an action on the Thing"
+        for k in kwargs.keys():
+            if isinstance(kwargs[k], ClientBlobOutput):
+                kwargs[k] = {"href": kwargs[k].href, "media_type": kwargs[k].media_type}
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
         task = poll_task(self.client, r.json())
@@ -118,6 +122,7 @@ class ThingClient:
     @classmethod
     def subclass_from_td(cls, thing_description: dict) -> type[Self]:
         """Create a ThingClient subclass from a Thing Description"""
+        my_thing_description = thing_description
 
         class Client(cls):  # type: ignore[valid-type, misc]
             # mypy wants the superclass to be statically type-able, but
@@ -125,7 +130,7 @@ class ThingClient:
             # use this class method on `ThingClient` subclasses, i.e.
             # to provide customisation but also add methods from a
             # Thing Description.
-            pass
+            thing_description = my_thing_description
 
         for name, p in thing_description["properties"].items():
             add_property(Client, name, p)
