@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 
-from typing import Annotated, TypeAlias
+from typing import Annotated
+from typing_extensions import TypeAlias
 from fastapi import Depends, Request
 from ..dependencies.thing_server import find_thing_server
 from ..actions import ActionManager

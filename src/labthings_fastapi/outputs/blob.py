@@ -30,10 +30,10 @@ from typing import (
     Literal,
     Mapping,
     Optional,
-    TypeAlias,
     Union,
     TYPE_CHECKING,
 )
+from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
 import uuid
 
