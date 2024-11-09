@@ -60,3 +60,12 @@ def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
         return model
     except (TypeError, AssertionError):
         return create_model(f"{model!r}", root=(model, ...), __base__=RootModel)
+
+
+def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
+    """Convert a pydantic model to a dictionary"""
+    if model is None:
+        return {}
+    if isinstance(model, RootModel):
+        return model_to_dict(model.root)
+    return dict(model)
