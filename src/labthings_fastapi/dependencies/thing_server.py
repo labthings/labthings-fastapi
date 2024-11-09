@@ -1,3 +1,11 @@
+"""
+Retrieve the ThingServer object
+
+This module provides a function that will retrieve the ThingServer
+based on the `Request` object. It may be used as a dependency with:
+`Annotated[ThingServer, Depends(thing_server_from_request)]`.
+"""
+
 from __future__ import annotations
 from weakref import WeakSet
 from typing import TYPE_CHECKING
