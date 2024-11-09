@@ -95,7 +95,9 @@ def input_model_from_signature(
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
         # pydantic uses `...` to represent missing defaults (i.e. required params)
         default = Field(...) if p.default is Parameter.empty else p.default
-        fields[name] = (p_type, default)
+        # p_type below has a complicated type, but it is reasonable to
+        # call p_type a `type` and ignore the mypy error.
+        fields[name] = (p_type, default)  # type: ignore[assignment]
     model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",
         model_config=ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
