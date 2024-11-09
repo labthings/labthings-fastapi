@@ -63,7 +63,7 @@ def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
         return create_model(f"{model!r}", root=(model, ...), __base__=RootModel)
 
 
-def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
+def model_to_dict(model: BaseModel) -> Dict[str, Any]:
     """Convert a pydantic model to a dictionary
 
     We convert only the top level model, i.e. we do not recurse into submodels.
@@ -75,8 +75,6 @@ def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
     If RootModels with non-empty input are allowed, this function will need to
     be updated to handle them.
     """
-    if model is None:
-        return {}
     if isinstance(model, RootModel):
         if model.root is None:
             return {}
