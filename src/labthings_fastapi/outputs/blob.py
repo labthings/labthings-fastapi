@@ -70,6 +70,8 @@ class BlobData(Protocol):
 class ServerSideBlobData(BlobData, Protocol):
     """A BlobOutput protocol for server-side use, i.e. including `response()`"""
 
+    id: Optional[uuid.UUID] = None
+
     def response(self) -> Response: ...
 
 
@@ -171,7 +173,8 @@ class Blob(BaseModel):
         if self.href == "blob://local":
             try:
                 blobdata_to_url = blobdata_to_url_ctx.get()
-                href = blobdata_to_url(self.data)
+                # MyPy seems to miss that `self.data` is a property, hence the ignore
+                href = blobdata_to_url(self.data)  # type: ignore[arg-type]
             except LookupError:
                 raise LookupError(
                     "Blobs may only be serialised inside the "
@@ -224,7 +227,7 @@ class Blob(BaseModel):
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
         """Create a BlobOutput from a bytes object"""
-        return cls.model_construct(
+        return cls.model_construct(  # type: ignore[return-value]
             href="blob://local",
             _data=BlobBytes(data, media_type=cls.default_media_type()),
         )
@@ -238,7 +241,7 @@ class Blob(BaseModel):
         collected.
         """
         file_path = os.path.join(folder.name, file)
-        return cls.model_construct(
+        return cls.model_construct(  # type: ignore[return-value]
             href="blob://local",
             _data=BlobFile(
                 file_path,
@@ -257,7 +260,7 @@ class Blob(BaseModel):
         temporary. If you are using temporary files, consider creating your
         Blob with `from_temporary_directory` instead.
         """
-        return cls.model_construct(
+        return cls.model_construct(  # type: ignore[return-value]
             href="blob://local",
             _data=BlobFile(file, media_type=cls.default_media_type()),
         )
@@ -326,7 +329,7 @@ url_to_blobdata_ctx = ContextVar[Callable[[str], BlobData]]("url_to_blobdata")
 async def blob_serialisation_context_manager(request: Request):
     """Set context variables to allow blobs to be serialised"""
     thing_server = find_thing_server(request.app)
-    blob_manager = thing_server.blob_data_manager
+    blob_manager: BlobDataManager = thing_server.blob_data_manager
     url_for = request.url_for
 
     def blobdata_to_url(blob: ServerSideBlobData) -> str:

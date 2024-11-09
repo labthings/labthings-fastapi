@@ -38,6 +38,7 @@ class ThingServer:
 
     app: FastAPI
     action_manager: ActionManager
+    blob_data_manager: BlobDataManager
 
     def set_cors_middleware(self) -> None:
         self.app.add_middleware(
