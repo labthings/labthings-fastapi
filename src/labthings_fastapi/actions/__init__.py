@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import weakref
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 
 from labthings_fastapi.utilities import model_to_dict
 from labthings_fastapi.utilities.introspection import EmptyInput
@@ -176,16 +176,6 @@ class Invocation(Thread):
 
             action = self.action
             thing = self.thing
-            #kwargs = self.input.model_dump() or {}
-            # if isinstance(self.input, RootModel):
-            #     if self.input.root is not None:
-            #         print(f"confused by {self.input}")
-            #         raise ValueError("RootModel inputs are only used for None")
-            #     kwargs = {}
-            # elif isinstance(self.input, BaseModel):
-            #     kwargs = dict(self.input)
-            # else:
-            #     kwargs = {}
             kwargs = model_to_dict(self.input)
             assert action is not None
             assert thing is not None
@@ -338,7 +328,9 @@ class ActionManager:
             response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}},
         )
-        def action_invocation(id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep):
+        def action_invocation(
+            id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep
+        ):
             try:
                 with self._invocations_lock:
                     return self._invocations[id].response(request=request)

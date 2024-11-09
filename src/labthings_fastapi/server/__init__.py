@@ -17,6 +17,7 @@ from ..thing_settings import ThingSettings
 from ..thing import Thing
 from ..thing_description.model import ThingDescription
 from ..dependencies.thing_server import _thing_servers
+from ..outputs.blob import BlobDataManager
 
 
 class ThingServer:
@@ -26,6 +27,8 @@ class ThingServer:
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
+        self.blob_data_manager = BlobDataManager()
+        self.blob_data_manager.attach_to_app(self.app)
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None

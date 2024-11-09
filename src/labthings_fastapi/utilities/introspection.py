@@ -17,7 +17,6 @@ from inspect import Parameter, signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.main import create_model
 from fastapi.dependencies.utils import analyze_param, get_typed_signature
-from labthings_fastapi.outputs.blob import BlobOutput, blob_output_model
 
 
 class EmptyObject(BaseModel):
@@ -94,12 +93,6 @@ def input_model_from_signature(
         # `type_hints` does more processing than p.annotation - but will
         # not have entries for missing annotations.
         p_type = Any if p.annotation is Parameter.empty else type_hints[name]
-        # Here, we add an exception for BlobOutput subclasses
-        try:
-            if issubclass(p_type, BlobOutput):
-                p_type = blob_output_model(p_type.media_type)
-        except TypeError:
-            print(f"{p_type} was not a class")
         # pydantic uses `...` to represent missing defaults (i.e. required params)
         default = Field(...) if p.default is Parameter.empty else p.default
         fields[name] = (p_type, default)

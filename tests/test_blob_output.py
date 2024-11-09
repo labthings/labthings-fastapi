@@ -11,7 +11,7 @@ from labthings_fastapi.server import ThingServer
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
-from labthings_fastapi.outputs.blob import blob_output_model, blob_type
+from labthings_fastapi.outputs.blob import blob_type
 from labthings_fastapi.client import ThingClient
 
 
@@ -70,12 +70,27 @@ class ThingTwo(Thing):
         return True
 
 
-def test_blob_output_model():
+def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
     with pytest.raises(ValueError):
-        blob_output_model(media_type="text/plain\\'DROP TABLES")
-    M = blob_output_model(media_type="text/plain")
-    assert M(href="http://example/").media_type == "text/plain"
+        blob_type(media_type="text/plain\\'DROP TABLES")
+    M = blob_type(media_type="text/plain")
+    assert M.from_bytes(b"").media_type == "text/plain"
+
+
+def test_blob_creation():
+    """Check that blobs can be created in three ways"""
+    TEXT = b"Test input"
+    td = TemporaryDirectory()
+    with open(os.path.join(td.name, "test_input"), "wb") as f:
+        f.write(TEXT)
+    blob = TextBlob.from_file(os.path.join(td.name, "test_input"))
+    assert blob.content == TEXT
+    blob = TextBlob.from_temporary_directory(td, "test_input")
+    assert blob.content == TEXT
+    assert blob.data._temporary_directory is td
+    blob = TextBlob.from_bytes(TEXT)
+    assert blob.content == TEXT
 
 
 def test_blob_output_client():
