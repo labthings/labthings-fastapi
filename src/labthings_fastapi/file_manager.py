@@ -1,5 +1,7 @@
 """Manage files created by Actions
 
+**This module is deprecated in favour of `labthings_fastapi.outputs.blob`**
+
 Simple actions return everything you need to know about them in their return value,
 which can be serialised to JSON. More complicated actions might need to return
 more complicated responses, for example files.
@@ -12,6 +14,7 @@ files via the Invocation object.
 from __future__ import annotations
 from tempfile import TemporaryDirectory
 from typing import Annotated, Sequence, Optional
+from warnings import warn
 
 from fastapi import Depends, Request
 
@@ -27,6 +30,10 @@ class FileManager:
     __globals__ = globals()  # "bake in" globals so dependency injection works
 
     def __init__(self, invocation_id: InvocationID, request: Request):
+        warn(
+            "FileManager is deprecated in favour of labthings_fastapi.outputs.blob",
+            DeprecationWarning,
+        )
         self.invocation_id = invocation_id
         self._links: set[tuple[str, str]] = set()
         self._dir = TemporaryDirectory(prefix=f"labthings-{self.invocation_id}-")

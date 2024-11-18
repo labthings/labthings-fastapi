@@ -8,14 +8,14 @@ from __future__ import annotations
 from typing import Annotated
 from fastapi import Depends, Request
 from anyio.from_thread import BlockingPortal as RealBlockingPortal
-from ..server import find_thing_server
+from .thing_server import find_thing_server
 
 
 def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
-    """Return a UUID for an action invocation
+    """Return the blocking portal from our ThingServer
 
-    This is for use as a FastAPI dependency, to allow other dependencies to
-    access the invocation ID. Useful for e.g. file management.
+    This is for use as a FastAPI dependency, to allow threaded code to call
+    async code.
     """
     portal = find_thing_server(request.app).blocking_portal
     if portal is None:

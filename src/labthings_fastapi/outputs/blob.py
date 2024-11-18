@@ -20,20 +20,38 @@ deal with this.
 """
 
 from __future__ import annotations
+from contextvars import ContextVar
 import io
 import os
+import re
 import shutil
-from typing import Any, Literal, Mapping, Optional
+from typing import (
+    Annotated,
+    Callable,
+    Literal,
+    Mapping,
+    Optional,
+)
+from weakref import WeakValueDictionary
+from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
+import uuid
 
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel, create_model
-from pydantic_core import PydanticUndefined
+from pydantic import (
+    BaseModel,
+    create_model,
+    model_serializer,
+    model_validator,
+)
+from labthings_fastapi.dependencies.thing_server import find_thing_server
+from starlette.exceptions import HTTPException
 from typing_extensions import Self, Protocol, runtime_checkable
 
 
 @runtime_checkable
-class BlobOutputProtocol(Protocol):
+class BlobData(Protocol):
     """A Protocol for a BlobOutput object"""
 
     @property
@@ -49,103 +67,72 @@ class BlobOutputProtocol(Protocol):
     def open(self) -> io.IOBase: ...
 
 
-class ServerSideBlobOutputProtocol(BlobOutputProtocol, Protocol):
+class ServerSideBlobData(BlobData, Protocol):
     """A BlobOutput protocol for server-side use, i.e. including `response()`"""
+
+    id: Optional[uuid.UUID] = None
 
     def response(self) -> Response: ...
 
 
-def is_blob_output(obj: Any) -> bool:
-    """Check if a class is a BlobOutput"""
-    # We do this based on the protocol - but because I've used properties in the protocol,
-    # I can't just use issubclass.
-    for attr in ServerSideBlobOutputProtocol.__protocol_attrs__:  # type: ignore[attr-defined]
-        if not hasattr(obj, attr):
-            return False
-    return True
+class BlobBytes:
+    """A BlobOutput that holds its data in memory as a `bytes` object"""
+
+    id: Optional[uuid.UUID] = None
+
+    def __init__(self, data: bytes, media_type: str):
+        self._bytes = data
+        self.media_type = media_type
+
+    @property
+    def content(self) -> bytes:
+        return self._bytes
+
+    def save(self, filename: str) -> None:
+        with open(filename, "wb") as f:
+            f.write(self._bytes)
+
+    def open(self) -> io.IOBase:
+        return io.BytesIO(self._bytes)
+
+    def response(self) -> Response:
+        return Response(content=self._bytes, media_type=self.media_type)
 
 
-class BlobOutputModel(BaseModel):
-    """A Pydantic model describing a BlobOutput"""
+class BlobFile:
+    """A BlobOutput that holds its data in a file
 
-    media_type: str
-    href: str
-    rel: Literal["output"] = "output"
-    description: str = (
-        "The output from this action is not serialised to JSON, so it must be "
-        "retrieved as a file. This link will return the file."
-    )
+    Only the filepath is retained by default. If you are using e.g. a temporary
+    directory, you should add the temporary directory as a property, to stop it
+    being garbage collected."""
 
+    id: Optional[uuid.UUID] = None
 
-def get_model_media_type(model: type) -> Optional[str]:
-    """Return the media type of a BlobOutput model"""
-    if is_blob_output(model):
-        return model.media_type  # type: ignore[attr-defined] # (checked for in is_blob_output)
-    try:
-        media_type = model.model_fields["media_type"].default  # type: ignore[attr-defined]
-        if media_type is PydanticUndefined:
-            return None
-        return media_type
-    except KeyError:  # If there's no media_type field, ignore it
-        pass
-    except AttributeError:  # If it's not a Pydantic model, ignore it
-        pass
-    return None
+    def __init__(self, file_path: str, media_type: str, **kwargs):
+        if not os.path.exists(file_path):
+            raise IOError("Tried to return a file that doesn't exist.")
+        self._file_path = file_path
+        self.media_type = media_type
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
+    @property
+    def content(self) -> bytes:
+        with open(self._file_path, "rb") as f:
+            return f.read()
 
-def blob_output_model(media_type: str) -> type[BlobOutputModel]:
-    """Create a BlobOutput subclass for a given media type"""
-    if "'" in media_type or "\\" in media_type:
-        raise ValueError("media_type must not contain single quotes or backslashes")
-    return create_model(
-        f"blob_output_{media_type.replace('/', '_')}",
-        __base__=BlobOutputModel,
-        media_type=(eval(f"Literal[r'{media_type}']"), media_type),
-    )
+    def save(self, filename: str) -> None:
+        shutil.copyfile(self._file_path, filename)
+
+    def open(self) -> io.IOBase:
+        return open(self._file_path, mode="rb")
+
+    def response(self) -> Response:
+        return FileResponse(self._file_path, media_type=self.media_type)
 
 
-def blob_to_model(output_type: type) -> type:
-    """Substitute BlobOutputModel for BlobOutput subclasses
-
-    This function converts BlobOutput classes to a Pydantic model, so
-    that the output is a JSON object containing the media type and a link.
-    NB this uses "duck typing", so the class need only expose the necessary
-    attributes.
-
-    NB this *only* converts the `output_model` of an `ActionDescriptor`, it
-    does not automatically process the actual output of the function.
-    """
-    if is_blob_output(output_type):
-        return blob_output_model(output_type.media_type)  # type: ignore[attr-defined]
-    return output_type
-
-
-def blob_to_link(output: Any, output_href: str) -> Mapping[str, str]:
-    """If the argument is a BlobOutput, convert it to a link.
-
-    Actions that return BlobOutput subclasses can't embed their output in a
-    JSON response, so we convert them to a link. This function does that.
-    Following the link will download the output as a file. We return a
-    dictionary rather than a BlobOutput object so that the output model
-    is used (which checks the media type for us).
-
-    NB this uses "duck typing" so may become stricter in the future.
-    """
-    if is_blob_output(output):
-        return {
-            "media_type": output.media_type,
-            "href": output_href,
-        }
-    return output
-
-
-NEITHER_BYTES_NOR_FILE = NotImplementedError(
-    "BlobOutput subclasses must provide _bytes or _file_path"
-)
-
-
-class BlobOutput:
-    """An output from LabThings best returned as a file
+class Blob(BaseModel):
+    """An output from LabThings best returned as binary data, not JSON
 
     This may be instantiated either using the class methods `from_bytes` or
     `from_temporary_directory`, which will use a `bytes` object to store the
@@ -154,10 +141,63 @@ class BlobOutput:
     collected.
     """
 
-    media_type: str
-    _bytes: bytes
-    _file_path: str
-    _temporary_directory: TemporaryDirectory
+    href: str
+    media_type: str = "*/*"
+    rel: Literal["output"] = "output"
+    description: str = (
+        "The output from this action is not serialised to JSON, so it must be "
+        "retrieved as a file. This link will return the file."
+    )
+
+    _data: Optional[ServerSideBlobData] = None
+
+    @model_validator(mode="after")
+    def retrieve_data(self):
+        if self.href == "blob://local":
+            if self._data:
+                return self
+            raise ValueError("Blob objects must have data if the href is blob://local")
+        try:
+            url_to_blobdata = url_to_blobdata_ctx.get()
+            self._data = url_to_blobdata(self.href)
+            self.href = "blob://local"
+        except LookupError:
+            raise LookupError(
+                "Blobs may only be created from URLs passed in over HTTP."
+                f"The URL in question was {self.href}."
+            )
+        return self
+
+    @model_serializer(mode="plain", when_used="always")
+    def to_dict(self) -> Mapping[str, str]:
+        if self.href == "blob://local":
+            try:
+                blobdata_to_url = blobdata_to_url_ctx.get()
+                # MyPy seems to miss that `self.data` is a property, hence the ignore
+                href = blobdata_to_url(self.data)  # type: ignore[arg-type]
+            except LookupError:
+                raise LookupError(
+                    "Blobs may only be serialised inside the "
+                    "context created by BlobIOContextDep."
+                )
+        else:
+            href = self.href
+        return {
+            "href": href,
+            "media_type": self.media_type,
+            "rel": self.rel,
+            "description": self.description,
+        }
+
+    @classmethod
+    def default_media_type(cls) -> str:
+        return cls.model_fields["media_type"].get_default()
+
+    @property
+    def data(self) -> ServerSideBlobData:
+        if self._data is None:
+            raise ValueError("This Blob has no data.")
+        return self._data
 
     @property
     def content(self) -> bytes:
@@ -171,40 +211,26 @@ class BlobOutput:
         guarantees are given about cacheing - reading it many times risks
         reading the file from disk many times, or re-downloading an artifact.
         """
-        if hasattr(self, "_bytes"):
-            return self._bytes
-        if hasattr(self, "_file_path"):
-            with open(self._file_path, "rb") as f:
-                return f.read()
-        raise NEITHER_BYTES_NOR_FILE
+        return self.data.content
 
     def save(self, filepath: str) -> None:
         """Save the output to a file.
 
         This may remove the need to hold the output in memory.
         """
-        if hasattr(self, "_bytes"):
-            with open(filepath, "wb") as f:
-                f.write(self._bytes)
-        elif hasattr(self, "_file_path"):
-            shutil.copyfile(self._file_path, filepath)
-        else:
-            raise NEITHER_BYTES_NOR_FILE
+        self.data.save(filepath)
 
     def open(self) -> io.IOBase:
         """Open the output as a binary file-like object."""
-        if hasattr(self, "_bytes"):
-            return io.BytesIO(self._bytes)
-        if hasattr(self, "_file_path"):
-            return open(self._file_path, mode="rb")
-        raise NEITHER_BYTES_NOR_FILE
+        return self.data.open()
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
         """Create a BlobOutput from a bytes object"""
-        obj = cls()
-        obj._bytes = data
-        return obj
+        return cls.model_construct(  # type: ignore[return-value]
+            href="blob://local",
+            _data=BlobBytes(data, media_type=cls.default_media_type()),
+        )
 
     @classmethod
     def from_temporary_directory(cls, folder: TemporaryDirectory, file: str) -> Self:
@@ -214,10 +240,16 @@ class BlobOutput:
         which will prevent it from being cleaned up until the object is garbage
         collected.
         """
-        obj = cls()
-        obj._file_path = os.path.join(folder.name, file)
-        obj._temporary_directory = folder
-        return obj
+        file_path = os.path.join(folder.name, file)
+        return cls.model_construct(  # type: ignore[return-value]
+            href="blob://local",
+            _data=BlobFile(
+                file_path,
+                media_type=cls.default_media_type(),
+                # Prevent the temporary directory from being cleaned up
+                _temporary_directory=folder,
+            ),
+        )
 
     @classmethod
     def from_file(cls, file: str) -> Self:
@@ -226,18 +258,102 @@ class BlobOutput:
         The file should exist for at least as long as the BlobOutput does; this
         is assumed to be the case and nothing is done to ensure it's not
         temporary. If you are using temporary files, consider creating your
-        BlobOutput with `from_temporary_directory` instead.
+        Blob with `from_temporary_directory` instead.
         """
-        if not os.path.exists(file):
-            raise IOError("Tried to return a file that doesn't exist.")
-        obj = cls()
-        obj._file_path = file
-        return obj
+        return cls.model_construct(  # type: ignore[return-value]
+            href="blob://local",
+            _data=BlobFile(file, media_type=cls.default_media_type()),
+        )
 
     def response(self):
         """ "Return a suitable response for serving the output"""
-        if hasattr(self, "_bytes"):
-            return Response(content=self._bytes, media_type=self.media_type)
-        if hasattr(self, "_file_path"):
-            return FileResponse(self._file_path, media_type=self.media_type)
-        raise NEITHER_BYTES_NOR_FILE
+        return self.data.response()
+
+
+def blob_type(media_type: str) -> type[Blob]:
+    """Create a BlobOutput subclass for a given media type"""
+    if "'" in media_type or "\\" in media_type:
+        raise ValueError("media_type must not contain single quotes or backslashes")
+    return create_model(
+        f"{media_type.replace('/', '_')}_blob",
+        __base__=Blob,
+        media_type=(eval(f"Literal[r'{media_type}']"), media_type),
+    )
+
+
+class BlobDataManager:
+    """A class to manage BlobData objects
+
+    The BlobManager is responsible for serving `Blob` objects to clients. It
+    holds weak references: it will not retain `Blob`s that are no longer in use.
+    Most `Blob`s will be retained"""
+
+    _blobs: WeakValueDictionary[uuid.UUID, ServerSideBlobData]
+
+    def __init__(self):
+        self._blobs = WeakValueDictionary()
+
+    def add_blob(self, blob: ServerSideBlobData) -> uuid.UUID:
+        """Add a BlobOutput to the manager"""
+        if hasattr(blob, "id") and blob.id is not None:
+            if blob.id in self._blobs:
+                return blob.id
+            else:
+                raise ValueError(
+                    f"BlobData already has an ID {blob.id} "
+                    "but was not found in this BlobDataManager"
+                )
+        blob.id = uuid.uuid4()
+        self._blobs[blob.id] = blob
+        return blob.id
+
+    def get_blob(self, blob_id: uuid.UUID) -> ServerSideBlobData:
+        """Retrieve a BlobOutput from the manager"""
+        return self._blobs[blob_id]
+
+    def download_blob(self, blob_id: uuid.UUID):
+        """Download a BlobOutput"""
+        blob = self.get_blob(blob_id)
+        return blob.response()
+
+    def attach_to_app(self, app: FastAPI):
+        """Attach the BlobDataManager to a FastAPI app"""
+        app.get("/blob/{blob_id}")(self.download_blob)
+
+
+blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
+
+url_to_blobdata_ctx = ContextVar[Callable[[str], BlobData]]("url_to_blobdata")
+
+
+async def blob_serialisation_context_manager(request: Request):
+    """Set context variables to allow blobs to be serialised"""
+    thing_server = find_thing_server(request.app)
+    blob_manager: BlobDataManager = thing_server.blob_data_manager
+    url_for = request.url_for
+
+    def blobdata_to_url(blob: ServerSideBlobData) -> str:
+        blob_id = blob_manager.add_blob(blob)
+        return str(url_for("download_blob", blob_id=blob_id))
+
+    def url_to_blobdata(url: str) -> BlobData:
+        m = re.search(r"blob/([0-9a-z\-]+)", url)
+        if not m:
+            raise HTTPException(
+                status_code=404, detail="Could not find blob ID in href"
+            )
+        invocation_id = uuid.UUID(m.group(1))
+        return blob_manager.get_blob(invocation_id)
+
+    t1 = blobdata_to_url_ctx.set(blobdata_to_url)
+    t2 = url_to_blobdata_ctx.set(url_to_blobdata)
+    try:
+        yield blob_manager
+    finally:
+        blobdata_to_url_ctx.reset(t1)
+        url_to_blobdata_ctx.reset(t2)
+
+
+BlobIOContextDep: TypeAlias = Annotated[
+    BlobDataManager, Depends(blob_serialisation_context_manager)
+]

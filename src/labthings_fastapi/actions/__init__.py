@@ -10,8 +10,8 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from labthings_fastapi.outputs.blob import blob_to_link
 
+from labthings_fastapi.utilities import model_to_dict
 from labthings_fastapi.utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
 from ..file_manager import FileManager
@@ -21,6 +21,7 @@ from ..dependencies.invocation import (
     InvocationCancelledError,
     invocation_logger,
 )
+from ..outputs.blob import BlobIOContextDep
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -158,32 +159,32 @@ class Invocation(Thread):
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
             input=self.input,
-            output=blob_to_link(self.output, href + "/output"),
+            output=self.output,
             links=links,
             log=self.log,
         )
 
     def run(self):
         """Overrides default threading.Thread run() method"""
-        self.action.emit_changed_event(self.thing, self._status)
-
-        # Capture just this thread's log messages
-        handler = DequeLogHandler(dest=self._log)
-        logger = invocation_logger(self.id)
-        logger.addHandler(handler)
-
-        action = self.action
-        thing = self.thing
-        kwargs = self.input.model_dump() or {}
-        assert action is not None
-        assert thing is not None
-
-        with self._status_lock:
-            self._status = InvocationStatus.RUNNING
-            self._start_time = datetime.datetime.now()
+        try:
             self.action.emit_changed_event(self.thing, self._status)
 
-        try:
+            # Capture just this thread's log messages
+            handler = DequeLogHandler(dest=self._log)
+            logger = invocation_logger(self.id)
+            logger.addHandler(handler)
+
+            action = self.action
+            thing = self.thing
+            kwargs = model_to_dict(self.input)
+            assert action is not None
+            assert thing is not None
+
+            with self._status_lock:
+                self._status = InvocationStatus.RUNNING
+                self._start_time = datetime.datetime.now()
+                self.action.emit_changed_event(self.thing, self._status)
+
             # The next line actually runs the action.
             ret = action.__get__(thing)(**kwargs, **self.dependencies)
 
@@ -283,6 +284,11 @@ class ActionManager:
         thread.start()
         return thread
 
+    def get_invocation(self, id: uuid.UUID) -> Invocation:
+        """Retrieve an invocation by ID"""
+        with self._invocations_lock:
+            return self._invocations[id]
+
     def list_invocations(
         self,
         action: Optional[ActionDescriptor] = None,
@@ -314,7 +320,7 @@ class ActionManager:
         """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""
 
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
-        def list_all_invocations(request: Request):
+        def list_all_invocations(request: Request, _blob_manager: BlobIOContextDep):
             return self.list_invocations(as_responses=True, request=request)
 
         @app.get(
@@ -322,7 +328,9 @@ class ActionManager:
             response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}},
         )
-        def action_invocation(id: uuid.UUID, request: Request):
+        def action_invocation(
+            id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep
+        ):
             try:
                 with self._invocations_lock:
                     return self._invocations[id].response(request=request)
@@ -346,7 +354,7 @@ class ActionManager:
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_output(id: uuid.UUID):
+        def action_invocation_output(id: uuid.UUID, _blob_manager: BlobIOContextDep):
             """Get the output of an action invocation
 
             This returns just the "output" component of the action invocation. If the

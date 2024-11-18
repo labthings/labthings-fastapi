@@ -10,6 +10,7 @@ from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
 from ..actions import InvocationModel
 from ..dependencies.invocation import CancelHook, InvocationID
+from ..dependencies.action_manager import ActionManagerContextDep
 from ..utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
@@ -19,7 +20,7 @@ from ..utilities.introspection import (
     input_model_from_signature,
     return_type,
 )
-from ..outputs.blob import blob_to_model, get_model_media_type
+from ..outputs.blob import BlobIOContextDep
 from ..thing_description import type_to_dataschema
 from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
 
@@ -69,7 +70,7 @@ class ActionDescriptor:
             remove_first_positional_arg=True,
             ignore=[p.name for p in self.dependency_params],
         )
-        self.output_model = blob_to_model(return_type(func))
+        self.output_model = return_type(func)
         self.invocation_model = create_model(
             f"{self.name}_invocation",
             __base__=InvocationModel,
@@ -163,6 +164,8 @@ class ActionDescriptor:
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
+            action_manager: ActionManagerContextDep,
+            _blob_manager: BlobIOContextDep,
             request: Request,
             body,
             id: InvocationID,
@@ -171,7 +174,7 @@ class ActionDescriptor:
             **dependencies,
         ):
             try:
-                action = thing.action_manager.invoke_action(
+                action = action_manager.invoke_action(
                     action=self,
                     thing=thing,
                     input=body,
@@ -179,7 +182,7 @@ class ActionDescriptor:
                     id=id,
                     cancel_hook=cancel_hook,
                 )
-                background_tasks.add_task(thing.action_manager.expire_invocations)
+                background_tasks.add_task(action_manager.expire_invocations)
                 return action.response(request=request)
             finally:
                 try:
@@ -219,8 +222,8 @@ class ActionDescriptor:
         except AttributeError:
             print(f"Failed to generate response model for action {self.name}")
         # Add an additional media type if we may return a file
-        if get_model_media_type(self.output_model):
-            responses[200]["content"][get_model_media_type(self.output_model)] = {}
+        if hasattr(self.output_model, "media_type"):
+            responses[200]["content"][self.output_model.media_type] = {}
         # Now we can add the endpoint to the app.
         app.post(
             thing.path + self.name,
@@ -243,8 +246,8 @@ class ActionDescriptor:
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations():
-            return thing.action_manager.list_invocations(self, thing, as_responses=True)
+        def list_invocations(action_manager: ActionManagerContextDep):
+            return action_manager.list_invocations(self, thing, as_responses=True)
 
     def action_affordance(
         self, thing: Thing, path: Optional[str] = None

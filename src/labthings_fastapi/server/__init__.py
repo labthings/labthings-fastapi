@@ -6,7 +6,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
-from weakref import WeakSet
 from collections.abc import Mapping
 from types import MappingProxyType
 
@@ -17,17 +16,8 @@ from ..actions import ActionManager
 from ..thing_settings import ThingSettings
 from ..thing import Thing
 from ..thing_description.model import ThingDescription
-
-
-_thing_servers: WeakSet[ThingServer] = WeakSet()
-
-
-def find_thing_server(app: FastAPI) -> ThingServer:
-    """Find the ThingServer associated with an app"""
-    for server in _thing_servers:
-        if server.app == app:
-            return server
-    raise RuntimeError("No ThingServer found for this app")
+from ..dependencies.thing_server import _thing_servers
+from ..outputs.blob import BlobDataManager
 
 
 class ThingServer:
@@ -37,6 +27,8 @@ class ThingServer:
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
+        self.blob_data_manager = BlobDataManager()
+        self.blob_data_manager.attach_to_app(self.app)
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
@@ -46,6 +38,7 @@ class ThingServer:
 
     app: FastAPI
     action_manager: ActionManager
+    blob_data_manager: BlobDataManager
 
     def set_cors_middleware(self) -> None:
         self.app.add_middleware(
