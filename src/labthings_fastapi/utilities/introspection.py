@@ -109,24 +109,6 @@ def input_model_from_signature(
     return model
 
 
-def function_dependencies(
-    func: Callable, dependency_types: Sequence[Type]
-) -> Dict[str, tuple[type, type]]:
-    """Determine whether a function's arguments require dependencies
-
-    The return value maps argument names to a tuple of (type, full_type)
-    where `full_type` is the annotation without simplification, i.e.
-    it will include the contents of any Annotated objects.
-    """
-    type_hints = get_type_hints(func, include_extras=False)
-    full_type_hints = get_type_hints(func, include_extras=True)
-    return {
-        name: (type_, full_type_hints[name])
-        for name, type_ in type_hints.items()
-        if type_ in dependency_types
-    }
-
-
 def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     """Find the arguments of a function that are FastAPI dependencies
 
