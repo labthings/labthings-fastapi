@@ -15,10 +15,10 @@ We also use the JSONSchema provided by W3C to validate the TDs we generate, in
 
 from __future__ import annotations
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional, Union
+from typing import Any, Optional
 import json
 
-from pydantic import TypeAdapter, ValidationError, BaseModel
+from pydantic import TypeAdapter, ValidationError
 from .model import DataSchema
 
 
@@ -192,7 +192,7 @@ def jsonschema_to_dataschema(
     return output
 
 
-def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
+def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     """Convert a Python type to a Thing Description DataSchema
 
     This makes use of pydantic's `schema_of` function to create a
@@ -205,9 +205,14 @@ def type_to_dataschema(t: Union[type, BaseModel], **kwargs) -> DataSchema:
     is passed in. Typically you'll want to use this for the
     `title` field.
     """
-    if isinstance(t, BaseModel):
+    if hasattr(t, "model_json_schema"):
+        # The input should be a `BaseModel` subclass, in which case this works:
         json_schema = t.model_json_schema()
     else:
+        # In principle, the below should work for any type, though some
+        # deferred annotations can go wrong.
+        # Some attempt at looking up the environment of functions might help
+        # here.
         json_schema = TypeAdapter(t).json_schema()
     schema_dict = jsonschema_to_dataschema(json_schema)
     # Definitions of referenced ($ref) schemas are put in a
