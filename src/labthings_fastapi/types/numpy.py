@@ -30,14 +30,15 @@ from pydantic import (
     WrapSerializer,
 )
 from typing import Annotated, Any, List, Union
+from typing_extensions import TypeAlias
 from collections.abc import Mapping, Sequence
 
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
 # but the below gets the job done for now.
-Number = Union[int, float]
-NestedListOfNumbers = Union[
+Number: TypeAlias = Union[int, float]
+NestedListOfNumbers: TypeAlias = Union[
     Number,
     List[Number],
     List[List[Number]],
@@ -68,10 +69,12 @@ def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray
 
 
 # Define an annotated type so Pydantic can cope with numpy
-NDArray = Annotated[
+NDArray: TypeAlias = Annotated[
     np.ndarray,
     PlainValidator(listoflists_to_np),
-    PlainSerializer(np_to_listoflists, when_used="json-unless-none"),
+    PlainSerializer(
+        np_to_listoflists, when_used="json-unless-none", return_type=NestedListOfNumbers
+    ),
     WithJsonSchema(NestedListOfNumbersModel.model_json_schema(), mode="validation"),
 ]
 

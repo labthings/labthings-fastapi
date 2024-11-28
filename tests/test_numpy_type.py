@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 import numpy as np
 
 from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
+
+
+class ArrayModel(RootModel):
+    root: NDArray
 
 
 def check_field_works_with_list(data):
@@ -86,3 +90,10 @@ def test_denumpifying_dict():
     assert dump["e"] is None
     assert dump["f"] == 1
     d.model_dump_json()
+
+
+def test_rootmodel():
+    for input in [[0, 1, 2], np.arange(3)]:
+        m = ArrayModel(root=input)
+        assert isinstance(m.root, np.ndarray)
+        assert (m.model_dump() == [0, 1, 2]).all()
