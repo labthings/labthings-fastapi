@@ -1,6 +1,6 @@
 [project]
 name = "labthings-fastapi"
-version = "0.0.6"
+version = "0.0.7"
 authors = [
   { name="Richard Bowman", email="richard.bowman@cantab.net" },
 ]
