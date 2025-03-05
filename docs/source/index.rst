@@ -11,7 +11,7 @@ Welcome to labthings-fastapi's documentation!
    :caption: Contents:
 
    core_concepts.rst
-   quickstart.rst
+   quickstart/quickstart.rst
    dependencies.rst
 
    apidocs/index
