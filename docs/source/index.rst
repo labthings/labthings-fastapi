@@ -12,7 +12,7 @@ Welcome to labthings-fastapi's documentation!
 
    core_concepts.rst
    quickstart/quickstart.rst
-   dependencies.rst
+   dependencies/dependencies.rst
 
    apidocs/index
 
