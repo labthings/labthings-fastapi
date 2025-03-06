@@ -6,6 +6,7 @@ from labthings_fastapi.server import ThingServer
 
 MyThingDep = direct_thing_client_dependency(MyThing, "/mything/")
 
+
 class TestThing(Thing):
     """A test thing with a counter property and a couple of actions"""
 
@@ -14,10 +15,12 @@ class TestThing(Thing):
         """Increment the counter on another thing"""
         my_thing.increment_counter()
 
+
 server = ThingServer()
 server.add_thing(MyThing(), "/mything/")
 server.add_thing(TestThing(), "/testthing/")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(server.app, port=5000)

@@ -28,6 +28,7 @@ class TestThing(Thing):
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
+
 if __name__ == "__main__":
     from labthings_fastapi.server import ThingServer
     import uvicorn
@@ -39,4 +40,3 @@ if __name__ == "__main__":
 
     # We run the server using `uvicorn`:
     uvicorn.run(server.app, port=5000)
-
