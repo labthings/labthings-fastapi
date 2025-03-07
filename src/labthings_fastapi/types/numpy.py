@@ -60,7 +60,7 @@ def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
     NB this will not be quick! Large arrays will be much better
     serialised by dumping to base64 encoding or similar.
     """
-    return arr.tolist()
+    return arr.tolist()  # type: ignore[return-value]
 
 
 def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
