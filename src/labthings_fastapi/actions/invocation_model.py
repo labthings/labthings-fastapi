@@ -43,9 +43,7 @@ class LogRecordModel(BaseModel):
                     # it will cause 500 errors when retrieving
                     # the invocation.
                     # This way, you can find and fix the source.
-                    data.message = (
-                        f"Error constructing message ({e}) " f"from {data!r}."
-                    )
+                    data.message = f"Error constructing message ({e}) from {data!r}."
         return data
 
 

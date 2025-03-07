@@ -27,7 +27,7 @@ def validate_thing_description(td: dict) -> None:
     jsonschema.validate(instance=td, schema=schema)
     validated_td = time.time()
     logging.info(
-        f"Thing Description validated OK (schema load: {loaded_schema-start:.1f}s, "
-        f"schema validation: {validated_schema-loaded_schema:.1f}s, TD validation: "
-        f"{validated_td-validated_schema:.1f}s)"
+        f"Thing Description validated OK (schema load: {loaded_schema - start:.1f}s, "
+        f"schema validation: {validated_schema - loaded_schema:.1f}s, TD validation: "
+        f"{validated_td - validated_schema:.1f}s)"
     )
