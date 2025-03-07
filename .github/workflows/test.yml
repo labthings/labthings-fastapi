@@ -80,7 +80,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Install Dependencies
-        run: pip install .[dev,server]
+        run: pip install -e .[dev,server]
 
       - name: Lint with Ruff
         run: ruff check .
