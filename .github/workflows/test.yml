@@ -45,7 +45,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Install Dependencies
-        run: pip install . -r dev-requirements.txt
+        run: pip install -e . -r dev-requirements.txt
 
       - name: Lint with Ruff
         run: ruff check .
