@@ -35,12 +35,12 @@ You can install this repository with `pip`, either clone it and run `pip install
 The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement.
 
 Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
-
 ```
 uv pip compile --extra dev --extra server pyproject.toml --output-file dev-requirements.txt
 ```
-
 If you're not using `uv`, just regular `pip-compile` from `pip-tools` will do the same thing.
+
+All changes to the codebase should go via pull requests, and should only be merged once all the checks in the `test` job are passing. It is preferable to merge code where the `test-with-unpinned-dependencies` job fails, and deal with the dependency issues in another PR, particularly where the required changes are distinct from the code in the PR.
 
 ## Demo
 
