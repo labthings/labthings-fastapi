@@ -34,6 +34,14 @@ You can install this repository with `pip`, either clone it and run `pip install
 
 The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement.
 
+Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
+
+```
+uv pip compile --extra dev --extra server pyproject.toml --output-file dev-requirements.txt
+```
+
+If you're not using `uv`, just regular `pip-compile` from `pip-tools` will do the same thing.
+
 ## Demo
 
 See the [examples folder](./examples/) for a runnable demo.

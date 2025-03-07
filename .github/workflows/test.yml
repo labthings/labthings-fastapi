@@ -45,7 +45,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Install Dependencies
-        run: pip install -e .[dev,server]
+        run: pip install . -r dev-requirements.txt
 
       - name: Lint with Ruff
         run: ruff check .
@@ -61,6 +61,37 @@ jobs:
         with:
           name: coverage.lcov
           path: ./coverage.lcov
+      
+      - name: Analyse with MyPy
+        run: mypy src
+
+test-with-unpinned-deps:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Dependencies
+        run: pip install .[dev,server]
+
+      - name: Lint with Ruff
+        run: ruff check .
+
+      - name: Format with Ruff
+        if: success() || failure()
+        run: ruff format --check .
+
+      - name: Test with pytest
+        if: success() || failure()
+        run: pytest --cov=src --cov-report=lcov
       
       - name: Analyse with MyPy
         run: mypy src
