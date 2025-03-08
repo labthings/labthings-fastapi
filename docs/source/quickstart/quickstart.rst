@@ -1,11 +1,20 @@
 Quick start
 ===========
 
-You can install `labthings-fastapi` using `pip`. Create a virtual environment for you project, then install labthings with:
+You can install `labthings-fastapi` using `pip`. We recommend you create a virtual environment, for example:
 
-.. code-block:: bash
 
-    pip install labthings-fastapi[server]
+.. literalinclude:: quickstart_example.sh
+    :language: bash
+    :start-after: BEGIN venv
+    :end-before: END venv
+    
+then install labthings with:
+
+.. literalinclude:: quickstart_example.sh
+    :language: bash
+    :start-after: BEGIN install
+    :end-before: END install
 
 To define a simple example ``Thing``, paste the following into a python file, ``counter.py``:
 
@@ -14,9 +23,11 @@ To define a simple example ``Thing``, paste the following into a python file, ``
     
 ``counter.py`` defines the ``TestThing`` class, and then runs a LabThings server in its ``__name__ == "__main__"`` block. This means we should be able to run the server with:
 
-.. code-block:: bash
 
-    python counter.py
+.. literalinclude:: quickstart_example.sh
+    :language: bash
+    :start-after: BEGIN serve
+    :end-before: END serve
 
 Visiting http://localhost:5000/counter/ will show the thing description, and you can interact with the actions and properties using the Swagger UI at http://localhost:5000/docs/.
 
