@@ -97,6 +97,10 @@ jobs:
         if: success() || failure()
         run: pytest --cov=src --cov-report=lcov
 
+      - name: Check quickstart, including installation
+        if: success() || failure()
+        run: bash ./docs/source/quickstart/test_quickstart_example.sh
+
   coverage:
     runs-on: ubuntu-latest
     needs: [base_coverage, test]

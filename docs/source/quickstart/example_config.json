@@ -1,0 +1,5 @@
+{
+    "things": {
+        "example": "labthings_fastapi.example_things:MyThing"
+    }
+}
