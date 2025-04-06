@@ -1,4 +1,5 @@
 import json
+from traceback import format_exception
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
@@ -10,6 +11,7 @@ class FallbackApp(FastAPI):
         self.labthings_config = None
         self.labthings_server = None
         self.labthings_error = None
+        self.log_history = None
 
 
 app = FallbackApp()
@@ -32,6 +34,9 @@ ERROR_PAGE = """
     </ul>
     <p>Your configuration:</p>
     <pre>{{config}}</pre>
+    <p>Traceback</p>
+    <pre>{{traceback}}</pre>
+    {{logginginfo}}
 </body>
 </html>
 """
@@ -40,6 +45,9 @@ ERROR_PAGE = """
 @app.get("/")
 async def root():
     error_message = f"{app.labthings_error!r}"
+    # use traceback.format_exception to get full traceback as list
+    # this ends in newlines, but needs joining to be a single string
+    error_w_trace = "".join(format_exception(app.labthings_error))
     things = ""
     if app.labthings_server:
         for path, thing in app.labthings_server.things.items():
@@ -49,6 +57,14 @@ async def root():
     content = content.replace("{{error}}", error_message)
     content = content.replace("{{things}}", things)
     content = content.replace("{{config}}", json.dumps(app.labthings_config, indent=2))
+    content = content.replace("{{traceback}}", error_w_trace)
+
+    if app.log_history is None:
+        logging_info = "    <p>No logging info available</p>"
+    else:
+        logging_info = f"    <p>Logging info</p>\n    <pre>{app.log_history}</pre>"
+
+    content = content.replace("{{logginginfo}}", logging_info)
     return HTMLResponse(content=content, status_code=500)
 
 
