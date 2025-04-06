@@ -2,3 +2,4 @@
 concurrency = multiprocessing, thread
 parallel = true
 sigterm = true
+omit = tests/**/*.py, docs/**/*.py
