@@ -119,8 +119,8 @@ def test_serve_with_no_config():
         check_serve_from_cli([])
 
 
-def test_invalid_thing_and_fallback():
-    """Check it fails for invalid things, and test the fallback option"""
+def test_invalid_thing():
+    """Check it fails for invalid things"""
     config_json = json.dumps(
         {
             "things": {
@@ -130,8 +130,20 @@ def test_invalid_thing_and_fallback():
     )
     with raises(ImportError):
         check_serve_from_cli(["-j", config_json])
-    ## the line below should start a dummy server with an error page -
-    ## it terminates happily once the server starts.
+
+def test_fallback():
+    """test the fallback option
+
+    startd a dummy server with an error page -
+    it terminates once the server starts.
+    """
+    config_json = json.dumps(
+        {
+            "things": {
+                "broken": "labthings_fastapi.example_things:MissingThing",
+            }
+        }
+    )
     check_serve_from_cli(["-j", config_json, "--fallback"])
 
 
