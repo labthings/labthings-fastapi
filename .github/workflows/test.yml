@@ -5,6 +5,7 @@ on:
 
 jobs:
   base_coverage:
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -111,17 +112,33 @@ jobs:
           name: coverage-3.12
 
       - name: Download code coverage report for base branch
+        id: download-base-coverage
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: base-coverage.lcov
         
       - name: Generate Code Coverage report
+        # Note, due to continue on error (to make job pass) we need to check the
+        # Status of the step directly not just use success() or failure()
+        if: steps.download-base-coverage.outcome == 'success'
         id: code-coverage
         uses: barecheck/code-coverage-action@v1
         with:
           barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
           lcov-file: "./coverage.lcov"
           base-lcov-file: "./base-coverage.lcov"
+          minimum-ratio: 0
+          send-summary-comment: true
+          show-annotations: "warning"
+        
+      - name: Generate Code Coverage report if base job fails
+        if: steps.download-base-coverage.outcome == 'failure'
+        id: code-coverage-without-base
+        uses: barecheck/code-coverage-action@v1
+        with:
+          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
+          lcov-file: "./coverage.lcov"
           minimum-ratio: 0
           send-summary-comment: true
           show-annotations: "warning"
