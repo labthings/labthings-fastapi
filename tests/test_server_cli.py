@@ -131,6 +131,7 @@ def test_invalid_thing():
     with raises(ImportError):
         check_serve_from_cli(["-j", config_json])
 
+
 def test_fallback():
     """test the fallback option
 
