@@ -28,7 +28,7 @@ ERROR_PAGE = """
     <p>Please check your configuration and try again.</p>
     <p>More details may be shown below:</p>
     <pre>{{error}}</pre>
-    <p>The following Things loaded successfuly:</p>
+    <p>The following Things loaded successfully:</p>
     <ul>
         {{things}}
     </ul>
