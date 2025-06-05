@@ -116,7 +116,7 @@ class Invocation(Thread):
         ``running``     Currently in-progress
         ``completed``   Finished without error
         ``cancelled``   Thread stopped after a cancel request
-        ``error``       Exception occured in thread
+        ``error``       Exception occurred in thread
         ==============  =============================================
         """
         with self._status_lock:
@@ -312,7 +312,7 @@ class ActionManager:
                 if v.expiry_time is not None:
                     if v.expiry_time < datetime.datetime.now():
                         to_delete.append(k)
-            logging.info(f"Deleting invocations {to_delete} as they have expired")
+            logging.debug(f"Deleting invocations {to_delete} as they have expired")
             for k in to_delete:
                 del self._invocations[k]
 
