@@ -10,8 +10,12 @@ import uvicorn
 from . import ThingServer, server_from_config
 
 
-def parse_args(argv: Optional[list[str]] = None) -> Namespace:
-    """Process command line arguments for the server"""
+def get_default_parser():
+    """Return the default CLI parser for LabThings
+
+    This can be used instead of `parse_args` if more arguments are needed
+    """
+
     parser = ArgumentParser()
     parser.add_argument("-c", "--config", type=str, help="Path to configuration file")
     parser.add_argument("-j", "--json", type=str, help="Configuration as JSON string")
@@ -29,8 +33,14 @@ def parse_args(argv: Optional[list[str]] = None) -> Namespace:
         default=5000,
         help="Bind socket to this port. If 0, an available port will be picked.",
     )
-    args = parser.parse_args(argv)
-    return args
+    return parser
+
+
+def parse_args(argv: Optional[list[str]] = None) -> Namespace:
+    """Process command line arguments for the server"""
+    parser = get_default_parser()
+    # Use parser to parse CLI arguments and return the namespace with attributes set.
+    return parser.parse_args(argv)
 
 
 def config_from_args(args: Namespace) -> dict:
