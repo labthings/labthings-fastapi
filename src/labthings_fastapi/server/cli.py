@@ -39,6 +39,7 @@ def get_default_parser():
 def parse_args(argv: Optional[list[str]] = None) -> Namespace:
     """Process command line arguments for the server"""
     parser = get_default_parser()
+    # Use parser to parse CLI arguments and return the namespace with attributes set.
     return parser.parse_args(argv)
 
 
