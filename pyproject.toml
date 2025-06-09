@@ -52,7 +52,7 @@ artifacts = ["src/*.json"]
 artifacts = ["src/*.json"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
