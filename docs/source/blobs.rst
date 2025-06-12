@@ -1,31 +1,31 @@
 Blob input/output
 =================
 
-`Blob` objects allow binary data to be returned by an Action. This binary data can be passed between Things, or between Things and client code. Using a `Blob` object allows binary data to be efficiently sent over HTTP if required, and allows the same code to run either on the server (without copying the data) or on a client (where data is transferred over HTTP).
+:class:`.Blob` objects allow binary data to be returned by an Action. This binary data can be passed between Things, or between Things and client code. Using a :class:`.Blob` object allows binary data to be efficiently sent over HTTP if required, and allows the same code to run either on the server (without copying the data) or on a client (where data is transferred over HTTP).
 
-If interactions require only simple data types that can easily be represented in JSON, very little thought needs to be given to data types - strings and numbers will be converted to and from JSON automatically, and your Python code should only ever see native Python datatypes whether it's running on the server or a remote client. However, if you want to transfer larger data objects such as images, large arrays or other binary data, you will need to use a `Blob` object.
+If interactions require only simple data types that can easily be represented in JSON, very little thought needs to be given to data types - strings and numbers will be converted to and from JSON automatically, and your Python code should only ever see native Python datatypes whether it's running on the server or a remote client. However, if you want to transfer larger data objects such as images, large arrays or other binary data, you will need to use a :class:`.Blob` object.
 
-`Blob` objects are not part of the Web of Things specification, which is most often used with fairly simple data structures in JSON. In LabThings-FastAPI, the `Blob` mechanism is intended to provide an efficient way to work with arbitrary binary data. If it's used to transfer data between two `Thing`s on the same server, the data should not be copied or otherwise iterated over - and when it must be transferred over the network it can be done using a binary transfer, rather than embedding in JSON with base64 encoding.
+:class:`.Blob` objects are not part of the Web of Things specification, which is most often used with fairly simple data structures in JSON. In LabThings-FastAPI, the :class:`.Blob` mechanism is intended to provide an efficient way to work with arbitrary binary data. If it's used to transfer data between two Things on the same server, the data should not be copied or otherwise iterated over - and when it must be transferred over the network it can be done using a binary transfer, rather than embedding in JSON with base64 encoding.
 
-A `Blob` consists of some data and a MIME type, which sets how the data should be interpreted. It is best to create a subclass of `Blob` with the content type set: this makes it clear what kind of data is in the `Blob`. In the future, it might be possible to add functionality to `Blob` subclasses, for example to make it simple to obtain a `PIL` `Image` object from a `Blob` containing JPEG data. However, this will not yet work across both client and server code.
+A :class:`.Blob` consists of some data and a MIME type, which sets how the data should be interpreted. It is best to create a subclass of :class:`.Blob` with the content type set: this makes it clear what kind of data is in the :class:`.Blob`. In the future, it might be possible to add functionality to :class:`.Blob` subclasses, for example to make it simple to obtain an image object from a :class:`.Blob` containing JPEG data. However, this will not currently work across both client and server code.
 
-Creating and using `Blob` objects
+Creating and using :class:`.Blob` objects
 ------------------------------------------------
 
-Blobs can be created from binary data that is in memory (a `bytes` object), on disk (a file), or using a URL as a placeholder. The intention is that the code that uses a `Blob` should not need to know which of these is the case, and should be able to use the same code regardless of how the data is stored. 
+Blobs can be created from binary data that is in memory (a :class:`bytes` object), on disk (a file), or using a URL as a placeholder. The intention is that the code that uses a :class:`.Blob` should not need to know which of these is the case, and should be able to use the same code regardless of how the data is stored. 
 
 Blobs offer three ways to access their data:
 
-* A `bytes` object, obtained via the `data` property. For blobs created with a `bytes` object, this simply returns the original data object with no copying. If the data is stored in a file, the file is opened and read when the `data` property is accessed. If the `Blob` references a URL, it is retrieved and returned when `data` is accessed.
-* An `open()` method providing a file-like object. This returns a `BytesIO` wrapper if the `Blob` was created from a `bytes` object or the file if the data is stored on disk. URLs are retrieved, stored as `bytes` and returned wrapped in a `BytesIO` object. 
-* A `save` method will either save the data to a file, or copy the existing file on disk. This should be more efficient than loading `data` and writing to a file, if the `Blob` is pointing to a file rather than data in memory. 
+* A `bytes` object, obtained via the `data` property. For blobs created with a `bytes` object, this simply returns the original data object with no copying. If the data is stored in a file, the file is opened and read when the `data` property is accessed. If the :class:`.Blob` references a URL, it is retrieved and returned when `data` is accessed.
+* An `open()` method providing a file-like object. This returns a :class:`~io.BytesIO` wrapper if the :class:`.Blob` was created from a `bytes` object or the file if the data is stored on disk. URLs are retrieved, stored as `bytes` and returned wrapped in a :class:`~io.BytesIO` object. 
+* A `save` method will either save the data to a file, or copy the existing file on disk. This should be more efficient than loading `data` and writing to a file, if the :class:`.Blob` is pointing to a file rather than data in memory. 
 
-The intention here is that `Blob` objects may be used identically with data in memory or on disk or even at a remote URL, and the code that uses them should not need to know which is the case.
+The intention here is that :class:`.Blob` objects may be used identically with data in memory or on disk or even at a remote URL, and the code that uses them should not need to know which is the case.
 
 Examples
 --------
 
-A camera might want to return an image as a `Blob` object. The code for the action might look like this:
+A camera might want to return an image as a :class:`.Blob` object. The code for the action might look like this:
 
 .. code-block:: python
 
@@ -115,21 +115,21 @@ On the client, we can use the `capture_image` action directly (as before), or we
     raw_blob.save("raw_image.raw")  # Download and save the raw image to a file
 
 
-Using `Blob` objects as inputs
-------------------------------
+Using :class:`.Blob` objects as inputs
+--------------------------------------
 
-`Blob` objects may be used as either the input or output of an action. There are relatively few good use cases for `Blob` inputs to actions, but a possible example would be image capture: one action could perform a quick capture of raw data, and another action could convert the raw data into a useful image. The output of the capture action would be a `Blob` representing the raw data, which could be passed to the conversion action. 
+:class:`.Blob` objects may be used as either the input or output of an action. There are relatively few good use cases for :class:`.Blob` inputs to actions, but a possible example would be image capture: one action could perform a quick capture of raw data, and another action could convert the raw data into a useful image. The output of the capture action would be a :class:`.Blob` representing the raw data, which could be passed to the conversion action. 
 
-Because `Blob` outputs are represented in JSON as links, they are downloaded with a separate HTTP request if needed. There is currently no way to create a `Blob` on the server via HTTP, which means remote clients can use `Blob` objects provided in the output of actions but they cannot yet upload data to be used as input. However, it is possible to pass the URL of a `Blob` that already exists on the server as input to a subsequent Action. This means, in the example above of raw image capture, a remote client over HTTP can pass the raw `Blob` to the conversion action, and the raw data need never be sent over the network.
+Because :class:`.Blob` outputs are represented in JSON as links, they are downloaded with a separate HTTP request if needed. There is currently no way to create a :class:`.Blob` on the server via HTTP, which means remote clients can use :class:`.Blob` objects provided in the output of actions but they cannot yet upload data to be used as input. However, it is possible to pass the URL of a :class:`.Blob` that already exists on the server as input to a subsequent Action. This means, in the example above of raw image capture, a remote client over HTTP can pass the raw :class:`.Blob` to the conversion action, and the raw data need never be sent over the network.
 
 Memory management and retention
 -------------------------------
 
-Management of `Blob` objects is currently very basic: when a `Blob` object is returned in the output of an Action that has been called via the HTTP interface, a fixed 5 minute expiry is used. This should be improved in the future to avoid memory management issues. 
+Management of :class:`.Blob` objects is currently very basic: when a :class:`.Blob` object is returned in the output of an Action that has been called via the HTTP interface, a fixed 5 minute expiry is used. This should be improved in the future to avoid memory management issues. 
 
-The behaviour is different when actions are called from other actions. If `action_a` calls `action_b`, and `action_b` returns a `Blob`, that `Blob` will be subject to Python's usual garbage collection rules when `action_a` ends - i.e. it will not be retained unless it is included in the output of `action_a`.
+The behaviour is different when actions are called from other actions. If `action_a` calls `action_b`, and `action_b` returns a :class:`.Blob`, that :class:`.Blob` will be subject to Python's usual garbage collection rules when `action_a` ends - i.e. it will not be retained unless it is included in the output of `action_a`.
 
 HTTP interface and serialization
------------------------
+--------------------------------
 
-`Blob` objects are subclasses of `pydantic.BaseModel`, which means they can be serialized to JSON and deserialized from JSON. When this happens, the `Blob` is represented as a JSON object with two fields: `url` and `content_type`. The `url` field is a link to the data. The `content_type` field is a string representing the MIME type of the data. When a `Blob` is serialized, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the `Blob`. Once an Action has finished running, the only strong reference to the `Blob` should be held by the output property of the action invocation. The `Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.
+:class:`.Blob` objects are subclasses of `pydantic.BaseModel`, which means they can be serialized to JSON and deserialized from JSON. When this happens, the :class:`.Blob` is represented as a JSON object with two fields: `url` and `content_type`. The `url` field is a link to the data. The `content_type` field is a string representing the MIME type of the data. When a :class:`.Blob` is serialized, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the :class:`.Blob`. Once an Action has finished running, the only strong reference to the :class:`.Blob` should be held by the output property of the action invocation. The :class:`.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.

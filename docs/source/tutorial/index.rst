@@ -1,8 +1,8 @@
 LabThings-FastAPI tutorial
 ==========================
 
-.. toctree:
-   
+.. toctree::
+
    installing_labthings.rst
    running_labthings.rst
 
