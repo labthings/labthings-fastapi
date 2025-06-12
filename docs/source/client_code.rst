@@ -1,7 +1,7 @@
 Client code
 ===========
 
-The interface to a `Thing` is defined by its interaction affordances, which are defined in the Thing Description. The `labthings-fastapi.client` library provides a `ThingClient` class to interact with a `Thing` via HTTP. This is a class with a method for each Action, and a property for each Property of the Thing. The intention is to provide a simple, pythonic interface that plays nicely with IDEs and autocompletion. 
+The interface to a `Thing` is defined by its actions, properties and events. Usually, Python code interacts with a `Thing` through a `ThingClient` subclass, where each action is a method and each property is a property of the class. The intention is to provide a simple, pythonic interface that plays nicely with IDEs and autocompletion. `ThingClient` subclasses can be generated dynamicall from a URL. Currently, this creates an object with the right methods and properties, but type hints are usually missing and autocompletion does not work well. In the future, `labthings-fastapi` will generate custom client subclasses that include type hints and autocompletion.
 
 An additional goal is to provide an interface that is consistent between the server and client code: a `DirectThingClient` class is used by the `labthings-fastapi` server to call actions and properties of other `Thing`s, which means code for an action may be developed as an HTTP client, for example in a Jupyter notebook, and then moved to the server with minimal changes. Currently, there are a few differences in behaviour between local and remote `Thing`s, most notably the return types (which are usually Pydantic models on the server, and currently dictionaries generated from JSON on the client). This should be improved in the future.
 
