@@ -7,6 +7,7 @@ Documentation for LabThings-FastAPI
 
    quickstart/quickstart.rst
    wot_core_concepts.rst
+   lt_core_concepts.rst
    tutorial/index.rst
    dependencies/dependencies.rst
    blobs.rst
@@ -34,7 +35,7 @@ Documentation for LabThings-FastAPI
     - Starlette (used by FastAPI) can handle requests asynchronously - this improves performance and enables websockets and other long-lived connections.
     - `Thing` code is still, for now, threaded. In the future it may become possible to us other concurrency models in `Thing` code.
 
-Compared to `python-labthings`_, this framework updates dependencies, shrinks the codebase, and simplifies the API.
+Compared to `python-labthings`_, this framework updates dependencies, shrinks the codebase, and simplifies the API  (see :doc:`lt_core_concepts`).
 * FastAPI more or less completely eliminates OpenAPI generation code from our codebase
 * Marshmallow schemas and endpoint classes are replaced with Python type hints, eliminating double- or triple-definition of actions and their inputs/outputs.
 * Thing Description generation is very much simplified by the new structure (multiple Things instead of one massive Thing with many extensions)
