@@ -1,17 +1,13 @@
-.. labthings-fastapi documentation master file, created by
-   sphinx-quickstart on Wed May 15 16:34:51 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-Welcome to labthings-fastapi's documentation!
+Documentation for LabThings-FastAPI
 =============================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   wot_core_concepts.rst
    quickstart/quickstart.rst
+   wot_core_concepts.rst
+   tutorial/index.rst
    dependencies/dependencies.rst
    concurrency.rst
    client_code.rst
