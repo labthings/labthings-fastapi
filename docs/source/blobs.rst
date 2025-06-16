@@ -122,14 +122,30 @@ Using :class:`.Blob` objects as inputs
 
 Because :class:`.Blob` outputs are represented in JSON as links, they are downloaded with a separate HTTP request if needed. There is currently no way to create a :class:`.Blob` on the server via HTTP, which means remote clients can use :class:`.Blob` objects provided in the output of actions but they cannot yet upload data to be used as input. However, it is possible to pass the URL of a :class:`.Blob` that already exists on the server as input to a subsequent Action. This means, in the example above of raw image capture, a remote client over HTTP can pass the raw :class:`.Blob` to the conversion action, and the raw data need never be sent over the network.
 
+
+HTTP interface and serialization
+--------------------------------
+
+:class:`.Blob` objects are subclasses of `pydantic.BaseModel`, which means they can be serialized to JSON and deserialized from JSON. When this happens, the :class:`.Blob` is represented as a JSON object with :prop:`.Blob.url` and :prop:`.Blob.content_type` fields. The :prop:`.Blob.url` field is a link to the data. The :prop:`.Blob.content_type` field is a string representing the MIME type of the data. It is worth noting that models may be nested: this means an action may return many :class:`.Blob` objects in its output, either as a list or as fields in a :class:`pydantic.BaseModel` subclass. Each :class:`.Blob` in the output will be serialized to JSON with its URL and content type, and the client can then download the data from the URL, one download per :class:`.Blob` object.
+
+When a :class:`.Blob` is serialized, the URL is generated with a unique ID to allow it to be downloaded. The URL is not guaranteed to be permanent, and should not be used as a long-term reference to the data. The URL will expire after 5 minutes, and the data will no longer be available for download after that time.
+
+In order to run an action and download the data, currently an HTTP client must:
+
+* Call the action that returns a :class:`.Blob` object, which will return a JSON object representing the invocation.
+* Poll the invocation until it is complete, and the :class:`.Blob` is available in its ``output`` property with the URL and content type.
+* Download the data from the URL in the :class:`.Blob` object, which will return the binary data.
+
+It may be possible to have actions return binary data directly in the future, but this is not yet implemented.
+
+
 Memory management and retention
 -------------------------------
 
 Management of :class:`.Blob` objects is currently very basic: when a :class:`.Blob` object is returned in the output of an Action that has been called via the HTTP interface, a fixed 5 minute expiry is used. This should be improved in the future to avoid memory management issues. 
 
+When a :class:`.Blob` is serialized, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the :class:`.Blob`. Once an Action has finished running, the only strong reference to the :class:`.Blob` should be held by the output property of the action invocation. The :class:`.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.
+
 The behaviour is different when actions are called from other actions. If `action_a` calls `action_b`, and `action_b` returns a :class:`.Blob`, that :class:`.Blob` will be subject to Python's usual garbage collection rules when `action_a` ends - i.e. it will not be retained unless it is included in the output of `action_a`.
 
-HTTP interface and serialization
---------------------------------
 
-:class:`.Blob` objects are subclasses of `pydantic.BaseModel`, which means they can be serialized to JSON and deserialized from JSON. When this happens, the :class:`.Blob` is represented as a JSON object with two fields: `url` and `content_type`. The `url` field is a link to the data. The `content_type` field is a string representing the MIME type of the data. When a :class:`.Blob` is serialized, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the :class:`.Blob`. Once an Action has finished running, the only strong reference to the :class:`.Blob` should be held by the output property of the action invocation. The :class:`.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.

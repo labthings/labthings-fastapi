@@ -12,7 +12,7 @@ Documentation for LabThings-FastAPI
    dependencies/dependencies.rst
    blobs.rst
    concurrency.rst
-   client_code.rst
+   using_things.rst
 
    apidocs/index
 

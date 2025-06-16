@@ -27,6 +27,7 @@ exclude_patterns = []
 
 autodoc2_packages = ["../../src/labthings_fastapi"]
 autodoc2_render_plugin = "myst"
+autodoc2_class_docstring = "both"
 
 # autoapi_dirs = ["../../src/labthings_fastapi"]
 # autoapi_ignore = []
