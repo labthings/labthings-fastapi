@@ -25,6 +25,8 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = []
 
+default_role = "py:obj"
+
 autodoc2_packages = ["../../src/labthings_fastapi"]
 autodoc2_render_plugin = "myst"
 autodoc2_class_docstring = "both"
@@ -43,6 +45,8 @@ html_theme = "sphinx_rtd_theme"
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "fastapi": ("https://fastapi.tiangolo.com", None),
+    "anyio": ("https://anyio.readthedocs.io/en/stable/", None),
+    "pydantic": ("https://docs.pydantic.dev/latest/", None),
 }
 
 myst_enable_extensions = ["fieldlist"]
