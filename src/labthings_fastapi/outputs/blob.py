@@ -7,7 +7,7 @@ like images, especially where an existing file-type is the obvious way to handle
 To return a file from an action, you should declare its return type as a BlobOutput
 subclass, defining the `media_type` attribute.
 
-The output from the class should be an instance of that subclass, with data supplied
+The action should then return an instance of that subclass, with data supplied
 either as a `bytes` object or a file on disk. If files are used, it's your
 responsibility to ensure the file is deleted after the `BlobOutput` object is
 garbage-collected. Constructing it using the class methods `from_bytes` or
@@ -52,31 +52,54 @@ from typing_extensions import Self, Protocol, runtime_checkable
 
 @runtime_checkable
 class BlobData(Protocol):
-    """A Protocol for a BlobOutput object"""
+    """The interface for the data store of a Blob.
+    
+    :class:`.Blob` objects can represent their data in various ways. Each of
+    those options must provide three ways to access the data, which are the
+    `content` property, the `save()` method, and the `open()` method.
+    """
 
     @property
     def media_type(self) -> str:
+        """The MIME type of the data, e.g. 'image/png' or 'application/json'"""
         pass
 
     @property
     def content(self) -> bytes:
+        """The data as a `bytes` object"""
         pass
 
-    def save(self, filename: str) -> None: ...
+    def save(self, filename: str) -> None:
+        """Save the data to a file"""
+        ...
 
-    def open(self) -> io.IOBase: ...
+    def open(self) -> io.IOBase:
+        """Return a file-like object that may be read from."""
+        ...
 
 
 class ServerSideBlobData(BlobData, Protocol):
-    """A BlobOutput protocol for server-side use, i.e. including `response()`"""
+    """A BlobData protocol for server-side use, i.e. including `response()`
+    
+    :class:`Blob` objects returned by actions must use :class:`.BlobData` objects
+    that can be downloaded. This protocol extends the :class:`.BlobData` protocol to
+    include a :meth:`~.ServerSideBlobData.response()` method that returns a FastAPI response object.
+    """
 
     id: Optional[uuid.UUID] = None
+    """A unique identifier for this BlobData object.
+    
+    The ID is set when the BlobData object is added to the BlobDataManager.
+    It is used to retrieve the BlobData object from the manager.
+    """
 
-    def response(self) -> Response: ...
+    def response(self) -> Response:
+        """A :class:`fastapi.Response` object that sends binary data."""
+        ...
 
 
 class BlobBytes:
-    """A BlobOutput that holds its data in memory as a `bytes` object"""
+    """A BlobOutput that holds its data in memory as a :class:`bytes` object"""
 
     id: Optional[uuid.UUID] = None
 
@@ -132,17 +155,26 @@ class BlobFile:
 
 
 class Blob(BaseModel):
-    """An output from LabThings best returned as binary data, not JSON
+    """A container for binary data that may be retrieved over HTTP
 
-    This may be instantiated either using the class methods `from_bytes` or
-    `from_temporary_directory`, which will use a `bytes` object to store the
-    output, or return a file on disk in a temporary directory. In the latter
-    case, the temporary directory will be deleted when the object is garbage
-    collected.
+    See :doc:`blobs` for more information on how to use this class.
+    
+    A :class:`.Blob` may be created to hold data using the class methods 
+    `from_bytes` or `from_temporary_directory`. The constructor will
+    attempt to deserialise a Blob from a URL, and may only be used within
+    a `blob_serialisation_context_manager`. This is made available when
+    actions are invoked, or when their output is returned.
+
+    You are strongly advised to subclass this class and specify the
+    `media_type` attribute, as this will propagate to the auto-generated
+    documentation.
     """
 
     href: str
+    """The URL where the data may be retrieved. This will be `blob://local`
+    if the data is stored locally."""
     media_type: str = "*/*"
+    """The MIME type of the data. This should be overridden in subclasses."""
     rel: Literal["output"] = "output"
     description: str = (
         "The output from this action is not serialised to JSON, so it must be "
@@ -150,9 +182,22 @@ class Blob(BaseModel):
     )
 
     _data: Optional[ServerSideBlobData] = None
+    """This object holds the data, either in memory or as a file."""
 
     @model_validator(mode="after")
     def retrieve_data(self):
+        """Retrieve the data from the URL
+        
+        When a :class:`.Blob` is created using its constructor, :mod:`pydantic`
+        will attempt to deserialise it by retrieving the data from the URL
+        specified in `href`. Currently, this must be a URL pointing to a 
+        :class:`.Blob` that already exists on this server.
+
+        This validator will only work if the function to resolve URLs to
+        :class:`.BlobData` objects has been set in the context variable. This
+        is done when actions are being invoked over HTTP, or when
+        their outputs are being returned.
+        """
         if self.href == "blob://local":
             if self._data:
                 return self
@@ -170,6 +215,19 @@ class Blob(BaseModel):
 
     @model_serializer(mode="plain", when_used="always")
     def to_dict(self) -> Mapping[str, str]:
+        """Serialise the Blob to a dictionary and make it downloadable
+        
+        When :mod:`pydantic` serialises this object, it will call this method
+        to convert it to a dictionary. There is a significant side-effect, which
+        is that we will add the blob to the :class:`.BlobDataManager` so it 
+        can be downloaded.
+        
+        This serialiser will only work if the function to resolve URLs to
+        :class:`.BlobData` objects has been set in the context variable. This
+        is done when the outputs of actions are being returned.
+
+        Note that the 
+        """
         if self.href == "blob://local":
             try:
                 blobdata_to_url = blobdata_to_url_ctx.get()
