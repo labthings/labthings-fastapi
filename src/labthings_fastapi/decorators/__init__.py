@@ -37,6 +37,7 @@ from typing import Optional, Callable
 from ..descriptors import (
     ActionDescriptor,
     PropertyDescriptor,
+    SettingDescriptor,
     EndpointDescriptor,
     HTTPMethod,
 )
@@ -91,25 +92,24 @@ def thing_property(func: Callable) -> PropertyDescriptor:
         getter=func,
     )
 
-def persistent_thing_property(func: Callable) -> PropertyDescriptor:
-    """Mark a method of a Thing as a Property
+def thing_setting(func: Callable) -> SettingDescriptor:
+    """Mark a method of a Thing as a Setting.
+
+    A setting is a property that persists between runs
 
     We replace the function with a `Descriptor` that's a
-    subclass of `PropertyDescriptor`
-
-    TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+    subclass of `SettingDescriptor`
     """
 
-    class PropertyDescriptorSubclass(PropertyDescriptor):
+    class SettingDescriptorSubclass(SettingDescriptor):
         def __get__(self, obj, objtype=None):
             return super().__get__(obj, objtype)
 
-    return PropertyDescriptorSubclass(
+    return SettingDescriptorSubclass(
         return_type(func),
         readonly=True,
         observable=False,
         getter=func,
-        persistent=True,
     )
 
 
