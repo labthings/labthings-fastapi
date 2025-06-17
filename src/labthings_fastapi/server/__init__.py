@@ -18,7 +18,6 @@ from ..thing import Thing
 from ..thing_description.model import ThingDescription
 from ..dependencies.thing_server import _thing_servers
 from ..outputs.blob import BlobDataManager
-from ..utilities import class_attributes
 
 
 class ThingServer:
@@ -86,11 +85,7 @@ class ThingServer:
         thing._labthings_thing_settings = ThingSettings(
             os.path.join(settings_folder, "settings.json")
         )
-        for name, attribute in class_attributes(thing):
-            if hasattr(attribute, "property_affordance"):
-                if attribute.persistent:
-                    attribute.save_location = os.path.join(settings_folder, "settings.json")
-        thing.attach_to_server(self, path)
+        thing.attach_to_server(self, path, os.path.join(settings_folder, "settings.json"))
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):

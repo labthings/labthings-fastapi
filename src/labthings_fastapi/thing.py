@@ -10,11 +10,15 @@ will do in the future...
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
+import logging
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
+
+from pydantic import BaseModel
+
 from .descriptors import PropertyDescriptor, ActionDescriptor
 from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -34,9 +38,6 @@ class Thing:
     This class should encapsulate the code that runs a piece of hardware, or provides
     a particular function - it will correspond to a path on the server, and a Thing
     Description document.
-
-    Your Thing should be a subclass of Thing - note that we don't define `__init__` so
-    you are free to initialise as you like and don't need to call `super().__init__`.
 
     ## Subclassing Notes
 
@@ -85,10 +86,11 @@ class Thing:
         if hasattr(self, "__exit__"):
             return await run_sync(self.__exit__, exc_t, exc_v, exc_tb)
 
-    def attach_to_server(self, server: ThingServer, path: str):
+    def attach_to_server(self, server: ThingServer, path: str, setting_storage_path: str):
         """Add HTTP handlers to an app for all Interaction Affordances"""
         self.path = path
         self.action_manager: ActionManager = server.action_manager
+        self._setting_storage_path = setting_storage_path
 
         for _name, item in class_attributes(self):
             try:
@@ -112,6 +114,30 @@ class Thing:
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
+
+
+    _settings: Optional[list[str]] = None
+
+    @property
+    def settings(self):
+        if self._settings is None:
+            self._settings = []
+            for name, attribute in class_attributes(self):
+                if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                    self._settings.append(name)
+        return self._settings
+
+    _setting_storage_path: Optional[str] = None
+
+    @property
+    def setting_storage_path(self) -> ThingSettings:
+        """The storage path for settings. This is set at runtime."""
+        return self._setting_storage_path
+
+    def save_settings(self):
+        if self.settings is not None:
+            setting_dict = {name: self.__dict__[name] for name in self.settings}
+            logging.warning(f'This should save {setting_dict} to {self._setting_storage_path}')
 
     _labthings_thing_settings: Optional[ThingSettings] = None
 

@@ -39,7 +39,6 @@ class PropertyDescriptor:
         title: Optional[str] = None,
         getter: Optional[Callable] = None,
         setter: Optional[Callable] = None,
-        persistent: bool = False,
     ):
         if getter and initial_value is not None:
             raise ValueError("getter and an initial value are mutually exclusive.")
@@ -54,7 +53,6 @@ class PropertyDescriptor:
         # The lines below allow _getter and _setter to be specified by subclasses
         self._setter = setter or getattr(self, "_setter", None)
         self._getter = getter or getattr(self, "_getter", None)
-        self.persistent = persistent
         self.save_location = None
         # Try to generate a DataSchema, so that we can raise an error that's easy to
         # link to the offending PropertyDescriptor
@@ -110,8 +108,6 @@ class PropertyDescriptor:
         obj.__dict__[self.name] = value
         if self._setter:
             self._setter(obj, value)
-        if self.persistent:
-            logging.warning(f'This should save {self.name} to {self.save_location}')
         self.emit_changed_event(obj, value)
 
     def _observers_set(self, obj):
@@ -227,3 +223,15 @@ class PropertyDescriptor:
         self._setter = func
         self.readonly = False
         return self
+
+
+class SettingDescriptor(PropertyDescriptor):
+
+    @property
+    def persistent(self):
+        return True
+
+    def __set__(self, obj, value):
+        """Set the property's value"""
+        super().__set__(obj, value)
+        obj.save_settings()
