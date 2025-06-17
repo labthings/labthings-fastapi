@@ -91,6 +91,27 @@ def thing_property(func: Callable) -> PropertyDescriptor:
         getter=func,
     )
 
+def persistent_thing_property(func: Callable) -> PropertyDescriptor:
+    """Mark a method of a Thing as a Property
+
+    We replace the function with a `Descriptor` that's a
+    subclass of `PropertyDescriptor`
+
+    TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+    """
+
+    class PropertyDescriptorSubclass(PropertyDescriptor):
+        def __get__(self, obj, objtype=None):
+            return super().__get__(obj, objtype)
+
+    return PropertyDescriptorSubclass(
+        return_type(func),
+        readonly=True,
+        observable=False,
+        getter=func,
+        persistent=True,
+    )
+
 
 def fastapi_endpoint(method: HTTPMethod, path: Optional[str] = None, **kwargs):
     """Add a function to FastAPI as an endpoint"""
