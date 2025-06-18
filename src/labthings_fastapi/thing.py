@@ -11,6 +11,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
 import logging
+import os
+import json
+from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request
 from anyio.abc import ObjectSendStream
@@ -31,6 +34,7 @@ if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
 
+_LOGGER = logging.getLogger(__name__)
 
 class Thing:
     """Represents a Thing, as defined by the Web of Things standard.
@@ -90,7 +94,7 @@ class Thing:
         """Add HTTP handlers to an app for all Interaction Affordances"""
         self.path = path
         self.action_manager: ActionManager = server.action_manager
-        self._setting_storage_path = setting_storage_path
+        self.load_settings(setting_storage_path)
 
         for _name, item in class_attributes(self):
             try:
@@ -134,11 +138,43 @@ class Thing:
         """The storage path for settings. This is set at runtime."""
         return self._setting_storage_path
 
+    def load_settings(self, setting_storage_path):
+        """Load settings from json. Called when connecting to the server."""
+        # Ensure that the settings path isn't set during loading or saving will be triggered
+        self._setting_storage_path = None
+        thing_name = type(self).__name__
+        if os.path.exists(setting_storage_path):
+            try:
+                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                    setting_dict = json.load(file_obj)
+                setting_attributes = {}
+                for name, attribute in class_attributes(self):
+                    if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                        setting_attributes[name] = attribute
+                for key, value in setting_dict.items():
+                    if key in setting_attributes:
+                        setting_attributes[key].set_without_emit(self, value) 
+                    else:
+                        _LOGGER.warning(
+                            "Cannot set %s from persistent storage as %s has no matching setting.",
+                            key, thing_name
+                        )
+            except (FileNotFoundError, JSONDecodeError, PermissionError):
+                _LOGGER.warning("Error loading settings for %s", thing_name)
+        self._setting_storage_path = setting_storage_path
+
+
     def save_settings(self):
-        """This is automattically called when a setting is updated with a setter"""
+        """Save settings to JSON. This is called when a setting is updated with a setter"""
         if self.settings is not None:
-            setting_dict = {name: getattr(self, name) for name in self.settings}
-            logging.warning(f'This should save {setting_dict} to {self._setting_storage_path}')
+            setting_dict = {}
+            for name, attribute in class_attributes(self):
+                if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                    setting_dict[name] = attribute.get_raw(self)
+            # Dumpy to string before writing so if this fails the file isn't overwritten
+            setting_json = json.dumps(setting_dict, indent=4)
+            with open(self._setting_storage_path, "w", encoding="utf-8") as file_obj:
+                file_obj.write(setting_json)
 
     _labthings_thing_state: Optional[dict] = None
 

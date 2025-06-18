@@ -235,3 +235,22 @@ class SettingDescriptor(PropertyDescriptor):
         """Set the property's value"""
         super().__set__(obj, value)
         obj.save_settings()
+
+    def get_raw(self, obj):
+        """
+        Used to get the raw data for saving settings. Any setting that returns
+        a non-JSON serialisable class should implement a `raw` flag in its getter
+        """
+        #TODO check if has a raw option rather than use a try
+        if self._getter:
+            try:
+                return self._getter(obj, raw=True)
+            except TypeError:
+                return self._getter(obj)
+            return self.__get__(obj)
+
+    def set_without_emit(self, obj, value):
+        """Set the property's value, but do not emit. This is called during initial setup"""
+        obj.__dict__[self.name] = value
+        if self._setter:
+            self._setter(obj, value)
