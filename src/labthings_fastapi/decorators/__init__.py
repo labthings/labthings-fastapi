@@ -92,6 +92,7 @@ def thing_property(func: Callable) -> PropertyDescriptor:
         getter=func,
     )
 
+
 def thing_setting(func: Callable) -> SettingDescriptor:
     """Mark a method of a Thing as a Setting.
 

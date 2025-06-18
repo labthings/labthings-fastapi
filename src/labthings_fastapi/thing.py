@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class Thing:
     """Represents a Thing, as defined by the Web of Things standard.
 
@@ -90,7 +91,9 @@ class Thing:
         if hasattr(self, "__exit__"):
             return await run_sync(self.__exit__, exc_t, exc_v, exc_tb)
 
-    def attach_to_server(self, server: ThingServer, path: str, setting_storage_path: str):
+    def attach_to_server(
+        self, server: ThingServer, path: str, setting_storage_path: str
+    ):
         """Add HTTP handlers to an app for all Interaction Affordances"""
         self.path = path
         self.action_manager: ActionManager = server.action_manager
@@ -119,7 +122,6 @@ class Thing:
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
 
-
     _settings: Optional[list[str]] = None
 
     @property
@@ -127,7 +129,9 @@ class Thing:
         if self._settings is None:
             self._settings = []
             for name, attribute in class_attributes(self):
-                if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                if hasattr(attribute, "property_affordance") and hasattr(
+                    attribute, "persistent"
+                ):
                     self._settings.append(name)
         return self._settings
 
@@ -149,27 +153,31 @@ class Thing:
                     setting_dict = json.load(file_obj)
                 setting_attributes = {}
                 for name, attribute in class_attributes(self):
-                    if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                    if hasattr(attribute, "property_affordance") and hasattr(
+                        attribute, "persistent"
+                    ):
                         setting_attributes[name] = attribute
                 for key, value in setting_dict.items():
                     if key in setting_attributes:
-                        setting_attributes[key].set_without_emit(self, value) 
+                        setting_attributes[key].set_without_emit(self, value)
                     else:
                         _LOGGER.warning(
                             "Cannot set %s from persistent storage as %s has no matching setting.",
-                            key, thing_name
+                            key,
+                            thing_name,
                         )
             except (FileNotFoundError, JSONDecodeError, PermissionError):
                 _LOGGER.warning("Error loading settings for %s", thing_name)
         self._setting_storage_path = setting_storage_path
-
 
     def save_settings(self):
         """Save settings to JSON. This is called when a setting is updated with a setter"""
         if self.settings is not None:
             setting_dict = {}
             for name, attribute in class_attributes(self):
-                if hasattr(attribute, "property_affordance") and hasattr(attribute, "persistent"):
+                if hasattr(attribute, "property_affordance") and hasattr(
+                    attribute, "persistent"
+                ):
                     setting_dict[name] = attribute.get_raw(self)
             # Dumpy to string before writing so if this fails the file isn't overwritten
             setting_json = json.dumps(setting_dict, indent=4)

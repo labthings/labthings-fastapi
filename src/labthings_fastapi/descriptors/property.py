@@ -226,7 +226,6 @@ class PropertyDescriptor:
 
 
 class SettingDescriptor(PropertyDescriptor):
-
     @property
     def persistent(self):
         return True
@@ -241,7 +240,7 @@ class SettingDescriptor(PropertyDescriptor):
         Used to get the raw data for saving settings. Any setting that returns
         a non-JSON serialisable class should implement a `raw` flag in its getter
         """
-        #TODO check if has a raw option rather than use a try
+        # TODO check if has a raw option rather than use a try
         if self._getter:
             try:
                 return self._getter(obj, raw=True)
