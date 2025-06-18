@@ -126,13 +126,13 @@ class Thing:
 
     @property
     def settings(self):
-        if self._settings is None:
-            self._settings = []
-            for name, attribute in class_attributes(self):
-                if hasattr(attribute, "property_affordance") and hasattr(
-                    attribute, "persistent"
-                ):
-                    self._settings.append(name)
+        if self._settings is not None:
+            return self._settings
+
+        self._settings = {}
+        for name, attr in class_attributes(self):
+            if hasattr(attr, "property_affordance") and hasattr(attr, "persistent"):
+                self._settings[name] = attr
         return self._settings
 
     _setting_storage_path: Optional[str] = None
@@ -151,15 +151,9 @@ class Thing:
             try:
                 with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
                     setting_dict = json.load(file_obj)
-                setting_attributes = {}
-                for name, attribute in class_attributes(self):
-                    if hasattr(attribute, "property_affordance") and hasattr(
-                        attribute, "persistent"
-                    ):
-                        setting_attributes[name] = attribute
                 for key, value in setting_dict.items():
-                    if key in setting_attributes:
-                        setting_attributes[key].set_without_emit(self, value)
+                    if key in self.settings:
+                        self.settings[key].set_without_emit(self, value)
                     else:
                         _LOGGER.warning(
                             "Cannot set %s from persistent storage as %s has no matching setting.",
@@ -174,11 +168,11 @@ class Thing:
         """Save settings to JSON. This is called when a setting is updated with a setter"""
         if self.settings is not None:
             setting_dict = {}
-            for name, attribute in class_attributes(self):
-                if hasattr(attribute, "property_affordance") and hasattr(
-                    attribute, "persistent"
-                ):
-                    setting_dict[name] = attribute.get_raw(self)
+            for name in self.settings.keys():
+                value = getattr(self, name)
+                if isinstance(value, BaseModel):
+                    value = value.model_dump()
+                setting_dict[name] = value
             # Dumpy to string before writing so if this fails the file isn't overwritten
             setting_json = json.dumps(setting_dict, indent=4)
             with open(self._setting_storage_path, "w", encoding="utf-8") as file_obj:
