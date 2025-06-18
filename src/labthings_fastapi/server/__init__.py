@@ -81,7 +81,9 @@ class ThingServer:
         # TODO: check for illegal things in `path` - potential security issue.
         settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
         os.makedirs(settings_folder, exist_ok=True)
-        thing.attach_to_server(self, path, os.path.join(settings_folder, "settings.json"))
+        thing.attach_to_server(
+            self, path, os.path.join(settings_folder, "settings.json")
+        )
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI):
