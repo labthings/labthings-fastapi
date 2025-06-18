@@ -13,7 +13,6 @@ from labthings_fastapi.utilities.object_reference_to_object import (
     object_reference_to_object,
 )
 from ..actions import ActionManager
-from ..thing_settings import ThingSettings
 from ..thing import Thing
 from ..thing_description.model import ThingDescription
 from ..dependencies.thing_server import _thing_servers
@@ -82,9 +81,6 @@ class ThingServer:
         # TODO: check for illegal things in `path` - potential security issue.
         settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
         os.makedirs(settings_folder, exist_ok=True)
-        thing._labthings_thing_settings = ThingSettings(
-            os.path.join(settings_folder, "settings.json")
-        )
         thing.attach_to_server(self, path, os.path.join(settings_folder, "settings.json"))
 
     @asynccontextmanager
@@ -117,17 +113,6 @@ class ThingServer:
             for name, thing in self.things.items():
                 # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
-                try:
-                    if thing._labthings_thing_settings:
-                        thing._labthings_thing_settings.write_to_file()
-                except PermissionError:
-                    logging.warning(
-                        f"Could not write {name} settings to disk: permission error."
-                    )
-                except FileNotFoundError:
-                    logging.warning(
-                        f"Could not write {name} settings, folder not found"
-                    )
 
         self.blocking_portal = None
 

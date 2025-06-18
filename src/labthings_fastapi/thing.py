@@ -25,7 +25,7 @@ from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint, WebSocket
-from .thing_settings import ThingSettings
+
 
 if TYPE_CHECKING:
     from .server import ThingServer
@@ -130,29 +130,15 @@ class Thing:
     _setting_storage_path: Optional[str] = None
 
     @property
-    def setting_storage_path(self) -> ThingSettings:
+    def setting_storage_path(self) -> str:
         """The storage path for settings. This is set at runtime."""
         return self._setting_storage_path
 
     def save_settings(self):
+        """This is automattically called when a setting is updated with a setter"""
         if self.settings is not None:
-            setting_dict = {name: self.__dict__[name] for name in self.settings}
+            setting_dict = {name: getattr(self, name) for name in self.settings}
             logging.warning(f'This should save {setting_dict} to {self._setting_storage_path}')
-
-    _labthings_thing_settings: Optional[ThingSettings] = None
-
-    @property
-    def thing_settings(self) -> ThingSettings:
-        """A dictionary that can be used to persist settings between runs"""
-        if self._labthings_thing_settings is None:
-            raise RuntimeError(
-                "Settings may not be accessed before we are attached to the server."
-            )
-        return self._labthings_thing_settings
-
-    @thing_settings.setter
-    def thing_settings(self, newsettings: ThingSettings):
-        self.thing_settings.replace(newsettings)
 
     _labthings_thing_state: Optional[dict] = None
 
