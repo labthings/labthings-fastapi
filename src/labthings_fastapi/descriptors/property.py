@@ -3,7 +3,6 @@ Define an object to represent an Action, as a descriptor.
 """
 
 from __future__ import annotations
-import logging
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
 from typing_extensions import Self
 from labthings_fastapi.utilities.introspection import get_summary, get_docstring
@@ -53,7 +52,6 @@ class PropertyDescriptor:
         # The lines below allow _getter and _setter to be specified by subclasses
         self._setter = setter or getattr(self, "_setter", None)
         self._getter = getter or getattr(self, "_getter", None)
-        self.save_location = None
         # Try to generate a DataSchema, so that we can raise an error that's easy to
         # link to the offending PropertyDescriptor
         type_to_dataschema(self.model)

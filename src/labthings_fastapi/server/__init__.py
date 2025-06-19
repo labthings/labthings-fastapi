@@ -1,5 +1,4 @@
 from __future__ import annotations
-import logging
 from typing import Optional, Sequence, TypeVar
 import os.path
 from fastapi import FastAPI, Request

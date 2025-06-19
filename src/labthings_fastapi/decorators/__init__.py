@@ -75,17 +75,13 @@ def thing_action(func: Optional[Callable] = None, **kwargs):
 def thing_property(func: Callable) -> PropertyDescriptor:
     """Mark a method of a Thing as a Property
 
-    We replace the function with a `Descriptor` that's a
-    subclass of `PropertyDescriptor`
+    Replace the function with a `Descriptor` that's a
+    `PropertyDescriptor`
 
     TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
     """
 
-    class PropertyDescriptorSubclass(PropertyDescriptor):
-        def __get__(self, obj, objtype=None):
-            return super().__get__(obj, objtype)
-
-    return PropertyDescriptorSubclass(
+    return PropertyDescriptor(
         return_type(func),
         readonly=True,
         observable=False,
@@ -98,15 +94,11 @@ def thing_setting(func: Callable) -> SettingDescriptor:
 
     A setting is a property that persists between runs
 
-    We replace the function with a `Descriptor` that's a
-    subclass of `SettingDescriptor`
+    Replace the function with a `Descriptor` that's a
+    `SettingDescriptor`
     """
 
-    class SettingDescriptorSubclass(SettingDescriptor):
-        def __get__(self, obj, objtype=None):
-            return super().__get__(obj, objtype)
-
-    return SettingDescriptorSubclass(
+    return SettingDescriptor(
         return_type(func),
         readonly=True,
         observable=False,
