@@ -22,7 +22,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .descriptors import PropertyDescriptor, ActionDescriptor
+from .descriptors import ThingProperty, ThingSetting, ActionDescriptor
 from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -56,7 +56,7 @@ class Thing:
       code that will close down your hardware. It's equivalent to a `finally:` block.
     * Properties and Actions are defined using decorators: the `@thing_action` decorator
       declares a method to be an action, which will run when it's triggered, and the
-      `@thing_property` decorator (or `PropertyDescriptor` descriptor) does the same for
+      `@thing_property` decorator (or `ThingProperty` descriptor) does the same for
       a property. See the documentation on those functions for more detail.
     * `title` will be used in various places as the human-readable name of your Thing,
       so it makes sense to set this in a subclass.
@@ -131,7 +131,7 @@ class Thing:
 
         self._settings = {}
         for name, attr in class_attributes(self):
-            if hasattr(attr, "property_affordance") and hasattr(attr, "persistent"):
+            if isinstance(attr, ThingSetting):
                 self._settings[name] = attr
         return self._settings
 
@@ -264,7 +264,7 @@ class Thing:
     def observe_property(self, property_name: str, stream: ObjectSendStream):
         """Register a stream to receive property change notifications"""
         prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, PropertyDescriptor):
+        if not isinstance(prop, ThingProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
 

@@ -36,8 +36,8 @@ from functools import wraps, partial
 from typing import Optional, Callable
 from ..descriptors import (
     ActionDescriptor,
-    PropertyDescriptor,
-    SettingDescriptor,
+    ThingProperty,
+    ThingSetting,
     EndpointDescriptor,
     HTTPMethod,
 )
@@ -72,16 +72,18 @@ def thing_action(func: Optional[Callable] = None, **kwargs):
         return partial(mark_thing_action, **kwargs)
 
 
-def thing_property(func: Callable) -> PropertyDescriptor:
+def thing_property(func: Callable) -> ThingProperty:
     """Mark a method of a Thing as a Property
 
-    Replace the function with a `Descriptor` that's a
-    `PropertyDescriptor`
-
-    TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+    As properties are accessed over the HTTP API they need to be JSON serialisable
+    only return standard python types, or Pydantic BaseModels
     """
 
-    return PropertyDescriptor(
+    # Replace the function with a `Descriptor` that's a `ThingProperty`
+
+    # TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+
+    return ThingProperty(
         return_type(func),
         readonly=True,
         observable=False,
@@ -89,16 +91,23 @@ def thing_property(func: Callable) -> PropertyDescriptor:
     )
 
 
-def thing_setting(func: Callable) -> SettingDescriptor:
+def thing_setting(func: Callable) -> ThingSetting:
     """Mark a method of a Thing as a Setting.
 
-    A setting is a property that persists between runs
+    When creating a Setting you must always create a setter as it is used to load
+    from disk.
 
-    Replace the function with a `Descriptor` that's a
-    `SettingDescriptor`
+    A setting is a property that persists between runs.
+
+    As settings are accessed over the HTTP API and saved to disk they need to be
+    JSON serialisable only return standard python types, or Pydantic BaseModels.
+
+    If the type is a pydantic BaseModel, then the setter must also be able to accept
+    the dictionary representation of this BaseModel as this is what will be used to
+    set the Setting when loading from disk on starting the server.
     """
-
-    return SettingDescriptor(
+    # Replace the function with a `Descriptor` that's a `ThingSetting`
+    return ThingSetting(
         return_type(func),
         readonly=True,
         observable=False,
