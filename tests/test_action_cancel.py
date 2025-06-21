@@ -8,12 +8,12 @@ from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, task_href
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import PropertyDescriptor
+from labthings_fastapi.descriptors import ThingProperty
 from labthings_fastapi.dependencies.invocation import CancelHook
 
 
 class ThingOne(Thing):
-    counter = PropertyDescriptor(int, 0, observable=False)
+    counter = ThingProperty(int, 0, observable=False)
 
     @thing_action
     def count_slowly(self, cancel: CancelHook, n: int = 10):

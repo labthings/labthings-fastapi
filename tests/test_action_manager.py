@@ -6,7 +6,7 @@ from temp_client import poll_task
 import time
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import PropertyDescriptor
+from labthings_fastapi.descriptors import ThingProperty
 
 
 class TestThing(Thing):
@@ -15,7 +15,7 @@ class TestThing(Thing):
         """Increment the counter"""
         self.counter += 1
 
-    counter = PropertyDescriptor(
+    counter = ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
