@@ -73,16 +73,17 @@ def thing_action(func: Optional[Callable] = None, **kwargs):
 
 
 def thing_property(func: Callable) -> ThingProperty:
-    """Mark a method of a Thing as a Property
+    """Mark a method of a Thing as a LabThings Property
+
+    This should be used as a decorator with a getter and a setter
+    just like a standard python property decorator. If extra functionality
+    is not required in the decorator, then using the ThingProperty class
+    directly may allow for clearer code
 
     As properties are accessed over the HTTP API they need to be JSON serialisable
     only return standard python types, or Pydantic BaseModels
     """
-
     # Replace the function with a `Descriptor` that's a `ThingProperty`
-
-    # TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
-
     return ThingProperty(
         return_type(func),
         readonly=True,
@@ -92,12 +93,17 @@ def thing_property(func: Callable) -> ThingProperty:
 
 
 def thing_setting(func: Callable) -> ThingSetting:
-    """Mark a method of a Thing as a Setting.
-
-    When creating a Setting you must always create a setter as it is used to load
-    from disk.
+    """Mark a method of a Thing as a LabThings Setting.
 
     A setting is a property that persists between runs.
+
+    This should be used as a decorator with a getter and a setter
+    just like a standard python property decorator. If extra functionality
+    is not required in the decorator, then using the ThingSetting class
+    directly may allow for clearer code
+
+    When creating a Setting using this decorator you must always create a setter
+    as it is used to load the value from disk.
 
     As settings are accessed over the HTTP API and saved to disk they need to be
     JSON serialisable only return standard python types, or Pydantic BaseModels.
