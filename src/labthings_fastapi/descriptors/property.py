@@ -232,6 +232,7 @@ class ThingSetting(ThingProperty):
 
     The setting otherwise acts just like a normal variable.
     """
+
     @property
     def persistent(self):
         return True
