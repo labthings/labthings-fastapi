@@ -3,7 +3,7 @@ import threading
 
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
-from labthings_fastapi.descriptors.property import PropertyDescriptor
+from labthings_fastapi.descriptors.property import ThingProperty
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action, thing_property
 from labthings_fastapi.server import ThingServer
@@ -279,7 +279,7 @@ class OpenCVCamera(Thing):
         with self._cap_lock:
             self._cap.set(cv.CAP_PROP_EXPOSURE, value)
 
-    last_frame_index = PropertyDescriptor(int, initial_value=-1)
+    last_frame_index = ThingProperty(int, initial_value=-1)
 
     mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
 

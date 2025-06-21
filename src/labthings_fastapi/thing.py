@@ -10,22 +10,31 @@ will do in the future...
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from collections.abc import Mapping
+import logging
+import os
+import json
+from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
-from .descriptors import PropertyDescriptor, ActionDescriptor
+
+from pydantic import BaseModel
+
+from .descriptors import ThingProperty, ThingSetting, ActionDescriptor
 from .thing_description.model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint, WebSocket
-from .thing_settings import ThingSettings
+
 
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Thing:
@@ -34,9 +43,6 @@ class Thing:
     This class should encapsulate the code that runs a piece of hardware, or provides
     a particular function - it will correspond to a path on the server, and a Thing
     Description document.
-
-    Your Thing should be a subclass of Thing - note that we don't define `__init__` so
-    you are free to initialise as you like and don't need to call `super().__init__`.
 
     ## Subclassing Notes
 
@@ -50,7 +56,7 @@ class Thing:
       code that will close down your hardware. It's equivalent to a `finally:` block.
     * Properties and Actions are defined using decorators: the `@thing_action` decorator
       declares a method to be an action, which will run when it's triggered, and the
-      `@thing_property` decorator (or `PropertyDescriptor` descriptor) does the same for
+      `@thing_property` decorator (or `ThingProperty` descriptor) does the same for
       a property. See the documentation on those functions for more detail.
     * `title` will be used in various places as the human-readable name of your Thing,
       so it makes sense to set this in a subclass.
@@ -85,10 +91,24 @@ class Thing:
         if hasattr(self, "__exit__"):
             return await run_sync(self.__exit__, exc_t, exc_v, exc_tb)
 
-    def attach_to_server(self, server: ThingServer, path: str):
-        """Add HTTP handlers to an app for all Interaction Affordances"""
+    def attach_to_server(
+        self, server: ThingServer, path: str, setting_storage_path: str
+    ):
+        """Attatch this thing to the server.
+
+        Things need to be attached to a server before use to function correctly.
+
+        :param server: The server to attach this Thing to
+        :param settings_storage_path: The path on disk to save the any Thing Settings
+        to. This should be the path to a json file. If it does not exist it will be
+        created.
+
+        Wc3 Web Of Things explanation:
+        This will add HTTP handlers to an app for all Interaction Affordances
+        """
         self.path = path
         self.action_manager: ActionManager = server.action_manager
+        self.load_settings(setting_storage_path)
 
         for _name, item in class_attributes(self):
             try:
@@ -113,20 +133,70 @@ class Thing:
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
 
-    _labthings_thing_settings: Optional[ThingSettings] = None
+    # A private variable to hold the list of settings so it doesn't need to be
+    # iterated through each time it is read
+    _settings_store: Optional[dict[str, ThingSetting]] = None
 
     @property
-    def thing_settings(self) -> ThingSettings:
-        """A dictionary that can be used to persist settings between runs"""
-        if self._labthings_thing_settings is None:
-            raise RuntimeError(
-                "Settings may not be accessed before we are attached to the server."
-            )
-        return self._labthings_thing_settings
+    def _settings(self) -> Optional[dict[str, ThingSetting]]:
+        """A private property that returns a dict of all settings for this Thing
 
-    @thing_settings.setter
-    def thing_settings(self, newsettings: ThingSettings):
-        self.thing_settings.replace(newsettings)
+        Each dict key is the name of the setting, the corresponding value is the
+        ThingSetting class (a descriptor). This can be used to directly get the
+        descriptor so that the value can be set without emitting signals, such
+        as on startup.
+        """
+        if self._settings_store is not None:
+            return self._settings_store
+
+        self._settings_store = {}
+        for name, attr in class_attributes(self):
+            if isinstance(attr, ThingSetting):
+                self._settings_store[name] = attr
+        return self._settings_store
+
+    _setting_storage_path: Optional[str] = None
+
+    @property
+    def setting_storage_path(self) -> Optional[str]:
+        """The storage path for settings. This is set as the Thing is added to a server"""
+        return self._setting_storage_path
+
+    def load_settings(self, setting_storage_path):
+        """Load settings from json. This is run when the Thing is added to a server"""
+        # Ensure that the settings path isn't set during loading or saving will be triggered
+        self._setting_storage_path = None
+        thing_name = type(self).__name__
+        if os.path.exists(setting_storage_path):
+            try:
+                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                    setting_dict = json.load(file_obj)
+                for key, value in setting_dict.items():
+                    if key in self._settings:
+                        self._settings[key].set_without_emit(self, value)
+                    else:
+                        _LOGGER.warning(
+                            "Cannot set %s from persistent storage as %s has no matching setting.",
+                            key,
+                            thing_name,
+                        )
+            except (FileNotFoundError, JSONDecodeError, PermissionError):
+                _LOGGER.warning("Error loading settings for %s", thing_name)
+        self._setting_storage_path = setting_storage_path
+
+    def save_settings(self):
+        """Save settings to JSON. This is called whenever a setting is updated"""
+        if self._settings is not None:
+            setting_dict = {}
+            for name in self._settings.keys():
+                value = getattr(self, name)
+                if isinstance(value, BaseModel):
+                    value = value.model_dump()
+                setting_dict[name] = value
+            # Dumpy to string before writing so if this fails the file isn't overwritten
+            setting_json = json.dumps(setting_dict, indent=4)
+            with open(self._setting_storage_path, "w", encoding="utf-8") as file_obj:
+                file_obj.write(setting_json)
 
     _labthings_thing_state: Optional[dict] = None
 
@@ -214,7 +284,7 @@ class Thing:
     def observe_property(self, property_name: str, stream: ObjectSendStream):
         """Register a stream to receive property change notifications"""
         prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, PropertyDescriptor):
+        if not isinstance(prop, ThingProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
 

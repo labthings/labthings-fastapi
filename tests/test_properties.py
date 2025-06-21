@@ -1,4 +1,4 @@
-from labthings_fastapi.descriptors import PropertyDescriptor
+from labthings_fastapi.descriptors import ThingProperty
 from labthings_fastapi.decorators import thing_property, thing_action
 from labthings_fastapi.thing import Thing
 from fastapi.testclient import TestClient
@@ -9,8 +9,8 @@ from pydantic import BaseModel
 
 
 class TestThing(Thing):
-    boolprop = PropertyDescriptor(bool, False, description="A boolean property")
-    stringprop = PropertyDescriptor(str, "foo", description="A string property")
+    boolprop = ThingProperty(bool, False, description="A boolean property")
+    stringprop = ThingProperty(str, "foo", description="A string property")
 
     _undoc = None
 
@@ -44,7 +44,7 @@ server.add_thing(thing, "/thing")
 
 
 def test_instantiation_with_type():
-    prop = PropertyDescriptor(bool, False)
+    prop = ThingProperty(bool, False)
     assert issubclass(prop.model, BaseModel)
 
 
@@ -53,7 +53,7 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = PropertyDescriptor(MyModel, MyModel())
+    prop = ThingProperty(MyModel, MyModel())
     assert prop.model is MyModel
 
 
@@ -65,7 +65,7 @@ def test_property_get_and_set():
         assert after_value.json() == test_str
 
 
-def test_propertydescriptor():
+def test_ThingProperty():
     with TestClient(server.app) as client:
         r = client.get("/thing/boolprop")
         assert r.json() is False

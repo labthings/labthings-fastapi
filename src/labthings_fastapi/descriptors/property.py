@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from ..thing import Thing
 
 
-class PropertyDescriptor:
+class ThingProperty:
     """A property that can be accessed via the HTTP API
 
-    By default, a PropertyDescriptor is "dumb", i.e. it acts just like
+    By default, a ThingProperty is "dumb", i.e. it acts just like
     a normal variable.
     """
 
@@ -53,7 +53,7 @@ class PropertyDescriptor:
         self._setter = setter or getattr(self, "_setter", None)
         self._getter = getter or getattr(self, "_getter", None)
         # Try to generate a DataSchema, so that we can raise an error that's easy to
-        # link to the offending PropertyDescriptor
+        # link to the offending ThingProperty
         type_to_dataschema(self.model)
 
     def __set_name__(self, owner, name: str):
@@ -214,10 +214,36 @@ class PropertyDescriptor:
     def setter(self, func: Callable) -> Self:
         """Decorator to set the property's value
 
-        PropertyDescriptors are variabes - so they will return the value they hold
+        ThingPropertys are variabes - so they will return the value they hold
         when they are accessed. However, they can run code when they are set: this
         decorator sets a function as that code.
         """
         self._setter = func
         self.readonly = False
         return self
+
+
+class ThingSetting(ThingProperty):
+    """A setting can be accessed via the HTTP API and is persistent between sessions
+
+    A ThingSetting is a ThingProperty with extra functionality for triggering
+    a Thing to save its settings.
+
+    The setting otherwise acts just like a normal variable.
+    """
+
+    def __set__(self, obj, value):
+        """Set the property's value"""
+        super().__set__(obj, value)
+        obj.save_settings()
+
+    def set_without_emit(self, obj, value):
+        """Set the property's value, but do not emit event to notify the server
+
+        This function is not expected to be used externally. It is called during
+        initial setup so that the setting can be set from disk before the server
+        is fully started.
+        """
+        obj.__dict__[self.name] = value
+        if self._setter:
+            self._setter(obj, value)

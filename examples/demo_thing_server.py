@@ -4,7 +4,7 @@ from typing import Optional, Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.server import ThingServer
-from labthings_fastapi.descriptors import PropertyDescriptor
+from labthings_fastapi.descriptors import ThingProperty
 from pydantic import Field
 from fastapi.responses import HTMLResponse
 
@@ -60,11 +60,11 @@ class MyThing(Thing):
             time.sleep(1)
             self.increment_counter()
 
-    counter = PropertyDescriptor(
+    counter = ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
-    foo = PropertyDescriptor(
+    foo = ThingProperty(
         model=str,
         initial_value="Example",
         description="A pointless string for demo purposes.",
