@@ -94,7 +94,18 @@ class Thing:
     def attach_to_server(
         self, server: ThingServer, path: str, setting_storage_path: str
     ):
-        """Add HTTP handlers to an app for all Interaction Affordances"""
+        """Attatch this thing to the server.
+
+        Things need to be attached to a server before use to function correctly.
+
+        :param server: The server to attach this Thing to
+        :param settings_storage_path: The path on disk to save the any Thing Settings
+        to. This should be the path to a json file. If it does not exist it will be
+        created.
+
+        Wc3 Web Of Things explanation:
+        This will add HTTP handlers to an app for all Interaction Affordances
+        """
         self.path = path
         self.action_manager: ActionManager = server.action_manager
         self.load_settings(setting_storage_path)
@@ -122,28 +133,37 @@ class Thing:
         async def websocket(ws: WebSocket):
             await websocket_endpoint(self, ws)
 
-    _settings: Optional[list[str]] = None
+    # A private variable to hold the list of settings so it doesn't need to be
+    # iterated through each time it is read
+    _settings_store: Optional[dict[str, ThingSetting]] = None
 
     @property
-    def settings(self):
-        if self._settings is not None:
-            return self._settings
+    def _settings(self) -> Optional[dict[str, ThingSetting]]:
+        """A private property that returns a dict of all settings for this Thing
 
-        self._settings = {}
+        Each dict key is the name of the setting, the corresponding value is the
+        ThingSetting class (a descriptor). This can be used to directly get the
+        descriptor so that the value can be set without emitting signals, such
+        as on startup.
+        """
+        if self._settings_store is not None:
+            return self._settings_store
+
+        self._settings_store = {}
         for name, attr in class_attributes(self):
             if isinstance(attr, ThingSetting):
-                self._settings[name] = attr
-        return self._settings
+                self._settings_store[name] = attr
+        return self._settings_store
 
     _setting_storage_path: Optional[str] = None
 
     @property
     def setting_storage_path(self) -> Optional[str]:
-        """The storage path for settings. This is set at runtime."""
+        """The storage path for settings. This is set as the Thing is added to a server"""
         return self._setting_storage_path
 
     def load_settings(self, setting_storage_path):
-        """Load settings from json. Called when connecting to the server."""
+        """Load settings from json. This is run when the Thing is added to a server"""
         # Ensure that the settings path isn't set during loading or saving will be triggered
         self._setting_storage_path = None
         thing_name = type(self).__name__
@@ -152,8 +172,8 @@ class Thing:
                 with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
                     setting_dict = json.load(file_obj)
                 for key, value in setting_dict.items():
-                    if key in self.settings:
-                        self.settings[key].set_without_emit(self, value)
+                    if key in self._settings:
+                        self._settings[key].set_without_emit(self, value)
                     else:
                         _LOGGER.warning(
                             "Cannot set %s from persistent storage as %s has no matching setting.",
@@ -165,10 +185,10 @@ class Thing:
         self._setting_storage_path = setting_storage_path
 
     def save_settings(self):
-        """Save settings to JSON. This is called when a setting is updated with a setter"""
-        if self.settings is not None:
+        """Save settings to JSON. This is called whenever a setting is updated"""
+        if self._settings is not None:
             setting_dict = {}
-            for name in self.settings.keys():
+            for name in self._settings.keys():
                 value = getattr(self, name)
                 if isinstance(value, BaseModel):
                     value = value.model_dump()

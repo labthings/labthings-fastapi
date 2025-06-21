@@ -227,15 +227,10 @@ class ThingSetting(ThingProperty):
     """A setting can be accessed via the HTTP API and is persistent between sessions
 
     A ThingSetting is a ThingProperty with extra functionality for triggering
-    a Thing to save its settings, and for setting a property without emitting an event so
-    that the setting can be set from disk before the server is fully started.
+    a Thing to save its settings.
 
     The setting otherwise acts just like a normal variable.
     """
-
-    @property
-    def persistent(self):
-        return True
 
     def __set__(self, obj, value):
         """Set the property's value"""
@@ -243,7 +238,12 @@ class ThingSetting(ThingProperty):
         obj.save_settings()
 
     def set_without_emit(self, obj, value):
-        """Set the property's value, but do not emit. This is called during initial setup"""
+        """Set the property's value, but do not emit event to notify the server
+
+        This function is not expected to be used externally. It is called during
+        initial setup so that the setting can be set from disk before the server
+        is fully started.
+        """
         obj.__dict__[self.name] = value
         if self._setter:
             self._setter(obj, value)
