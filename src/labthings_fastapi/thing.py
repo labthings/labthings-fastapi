@@ -138,7 +138,7 @@ class Thing:
     _setting_storage_path: Optional[str] = None
 
     @property
-    def setting_storage_path(self) -> str:
+    def setting_storage_path(self) -> Optional[str]:
         """The storage path for settings. This is set at runtime."""
         return self._setting_storage_path
 
