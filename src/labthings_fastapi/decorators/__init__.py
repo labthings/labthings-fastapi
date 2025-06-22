@@ -111,6 +111,12 @@ def thing_setting(func: Callable) -> ThingSetting:
     If the type is a pydantic BaseModel, then the setter must also be able to accept
     the dictionary representation of this BaseModel as this is what will be used to
     set the Setting when loading from disk on starting the server.
+
+    Note: If a setting updated, rather than explicitly set this will not trigger saving.
+    For example: if a Thing has a setting called `dictsetting` holding the dictionary
+    `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
+    but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
+    called.
     """
     # Replace the function with a `Descriptor` that's a `ThingSetting`
     return ThingSetting(

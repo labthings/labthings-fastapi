@@ -16,6 +16,9 @@ from labthings_fastapi.server import ThingServer
 class TestThing(Thing):
     boolsetting = ThingSetting(bool, False, description="A boolean setting")
     stringsetting = ThingSetting(str, "foo", description="A string setting")
+    dictsetting = ThingSetting(
+        dict, {"a": 1, "b": 2}, description="A dictionary setting"
+    )
 
     _float = 1.0
 
@@ -42,15 +45,20 @@ def _get_setting_file(server, thingpath):
     return os.path.normpath(path)
 
 
-def _settings_dict(boolsetting=False, floatsetting=1.0, stringsetting="foo"):
+def _settings_dict(
+    boolsetting=False, floatsetting=1.0, stringsetting="foo", dictsetting=None
+):
     """Return the expected settings dictionary
 
     Parameters can be updated from default values
     """
+    if dictsetting is None:
+        dictsetting = {"a": 1, "b": 2}
     return {
         "boolsetting": boolsetting,
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
+        "dictsetting": dictsetting,
     }
 
 
@@ -89,6 +97,37 @@ def test_settings_save(thing, server):
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
+
+
+def test_settings_dict_save(thing, server):
+    """Check settings are saved if the dict is updated in full"""
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    # No setting file created when first added
+    assert not os.path.isfile(setting_file)
+    with TestClient(server.app):
+        thing.dictsetting = {"c": 3}
+        assert os.path.isfile(setting_file)
+        with open(setting_file, "r", encoding="utf-8") as file_obj:
+            # Check settings on file match expected dictionary
+            assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
+
+
+def test_settings_dict_internal_update(thing, server):
+    """Confirm settings are not saved if the internal value of a dictionary is updated
+
+    This behaviour is not ideal, but it is documented. If the behaviour is updated
+    then the documentation should be updated and this test removed
+    """
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    # No setting file created when first added
+    assert not os.path.isfile(setting_file)
+    with TestClient(server.app):
+        thing.dictsetting["a"] = 4
+        # As only an internal member of the dictornary was set, the saving was not
+        # triggered.
+        assert not os.path.isfile(setting_file)
 
 
 def test_settings_load(thing, server):
