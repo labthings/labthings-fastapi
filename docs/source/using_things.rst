@@ -5,6 +5,8 @@ The interface to a `Thing` is defined by its actions, properties and events [#ev
 
 :class:`.ThingClient` subclasses can be generated dynamically from a URL using :meth:`.ThingClient.from_url`. This creates an object with the right methods, properties and docstrings, though type hints are often missing. The client can be "introspected" to explore its methods and properties using tools that work at run-time (e.g. autocompletion in a Jupyter notebook), but "static" analysis tools will not yet work.
 
+.. [#events] Events are not yet implemented.
+
 Using Things from other languages
 ----------------------------------
 
@@ -16,8 +18,6 @@ Dynamic class generation
 -------------------------
 
 The object returned by :meth:`.ThingClient.from_url` is an instance of a dynamically-created subclass of :class:`.ThingClient`. Dynamically creating the class is needed because we don't know what the methods and properties should be until we have downloaded the Thing Description. However, this means most code autocompletion tools, type checkers, and linters will not work well with these classes. In the future, LabThings-FastAPI will generate custom client subclasses that can be shared in client modules, which should fix these problems (see below).
-
-.. [#events] Events are not yet implemented.
 
 Using Things from other Things
 ------------------------------
