@@ -132,7 +132,12 @@ class ThingProperty:
         """
         runner = obj._labthings_blocking_portal
         if not runner:
-            raise NotConnectedToServerError("Can't emit without a blocking portal")
+            thing_name = obj.__class__.__name__
+            msg = (
+                f"Cannot emit property updated changed event. Is {thing_name} "
+                "connected to a running server?"
+            )
+            raise NotConnectedToServerError(msg)
         runner.start_task_soon(
             self.emit_changed_event_async,
             obj,
