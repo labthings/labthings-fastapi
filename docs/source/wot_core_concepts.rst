@@ -1,7 +1,7 @@
-Core Concepts
-=============
+Web of Things Core Concepts
+===========================
 
-LabThings is rooted in the `W3C Web of Things standards <WoT>`_. Using IP networking in labs is not itself new, though perhaps under-used. However lack of proper standardisation has stiffled widespread adoption. LabThings, rather than try to introduce new competing standards, uses the architecture and terminology introduced by the W3C Web of Things. A full description of the core architecture can be found in the `Web of Things (WoT) Architecture <https://www.w3.org/TR/wot-architecture/#sec-wot-architecture>`_ document. However, a brief outline of the concepts relevant to `labthings-fastapi` is given below.
+LabThings is rooted in the `W3C Web of Things standards <WoT>`_. Using IP networking in labs is not new, though perhaps under-used. However lack of proper standardisation has stiffled widespread adoption. LabThings, rather than try to introduce new competing standards, uses the architecture and terminology introduced by the W3C Web of Things. A full description of the core architecture can be found in the `Web of Things (WoT) Architecture <https://www.w3.org/TR/wot-architecture/#sec-wot-architecture>`_ document. However, a brief outline of the concepts relevant to `labthings-fastapi` is given below.
 
 Thing
 ---------
