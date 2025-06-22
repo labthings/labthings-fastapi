@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Optional, Sequence, TypeVar
 import os.path
+import re
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
@@ -16,6 +18,11 @@ from ..thing import Thing
 from ..thing_description.model import ThingDescription
 from ..dependencies.thing_server import _thing_servers
 from ..outputs.blob import BlobDataManager
+
+# A path should be made up of names separated by / as a path separator.
+# Each name should be made of alphanumeric characters, hyphen, or underscore.
+# This regex enforces a trailing /
+PATH_REGEX = re.compile(r"^/([a-zA-Z0-9\-_]+\/)+$")
 
 
 class ThingServer:
@@ -71,13 +78,26 @@ class ThingServer:
         )
 
     def add_thing(self, thing: Thing, path: str):
-        """Add a thing to the server"""
+        """Add a thing to the server
+
+        :param thing: The thing to add to the server.
+        :param path: the relative path to access the thing on the server. Must only
+        contain alphanumeric characters, hyphens, or underscores.
+        """
+        # Ensure leading and trailing /
         if not path.endswith("/"):
             path += "/"
+        if not path.startswith("/"):
+            path = "/" + path
+        if PATH_REGEX.match(path) is None:
+            msg = (
+                f"{path} contains unsafe characters. Use only alphanumeric "
+                "characters, hyphens and underscores"
+            )
+            raise ValueError(msg)
         if path in self._things:
             raise KeyError(f"{path} has already been added to this thing server.")
         self._things[path] = thing
-        # TODO: check for illegal things in `path` - potential security issue.
         settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
         os.makedirs(settings_folder, exist_ok=True)
         thing.attach_to_server(

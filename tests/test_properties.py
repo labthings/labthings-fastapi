@@ -1,11 +1,14 @@
+from threading import Thread
+
+from pytest import raises
+from pydantic import BaseModel
+from fastapi.testclient import TestClient
+
 from labthings_fastapi.descriptors import ThingProperty
 from labthings_fastapi.decorators import thing_property, thing_action
 from labthings_fastapi.thing import Thing
-from fastapi.testclient import TestClient
 from labthings_fastapi.server import ThingServer
-from threading import Thread
-from pytest import raises
-from pydantic import BaseModel
+from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
 class TestThing(Thing):
@@ -44,6 +47,12 @@ server.add_thing(thing, "/thing")
 
 
 def test_instantiation_with_type():
+    """
+    Check the internal model (data type) of the ThingSetting descriptor is a BaseModel
+
+    To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
+    types.
+    """
     prop = ThingProperty(bool, False)
     assert issubclass(prop.model, BaseModel)
 
@@ -117,8 +126,11 @@ def test_setting_from_thread():
 
 
 def test_setting_without_event_loop():
+    """Test that an exception is raised if updating a ThingProperty
+    without connecting the Thing to a running server with an event loop.
+    """
     # This test may need to change, if we change the intended behaviour
     # Currently it should never be necessary to change properties from the
     # main thread, so we raise an error if you try to do so
-    with raises(RuntimeError):
+    with raises(NotConnectedToServerError):
         thing.boolprop = False  # Can't call it until the event loop's running

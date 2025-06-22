@@ -6,8 +6,11 @@ from __future__ import annotations
 from functools import partial
 import inspect
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, overload
+from weakref import WeakSet
+
 from fastapi import Body, FastAPI, Request, BackgroundTasks
 from pydantic import create_model
+
 from ..actions import InvocationModel
 from ..dependencies.invocation import CancelHook, InvocationID
 from ..dependencies.action_manager import ActionManagerContextDep
@@ -23,9 +26,8 @@ from ..utilities.introspection import (
 from ..outputs.blob import BlobIOContextDep
 from ..thing_description import type_to_dataschema
 from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
-
-from weakref import WeakSet
 from ..utilities import labthings_data, get_blocking_portal
+from ..exceptions import NotConnectedToServerError
 
 if TYPE_CHECKING:
     from ..thing import Thing
@@ -129,12 +131,23 @@ class ActionDescriptor:
     def emit_changed_event(self, obj, status):
         """Notify subscribers that the action status has changed
 
-        NB this function **must** be run from a thread, not the event loop.
+        This function is run from within the `Invocation` thread that
+        is created when an action is called. It must be run from this thread
+        as it is communicating with the event loop via an `asyncio` blocking
+        portal.
+
+        :raises NotConnectedToServerError: if the Thing calling the action is not
+        connected to a server with a running event loop.
         """
         try:
             runner = get_blocking_portal(obj)
             if not runner:
-                raise RuntimeError("Can't emit without a blocking portal")
+                thing_name = obj.__class__.__name__
+                msg = (
+                    f"Cannot emit action changed event. Is {thing_name} connected to "
+                    "a running server?"
+                )
+                raise NotConnectedToServerError(msg)
             runner.start_task_soon(
                 self.emit_changed_event_async,
                 obj,

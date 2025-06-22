@@ -4,14 +4,17 @@ Define an object to represent an Action, as a descriptor.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
+from weakref import WeakSet
+
 from typing_extensions import Self
-from labthings_fastapi.utilities.introspection import get_summary, get_docstring
 from pydantic import BaseModel, RootModel
 from fastapi import Body, FastAPI
-from weakref import WeakSet
+
 from ..utilities import labthings_data, wrap_plain_types_in_rootmodel
+from ..utilities.introspection import get_summary, get_docstring
 from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..thing_description import type_to_dataschema
+from ..exceptions import NotConnectedToServerError
 
 
 if TYPE_CHECKING:
@@ -118,11 +121,18 @@ class ThingProperty:
     def emit_changed_event(self, obj: Thing, value: Any) -> None:
         """Notify subscribers that the property has changed
 
-        NB this function **must** be run from a thread, not the event loop.
+        This function is run when properties are upadated. It must be run from
+        within a thread. This could be the `Invocation` thread of a running action, or
+        the property should be updated over via a client/http. It must be run from a
+        thread as it is communicating with the event loop via an `asyncio` blocking
+        portal.
+
+        :raises NotConnectedToServerError: if the Thing that is calling the property
+        update is not connected to a server with a running event loop.
         """
         runner = obj._labthings_blocking_portal
         if not runner:
-            raise RuntimeError("Can't emit without a blocking portal")
+            raise NotConnectedToServerError("Can't emit without a blocking portal")
         runner.start_task_soon(
             self.emit_changed_event_async,
             obj,
