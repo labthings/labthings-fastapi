@@ -10,20 +10,25 @@ At its core LabThings FastAPI is a server-based framework. To use LabThings Fast
 
 The server API is accessed over an HTTP requests, allowing client code (see below) to be written in any language that can send an HTTP request.
 
-Client Code
------------
-
-Clients or client code (Not to be confused with a :class:`.ThingClient`, see below) is the terminology used to describe any software that uses HTTP requests to access the LabThing Server. Clients can be written in any language that supports an HTTP request. However, LabThings FastAPI provides additional functionality that makes writing client code in Python easier.
-
 Everything is a Thing
 ---------------------
 
-As described in :doc:`wot_core_concepts`, a Thing represents a piece of hardware or software. LabThings-FastAPI automatically generates a `Thing Description`_ to describe each Thing. Each function offered by the Thing is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
+As described in :doc:`wot_core_concepts`, a Thing represents a piece of hardware or software. LabThings-FastAPI automatically generates a `Thing Description`_ to describe each Thing. Each function offered by the Thing is either a Property or Action (LabThings-FastAPI does not yet support Events). These are termed "interaction affordances" in WoT_ terminology.
 
 Code on the LabThings FastAPI Server is composed of Things, however these can call generic Python functions/classes. The entire HTTP API served by the server is defined by :class:`.Thing` objects. As such the full API is composed of the actions and properties (and perhaps eventually events) defined in each Thing.
 
 _`Thing Description`: wot_core_concepts#thing
 _`WoT`: wot_core_concepts
+
+Properties vs Settings
+----------------------
+
+A Thing in LabThings-FastAPI can have Settings as well as Properties. "Setting" is LabThings-FastAPI terminology for a "Property" with a value that persists after the server is restarted. All Settings are Properties, and -- except for persisting after a server restart -- Settings are identical to any other Properties.
+
+Client Code
+-----------
+
+Clients or client code (Not to be confused with a :class:`.ThingClient`, see below) is the terminology used to describe any software that uses HTTP requests to access the LabThing Server. Clients can be written in any language that supports an HTTP request. However, LabThings FastAPI provides additional functionality that makes writing client code in Python easier.
 
 ThingClients
 ------------
