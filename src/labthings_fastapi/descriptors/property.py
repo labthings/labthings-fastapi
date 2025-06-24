@@ -229,7 +229,7 @@ class ThingProperty:
     def setter(self, func: Callable) -> Self:
         """Decorator to set the property's value
 
-        ThingPropertys are variables - so they will return the value they hold
+        ``ThingProperty`` descriptors return the value they hold
         when they are accessed. However, they can run code when they are set: this
         decorator sets a function as that code.
         """
@@ -244,7 +244,7 @@ class ThingSetting(ThingProperty):
     A ThingSetting is a ThingProperty with extra functionality for triggering
     a Thing to save its settings.
 
-    Note: If a setting updated, rather than explicitly set this will not trigger saving.
+    Note: If a setting is mutated rather than assigned to, this will not trigger saving.
     For example: if a Thing has a setting called `dictsetting` holding the dictionary
     `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
     but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never

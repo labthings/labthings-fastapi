@@ -100,7 +100,7 @@ def thing_setting(func: Callable) -> ThingSetting:
     This should be used as a decorator with a getter and a setter
     just like a standard python property decorator. If extra functionality
     is not required in the decorator, then using the ThingSetting class
-    directly may allow for clearer code
+    directly may allow for clearer code where the property works like a normal variable.
 
     When creating a Setting using this decorator you must always create a setter
     as it is used to load the value from disk.
@@ -112,7 +112,7 @@ def thing_setting(func: Callable) -> ThingSetting:
     the dictionary representation of this BaseModel as this is what will be used to
     set the Setting when loading from disk on starting the server.
 
-    Note: If a setting updated, rather than explicitly set this will not trigger saving.
+    Note: If a setting is mutated rather than set, this will not trigger saving.
     For example: if a Thing has a setting called `dictsetting` holding the dictionary
     `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
     but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
