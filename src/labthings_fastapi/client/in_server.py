@@ -164,7 +164,6 @@ def direct_thing_client_class(
     dependencies: list[inspect.Parameter] = []
     for name, item in attributes(thing_class):
         if isinstance(item, ThingProperty):
-            # TODO: What about properties that don't use descriptors? Fall back to http?
             add_property(client_attrs, name, item)
         elif isinstance(item, ActionDescriptor):
             if actions is None or name in actions:
