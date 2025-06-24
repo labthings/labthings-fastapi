@@ -4,24 +4,27 @@ Define an object to represent an Action, as a descriptor.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
+from weakref import WeakSet
+
 from typing_extensions import Self
-from labthings_fastapi.utilities.introspection import get_summary, get_docstring
 from pydantic import BaseModel, RootModel
 from fastapi import Body, FastAPI
-from weakref import WeakSet
+
 from ..utilities import labthings_data, wrap_plain_types_in_rootmodel
+from ..utilities.introspection import get_summary, get_docstring
 from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..thing_description import type_to_dataschema
+from ..exceptions import NotConnectedToServerError
 
 
 if TYPE_CHECKING:
     from ..thing import Thing
 
 
-class PropertyDescriptor:
+class ThingProperty:
     """A property that can be accessed via the HTTP API
 
-    By default, a PropertyDescriptor is "dumb", i.e. it acts just like
+    By default, a ThingProperty is "dumb", i.e. it acts just like
     a normal variable.
     """
 
@@ -53,7 +56,7 @@ class PropertyDescriptor:
         self._setter = setter or getattr(self, "_setter", None)
         self._getter = getter or getattr(self, "_getter", None)
         # Try to generate a DataSchema, so that we can raise an error that's easy to
-        # link to the offending PropertyDescriptor
+        # link to the offending ThingProperty
         type_to_dataschema(self.model)
 
     def __set_name__(self, owner, name: str):
@@ -118,11 +121,23 @@ class PropertyDescriptor:
     def emit_changed_event(self, obj: Thing, value: Any) -> None:
         """Notify subscribers that the property has changed
 
-        NB this function **must** be run from a thread, not the event loop.
+        This function is run when properties are upadated. It must be run from
+        within a thread. This could be the `Invocation` thread of a running action, or
+        the property should be updated over via a client/http. It must be run from a
+        thread as it is communicating with the event loop via an `asyncio` blocking
+        portal.
+
+        :raises NotConnectedToServerError: if the Thing that is calling the property
+        update is not connected to a server with a running event loop.
         """
         runner = obj._labthings_blocking_portal
         if not runner:
-            raise RuntimeError("Can't emit without a blocking portal")
+            thing_name = obj.__class__.__name__
+            msg = (
+                f"Cannot emit property updated changed event. Is {thing_name} "
+                "connected to a running server?"
+            )
+            raise NotConnectedToServerError(msg)
         runner.start_task_soon(
             self.emit_changed_event_async,
             obj,
@@ -214,10 +229,42 @@ class PropertyDescriptor:
     def setter(self, func: Callable) -> Self:
         """Decorator to set the property's value
 
-        PropertyDescriptors are variabes - so they will return the value they hold
+        ``ThingProperty`` descriptors return the value they hold
         when they are accessed. However, they can run code when they are set: this
         decorator sets a function as that code.
         """
         self._setter = func
         self.readonly = False
         return self
+
+
+class ThingSetting(ThingProperty):
+    """A setting can be accessed via the HTTP API and is persistent between sessions
+
+    A ThingSetting is a ThingProperty with extra functionality for triggering
+    a Thing to save its settings.
+
+    Note: If a setting is mutated rather than assigned to, this will not trigger saving.
+    For example: if a Thing has a setting called `dictsetting` holding the dictionary
+    `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
+    but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
+    called.
+
+    The setting otherwise acts just like a normal variable.
+    """
+
+    def __set__(self, obj, value):
+        """Set the property's value"""
+        super().__set__(obj, value)
+        obj.save_settings()
+
+    def set_without_emit(self, obj, value):
+        """Set the property's value, but do not emit event to notify the server
+
+        This function is not expected to be used externally. It is called during
+        initial setup so that the setting can be set from disk before the server
+        is fully started.
+        """
+        obj.__dict__[self.name] = value
+        if self._setter:
+            self._setter(obj, value)

@@ -51,6 +51,15 @@ artifacts = ["src/*.json"]
 [tool.hatch.build.targets.wheel]
 artifacts = ["src/*.json"]
 
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=labthings_fastapi",
+    "--cov-report=term",
+    "--cov-report=xml:coverage.xml",
+    "--cov-report=html:htmlcov",
+    "--cov-report=lcov",
+]
+
 [tool.ruff]
 target-version = "py310"
 

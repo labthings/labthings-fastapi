@@ -16,7 +16,7 @@ from typing import Any, Mapping, Optional, Union
 from pydantic import BaseModel
 from labthings_fastapi.descriptors.action import ActionDescriptor
 
-from labthings_fastapi.descriptors.property import PropertyDescriptor
+from labthings_fastapi.descriptors.property import ThingProperty
 from labthings_fastapi.utilities import attributes
 from . import PropertyClientDescriptor
 from ..thing import Thing
@@ -123,7 +123,7 @@ def add_action(
 
 
 def add_property(
-    attrs: dict[str, Any], property_name: str, property: PropertyDescriptor
+    attrs: dict[str, Any], property_name: str, property: ThingProperty
 ) -> None:
     """Add a property to a DirectThingClient subclass"""
     attrs[property_name] = property_descriptor(
@@ -131,7 +131,7 @@ def add_property(
         property.model,
         description=property.description,
         writeable=not property.readonly,
-        readable=True,  # TODO: make this configurable in PropertyDescriptor
+        readable=True,  # TODO: make this configurable in ThingProperty
     )
 
 
@@ -163,8 +163,7 @@ def direct_thing_client_class(
     }
     dependencies: list[inspect.Parameter] = []
     for name, item in attributes(thing_class):
-        if isinstance(item, PropertyDescriptor):
-            # TODO: What about properties that don't use descriptors? Fall back to http?
+        if isinstance(item, ThingProperty):
             add_property(client_attrs, name, item)
         elif isinstance(item, ActionDescriptor):
             if actions is None or name in actions:

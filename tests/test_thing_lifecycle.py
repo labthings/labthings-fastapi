@@ -1,11 +1,11 @@
-from labthings_fastapi.descriptors import PropertyDescriptor
+from labthings_fastapi.descriptors import ThingProperty
 from labthings_fastapi.thing import Thing
 from fastapi.testclient import TestClient
 from labthings_fastapi.server import ThingServer
 
 
 class TestThing(Thing):
-    alive = PropertyDescriptor(bool, False, description="Is the thing alive?")
+    alive = ThingProperty(bool, False, description="Is the thing alive?")
 
     def __enter__(self):
         print("setting up TestThing from __enter__")

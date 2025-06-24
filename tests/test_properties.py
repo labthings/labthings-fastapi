@@ -1,16 +1,19 @@
-from labthings_fastapi.descriptors import PropertyDescriptor
-from labthings_fastapi.decorators import thing_property, thing_action
-from labthings_fastapi.thing import Thing
-from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from threading import Thread
+
 from pytest import raises
 from pydantic import BaseModel
+from fastapi.testclient import TestClient
+
+from labthings_fastapi.descriptors import ThingProperty
+from labthings_fastapi.decorators import thing_property, thing_action
+from labthings_fastapi.thing import Thing
+from labthings_fastapi.server import ThingServer
+from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
 class TestThing(Thing):
-    boolprop = PropertyDescriptor(bool, False, description="A boolean property")
-    stringprop = PropertyDescriptor(str, "foo", description="A string property")
+    boolprop = ThingProperty(bool, False, description="A boolean property")
+    stringprop = ThingProperty(str, "foo", description="A string property")
 
     _undoc = None
 
@@ -44,7 +47,13 @@ server.add_thing(thing, "/thing")
 
 
 def test_instantiation_with_type():
-    prop = PropertyDescriptor(bool, False)
+    """
+    Check the internal model (data type) of the ThingSetting descriptor is a BaseModel
+
+    To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
+    types.
+    """
+    prop = ThingProperty(bool, False)
     assert issubclass(prop.model, BaseModel)
 
 
@@ -53,7 +62,7 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = PropertyDescriptor(MyModel, MyModel())
+    prop = ThingProperty(MyModel, MyModel())
     assert prop.model is MyModel
 
 
@@ -65,7 +74,7 @@ def test_property_get_and_set():
         assert after_value.json() == test_str
 
 
-def test_propertydescriptor():
+def test_ThingProperty():
     with TestClient(server.app) as client:
         r = client.get("/thing/boolprop")
         assert r.json() is False
@@ -117,8 +126,11 @@ def test_setting_from_thread():
 
 
 def test_setting_without_event_loop():
+    """Test that an exception is raised if updating a ThingProperty
+    without connecting the Thing to a running server with an event loop.
+    """
     # This test may need to change, if we change the intended behaviour
     # Currently it should never be necessary to change properties from the
     # main thread, so we raise an error if you try to do so
-    with raises(RuntimeError):
+    with raises(NotConnectedToServerError):
         thing.boolprop = False  # Can't call it until the event loop's running

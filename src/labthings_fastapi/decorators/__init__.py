@@ -36,7 +36,8 @@ from functools import wraps, partial
 from typing import Optional, Callable
 from ..descriptors import (
     ActionDescriptor,
-    PropertyDescriptor,
+    ThingProperty,
+    ThingSetting,
     EndpointDescriptor,
     HTTPMethod,
 )
@@ -71,20 +72,54 @@ def thing_action(func: Optional[Callable] = None, **kwargs):
         return partial(mark_thing_action, **kwargs)
 
 
-def thing_property(func: Callable) -> PropertyDescriptor:
-    """Mark a method of a Thing as a Property
+def thing_property(func: Callable) -> ThingProperty:
+    """Mark a method of a Thing as a LabThings Property
 
-    We replace the function with a `Descriptor` that's a
-    subclass of `PropertyDescriptor`
+    This should be used as a decorator with a getter and a setter
+    just like a standard python property decorator. If extra functionality
+    is not required in the decorator, then using the ThingProperty class
+    directly may allow for clearer code
 
-    TODO: try https://stackoverflow.com/questions/54413434/type-hinting-with-descriptors
+    As properties are accessed over the HTTP API they need to be JSON serialisable
+    only return standard python types, or Pydantic BaseModels
     """
+    # Replace the function with a `Descriptor` that's a `ThingProperty`
+    return ThingProperty(
+        return_type(func),
+        readonly=True,
+        observable=False,
+        getter=func,
+    )
 
-    class PropertyDescriptorSubclass(PropertyDescriptor):
-        def __get__(self, obj, objtype=None):
-            return super().__get__(obj, objtype)
 
-    return PropertyDescriptorSubclass(
+def thing_setting(func: Callable) -> ThingSetting:
+    """Mark a method of a Thing as a LabThings Setting.
+
+    A setting is a property that persists between runs.
+
+    This should be used as a decorator with a getter and a setter
+    just like a standard python property decorator. If extra functionality
+    is not required in the decorator, then using the ThingSetting class
+    directly may allow for clearer code where the property works like a normal variable.
+
+    When creating a Setting using this decorator you must always create a setter
+    as it is used to load the value from disk.
+
+    As settings are accessed over the HTTP API and saved to disk they need to be
+    JSON serialisable only return standard python types, or Pydantic BaseModels.
+
+    If the type is a pydantic BaseModel, then the setter must also be able to accept
+    the dictionary representation of this BaseModel as this is what will be used to
+    set the Setting when loading from disk on starting the server.
+
+    Note: If a setting is mutated rather than set, this will not trigger saving.
+    For example: if a Thing has a setting called `dictsetting` holding the dictionary
+    `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
+    but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
+    called.
+    """
+    # Replace the function with a `Descriptor` that's a `ThingSetting`
+    return ThingSetting(
         return_type(func),
         readonly=True,
         observable=False,
