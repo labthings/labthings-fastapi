@@ -6,12 +6,13 @@ from .decorators import (
     thing_action,
 )
 from .dependencies.blocking_portal import BlockingPortal
-from .dependencies.invocation import InvocationID, InvocationLogger
+from .dependencies.invocation import InvocationID, InvocationLogger, CancelHook
 from .dependencies.metadata import GetThingStates
 from .dependencies.raw_thing import raw_thing_dependency
 from .dependencies.thing import direct_thing_client_dependency
 from .outputs.mjpeg_stream import MJPEGStream, MJPEGStreamDescriptor
 from .outputs.blob import Blob
+from .server import ThingServer
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.
@@ -29,10 +30,12 @@ __all__ = [
     "BlockingPortal",
     "InvocationID",
     "InvocationLogger",
+    "CancelHook",
     "GetThingStates",
     "raw_thing_dependency",
     "direct_thing_client_dependency",
     "MJPEGStream",
     "MJPEGStreamDescriptor",
     "Blob",
+    "ThingServer",
 ]
