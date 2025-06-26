@@ -1,7 +1,5 @@
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import fastapi_endpoint
+from labthings_fastapi import ThingServer, Thing, fastapi_endpoint
 from pydantic import BaseModel
 
 

@@ -1,12 +1,11 @@
 from fastapi.testclient import TestClient
 import pytest
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, get_link
-from labthings_fastapi.decorators import thing_action
 from labthings_fastapi.example_things import MyThing
+import labthings_fastapi as lt
 
 thing = MyThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 
@@ -49,7 +48,7 @@ def test_varargs():
     """Test that we can't use *args in an action"""
     with pytest.raises(TypeError):
 
-        @thing_action
+        @lt.thing_action
         def action_with_varargs(self, *args) -> None:
             """An action that takes *args"""
             pass

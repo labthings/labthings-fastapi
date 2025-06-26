@@ -1,27 +1,24 @@
 from fastapi.testclient import TestClient
 import pytest
 import httpx
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task
 import time
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import ThingProperty
+import labthings_fastapi as lt
 
 
-class TestThing(Thing):
-    @thing_action(retention_time=0.01)
+class TestThing(lt.Thing):
+    @lt.thing_action(retention_time=0.01)
     def increment_counter(self):
         """Increment the counter"""
         self.counter += 1
 
-    counter = ThingProperty(
+    counter = lt.ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
 
 thing = TestThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 

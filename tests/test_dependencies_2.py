@@ -18,7 +18,8 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
-from labthings_fastapi.dependencies.invocation import InvocationID, invocation_id
+import labthings_fastapi as lt
+from labthings_fastapi.dependencies.invocation import invocation_id
 from labthings_fastapi.file_manager import FileManager
 from uuid import UUID
 
@@ -122,7 +123,7 @@ def test_class_dep_with_subdep():
 
 
 def test_invocation_id():
-    """Add an endpoint that uses a dependency from another file"""
+    """Add an endpoint that uses a dependency imported from another file"""
     app = FastAPI()
 
     @app.post("/endpoint")
@@ -135,11 +136,11 @@ def test_invocation_id():
 
 
 def test_invocation_id_alias():
-    """Add an endpoint that uses a dependency from another file"""
+    """Add an endpoint that uses a dependency alias from another file"""
     app = FastAPI()
 
     @app.post("/endpoint")
-    def endpoint(id: InvocationID) -> bool:
+    def endpoint(id: lt.InvocationID) -> bool:
         return True
 
     with TestClient(app) as client:

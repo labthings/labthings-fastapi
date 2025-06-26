@@ -1,9 +1,9 @@
+import labthings_fastapi as lt
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from labthings_fastapi.example_things import MyThing
 
 my_thing = MyThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(my_thing, "/my_thing")
 
 

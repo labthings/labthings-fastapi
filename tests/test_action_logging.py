@@ -4,29 +4,26 @@ This tests the log that is returned in an action invocation
 
 import logging
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.dependencies.invocation import InvocationLogger
+import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
 
 
-class ThingOne(Thing):
+class ThingOne(lt.Thing):
     LOG_MESSAGES = [
         "message 1",
         "message 2",
     ]
 
-    @thing_action
-    def action_one(self, logger: InvocationLogger):
+    @lt.thing_action
+    def action_one(self, logger: lt.InvocationLogger):
         for m in self.LOG_MESSAGES:
             logger.info(m)
 
 
 def test_invocation_logging(caplog):
     caplog.set_level(logging.INFO)
-    server = ThingServer()
+    server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     with TestClient(server.app) as client:
         r = client.post("/thing_one/action_one")

@@ -1,13 +1,11 @@
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
+import labthings_fastapi as lt
 from labthings_fastapi.file_manager import FileManagerDep
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, get_link
 
 
-class FileThing(Thing):
-    @thing_action
+class FileThing(lt.Thing):
+    @lt.thing_action
     def write_message_file(
         self,
         file_manager: FileManagerDep,
@@ -23,7 +21,7 @@ class FileThing(Thing):
 
 
 thing = FileThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 
