@@ -4,6 +4,7 @@ from .decorators import (
     thing_property,
     thing_setting,
     thing_action,
+    fastapi_endpoint,
 )
 from .dependencies.blocking_portal import BlockingPortal
 from .dependencies.invocation import InvocationID, InvocationLogger, CancelHook
@@ -27,6 +28,7 @@ __all__ = [
     "thing_property",
     "thing_setting",
     "thing_action",
+    "fastapi_endpoint",
     "BlockingPortal",
     "InvocationID",
     "InvocationLogger",
