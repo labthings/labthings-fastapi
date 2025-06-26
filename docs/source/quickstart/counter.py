@@ -1,13 +1,11 @@
 import time
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import ThingProperty
+import labthings_fastapi as lt
 
 
-class TestThing(Thing):
+class TestThing(lt.Thing):
     """A test thing with a counter property and a couple of actions"""
 
-    @thing_action
+    @lt.thing_action
     def increment_counter(self) -> None:
         """Increment the counter property
 
@@ -17,23 +15,22 @@ class TestThing(Thing):
         """
         self.counter += 1
 
-    @thing_action
+    @lt.thing_action
     def slowly_increase_counter(self) -> None:
         """Increment the counter slowly over a minute"""
         for i in range(60):
             time.sleep(1)
             self.increment_counter()
 
-    counter = ThingProperty(
+    counter = lt.ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
 
 if __name__ == "__main__":
-    from labthings_fastapi.server import ThingServer
     import uvicorn
 
-    server = ThingServer()
+    server = lt.ThingServer()
 
     # The line below creates a TestThing instance and adds it to the server
     server.add_thing(TestThing(), "/counter/")
