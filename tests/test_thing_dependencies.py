@@ -24,7 +24,7 @@ class ThingOne(lt.Thing):
         return self.ACTION_ONE_RESULT
 
 
-ThingOneDep = lt.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
 
 
 class ThingTwo(lt.Thing):
@@ -39,7 +39,7 @@ class ThingTwo(lt.Thing):
         return thing_one.action_one()
 
 
-ThingTwoDep = lt.direct_thing_client_dependency(ThingTwo, "/thing_two/")
+ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "/thing_two/")
 
 
 class ThingThree(lt.Thing):
@@ -113,7 +113,7 @@ def test_raw_interthing_dependency():
 
     This uses the internal thing client mechanism.
     """
-    ThingOneDep = lt.raw_thing_dependency(ThingOne)
+    ThingOneDep = lt.deps.raw_thing_dependency(ThingOne)
 
     class ThingTwo(lt.Thing):
         @lt.thing_action
@@ -139,7 +139,7 @@ def test_conflicting_dependencies():
     This also checks that dependencies on the same class but different
     actions are recognised as "different".
     """
-    ThingTwoDepNoActions = lt.direct_thing_client_dependency(
+    ThingTwoDepNoActions = lt.deps.direct_thing_client_dependency(
         ThingTwo, "/thing_two/", []
     )
 
@@ -153,7 +153,7 @@ def test_conflicting_dependencies():
             return thing_two.action_two()
 
     with pytest.raises(ValueError):
-        lt.direct_thing_client_dependency(ThingFour, "/thing_four/")
+        lt.deps.direct_thing_client_dependency(ThingFour, "/thing_four/")
 
 
 def check_request():

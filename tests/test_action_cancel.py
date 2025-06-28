@@ -12,7 +12,7 @@ class ThingOne(lt.Thing):
     counter = lt.ThingProperty(int, 0, observable=False)
 
     @lt.thing_action
-    def count_slowly(self, cancel: lt.CancelHook, n: int = 10):
+    def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):
         for i in range(n):
             cancel.sleep(0.1)
             self.counter += 1

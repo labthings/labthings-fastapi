@@ -6,13 +6,9 @@ from .decorators import (
     thing_action,
     fastapi_endpoint,
 )
-from .dependencies.blocking_portal import BlockingPortal
-from .dependencies.invocation import InvocationID, InvocationLogger, CancelHook
-from .dependencies.metadata import GetThingStates
-from .dependencies.raw_thing import raw_thing_dependency
-from .dependencies.thing import direct_thing_client_dependency
-from .outputs.mjpeg_stream import MJPEGStream, MJPEGStreamDescriptor
-from .outputs.blob import Blob
+from . import deps
+from . import outputs
+from .outputs import blob
 from .server import ThingServer
 
 # The symbols in __all__ are part of our public API.
@@ -29,15 +25,8 @@ __all__ = [
     "thing_setting",
     "thing_action",
     "fastapi_endpoint",
-    "BlockingPortal",
-    "InvocationID",
-    "InvocationLogger",
-    "CancelHook",
-    "GetThingStates",
-    "raw_thing_dependency",
-    "direct_thing_client_dependency",
-    "MJPEGStream",
-    "MJPEGStreamDescriptor",
-    "Blob",
+    "deps",
+    "outputs",
+    "blob",
     "ThingServer",
 ]

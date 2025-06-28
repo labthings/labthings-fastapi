@@ -27,7 +27,7 @@ class ThingOne(lt.Thing):
         return {"a": self.a}
 
 
-ThingOneDep = lt.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
 
 
 class ThingTwo(lt.Thing):

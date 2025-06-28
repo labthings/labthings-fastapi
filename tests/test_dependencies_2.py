@@ -140,7 +140,7 @@ def test_invocation_id_alias():
     app = FastAPI()
 
     @app.post("/endpoint")
-    def endpoint(id: lt.InvocationID) -> bool:
+    def endpoint(id: lt.deps.InvocationID) -> bool:
         return True
 
     with TestClient(app) as client:

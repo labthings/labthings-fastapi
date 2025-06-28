@@ -16,7 +16,7 @@ class ThingOne(lt.Thing):
     ]
 
     @lt.thing_action
-    def action_one(self, logger: lt.InvocationLogger):
+    def action_one(self, logger: lt.deps.InvocationLogger):
         for m in self.LOG_MESSAGES:
             logger.info(m)
 

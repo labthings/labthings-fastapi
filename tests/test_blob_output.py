@@ -12,7 +12,7 @@ from labthings_fastapi.outputs.blob import blob_type
 from labthings_fastapi.client import ThingClient
 
 
-class TextBlob(lt.Blob):
+class TextBlob(lt.blob.Blob):
     media_type: str = "text/plain"
 
 
@@ -49,7 +49,7 @@ class ThingOne(lt.Thing):
         return blob
 
 
-ThingOneDep = lt.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
 
 
 class ThingTwo(lt.Thing):
