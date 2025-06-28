@@ -5,7 +5,7 @@ source .venv/bin/activate  # or .venv/Scripts/activate on Windows
 # END venv
 echo "Installing labthings-fastapi"
 # BEGIN install
-pip install labthings-fastapi[server]
+pip install labthings-fastapi
 # END install
 echo "running example"
 # BEGIN serve
