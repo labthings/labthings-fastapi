@@ -4,26 +4,22 @@ This tests the log that is returned in an action invocation
 
 import uuid
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task, task_href
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import ThingProperty
-from labthings_fastapi.dependencies.invocation import CancelHook
+import labthings_fastapi as lt
 
 
-class ThingOne(Thing):
-    counter = ThingProperty(int, 0, observable=False)
+class ThingOne(lt.Thing):
+    counter = lt.ThingProperty(int, 0, observable=False)
 
-    @thing_action
-    def count_slowly(self, cancel: CancelHook, n: int = 10):
+    @lt.thing_action
+    def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):
         for i in range(n):
             cancel.sleep(0.1)
             self.counter += 1
 
 
 def test_invocation_cancel():
-    server = ThingServer()
+    server = lt.ThingServer()
     thing_one = ThingOne()
     server.add_thing(thing_one, "/thing_one")
     with TestClient(server.app) as client:

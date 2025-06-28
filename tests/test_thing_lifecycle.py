@@ -1,11 +1,9 @@
-from labthings_fastapi.descriptors import ThingProperty
-from labthings_fastapi.thing import Thing
+import labthings_fastapi as lt
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 
 
-class TestThing(Thing):
-    alive = ThingProperty(bool, False, description="Is the thing alive?")
+class TestThing(lt.Thing):
+    alive = lt.ThingProperty(bool, False, description="Is the thing alive?")
 
     def __enter__(self):
         print("setting up TestThing from __enter__")
@@ -18,7 +16,7 @@ class TestThing(Thing):
 
 
 thing = TestThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 

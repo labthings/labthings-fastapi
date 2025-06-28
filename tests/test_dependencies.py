@@ -5,7 +5,7 @@ for actions.
 """
 
 from fastapi import Depends, FastAPI, Request
-from labthings_fastapi.dependencies.invocation import InvocationID
+from labthings_fastapi.deps import InvocationID
 from labthings_fastapi.file_manager import FileManagerDep
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep

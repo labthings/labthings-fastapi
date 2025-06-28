@@ -7,22 +7,19 @@ import logging
 
 from fastapi.testclient import TestClient
 
-from labthings_fastapi.descriptors import ThingSetting
-from labthings_fastapi.decorators import thing_setting, thing_action
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.server import ThingServer
+import labthings_fastapi as lt
 
 
-class TestThing(Thing):
-    boolsetting = ThingSetting(bool, False, description="A boolean setting")
-    stringsetting = ThingSetting(str, "foo", description="A string setting")
-    dictsetting = ThingSetting(
+class TestThing(lt.Thing):
+    boolsetting = lt.ThingSetting(bool, False, description="A boolean setting")
+    stringsetting = lt.ThingSetting(str, "foo", description="A string setting")
+    dictsetting = lt.ThingSetting(
         dict, {"a": 1, "b": 2}, description="A dictionary setting"
     )
 
     _float = 1.0
 
-    @thing_setting
+    @lt.thing_setting
     def floatsetting(self) -> float:
         return self._float
 
@@ -30,11 +27,11 @@ class TestThing(Thing):
     def floatsetting(self, value: float):
         self._float = value
 
-    @thing_action
+    @lt.thing_action
     def toggle_boolsetting(self):
         self.boolsetting = not self.boolsetting
 
-    @thing_action
+    @lt.thing_action
     def toggle_boolsetting_from_thread(self):
         t = Thread(target=self.toggle_boolsetting)
         t.start()
@@ -72,7 +69,7 @@ def server():
     with tempfile.TemporaryDirectory() as tempdir:
         # Yield server rather than return so that the temp directory isn't cleaned up
         # until after the test is run
-        yield ThingServer(settings_folder=tempdir)
+        yield lt.ThingServer(settings_folder=tempdir)
 
 
 def test_setting_available(thing):
