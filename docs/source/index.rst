@@ -44,7 +44,7 @@ Compared to `python-labthings`_, this framework updates dependencies, shrinks th
 Installation
 ------------
 
-``pip install labthings-fastapi[server]``
+``pip install labthings-fastapi``
 
 Indices and tables
 ==================
