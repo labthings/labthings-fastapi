@@ -9,7 +9,9 @@ from .decorators import (
 from . import deps
 from . import outputs
 from .outputs import blob
-from .server import ThingServer
+from .server import ThingServer, cli
+from .client import ThingClient
+from .utilities import get_blocking_portal
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.
@@ -29,4 +31,7 @@ __all__ = [
     "outputs",
     "blob",
     "ThingServer",
+    "cli",
+    "ThingClient",
+    "get_blocking_portal",
 ]
