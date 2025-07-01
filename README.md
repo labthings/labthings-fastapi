@@ -28,17 +28,17 @@ Features include:
 
 ## Installation
 
-You can install this repository with `pip`, either clone it and run `pip install -e .[dev]` to work on it, or just `pip install https://gitlab.com/rwb27/labthings-fastapi.git`. It will be published on PyPI in the near future, initially as `labthings-fastapi`. It may at some point be renamed to `labthings` v2.
+You can install this repository with `pip install labthings-fastapi`. It may at some point be renamed to `labthings` v2. For the latest development version, either clone it and run `pip install -e .[dev]` to work on it, or just `pip install https://gitlab.com/rwb27/labthings-fastapi.git`.
 
 ## Developer notes
 
-The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement.
+The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit.
 
 Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
 ```
-uv pip compile --extra dev --extra server pyproject.toml --output-file dev-requirements.txt
+uv pip compile --extra dev pyproject.toml --output-file dev-requirements.txt
 ```
-If you're not using `uv`, just regular `pip-compile` from `pip-tools` will do the same thing.
+If you're not using `uv`, just regular `pip-compile` from `pip-tools` should do the same thing.
 
 All changes to the codebase should go via pull requests, and should only be merged once all the checks in the `test` job are passing. It is preferable to merge code where the `test-with-unpinned-dependencies` job fails, and deal with the dependency issues in another PR, particularly where the required changes are distinct from the code in the PR.
 
@@ -49,3 +49,4 @@ See the [examples folder](./examples/) for a runnable demo.
 [Web of Things]: https://www.w3.org/WoT/
 [python-labthings]: https://github.com/labthings/python-labthings/
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
+[pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
