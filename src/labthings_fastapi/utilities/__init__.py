@@ -4,7 +4,7 @@ from weakref import WeakSet
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
 from anyio.from_thread import BlockingPortal
-from labthings_fastapi.utilities.introspection import EmptyObject
+from .introspection import EmptyObject
 
 if TYPE_CHECKING:
     from ..thing import Thing

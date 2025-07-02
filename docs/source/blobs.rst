@@ -29,15 +29,13 @@ A camera might want to return an image as a :class:`.Blob` object. The code for 
 
 .. code-block:: python
 
-    from labthings_fastapi.blob import Blob
-    from labthings_fastapi.thing import Thing
-    from labthings_fastapi.decorators import thing_action
+    import labthings_fastapi as lt
 
-    class JPEGBlob(Blob):
+    class JPEGBlob(lt.blob.Blob):
         content_type = "image/jpeg"
 
-    class Camera(Thing):
-        @thing_action
+    class Camera(lt.Thing):
+        @lt.thing_action
         def capture_image(self) -> JPEGBlob:
             # Capture an image and return it as a Blob
             image_data = self._capture_image()  # This returns a bytes object holding the JPEG data
@@ -48,7 +46,7 @@ The corresponding client code might look like this:
 .. code-block:: python
 
     from PIL import Image
-    from labthings_fastapi.client import ThingClient
+    from labthings_fastapi import ThingClient
 
     camera = ThingClient.from_url("http://localhost:5000/camera/")
     image_blob = camera.capture_image()
@@ -63,30 +61,28 @@ We could define a more sophisticated camera that can capture raw images and conv
 
 .. code-block:: python
 
-    from labthings_fastapi.blob import Blob
-    from labthings_fastapi.thing import Thing
-    from labthings_fastapi.decorators import thing_action
+    import labthings_fastapi as lt
 
-    class JPEGBlob(Blob):
+    class JPEGBlob(lt.Blob):
         content_type = "image/jpeg"
 
-    class RAWBlob(Blob):
+    class RAWBlob(lt.Blob):
         content_type = "image/x-raw"
 
-    class Camera(Thing):
-        @thing_action
+    class Camera(lt.Thing):
+        @lt.thing_action
         def capture_raw_image(self) -> RAWBlob:
             # Capture a raw image and return it as a Blob
             raw_data = self._capture_raw_image()  # This returns a bytes object holding the raw data
             return RAWBlob.from_bytes(raw_data)
         
-        @thing_action
+        @lt.thing_action
         def convert_raw_to_jpeg(self, raw_blob: RAWBlob) -> JPEGBlob:
             # Convert a raw image Blob to a JPEG Blob
             jpeg_data = self._convert_raw_to_jpeg(raw_blob.data)  # This returns a bytes object holding the JPEG data
             return JPEGBlob.from_bytes(jpeg_data)
         
-        @thing_action
+        @lt.thing_action
         def capture_image(self) -> JPEGBlob:
             # Capture an image and return it as a Blob
             raw_blob = self.capture_raw_image()  # Capture the raw image
@@ -99,7 +95,7 @@ On the client, we can use the `capture_image` action directly (as before), or we
 .. code-block:: python
 
     from PIL import Image
-    from labthings_fastapi.client import ThingClient
+    from labthings_fastapi import ThingClient
 
     camera = ThingClient.from_url("http://localhost:5000/camera/")
     

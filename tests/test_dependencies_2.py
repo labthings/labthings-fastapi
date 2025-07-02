@@ -2,12 +2,15 @@
 
 Class-based dependencies in modules with `from __future__ import annotations`
 fail if they have sub-dependencies, because the global namespace is not found by
-pydantic. The work-around is to add a line to each class definition:
+pydantic. The work-around was to add a line to each class definition:
 ```
 __globals__ = globals()
 ```
 This bakes in the global namespace of the module, and allows FastAPI to correctly
 traverse the dependency tree.
+
+This is related to https://github.com/fastapi/fastapi/issues/4557 and may have
+been fixed upstream in FastAPI.
 
 The tests in this module were written while I was figuring this out: they mostly
 test things from FastAPI that obviously work, but I will leave them in here as
@@ -18,9 +21,8 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
-from labthings_fastapi.dependencies.invocation import InvocationID, invocation_id
+import labthings_fastapi as lt
 from labthings_fastapi.file_manager import FileManager
-from uuid import UUID
 
 
 def test_dep_from_module():
@@ -122,11 +124,11 @@ def test_class_dep_with_subdep():
 
 
 def test_invocation_id():
-    """Add an endpoint that uses a dependency from another file"""
+    """Add an endpoint that uses a dependency imported from another file"""
     app = FastAPI()
 
     @app.post("/endpoint")
-    def invoke_fancy(id: Annotated[UUID, Depends(invocation_id)]) -> bool:
+    def invoke_fancy(id: lt.deps.InvocationID) -> bool:
         return True
 
     with TestClient(app) as client:
@@ -135,11 +137,11 @@ def test_invocation_id():
 
 
 def test_invocation_id_alias():
-    """Add an endpoint that uses a dependency from another file"""
+    """Add an endpoint that uses a dependency alias from another file"""
     app = FastAPI()
 
     @app.post("/endpoint")
-    def endpoint(id: InvocationID) -> bool:
+    def endpoint(id: lt.deps.InvocationID) -> bool:
         return True
 
     with TestClient(app) as client:

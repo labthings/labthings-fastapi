@@ -6,20 +6,16 @@ import inspect
 from fastapi.testclient import TestClient
 from fastapi import Request
 import pytest
-from labthings_fastapi.server import ThingServer
+import labthings_fastapi as lt
 from temp_client import poll_task
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.dependencies.raw_thing import raw_thing_dependency
-from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
 from labthings_fastapi.client.in_server import direct_thing_client_class
 from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 
 
-class ThingOne(Thing):
+class ThingOne(lt.Thing):
     ACTION_ONE_RESULT = "Action one result!"
 
-    @thing_action
+    @lt.thing_action
     def action_one(self) -> str:
         """An action that takes no arguments"""
         return self.action_one_internal()
@@ -28,26 +24,26 @@ class ThingOne(Thing):
         return self.ACTION_ONE_RESULT
 
 
-ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
 
 
-class ThingTwo(Thing):
-    @thing_action
+class ThingTwo(lt.Thing):
+    @lt.thing_action
     def action_two(self, thing_one: ThingOneDep) -> str:
         """An action that needs a ThingOne"""
         return thing_one.action_one()
 
-    @thing_action
+    @lt.thing_action
     def action_two_a(self, thing_one: ThingOneDep) -> str:
         """Another action that needs a ThingOne"""
         return thing_one.action_one()
 
 
-ThingTwoDep = direct_thing_client_dependency(ThingTwo, "/thing_two/")
+ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "/thing_two/")
 
 
-class ThingThree(Thing):
-    @thing_action
+class ThingThree(lt.Thing):
+    @lt.thing_action
     def action_three(self, thing_two: ThingTwoDep) -> str:
         """An action that needs a ThingTwo"""
         # Note that we don't have to supply the ThingOne dependency
@@ -84,7 +80,7 @@ def test_interthing_dependency():
 
     This uses the internal thing client mechanism.
     """
-    server = ThingServer()
+    server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
     with TestClient(server.app) as client:
@@ -100,7 +96,7 @@ def test_interthing_dependency_with_dependencies():
     This uses the internal thing client mechanism, and requires
     dependency injection for the called action
     """
-    server = ThingServer()
+    server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
     server.add_thing(ThingThree(), "/thing_three")
@@ -117,15 +113,15 @@ def test_raw_interthing_dependency():
 
     This uses the internal thing client mechanism.
     """
-    ThingOneDep = raw_thing_dependency(ThingOne)
+    ThingOneDep = lt.deps.raw_thing_dependency(ThingOne)
 
-    class ThingTwo(Thing):
-        @thing_action
+    class ThingTwo(lt.Thing):
+        @lt.thing_action
         def action_two(self, thing_one: ThingOneDep) -> str:
             """An action that needs a ThingOne"""
             return thing_one.action_one()
 
-    server = ThingServer()
+    server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
     with TestClient(server.app) as client:
@@ -143,19 +139,21 @@ def test_conflicting_dependencies():
     This also checks that dependencies on the same class but different
     actions are recognised as "different".
     """
-    ThingTwoDepNoActions = direct_thing_client_dependency(ThingTwo, "/thing_two/", [])
+    ThingTwoDepNoActions = lt.deps.direct_thing_client_dependency(
+        ThingTwo, "/thing_two/", []
+    )
 
-    class ThingFour(Thing):
-        @thing_action
+    class ThingFour(lt.Thing):
+        @lt.thing_action
         def action_four(self, thing_two: ThingTwoDepNoActions) -> str:
             return str(thing_two)
 
-        @thing_action
+        @lt.thing_action
         def action_five(self, thing_two: ThingTwoDep) -> str:
             return thing_two.action_two()
 
     with pytest.raises(ValueError):
-        direct_thing_client_dependency(ThingFour, "/thing_four/")
+        lt.deps.direct_thing_client_dependency(ThingFour, "/thing_four/")
 
 
 def check_request():
@@ -163,7 +161,7 @@ def check_request():
 
     This is mostly just verifying that there's nothing funky in between the
     Starlette `Request` object and the FastAPI `app`."""
-    server = ThingServer()
+    server = lt.ThingServer()
 
     @server.app.get("/check_request_app/")
     def check_request_app(request: Request) -> bool:

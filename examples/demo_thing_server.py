@@ -1,18 +1,16 @@
 import logging
 import time
 from typing import Optional, Annotated
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.server import ThingServer
-from labthings_fastapi.descriptors import ThingProperty
 from pydantic import Field
 from fastapi.responses import HTMLResponse
+
+import labthings_fastapi as lt
 
 logging.basicConfig(level=logging.INFO)
 
 
-class MyThing(Thing):
-    @thing_action
+class MyThing(lt.Thing):
+    @lt.thing_action
     def anaction(
         self,
         repeats: Annotated[
@@ -43,7 +41,7 @@ class MyThing(Thing):
         self.increment_counter()
         return "finished!!"
 
-    @thing_action
+    @lt.thing_action
     def increment_counter(self):
         """Increment the counter property
 
@@ -53,25 +51,25 @@ class MyThing(Thing):
         """
         self.counter += 1
 
-    @thing_action
+    @lt.thing_action
     def slowly_increase_counter(self):
         """Increment the counter slowly over a minute"""
         for i in range(60):
             time.sleep(1)
             self.increment_counter()
 
-    counter = ThingProperty(
+    counter = lt.ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
-    foo = ThingProperty(
+    foo = lt.ThingProperty(
         model=str,
         initial_value="Example",
         description="A pointless string for demo purposes.",
     )
 
 
-thing_server = ThingServer()
+thing_server = lt.ThingServer()
 my_thing = MyThing()
 td = my_thing.thing_description()
 my_thing.validate_thing_description()

@@ -4,20 +4,16 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 
 from typing import Any, Mapping
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import ThingServer
 from temp_client import poll_task
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action, thing_property
-from labthings_fastapi.dependencies.thing import direct_thing_client_dependency
-from labthings_fastapi.dependencies.metadata import GetThingStates
+import labthings_fastapi as lt
 
 
-class ThingOne(Thing):
+class ThingOne(lt.Thing):
     def __init__(self):
-        Thing.__init__(self)
+        lt.Thing.__init__(self)
         self._a = 0
 
-    @thing_property
+    @lt.thing_property
     def a(self):
         return self._a
 
@@ -30,19 +26,19 @@ class ThingOne(Thing):
         return {"a": self.a}
 
 
-ThingOneDep = direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
 
 
-class ThingTwo(Thing):
+class ThingTwo(lt.Thing):
     A_VALUES = [1, 2, 3]
 
     @property
     def thing_state(self):
         return {"a": 1}
 
-    @thing_action
+    @lt.thing_action
     def count_and_watch(
-        self, thing_one: ThingOneDep, get_metadata: GetThingStates
+        self, thing_one: ThingOneDep, get_metadata: lt.deps.GetThingStates
     ) -> Mapping[str, Mapping[str, Any]]:
         metadata = {}
         for a in self.A_VALUES:
@@ -52,7 +48,7 @@ class ThingTwo(Thing):
 
 
 def test_fresh_metadata():
-    server = ThingServer()
+    server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one/")
     server.add_thing(ThingTwo(), "/thing_two/")
     with TestClient(server.app) as client:

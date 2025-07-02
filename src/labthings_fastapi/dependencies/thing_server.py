@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI, Request
 
 if TYPE_CHECKING:
-    from labthings_fastapi.server import ThingServer
+    from ..server import ThingServer
 
 _thing_servers: WeakSet[ThingServer] = WeakSet()
 

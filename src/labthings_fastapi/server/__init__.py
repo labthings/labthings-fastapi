@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from labthings_fastapi.utilities.object_reference_to_object import (
+from ..utilities.object_reference_to_object import (
     object_reference_to_object,
 )
 from ..actions import ActionManager

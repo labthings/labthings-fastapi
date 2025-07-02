@@ -4,8 +4,7 @@ from pydantic import BaseModel, RootModel
 import numpy as np
 
 from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
+import labthings_fastapi as lt
 
 
 class ArrayModel(RootModel):
@@ -63,8 +62,8 @@ def test_0d():
     m.model_dump_json()
 
 
-class MyNumpyThing(Thing):
-    @thing_action
+class MyNumpyThing(lt.Thing):
+    @lt.thing_action
     def action_with_arrays(self, a: NDArray) -> NDArray:
         return a * 2
 

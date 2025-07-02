@@ -4,26 +4,23 @@ from pytest import raises
 from pydantic import BaseModel
 from fastapi.testclient import TestClient
 
-from labthings_fastapi.descriptors import ThingProperty
-from labthings_fastapi.decorators import thing_property, thing_action
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.server import ThingServer
+import labthings_fastapi as lt
 from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
-class TestThing(Thing):
-    boolprop = ThingProperty(bool, False, description="A boolean property")
-    stringprop = ThingProperty(str, "foo", description="A string property")
+class TestThing(lt.Thing):
+    boolprop = lt.ThingProperty(bool, False, description="A boolean property")
+    stringprop = lt.ThingProperty(str, "foo", description="A string property")
 
     _undoc = None
 
-    @thing_property
+    @lt.thing_property
     def undoc(self):
         return self._undoc
 
     _float = 1.0
 
-    @thing_property
+    @lt.thing_property
     def floatprop(self) -> float:
         return self._float
 
@@ -31,18 +28,18 @@ class TestThing(Thing):
     def floatprop(self, value: float):
         self._float = value
 
-    @thing_action
+    @lt.thing_action
     def toggle_boolprop(self):
         self.boolprop = not self.boolprop
 
-    @thing_action
+    @lt.thing_action
     def toggle_boolprop_from_thread(self):
         t = Thread(target=self.toggle_boolprop)
         t.start()
 
 
 thing = TestThing()
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 
@@ -53,7 +50,7 @@ def test_instantiation_with_type():
     To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
     types.
     """
-    prop = ThingProperty(bool, False)
+    prop = lt.ThingProperty(bool, False)
     assert issubclass(prop.model, BaseModel)
 
 
@@ -62,7 +59,7 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = ThingProperty(MyModel, MyModel())
+    prop = lt.ThingProperty(MyModel, MyModel())
     assert prop.model is MyModel
 
 
