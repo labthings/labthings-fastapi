@@ -48,10 +48,14 @@ def test_instantiation_with_type():
     Check the internal model (data type) of the ThingSetting descriptor is a BaseModel
 
     To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
-    types.
+    types. Note that the model is not created until the property is assigned to a
+    `Thing`, as it happens in `__set_name__` of the `ThingProperty` descriptor.
     """
-    prop = lt.ThingProperty(bool, False)
-    assert issubclass(prop.model, BaseModel)
+
+    class BasicThing(lt.Thing):
+        prop = lt.ThingProperty(bool, False)
+
+    assert issubclass(BasicThing.prop.model, BaseModel)
 
 
 def test_instantiation_with_model():
@@ -59,8 +63,10 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = lt.ThingProperty(MyModel, MyModel())
-    assert prop.model is MyModel
+    class BasicThing(lt.Thing):
+        prop = lt.ThingProperty(MyModel, MyModel())
+
+    assert BasicThing.prop.model is MyModel
 
 
 def test_property_get_and_set():
