@@ -68,21 +68,29 @@ def test_instantiation_with_type():
     assert issubclass(BasicThing.prop.model, BaseModel)
 
 
+def exception_is_or_is_caused_by(err: Exception, cls: type[Exception]):
+    return isinstance(err, cls) or isinstance(err.__cause__, cls)
+
+
 def test_instantiation_with_type_and_model():
     """If a model is specified, we check it matches the inferred type."""
 
     class BasicThing(lt.Thing):
         prop = lt.ThingProperty[bool](model=bool, initial_value=False)
 
-    with pytest.raises(MismatchedTypeError):
+    with pytest.raises(Exception) as e:
 
         class InvalidThing(lt.Thing):
             prop = lt.ThingProperty[bool](model=int, initial_value=False)
 
-    with pytest.raises(MissingTypeError):
+    assert exception_is_or_is_caused_by(e.value, MismatchedTypeError)
+
+    with pytest.raises(Exception) as e:
 
         class InvalidThing(lt.Thing):
             prop = lt.ThingProperty(model=bool, initial_value=False)
+
+    assert exception_is_or_is_caused_by(e.value, MissingTypeError)
 
 
 def test_missing_default():
