@@ -10,7 +10,7 @@ import time
 
 
 class CancellableCountingThing(lt.Thing):
-    counter = lt.ThingProperty(int, 0, observable=False)
+    counter = lt.ThingProperty[int](initial_value=0, observable=False)
     check = lt.ThingProperty(
         bool,
         False,

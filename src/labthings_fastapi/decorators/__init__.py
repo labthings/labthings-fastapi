@@ -33,7 +33,7 @@ not supported at this time.
 """
 
 from functools import wraps, partial
-from typing import Optional, Callable, TypeVar, TYPE_CHECKING
+from typing import Optional, Callable, TypeVar
 from ..descriptors import (
     ActionDescriptor,
     ThingProperty,
@@ -42,10 +42,6 @@ from ..descriptors import (
     HTTPMethod,
 )
 from ..utilities.introspection import return_type
-
-
-if TYPE_CHECKING:
-    from ..thing import Thing
 
 
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
@@ -79,14 +75,7 @@ def thing_action(func: Optional[Callable] = None, **kwargs):
 Value = TypeVar("Value")
 
 
-def thing_property(
-    func: Callable[
-        [
-            Thing,
-        ],
-        Value,
-    ],
-) -> ThingProperty[Value]:
+def thing_property(func: Callable[..., Value]) -> ThingProperty[Value]:
     """Mark a method of a Thing as a LabThings Property
 
     This should be used as a decorator with a getter and a setter
@@ -106,14 +95,7 @@ def thing_property(
     )
 
 
-def thing_setting(
-    func: Callable[
-        [
-            Thing,
-        ],
-        Value,
-    ],
-) -> ThingSetting[Value]:
+def thing_setting(func: Callable[..., Value]) -> ThingSetting[Value]:
     """Mark a method of a Thing as a LabThings Setting.
 
     A setting is a property that persists between runs.

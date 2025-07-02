@@ -11,9 +11,9 @@ import labthings_fastapi as lt
 
 
 class TestThing(lt.Thing):
-    boolsetting = lt.ThingSetting(bool, False, description="A boolean setting")
-    stringsetting = lt.ThingSetting(str, "foo", description="A string setting")
-    dictsetting = lt.ThingSetting(
+    boolsetting = lt.ThingSetting[bool](bool, False, description="A boolean setting")
+    stringsetting = lt.ThingSetting[str](str, "foo", description="A string setting")
+    dictsetting = lt.ThingSetting[dict](
         dict, {"a": 1, "b": 2}, description="A dictionary setting"
     )
 

@@ -73,12 +73,11 @@ class MyThing(Thing):
             time.sleep(delay)
             self.increment_counter()
 
-    counter = ThingProperty(
-        model=int, initial_value=0, readonly=True, description="A pointless counter"
+    counter = ThingProperty[int](
+        initial_value=0, readonly=True, description="A pointless counter"
     )
 
-    foo = ThingProperty(
-        model=str,
+    foo = ThingProperty[str](
         initial_value="Example",
         description="A pointless string for demo purposes.",
     )
@@ -103,7 +102,7 @@ class ThingWithBrokenAffordances(Thing):
         raise RuntimeError("This is a broken action")
 
     @thing_property
-    def broken_property(self):
+    def broken_property(self) -> bool:
         """A property that raises an exception"""
         raise RuntimeError("This is a broken property")
 
