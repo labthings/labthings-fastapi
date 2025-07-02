@@ -71,7 +71,7 @@ async def root():
         logging_info = f"    <p>Logging info</p>\n    <pre>{app.log_history}</pre>"
 
     content = content.replace("{{logginginfo}}", logging_info)
-    return HTMLResponse(content=content, status_code=206)
+    return HTMLResponse(content=content, status_code=218)
 
 
 @app.get("/{path:path}")
