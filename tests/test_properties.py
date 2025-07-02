@@ -66,7 +66,7 @@ def test_instantiation_with_type():
     """
 
     class BasicThing(Thing):
-        prop = ThingProperty[bool](default=False)
+        prop = ThingProperty[bool](initial_value=False)
 
     assert issubclass(BasicThing.prop.model, BaseModel)
 
@@ -75,17 +75,17 @@ def test_instantiation_with_type_and_model():
     """If a model is specified, we check it matches the inferred type."""
 
     class BasicThing(Thing):
-        prop = ThingProperty[bool](model=bool, default=False)
+        prop = ThingProperty[bool](model=bool, initial_value=False)
 
     with pytest.raises(MismatchedTypeError):
 
         class InvalidThing(Thing):
-            prop = ThingProperty[bool](model=int, default=False)
+            prop = ThingProperty[bool](model=int, initial_value=False)
 
     with pytest.raises(MissingTypeError):
 
         class InvalidThing(Thing):
-            prop = ThingProperty(model=bool, default=False)
+            prop = ThingProperty(model=bool, initial_value=False)
 
 
 def test_missing_default():
@@ -100,7 +100,7 @@ def test_annotation_on_class():
     """Test that a type annotation on the attribute is picked up."""
 
     class BasicThing(Thing):
-        prop: bool = ThingProperty(default=False)
+        prop: bool = ThingProperty(initial_value=False)
 
     assert isinstance(BasicThing.prop, ThingProperty)
     assert BasicThing.prop._value_type is bool
@@ -114,7 +114,7 @@ def test_overspecified_default():
             def get_prop(self) -> bool:
                 return False
 
-            prop = ThingProperty[bool](default=False, getter=get_prop)
+            prop = ThingProperty[bool](initial_value=False, getter=get_prop)
 
 
 def test_instantiation_with_model():
@@ -123,7 +123,7 @@ def test_instantiation_with_model():
         b: float = 2.0
 
     class BasicThing(Thing):
-        prop = ThingProperty(MyModel, MyModel())
+        prop = ThingProperty[MyModel](initial_value=MyModel())
 
     assert BasicThing.prop.model is MyModel
 
