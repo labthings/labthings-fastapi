@@ -38,13 +38,18 @@ ERROR_PAGE = """
     <pre>{{traceback}}</pre>
     {{logginginfo}}
 </body>
+<style>
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
 </html>
 """
 
 
 @app.get("/")
 async def root():
-    error_message = f"{app.labthings_error!r}"
+    error_message = f"{app.labthings_error}"
     # use traceback.format_exception to get full traceback as list
     # this ends in newlines, but needs joining to be a single string
     error_w_trace = "".join(format_exception(app.labthings_error))
@@ -65,7 +70,7 @@ async def root():
         logging_info = f"    <p>Logging info</p>\n    <pre>{app.log_history}</pre>"
 
     content = content.replace("{{logginginfo}}", logging_info)
-    return HTMLResponse(content=content, status_code=500)
+    return HTMLResponse(content=content, status_code=206)
 
 
 @app.get("/{path:path}")
