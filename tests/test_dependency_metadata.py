@@ -18,7 +18,7 @@ class ThingOne(Thing):
         self._a = 0
 
     @thing_property
-    def a(self):
+    def a(self) -> int:
         return self._a
 
     @a.setter

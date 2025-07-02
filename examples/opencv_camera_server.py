@@ -279,7 +279,7 @@ class OpenCVCamera(Thing):
         with self._cap_lock:
             self._cap.set(cv.CAP_PROP_EXPOSURE, value)
 
-    last_frame_index = ThingProperty(int, initial_value=-1)
+    last_frame_index = ThingProperty[int](int, initial_value=-1)
 
     mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
 

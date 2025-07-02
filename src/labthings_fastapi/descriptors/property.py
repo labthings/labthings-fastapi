@@ -179,7 +179,9 @@ class ThingProperty(Generic[Value]):
         1. As a type argument on the property itself, e.g. `BaseThingProperty[int]`
         2. As a type annotation on the class, e.g. `my_property: int = BaseThingProperty`
         3. As a type annotation on the getter method, e.g. `@BaseThingProperty\n def my_property(self) -> int: ...`
-        4. As an explicitly set model argument, e.g. `BaseThingProperty(model=int)`
+
+        There is a model argument, e.g. `BaseThingProperty(model=int)` but this is no longer
+        supported and will raise an error.
 
         All of these are checked, and an error is raised if any of them are inconsistent.
         If no type is specified, an error is raised.
@@ -226,6 +228,10 @@ class ThingProperty(Generic[Value]):
             raise MissingTypeError(
                 f"Property '{name}' on '{owner}' is missing a type annotation. "
                 "Please provide a type annotation ."
+            )
+        if len(value_types) == 1 and "model_argument" in value_types:
+            raise MissingTypeError(
+                f"Property '{name}' on '{owner}' specifies `model` but is not type annotated."
             )
         print(
             f"Initializing property '{name}' on '{owner}', {value_types}."
@@ -428,7 +434,7 @@ class ThingProperty(Generic[Value]):
         return self
 
 
-class ThingSetting(ThingProperty):
+class ThingSetting(ThingProperty[Value], Generic[Value]):
     """A setting can be accessed via the HTTP API and is persistent between sessions
 
     A ThingSetting is a ThingProperty with extra functionality for triggering

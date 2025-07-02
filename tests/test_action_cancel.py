@@ -13,7 +13,7 @@ from labthings_fastapi.dependencies.invocation import CancelHook
 
 
 class ThingOne(Thing):
-    counter = ThingProperty(int, 0, observable=False)
+    counter = ThingProperty[int](initial_value=0, observable=False)
 
     @thing_action
     def count_slowly(self, cancel: CancelHook, n: int = 10):

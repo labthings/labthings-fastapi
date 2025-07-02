@@ -5,7 +5,7 @@ from labthings_fastapi.server import ThingServer
 
 
 class TestThing(Thing):
-    alive = ThingProperty(bool, False, description="Is the thing alive?")
+    alive = ThingProperty[bool](initial_value=False, description="Is the thing alive?")
 
     def __enter__(self):
         print("setting up TestThing from __enter__")
