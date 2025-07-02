@@ -63,7 +63,7 @@ def test_instantiation_with_type():
     """
 
     class BasicThing(lt.Thing):
-        prop = lt.ThingProperty[bool](default=False)
+        prop = lt.ThingProperty[bool](initial_value=False)
 
     assert issubclass(BasicThing.prop.model, BaseModel)
 
@@ -72,17 +72,17 @@ def test_instantiation_with_type_and_model():
     """If a model is specified, we check it matches the inferred type."""
 
     class BasicThing(lt.Thing):
-        prop = lt.ThingProperty[bool](model=bool, default=False)
+        prop = lt.ThingProperty[bool](model=bool, initial_value=False)
 
     with pytest.raises(MismatchedTypeError):
 
         class InvalidThing(lt.Thing):
-            prop = lt.ThingProperty[bool](model=int, default=False)
+            prop = lt.ThingProperty[bool](model=int, initial_value=False)
 
     with pytest.raises(MissingTypeError):
 
         class InvalidThing(lt.Thing):
-            prop = lt.ThingProperty(model=bool, default=False)
+            prop = lt.ThingProperty(model=bool, initial_value=False)
 
 
 def test_missing_default():
@@ -97,7 +97,7 @@ def test_annotation_on_class():
     """Test that a type annotation on the attribute is picked up."""
 
     class BasicThing(lt.Thing):
-        prop: bool = lt.ThingProperty(default=False)
+        prop: bool = lt.ThingProperty(initial_value=False)
 
     assert isinstance(BasicThing.prop, lt.ThingProperty)
     assert BasicThing.prop._value_type is bool
@@ -111,7 +111,7 @@ def test_overspecified_default():
             def get_prop(self) -> bool:
                 return False
 
-            prop = lt.ThingProperty[bool](default=False, getter=get_prop)
+            prop = lt.ThingProperty[bool](initial_value=False, getter=get_prop)
 
 
 def test_instantiation_with_model():
@@ -120,7 +120,7 @@ def test_instantiation_with_model():
         b: float = 2.0
 
     class BasicThing(lt.Thing):
-        prop = lt.ThingProperty(MyModel, MyModel())
+        prop = lt.ThingProperty[MyModel](initial_value=MyModel())
 
     assert BasicThing.prop.model is MyModel
 
