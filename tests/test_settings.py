@@ -14,9 +14,9 @@ from labthings_fastapi.server import ThingServer
 
 
 class TestThing(Thing):
-    boolsetting = ThingSetting(bool, False, description="A boolean setting")
-    stringsetting = ThingSetting(str, "foo", description="A string setting")
-    dictsetting = ThingSetting(
+    boolsetting = ThingSetting[bool](bool, False, description="A boolean setting")
+    stringsetting = ThingSetting[str](str, "foo", description="A string setting")
+    dictsetting = ThingSetting[dict](
         dict, {"a": 1, "b": 2}, description="A dictionary setting"
     )
 

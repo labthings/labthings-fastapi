@@ -60,12 +60,11 @@ class MyThing(Thing):
             time.sleep(1)
             self.increment_counter()
 
-    counter = ThingProperty(
-        model=int, initial_value=0, readonly=True, description="A pointless counter"
+    counter = ThingProperty[int](
+        initial_value=0, readonly=True, description="A pointless counter"
     )
 
-    foo = ThingProperty(
-        model=str,
+    foo = ThingProperty[str](
         initial_value="Example",
         description="A pointless string for demo purposes.",
     )

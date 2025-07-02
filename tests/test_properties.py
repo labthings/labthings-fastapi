@@ -3,22 +3,32 @@ from threading import Thread
 from pytest import raises
 from pydantic import BaseModel
 from fastapi.testclient import TestClient
+import pytest
 
 from labthings_fastapi.descriptors import ThingProperty
 from labthings_fastapi.decorators import thing_property, thing_action
+from labthings_fastapi.descriptors.property import (
+    MismatchedTypeError,
+    MissingDefaultError,
+    MissingTypeError,
+)
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.server import ThingServer
 from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
 class TestThing(Thing):
-    boolprop = ThingProperty(bool, False, description="A boolean property")
-    stringprop = ThingProperty(str, "foo", description="A string property")
+    boolprop = ThingProperty[bool](
+        initial_value=False, description="A boolean property"
+    )
+    stringprop = ThingProperty[str](
+        initial_value="foo", description="A string property"
+    )
 
     _undoc = None
 
     @thing_property
-    def undoc(self):
+    def undoc(self) -> None:
         return self._undoc
 
     _float = 1.0
@@ -51,10 +61,68 @@ def test_instantiation_with_type():
     Check the internal model (data type) of the ThingSetting descriptor is a BaseModel
 
     To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
-    types.
+    types. Note that the model is not created until the property is assigned to a
+    `Thing`, as it happens in `__set_name__` of the `ThingProperty` descriptor.
     """
-    prop = ThingProperty(bool, False)
-    assert issubclass(prop.model, BaseModel)
+
+    class BasicThing(Thing):
+        prop = ThingProperty[bool](initial_value=False)
+
+    assert issubclass(BasicThing.prop.model, BaseModel)
+
+
+def exception_is_or_is_caused_by(err: Exception, cls: type[Exception]):
+    return isinstance(err, cls) or isinstance(err.__cause__, cls)
+
+
+def test_instantiation_with_type_and_model():
+    """If a model is specified, we check it matches the inferred type."""
+
+    class BasicThing(Thing):
+        prop = ThingProperty[bool](model=bool, initial_value=False)
+
+    with pytest.raises(Exception) as e:
+
+        class InvalidThing(Thing):
+            prop = ThingProperty[bool](model=int, initial_value=False)
+
+    assert exception_is_or_is_caused_by(e.value, MismatchedTypeError)
+
+    with pytest.raises(Exception) as e:
+
+        class InvalidThing(Thing):
+            prop = ThingProperty(model=bool, initial_value=False)
+
+    assert exception_is_or_is_caused_by(e.value, MissingTypeError)
+
+
+def test_missing_default():
+    """Test that a default is required if no model is specified."""
+    with pytest.raises(MissingDefaultError):
+
+        class InvalidThing(Thing):
+            prop = ThingProperty[bool]()
+
+
+def test_annotation_on_class():
+    """Test that a type annotation on the attribute is picked up."""
+
+    class BasicThing(Thing):
+        prop: bool = ThingProperty(initial_value=False)
+
+    assert isinstance(BasicThing.prop, ThingProperty)
+    assert BasicThing.prop._value_type is bool
+
+
+def test_overspecified_default():
+    """Test that a default is not allowed if a getter is specified."""
+    with pytest.raises(ValueError):
+
+        class InvalidThing(Thing):
+            def get_prop(self) -> bool:
+                return False
+
+            prop = ThingProperty[bool](initial_value=False, getter=get_prop)
 
 
 def test_instantiation_with_model():
@@ -62,8 +130,10 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = ThingProperty(MyModel, MyModel())
-    assert prop.model is MyModel
+    class BasicThing(Thing):
+        prop = ThingProperty[MyModel](initial_value=MyModel())
+
+    assert BasicThing.prop.model is MyModel
 
 
 def test_property_get_and_set():

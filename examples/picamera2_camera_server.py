@@ -82,21 +82,18 @@ class StreamingPiCamera2(Thing):
         self.device_index = device_index
         self.camera_configs: dict[str, dict] = {}
 
-    stream_resolution = ThingProperty(
-        tuple[int, int],
+    stream_resolution = ThingProperty[tuple[int, int]](
         initial_value=(1640, 1232),
         description="Resolution to use for the MJPEG stream",
     )
-    image_resolution = ThingProperty(
-        tuple[int, int],
+    image_resolution = ThingProperty[tuple[int, int]](
         initial_value=(3280, 2464),
         description="Resolution to use for still images (by default)",
     )
-    mjpeg_bitrate = ThingProperty(
-        int, initial_value=0, description="Bitrate for MJPEG stream (best left at 0)"
+    mjpeg_bitrate = ThingProperty[int](
+        initial_value=0, description="Bitrate for MJPEG stream (best left at 0)"
     )
-    stream_active = ThingProperty(
-        bool,
+    stream_active = ThingProperty[bool](
         initial_value=False,
         description="Whether the MJPEG stream is active",
         observable=True,
@@ -114,7 +111,7 @@ class StreamingPiCamera2(Thing):
     exposure_time = PicameraControl(
         "ExposureTime", int, description="The exposure time in microseconds"
     )
-    sensor_modes = ThingProperty(list[SensorMode], readonly=True)
+    sensor_modes = ThingProperty[list[SensorMode]](readonly=True, getter=list)
 
     def __enter__(self):
         self._picamera = picamera2.Picamera2(camera_num=self.device_index)
@@ -217,7 +214,7 @@ class StreamingPiCamera2(Thing):
     def exposure(self, value):
         raise NotImplementedError()
 
-    last_frame_index = ThingProperty(int, initial_value=-1)
+    last_frame_index = [int](initial_value=-1)
 
     mjpeg_stream = MJPEGStreamDescriptor(ringbuffer_size=10)
 
