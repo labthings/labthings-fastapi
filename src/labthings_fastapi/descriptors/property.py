@@ -140,7 +140,10 @@ class ThingProperty(Generic[Value]):
         :param initial_value: The initial value of the property. If this is set,
             the property must not have a getter, and should behave like a variable.
         :param readonly: If True, the property cannot be set via the HTTP API.
-        :param observable: If True, the property can be observed for changes.
+        :param observable: If True, the property can be observed for changes via
+            websockets. This causes the setter to run code in the async event loop
+            that will notify a list of subscribers each time the property is set.
+            Currently, only websockets can be used to observe properties.
         :param description: A description of the property, used in the API documentation.
             LabThings will attempt to take this from the docstring if not supplied.
         :param title: A human-readable title for the property, used in the API
