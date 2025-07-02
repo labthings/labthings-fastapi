@@ -6,7 +6,6 @@ for actions.
 
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
-from labthings_fastapi.file_manager import FileManagerDep
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep
 
@@ -55,17 +54,3 @@ def test_dependency_needing_request():
         assert r.status_code == 200
         invocation = r.json()
         assert invocation is True
-
-
-def test_file_manager():
-    app = FastAPI()
-
-    @app.post("/invoke_with_file")
-    def invoke_with_file(
-        file_manager: FileManagerDep,
-    ) -> dict[str, str]:
-        return {"directory": str(file_manager.directory)}
-
-    with TestClient(app) as client:
-        r = client.post("/invoke_with_file")
-        assert r.status_code == 200

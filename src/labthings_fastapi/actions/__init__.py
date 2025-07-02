@@ -8,13 +8,11 @@ import uuid
 from typing import TYPE_CHECKING
 import weakref
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..utilities import model_to_dict
 from ..utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
-from ..file_manager import FileManager
 from .invocation_model import InvocationModel, InvocationStatus
 from ..dependencies.invocation import (
     CancelHook,
@@ -68,10 +66,6 @@ class Invocation(Thread):
         # How long to keep the invocation after it finishes
         self.retention_time = action.retention_time
         self.expiry_time: Optional[datetime.datetime] = None
-
-        # This is added post-hoc by the FastAPI endpoint, in
-        # `ActionDescriptor.add_to_fastapi`
-        self._file_manager: Optional[FileManager] = None
 
         # Private state properties
         self._status_lock = Lock()  # This Lock protects properties below
@@ -148,8 +142,6 @@ class Invocation(Thread):
             LinkElement(rel="self", href=href),
             LinkElement(rel="output", href=href + "/output"),
         ]
-        if self._file_manager:
-            links += self._file_manager.links(href)
         return self.action.invocation_model(
             status=self.status,
             id=self.id,
@@ -413,50 +405,3 @@ class ActionManager:
                         ),
                     )
                 invocation.cancel()
-
-        @app.get(
-            ACTION_INVOCATIONS_PATH + "/{id}/files",
-            responses={
-                404: {"description": "Invocation ID not found"},
-                503: {"description": "No files are available for this invocation"},
-            },
-        )
-        def action_invocation_files(id: uuid.UUID) -> list[str]:
-            with self._invocations_lock:
-                try:
-                    invocation: Any = self._invocations[id]
-                except KeyError:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="No action invocation found with ID {id}",
-                    )
-                if not invocation._file_manager:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="No files are available for this invocation",
-                    )
-                return invocation._file_manager.filenames
-
-        @app.get(
-            ACTION_INVOCATIONS_PATH + "/{id}/files/{filename}",
-            response_class=FileResponse,
-            responses={
-                404: {"description": "Invocation ID not found, or file not found"},
-                503: {"description": "No files are available for this invocation"},
-            },
-        )
-        def action_invocation_file(id: uuid.UUID, filename: str):
-            with self._invocations_lock:
-                try:
-                    invocation: Any = self._invocations[id]
-                except KeyError:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="No action invocation found with ID {id}",
-                    )
-                if not invocation._file_manager:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="No files are available for this invocation",
-                    )
-                return FileResponse(invocation._file_manager.path(filename))
