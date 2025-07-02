@@ -1,7 +1,7 @@
 import labthings_fastapi as lt
 from labthings_fastapi.example_things import MyThing
 
-MyThingDep = lt.direct_thing_client_dependency(MyThing, "/mything/")
+MyThingDep = lt.deps.direct_thing_client_dependency(MyThing, "/mything/")
 
 
 class TestThing(lt.Thing):
