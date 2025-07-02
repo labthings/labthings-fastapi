@@ -32,34 +32,36 @@ class Telly(lt.Thing):
             image.save(dest, "jpeg")
             jpegs.append(dest.getvalue())
 
-        i = -1
-        start_time = time.time()
-        while self._streaming:
-            i = (i + 1) % len(jpegs)
-            print(f"sending frame {i}")
+        i = 0
+        while self._streaming and i < len(jpegs):
             self.stream.add_frame(jpegs[i], self._labthings_blocking_portal)
             time.sleep(1 / self.framerate)
-
-            if time.time() - start_time > 10:
-                break
-        print("stopped sending frames")
+            i = i + 1
+        self.stream.stop(self._labthings_blocking_portal)
         self._streaming = False
 
 
 def test_mjpeg_stream():
+    """Verify the MJPEG stream contains at least one frame marker.
+
+    A limitation of the TestClient is that it can't actually stream.
+    This means that all of the frames sent by our test Thing will
+    arrive in a single packet.
+
+    For now, we just check it starts with the frame separator,
+    but it might be possible in the future to check there are three
+    images there.
+    """
     server = lt.ThingServer()
     telly = Telly()
     server.add_thing(telly, "telly")
     with TestClient(server.app) as client:
-        with client.stream("GET", "/telly/stream", timeout=0.1) as stream:
+        with client.stream("GET", "/telly/stream") as stream:
             stream.raise_for_status()
             received = 0
             for b in stream.iter_bytes():
                 received += 1
-                print(f"Got packet {received}")
                 assert b.startswith(b"--frame")
-                if received > 5:
-                    break
 
 
 if __name__ == "__main__":

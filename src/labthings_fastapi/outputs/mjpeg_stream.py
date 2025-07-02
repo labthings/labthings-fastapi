@@ -107,10 +107,11 @@ class MJPEGStream:
             ]
             self.last_frame_i = -1
 
-    def stop(self):
+    def stop(self, portal: BlockingPortal):
         """Stop the stream"""
         with self._lock:
             self._streaming = False
+            portal.start_task_soon(self.notify_stream_stopped)
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the ith frame acquired by the camera
@@ -139,9 +140,13 @@ class MJPEGStream:
         yield entry.frame
 
     async def next_frame(self) -> int:
-        """Wait for the next frame, and return its index"""
+        """Wait for the next frame, and return its index
+
+        :raises StopAsyncIteration: if the stream has stopped."""
         async with self.condition:
             await self.condition.wait()
+            if not self._streaming:
+                raise StopAsyncIteration()
             return self.last_frame_i
 
     async def grab_frame(self) -> bytes:
@@ -170,6 +175,8 @@ class MJPEGStream:
                 i = await self.next_frame()
                 async with self.buffer_for_reading(i) as frame:
                     yield frame
+            except StopAsyncIteration:
+                break
             except Exception as e:
                 logging.error(f"Error in stream: {e}, stream stopped")
                 return
@@ -178,7 +185,7 @@ class MJPEGStream:
         """Return a StreamingResponse that streams an MJPEG stream"""
         return MJPEGStreamResponse(self.frame_async_generator())
 
-    def add_frame(self, frame: bytes, portal: BlockingPortal):
+    def add_frame(self, frame: bytes, portal: BlockingPortal) -> None:
         """Return the next buffer in the ringbuffer to write to
 
         :param frame: The frame to add
@@ -196,10 +203,16 @@ class MJPEGStream:
             entry.index = self.last_frame_i + 1
             portal.start_task_soon(self.notify_new_frame, entry.index)
 
-    async def notify_new_frame(self, i):
+    async def notify_new_frame(self, i: int) -> None:
         """Notify any waiting tasks that a new frame is available"""
         async with self.condition:
             self.last_frame_i = i
+            self.condition.notify_all()
+
+    async def notify_stream_stopped(self) -> None:
+        """Raise an exception in any waiting tasks to signal the stream has stopped."""
+        assert self._streaming is False
+        async with self.condition:
             self.condition.notify_all()
 
 
