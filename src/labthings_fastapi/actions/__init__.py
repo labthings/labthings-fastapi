@@ -11,8 +11,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from labthings_fastapi.utilities import model_to_dict
-from labthings_fastapi.utilities.introspection import EmptyInput
+from ..utilities import model_to_dict
+from ..utilities.introspection import EmptyInput
 from ..thing_description.model import LinkElement
 from ..file_manager import FileManager
 from .invocation_model import InvocationModel, InvocationStatus

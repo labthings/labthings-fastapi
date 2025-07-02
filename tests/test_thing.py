@@ -1,6 +1,6 @@
 import pytest
 from labthings_fastapi.example_things import MyThing
-from labthings_fastapi.server import ThingServer
+from labthings_fastapi import ThingServer
 
 
 def test_td_validates():

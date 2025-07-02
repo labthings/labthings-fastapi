@@ -5,7 +5,6 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 from typing import Any, Mapping
 from fastapi.testclient import TestClient
 from temp_client import poll_task
-from labthings_fastapi.dependencies.metadata import GetThingStates
 import labthings_fastapi as lt
 
 
@@ -39,7 +38,7 @@ class ThingTwo(lt.Thing):
 
     @lt.thing_action
     def count_and_watch(
-        self, thing_one: ThingOneDep, get_metadata: GetThingStates
+        self, thing_one: ThingOneDep, get_metadata: lt.deps.GetThingStates
     ) -> Mapping[str, Mapping[str, Any]]:
         metadata = {}
         for a in self.A_VALUES:

@@ -8,8 +8,6 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
-from labthings_fastapi.outputs.blob import blob_type
-from labthings_fastapi.client import ThingClient
 
 
 class TextBlob(lt.blob.Blob):
@@ -71,8 +69,8 @@ class ThingTwo(lt.Thing):
 def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
     with pytest.raises(ValueError):
-        blob_type(media_type="text/plain\\'DROP TABLES")
-    M = blob_type(media_type="text/plain")
+        lt.blob.blob_type(media_type="text/plain\\'DROP TABLES")
+    M = lt.blob.blob_type(media_type="text/plain")
     assert M.from_bytes(b"").media_type == "text/plain"
 
 
@@ -99,7 +97,7 @@ def test_blob_output_client():
     server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     with TestClient(server.app) as client:
-        tc = ThingClient.from_url("/thing_one/", client=client)
+        tc = lt.ThingClient.from_url("/thing_one/", client=client)
         check_actions(tc)
 
 
@@ -115,7 +113,7 @@ def test_blob_output_inserver():
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
     with TestClient(server.app) as client:
-        tc = ThingClient.from_url("/thing_two/", client=client)
+        tc = lt.ThingClient.from_url("/thing_two/", client=client)
         output = tc.check_both()
         assert output is True
 
@@ -145,7 +143,7 @@ def test_blob_input():
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
     with TestClient(server.app) as client:
-        tc = ThingClient.from_url("/thing_one/", client=client)
+        tc = lt.ThingClient.from_url("/thing_one/", client=client)
         output = tc.action_one()
         print(f"Output is {output}")
         assert output is not None
@@ -157,7 +155,7 @@ def test_blob_input():
         assert passthrough.content == ThingOne.ACTION_ONE_RESULT
 
         # Check that the same thing works on the server side
-        tc2 = ThingClient.from_url("/thing_two/", client=client)
+        tc2 = lt.ThingClient.from_url("/thing_two/", client=client)
         assert tc2.check_passthrough() is True
 
 

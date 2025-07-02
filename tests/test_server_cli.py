@@ -5,7 +5,8 @@ import tempfile
 
 from pytest import raises
 
-from labthings_fastapi.server import server_from_config, ThingServer
+from labthings_fastapi import ThingServer
+from labthings_fastapi.server import server_from_config
 from labthings_fastapi.server.cli import serve_from_cli
 
 

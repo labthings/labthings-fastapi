@@ -1,7 +1,7 @@
 from __future__ import annotations
 from functools import partial, wraps
 
-from labthings_fastapi.utilities.introspection import get_docstring, get_summary
+from ..utilities.introspection import get_docstring, get_summary
 
 from typing import (
     Callable,

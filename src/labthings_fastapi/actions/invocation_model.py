@@ -7,7 +7,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from labthings_fastapi.thing_description.model import Links
+from ..thing_description.model import Links
 
 
 class InvocationStatus(Enum):

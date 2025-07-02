@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 from typing import Optional
 import json
 
-from labthings_fastapi.utilities.object_reference_to_object import (
+from ..utilities.object_reference_to_object import (
     object_reference_to_object,
 )
 import uvicorn

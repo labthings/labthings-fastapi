@@ -14,10 +14,10 @@ import inspect
 import logging
 from typing import Any, Mapping, Optional, Union
 from pydantic import BaseModel
-from labthings_fastapi.descriptors.action import ActionDescriptor
+from ..descriptors.action import ActionDescriptor
 
-from labthings_fastapi.descriptors.property import ThingProperty
-from labthings_fastapi.utilities import attributes
+from ..descriptors.property import ThingProperty
+from ..utilities import attributes
 from . import PropertyClientDescriptor
 from ..thing import Thing
 from ..dependencies.thing_server import find_thing_server
