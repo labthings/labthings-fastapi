@@ -4,6 +4,7 @@ import httpx
 from temp_client import poll_task
 import time
 import labthings_fastapi as lt
+from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
 
 
 class TestThing(lt.Thing):
@@ -31,7 +32,7 @@ def action_partial(client: TestClient, url: str):
     return run
 
 
-def test_expiry():
+def test_action_expires():
     with TestClient(server.app) as client:
         before_value = client.get("/thing/counter").json()
         r = client.post("/thing/increment_counter")
@@ -42,5 +43,17 @@ def test_expiry():
         after_value = client.get("/thing/counter").json()
         assert after_value == before_value + 2
         invocation["status"] = "running"  # Force an extra poll
+        # When the second action runs, the first one should expire
+        # so polling it again should give a 404.
         with pytest.raises(httpx.HTTPStatusError):
             poll_task(client, invocation)
+
+
+def test_actions_list():
+    with TestClient(server.app) as client:
+        r = client.post("/thing/increment_counter")
+        invocation = poll_task(client, r.json())
+        r2 = client.get(ACTION_INVOCATIONS_PATH)
+        r2.raise_for_status()
+        invocations = r2.json()
+        assert invocations == [invocation]
