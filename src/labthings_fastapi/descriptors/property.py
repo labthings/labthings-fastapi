@@ -3,6 +3,7 @@ Define an object to represent an Action, as a descriptor.
 """
 
 from __future__ import annotations
+from types import EllipsisType
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -11,9 +12,11 @@ from typing import (
     Optional,
     Generic,
     Type,
+    TypeAlias,
     TypeVar,
     overload,
 )
+import typing
 from weakref import WeakSet
 
 from typing_extensions import Self
@@ -30,36 +33,129 @@ from ..exceptions import NotConnectedToServerError
 if TYPE_CHECKING:
     from ..thing import Thing
 
+
+class MissingTypeError(TypeError):
+    """Error raised when a type annotation is missing for a property."""
+
+
+class MismatchedTypeError(TypeError):
+    """Error raised when a type annotation does not match the expected type for a property."""
+
+
+class MissingDefaultError(AttributeError):
+    """Error raised when a property has no getter or initial value."""
+
+
 Value = TypeVar("Value")
-Descriptor = TypeVar("Descriptor")
+Owner: TypeAlias = "Thing"
+# There was an intention to make ThingProperty generic in 2 variables, one for
+# the value and one for the owner, but this was problematic.
+# For now, we'll stick to typing the owner as a Thing.
+# We may want to search-and-replace the Owner symbol, but I think it is
+# helpful for now. I don't think NewType would be appropriate here,
+# as it would probably raise errors when defining getter/setter methods.
 
 
 class ThingProperty(Generic[Value]):
     """A property that can be accessed via the HTTP API
 
     By default, a ThingProperty is "dumb", i.e. it acts just like
-    a normal variable.
+    a normal variable. It can have a getter and setter, in which case
+    it will work similarly to a Python property.
     """
 
     model: type[BaseModel]
+    """A Pydantic model that describes the type of the property."""
     readonly: bool = False
+    """If True, the property cannot be set via the HTTP API"""
+    _model_arg: type[Value]
+    """The type of the model argument, if specified."""
+    _value_type: type[Value]
+    """The type of the value, may or may not be a Pydantic model."""
 
     def __init__(
         self,
-        model: type,
-        initial_value: Any = None,
+        model: type | None = None,
+        initial_value: Value | EllipsisType = ...,
         readonly: bool = False,
         observable: bool = False,
         description: Optional[str] = None,
         title: Optional[str] = None,
-        getter: Optional[Callable[[Thing, Type[Thing]], Value]] = None,
-        setter: Optional[Callable] = None,
+        getter: Optional[
+            Callable[
+                [
+                    Owner,
+                ],
+                Value,
+            ]
+        ] = None,
+        setter: Optional[Callable[[Owner, Value], None]] = None,
     ):
-        if getter and initial_value is not None:
+        """A property that can be accessed via the HTTP API
+
+        ThingProperty is a descriptor that functions like a variable, optionally
+        with notifications when it is set. It may also have a getter and setter,
+        which work in a similar way to Python properties.
+
+        The type of a property can be set in several ways:
+        1. As a type argument on the property itself, e.g. `ThingProperty[int]`
+        2. As a type annotation on the class, e.g. `my_property: int = ThingProperty`
+        3. As a type annotation on the getter method, e.g.
+           `@ThingProperty\n def my_property(self) -> int: ...`
+        4. As an explicitly set model argument, e.g. `ThingProperty(model=int)`
+
+        All of these are checked, and an error is raised if any of them are inconsistent.
+        If no type is specified, an error is raised. `model` may be deprecated in the
+        future.
+
+        ``ThingProperty`` can behave in several different ways:
+        - If no `getter` or `setter` is specified, it will behave like a simple
+            data attribute (i.e. a variable). If `observable` is `True`, it is
+            possible to register for notifications when the value is set. In this
+            case, an `initial_value` is required.
+        - If a `getter` is specified and `observable` is `False`, the `getter`
+            will be called when the property is accessed, and its return value
+            will be the property's value, just like the builtin `property`. The
+            property will be read-only both locally and via HTTP.
+        - If a `getter` is specified and `observable` is `True`, the `getter`
+            is used instead of `initial_value` but thereafter the property
+            behaves like a variable. The `getter` is only on first access.
+            The property may be written to locally, and whether it's writable
+            via HTTP depends on the `readonly` argument.
+        - If both a `getter` and `setter` are specified and `observable` is `False`,
+            the property behaves like a Python property, with the `getter` being
+            called when the property is accessed, and the `setter` being called
+            when the property is set. The property is read-only via HTTP if
+            `readonly` is `True`. It may always be written to locally.
+        - If `observable` is `True` and a `setter` is specified, the property
+            will behave like a variable, but will call the `setter`
+            when the property is set. The `setter` may perform tasks like sending
+            the updated value to the hardware, but it is not responsible for
+            remembering the value. The initial value is set via the `getter` or
+            `initial_value`.
+
+
+        :param model: The type of the property. This is optional, because it is
+            better to use type hints (see notes on typing above).
+        :param initial_value: The initial value of the property. If this is set,
+            the property must not have a getter, and should behave like a variable.
+        :param readonly: If True, the property cannot be set via the HTTP API.
+        :param observable: If True, the property can be observed for changes.
+        :param description: A description of the property, used in the API documentation.
+            LabThings will attempt to take this from the docstring if not supplied.
+        :param title: A human-readable title for the property, used in the API
+            documentation. Defaults to the first line of the docstring, or the name
+            of the property.
+        :param getter: A function that gets the value of the property.
+        :param setter: A function that sets the value of the property.
+        """
+        if getter and not isinstance(initial_value, EllipsisType):
             raise ValueError("getter and an initial value are mutually exclusive.")
-        if model is None:
-            raise ValueError("LabThings Properties must have a type")
-        self.model = wrap_plain_types_in_rootmodel(model)
+        if isinstance(initial_value, EllipsisType) and getter is None:
+            raise MissingDefaultError()
+        # We no longer check types in __init__, as we do that in __set_name__
+        if isinstance(model, type):
+            self._model_arg = model
         self.readonly = readonly
         self.observable = observable
         self.initial_value = initial_value
@@ -70,10 +166,76 @@ class ThingProperty(Generic[Value]):
         self._getter = getter or getattr(self, "_getter", None)
         # Try to generate a DataSchema, so that we can raise an error that's easy to
         # link to the offending ThingProperty
-        type_to_dataschema(self.model)
 
-    def __set_name__(self, owner, name: str):
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
+        """Notification of the name and owning class.
+
+        When a descriptor is attached to a class, Python calls this method.
+        We use it to take note of the property's name and the class it belongs to,
+        which also allows us to check if there is a type annotation for the property
+        on the class.
+
+        The type of a property can be set in several ways:
+        1. As a type argument on the property itself, e.g. `BaseThingProperty[int]`
+        2. As a type annotation on the class, e.g. `my_property: int = BaseThingProperty`
+        3. As a type annotation on the getter method, e.g. `@BaseThingProperty\n def my_property(self) -> int: ...`
+        4. As an explicitly set model argument, e.g. `BaseThingProperty(model=int)`
+
+        All of these are checked, and an error is raised if any of them are inconsistent.
+        If no type is specified, an error is raised.
+
+        This method is called after `__init__`, so if there was a type subscript
+        (e.g. `BaseThingProperty[ModelType]`), it will be available as
+        `self.__orig_class__` at this point (but not during `__init__`).
+
+        :param owner: The class that owns this property.
+        :param name: The name of the property.
+
+        :raises MissingTypeError: If no type annotation is found for the property.
+        :raises MismatchedTypeError: If multiple type annotations are found and they do not agree.
+        """
         self._name = name
+        value_types: dict[str, type[Value]] = {}
+        if hasattr(self, "_model_arg"):
+            # If we have a model argument, we can use that
+            value_types["model_argument"] = self._model_arg
+        if self._getter is not None:
+            # If the property has a getter, we can extract the type from it
+            annotations = typing.get_type_hints(self._getter, include_extras=True)
+            if "return" in annotations:
+                value_types["getter_return_type"] = annotations["return"]
+        owner_annotations = typing.get_type_hints(owner, include_extras=True)
+        if name in owner_annotations:
+            # If the property has a type annotation on the owning class, we can use that
+            value_types["class_annotation"] = owner_annotations[name]
+        if hasattr(self, "__orig_class__"):
+            # We were instantiated as BaseThingProperty[ModelType] so can use that type
+            value_types["__orig_class__"] = typing.get_args(self.__orig_class__)[0]
+
+        # Check we have a model, and that it is consistent if it's specified in multiple places
+        try:
+            # Pick the first one we find, then check the rest against it
+            self._value_type = next(iter(value_types.values()))
+            for v_type in value_types.values():
+                if v_type != self._value_type:
+                    raise MismatchedTypeError(
+                        f"Inconsistent model for property '{name}' on '{owner}'. "
+                        f"Types were: {value_types}."
+                    )
+        except StopIteration:  # This means no types were found, value_types is empty
+            raise MissingTypeError(
+                f"Property '{name}' on '{owner}' is missing a type annotation. "
+                "Please provide a type annotation ."
+            )
+        print(
+            f"Initializing property '{name}' on '{owner}', {value_types}."
+        )  # TODO: Debug print statement, remove
+        # If the model is a plain type, wrap it in a RootModel so that it can be used
+        # as a FastAPI model.
+        self.model = wrap_plain_types_in_rootmodel(self._value_type)
+        # Try to generate a DataSchema, so that we can raise an error that's easy to
+        # link to the offending ThingProperty
+        type_to_dataschema(self.model)
 
     @property
     def title(self):
@@ -90,14 +252,16 @@ class ThingProperty(Generic[Value]):
         return self._description or get_docstring(self._getter, remove_summary=True)
 
     @overload
-    def __get__(self, obj: None, owner: Type[Thing]) -> Descriptor:
+    def __get__(self, obj: None, owner: Type[Owner]) -> Self:
         """Called when an attribute is accessed via class not an instance"""
 
     @overload
-    def __get__(self, obj: Thing, owner: Type[Thing]) -> Value:
+    def __get__(self, obj: Owner, owner: Type[Owner] | None) -> Value:
         """Called when an attribute is accessed on an instance variable"""
 
-    def __get__(self, obj: Optional[Thing], owner: Type[Thing]) -> Value | Descriptor:
+    def __get__(
+        self, obj: Owner | None, owner: Type[Owner] | None = None
+    ) -> Value | Self:
         """The value of the property
 
         If `obj` is none (i.e. we are getting the attribute of the class),
@@ -122,8 +286,13 @@ class ThingProperty(Generic[Value]):
                 # if we get to here, the property should be observable, so cache
                 obj.__dict__[self.name] = self._getter(obj)
                 return obj.__dict__[self.name]
-            else:
+            elif not isinstance(self.initial_value, EllipsisType):
                 return self.initial_value
+            else:
+                raise MissingDefaultError(
+                    f"Property '{self.name}' on '{obj.__class__.__name__}' has "
+                    " no value and no getter or initial value."
+                )
 
     def __set__(self, obj, value):
         """Set the property's value"""
