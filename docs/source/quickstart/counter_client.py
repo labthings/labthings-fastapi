@@ -1,4 +1,4 @@
-from labthings_fastapi.client import ThingClient
+from labthings_fastapi import ThingClient
 
 counter = ThingClient.from_url("http://localhost:5000/counter/")
 

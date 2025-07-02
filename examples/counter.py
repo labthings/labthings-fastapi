@@ -1,14 +1,12 @@
 import time
-from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.descriptors import ThingProperty
-from labthings_fastapi.server import ThingServer
+
+import labthings_fastapi as lt
 
 
-class TestThing(Thing):
+class TestThing(lt.Thing):
     """A test thing with a counter property and a couple of actions"""
 
-    @thing_action
+    @lt.thing_action
     def increment_counter(self) -> None:
         """Increment the counter property
 
@@ -18,17 +16,17 @@ class TestThing(Thing):
         """
         self.counter += 1
 
-    @thing_action
+    @lt.thing_action
     def slowly_increase_counter(self) -> None:
         """Increment the counter slowly over a minute"""
         for i in range(60):
             time.sleep(1)
             self.increment_counter()
 
-    counter = ThingProperty(
+    counter = lt.ThingProperty(
         model=int, initial_value=0, readonly=True, description="A pointless counter"
     )
 
 
-server = ThingServer()
+server = lt.ThingServer()
 server.add_thing(TestThing(), "/test")
