@@ -43,6 +43,7 @@ pre {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+</style>
 </html>
 """
 
