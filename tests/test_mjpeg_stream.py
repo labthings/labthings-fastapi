@@ -10,6 +10,7 @@ class Telly(lt.Thing):
     _stream_thread: threading.Thread
     _streaming: bool = False
     framerate: float = 1000
+    frame_limit: int = 3
 
     stream = lt.outputs.MJPEGStreamDescriptor()
 
@@ -33,8 +34,10 @@ class Telly(lt.Thing):
             jpegs.append(dest.getvalue())
 
         i = 0
-        while self._streaming and i < len(jpegs):
-            self.stream.add_frame(jpegs[i], self._labthings_blocking_portal)
+        while self._streaming and (i < self.frame_limit or self.frame_limit < 0):
+            self.stream.add_frame(
+                jpegs[i % len(jpegs)], self._labthings_blocking_portal
+            )
             time.sleep(1 / self.framerate)
             i = i + 1
         self.stream.stop(self._labthings_blocking_portal)
@@ -65,4 +68,11 @@ def test_mjpeg_stream():
 
 
 if __name__ == "__main__":
-    test_mjpeg_stream()
+    import uvicorn
+
+    server = lt.ThingServer()
+    telly = Telly()
+    telly.framerate = 6
+    telly.frame_limit = -1
+    server.add_thing(telly, "telly")
+    uvicorn.run(server.app, port=5000)
