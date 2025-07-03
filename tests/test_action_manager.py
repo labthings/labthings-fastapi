@@ -4,6 +4,7 @@ import httpx
 from temp_client import poll_task
 import time
 import labthings_fastapi as lt
+from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
 
 
 class TestThing(lt.Thing):
@@ -22,16 +23,20 @@ server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
 
-def action_partial(client: TestClient, url: str):
-    def run(payload=None):
-        r = client.post(url, json=payload)
-        assert r.status_code in (200, 201)
-        return poll_task(client, r.json())
+def test_action_expires():
+    """Check the action is removed from the server
 
-    return run
+    We've set the retention period to be very short, so the action
+    should not be retrievable after some time has elapsed.
 
+    This test checks that actions do indeed get removed.
 
-def test_expiry():
+    Note that the code that expires actions runs whenever a new
+    action is started. That's why we need to invoke the action twice:
+    the second invocation runs the code that deletes the first one.
+    This behaviour might change in the future, making the second run
+    unnecessary.
+    """
     with TestClient(server.app) as client:
         before_value = client.get("/thing/counter").json()
         r = client.post("/thing/increment_counter")
@@ -42,5 +47,24 @@ def test_expiry():
         after_value = client.get("/thing/counter").json()
         assert after_value == before_value + 2
         invocation["status"] = "running"  # Force an extra poll
+        # When the second action runs, the first one should expire
+        # so polling it again should give a 404.
         with pytest.raises(httpx.HTTPStatusError):
             poll_task(client, invocation)
+
+
+def test_actions_list():
+    """Check that the /action_invocations/ path works.
+
+    The /action_invocations/ path should return a list of invocation
+    objects (a representation of each action that's been run recently).
+
+    It's implemented in `ActionManager.list_all_invocations`.
+    """
+    with TestClient(server.app) as client:
+        r = client.post("/thing/increment_counter")
+        invocation = poll_task(client, r.json())
+        r2 = client.get(ACTION_INVOCATIONS_PATH)
+        r2.raise_for_status()
+        invocations = r2.json()
+        assert invocations == [invocation]

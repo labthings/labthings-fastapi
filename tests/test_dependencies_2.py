@@ -22,7 +22,6 @@ from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
 import labthings_fastapi as lt
-from labthings_fastapi.file_manager import FileManager
 
 
 def test_dep_from_module():
@@ -147,17 +146,3 @@ def test_invocation_id_alias():
     with TestClient(app) as client:
         r = client.post("/endpoint")
         assert r.status_code == 200
-
-
-def test_filemanager_dep():
-    """Test out our FileManager class as a dependency"""
-    app = FastAPI()
-
-    @app.post("/endpoint")
-    def endpoint(fm: Annotated[FileManager, Depends()]) -> str:
-        return f"Saving to {fm.directory}"
-
-    with TestClient(app) as client:
-        r = client.post("/endpoint")
-        assert r.status_code == 200
-        assert r.json().startswith("Saving to ")

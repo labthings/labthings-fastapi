@@ -186,22 +186,16 @@ class ActionDescriptor:
             background_tasks: BackgroundTasks,
             **dependencies,
         ):
-            try:
-                action = action_manager.invoke_action(
-                    action=self,
-                    thing=thing,
-                    input=body,
-                    dependencies=dependencies,
-                    id=id,
-                    cancel_hook=cancel_hook,
-                )
-                background_tasks.add_task(action_manager.expire_invocations)
-                return action.response(request=request)
-            finally:
-                try:
-                    action._file_manager = request.state.file_manager
-                except AttributeError:
-                    pass  # This probably means there was no FileManager created.
+            action = action_manager.invoke_action(
+                action=self,
+                thing=thing,
+                input=body,
+                dependencies=dependencies,
+                id=id,
+                cancel_hook=cancel_hook,
+            )
+            background_tasks.add_task(action_manager.expire_invocations)
+            return action.response(request=request)
 
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)
