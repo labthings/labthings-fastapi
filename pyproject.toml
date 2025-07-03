@@ -30,6 +30,7 @@ dev = [
   "mypy>=1.6.1, <2",
   "ruff>=0.1.3",
   "types-jsonschema",
+  "Pillow",
 ]
 
 [project.urls]
