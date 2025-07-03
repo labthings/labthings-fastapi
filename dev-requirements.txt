@@ -81,6 +81,8 @@ orjson==3.10.15
     # via fastapi
 packaging==24.2
     # via pytest
+pillow==11.3.0
+    # via labthings-fastapi (pyproject.toml)
 pluggy==1.5.0
     # via pytest
 pydantic==2.10.6
