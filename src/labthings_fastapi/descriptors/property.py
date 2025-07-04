@@ -3,7 +3,17 @@ Define an object to represent an Action, as a descriptor.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Optional,
+    Generic,
+    Type,
+    TypeVar,
+    overload,
+)
 from weakref import WeakSet
 
 from typing_extensions import Self
@@ -20,8 +30,11 @@ from ..exceptions import NotConnectedToServerError
 if TYPE_CHECKING:
     from ..thing import Thing
 
+Value = TypeVar("Value")
+Descriptor = TypeVar("Descriptor")
 
-class ThingProperty:
+
+class ThingProperty(Generic[Value]):
     """A property that can be accessed via the HTTP API
 
     By default, a ThingProperty is "dumb", i.e. it acts just like
@@ -39,7 +52,7 @@ class ThingProperty:
         observable: bool = False,
         description: Optional[str] = None,
         title: Optional[str] = None,
-        getter: Optional[Callable] = None,
+        getter: Optional[Callable[[Thing, Type[Thing]], Value]] = None,
         setter: Optional[Callable] = None,
     ):
         if getter and initial_value is not None:
@@ -76,7 +89,15 @@ class ThingProperty:
         """A description of the property"""
         return self._description or get_docstring(self._getter, remove_summary=True)
 
-    def __get__(self, obj, type=None) -> Any:
+    @overload
+    def __get__(self, obj: None, owner: Type[Thing]) -> Descriptor:
+        """Called when an attribute is accessed via class not an instance"""
+
+    @overload
+    def __get__(self, obj: Thing, owner: Type[Thing]) -> Value:
+        """Called when an attribute is accessed on an instance variable"""
+
+    def __get__(self, obj: Optional[Thing], owner: Type[Thing]) -> Value | Descriptor:
         """The value of the property
 
         If `obj` is none (i.e. we are getting the attribute of the class),
@@ -187,7 +208,7 @@ class ThingProperty:
             description=f"## {self.title}\n\n{self.description or ''}",
         )
         def get_property():
-            return self.__get__(thing)
+            return self.__get__(thing, type(thing))
 
     def property_affordance(
         self, thing: Thing, path: Optional[str] = None
