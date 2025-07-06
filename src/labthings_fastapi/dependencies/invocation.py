@@ -33,8 +33,12 @@ def invocation_logger(id: InvocationID) -> logging.Logger:
 InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]
 
 
-class InvocationCancelledError(SystemExit):
-    pass
+class InvocationCancelledError(BaseException):
+    """An invocation was cancelled by the user.
+
+    Note that this inherits from BaseException so won't be caught by
+    `except Exception`, it must be handled specifically.
+    """
 
 
 class CancelEvent(threading.Event):
