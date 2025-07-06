@@ -20,8 +20,14 @@ app = FallbackApp()
 ERROR_PAGE = """
 <!DOCTYPE html>
 <html>
-<head>
+<head lang="en">
     <title>LabThings</title>
+    <style>
+    pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    </style>
 </head>
 <body>
     <h1>LabThings Could't Load</h1>
@@ -39,12 +45,6 @@ ERROR_PAGE = """
     <pre>{{traceback}}</pre>
     {{logginginfo}}
 </body>
-<style>
-pre {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
-</style>
 </html>
 """
 
