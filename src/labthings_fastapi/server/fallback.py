@@ -12,6 +12,7 @@ class FallbackApp(FastAPI):
         self.labthings_server = None
         self.labthings_error = None
         self.log_history = None
+        self.html_code = 500
 
 
 app = FallbackApp()
@@ -71,7 +72,7 @@ async def root():
         logging_info = f"    <p>Logging info</p>\n    <pre>{app.log_history}</pre>"
 
     content = content.replace("{{logginginfo}}", logging_info)
-    return HTMLResponse(content=content, status_code=218)
+    return HTMLResponse(content=content, status_code=app.html_code)
 
 
 @app.get("/{path:path}")
