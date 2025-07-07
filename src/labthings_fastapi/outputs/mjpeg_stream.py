@@ -204,7 +204,10 @@ class MJPEGStream:
             portal.start_task_soon(self.notify_new_frame, entry.index)
 
     async def notify_new_frame(self, i: int) -> None:
-        """Notify any waiting tasks that a new frame is available"""
+        """Notify any waiting tasks that a new frame is available.
+
+        :param i: The number of the frame (which counts up since the server starts)
+        """
         async with self.condition:
             self.last_frame_i = i
             self.condition.notify_all()
