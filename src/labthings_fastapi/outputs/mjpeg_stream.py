@@ -41,7 +41,11 @@ class MJPEGStreamResponse(StreamingResponse):
 
         This response is initialised with an async generator that yields `bytes`
         objects, each of which is a JPEG file. We add the --frame markers and mime
-        types that enable it to work in an `img` tag.
+        types that mark it as an MJPEG stream. This is sufficient to enable it to
+        work in an `img` tag, with the `src` set to the MJPEG stream's endpoint.
+
+        It expects an async generator that supplies individual JPEGs to be streamed,
+        such as the one provided by `.MJPEGStream`.
 
         NB the ``status_code`` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
@@ -63,6 +67,24 @@ class MJPEGStreamResponse(StreamingResponse):
 
 
 class MJPEGStream:
+    """Manage streaming images over HTTP as an MJPEG stream
+
+    An MJPEGStream object handles accepting images (already in
+    JPEG format) and streaming them to HTTP clients as a multipart
+    response.
+
+    The minimum needed to make the stream work is to periodically
+    call `add_frame` with JPEG image data.
+
+    To add a stream to a `.Thing`, use the `.MJPEGStreamDescriptor`
+    which will handle creating an `MJPEGStream` object on first access,
+    and will also add it to the HTTP API.
+
+    The MJPEG stream buffers the last few frames (10 by default) and
+    also has a hook to notify the size of each frame as it is added.
+    The latter is used by OpenFlexure's autofocus routine.
+    """
+
     def __init__(self, ringbuffer_size: int = 10):
         self._lock = threading.Lock()
         self.condition = anyio.Condition()
@@ -85,10 +107,11 @@ class MJPEGStream:
             ]
             self.last_frame_i = -1
 
-    def stop(self):
+    def stop(self, portal: BlockingPortal):
         """Stop the stream"""
         with self._lock:
             self._streaming = False
+            portal.start_task_soon(self.notify_stream_stopped)
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the ith frame acquired by the camera
@@ -117,9 +140,13 @@ class MJPEGStream:
         yield entry.frame
 
     async def next_frame(self) -> int:
-        """Wait for the next frame, and return its index"""
+        """Wait for the next frame, and return its index
+
+        :raises StopAsyncIteration: if the stream has stopped."""
         async with self.condition:
             await self.condition.wait()
+            if not self._streaming:
+                raise StopAsyncIteration()
             return self.last_frame_i
 
     async def grab_frame(self) -> bytes:
@@ -148,6 +175,8 @@ class MJPEGStream:
                 i = await self.next_frame()
                 async with self.buffer_for_reading(i) as frame:
                     yield frame
+            except StopAsyncIteration:
+                break
             except Exception as e:
                 logging.error(f"Error in stream: {e}, stream stopped")
                 return
@@ -156,7 +185,7 @@ class MJPEGStream:
         """Return a StreamingResponse that streams an MJPEG stream"""
         return MJPEGStreamResponse(self.frame_async_generator())
 
-    def add_frame(self, frame: bytes, portal: BlockingPortal):
+    def add_frame(self, frame: bytes, portal: BlockingPortal) -> None:
         """Return the next buffer in the ringbuffer to write to
 
         :param frame: The frame to add
@@ -174,15 +203,31 @@ class MJPEGStream:
             entry.index = self.last_frame_i + 1
             portal.start_task_soon(self.notify_new_frame, entry.index)
 
-    async def notify_new_frame(self, i):
-        """Notify any waiting tasks that a new frame is available"""
+    async def notify_new_frame(self, i: int) -> None:
+        """Notify any waiting tasks that a new frame is available.
+
+        :param i: The number of the frame (which counts up since the server starts)
+        """
         async with self.condition:
             self.last_frame_i = i
             self.condition.notify_all()
 
+    async def notify_stream_stopped(self) -> None:
+        """Raise an exception in any waiting tasks to signal the stream has stopped."""
+        assert self._streaming is False
+        async with self.condition:
+            self.condition.notify_all()
+
 
 class MJPEGStreamDescriptor:
-    """A descriptor that returns a MJPEGStream object when accessed"""
+    """A descriptor that returns a MJPEGStream object when accessed
+
+    If this descriptor is added to a `.Thing`, it will create an `.MJPEGStream`
+    object when it is first accessed. It will also add two HTTP endpoints,
+    one with the name of the descriptor serving the MJPEG stream, and another
+    with `/viewer` appended, which serves a basic HTML page that views the stream.
+
+    """
 
     def __init__(self, **kwargs):
         self._kwargs = kwargs
