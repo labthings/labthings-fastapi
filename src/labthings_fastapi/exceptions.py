@@ -1,5 +1,7 @@
 """A submodule for custom LabThings-FastAPI Exceptions"""
 
+from .dependencies.invocation import InvocationCancelledError
+
 
 class NotConnectedToServerError(RuntimeError):
     """The Thing is not connected to a server
@@ -9,3 +11,6 @@ class NotConnectedToServerError(RuntimeError):
     connected to a ThingServer. A server connection is needed
     to manage asynchronous behaviour.
     """
+
+
+__all__ = ["NotConnectedToServerError", "InvocationCancelledError"]
