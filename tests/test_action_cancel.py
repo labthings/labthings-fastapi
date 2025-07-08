@@ -11,9 +11,8 @@ import time
 
 class CancellableCountingThing(lt.Thing):
     counter = lt.ThingProperty[int](initial_value=0, observable=False)
-    check = lt.ThingProperty(
-        bool,
-        False,
+    check = lt.ThingProperty[bool](
+        initial_value=False,
         observable=False,
         description=(
             "This variable is used to check that the action can detect a cancel event "
