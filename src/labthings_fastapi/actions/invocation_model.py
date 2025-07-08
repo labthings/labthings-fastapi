@@ -46,9 +46,9 @@ class LogRecordModel(BaseModel):
     @classmethod
     def generate_message(cls, data: Any) -> Any:
         """Ensure LogRecord objects have constructed their message.
-        
+
         :param data: The LogRecord to process.
-        
+
         :return: The LogRecord, with a message constructed.
         """
         if not hasattr(data, "message"):

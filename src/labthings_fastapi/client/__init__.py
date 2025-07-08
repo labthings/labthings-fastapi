@@ -1,8 +1,8 @@
-"""A first pass at a client library for LabThings-FastAPI
+"""Code to access `.Thing` features over HTTP.
 
-This will become its own package if it's any good. The goal is to see if we can
-make a client library that produces introspectable Python objects from a Thing
-Description.
+This module defines a base class for controlling LabThings-FastAPI over HTTP.
+It is based on `httpx`, and attempts to create a simple wrapper such that
+each Action becomes a method and each Property becomes an attribute.
 """
 
 from __future__ import annotations
@@ -17,27 +17,48 @@ from pydantic import BaseModel
 
 from .outputs import ClientBlobOutput
 
-
+__all__ = ["ThingClient", "poll_task"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
 
 def get_link(obj: dict, rel: str) -> Mapping:
-    """Retrieve a link from an object's `links` list, by its `rel` attribute"""
+    """Retrieve a link from an object's `links` list, by its `rel` attribute."""
     return next(link for link in obj["links"] if link["rel"] == rel)
 
 
 def get_link_href(obj: dict, rel: str) -> str:
-    """Retrieve the `href` from an object's `links` list, by its `rel` attribute"""
+    """Retrieve the `href` from an object's `links` list, by its `rel` attribute."""
     return get_link(obj, rel)["href"]
 
 
 def task_href(t):
-    """Extract the endpoint address from a task dictionary"""
+    """Extract the endpoint address from a task dictionary."""
     return get_link(t, "self")["href"]
 
 
-def poll_task(client, task, interval=0.5, first_interval=0.05):
-    """Poll a task until it finishes, and return the return value"""
+def poll_task(
+    client: httpx.Client,
+    task: dict,
+    interval: float = 0.5,
+    first_interval: float = 0.05,
+) -> dict:
+    """Poll a task until it finishes, and return the output.
+
+    When actions are invoked in a LabThings-FastAPI server, the
+    initial POST request returns immediately. The returned invocation
+    includes a link that may be polled to find out when the action
+    has completed, whether it was successful, and retrieve its
+    output.
+
+    :param client: the `httpx.Client` to use for HTTP requests.
+    :param task: the dictionary returned from the initial POST request.
+    :param interval: sets how frequently we poll, in seconds.
+    :param first_interval: sets how long we wait before the first
+        polling request. Often, it makes sense for this to be a short
+        interval, in case the action fails (or returns) immediately.
+
+    :return: the completed task as a dictionary.
+    """
     first_time = True
     while task["status"] in ACTION_RUNNING_KEYWORDS:
         time.sleep(first_interval if first_time else interval)
@@ -49,13 +70,26 @@ def poll_task(client, task, interval=0.5, first_interval=0.05):
 
 
 class ThingClient:
-    """A client for a LabThings-FastAPI Thing
+    """A client for a LabThings-FastAPI Thing.
 
-    NB ThingClient must be subclassed to add actions/properties,
-    so this class will be minimally useful on its own.
+    .. note::
+        ThingClient must be subclassed to add actions/properties,
+        so this class will be minimally useful on its own.
+
+        The best way to get a client for a particular Thing is
+        currently `.ThingClient.from_url`, which dynamically
+        creates a subclass with the right attributes.
     """
 
     def __init__(self, base_url: str, client: Optional[httpx.Client] = None):
+        """Create a ThingClient connected to a remote Thing.
+
+        :param base_url: the base URL of the Thing. This should be the URL
+            of the Thing Description document.
+        :param client: an optional `httpx.Client` object to use for all
+            HTTP requests. This may be a `fastapi.TestClient` object for
+            testing purposes.
+        """
         parsed = urlparse(base_url)
         server = f"{parsed.scheme}://{parsed.netloc}"
         self.server = server
@@ -63,16 +97,48 @@ class ThingClient:
         self.client = client or httpx.Client(base_url=server)
 
     def get_property(self, path: str) -> Any:
+        """Make a GET request to retrieve the value of a property.
+
+        :param path: the URI of the ``getproperty`` endpoint, relative
+            to the ``base_url``.
+
+        :return: the property's value, as deserialised from JSON.
+        """
         r = self.client.get(urljoin(self.path, path))
         r.raise_for_status()
         return r.json()
 
     def set_property(self, path: str, value: Any):
+        """Make a PUT request to set the value of a property.
+
+        :param path: the URI of the ``getproperty`` endpoint, relative
+            to the ``base_url``.
+        :param value: the property's value. Currently this must be
+            serialisable to JSON.
+        """
         r = self.client.put(urljoin(self.path, path), json=value)
         r.raise_for_status()
 
     def invoke_action(self, path: str, **kwargs):
-        "Invoke an action on the Thing"
+        """Invoke an action on the Thing.
+
+        This method will make the initial POST request to invoke an action,
+        then poll the resulting invocation until it completes. If successful,
+        the action's output will be returned directly.
+
+        While the action is running, log messages will be re-logged locally.
+        If you have enabled logging to the console, these should be visible.
+
+        :param path: the URI of the ``invokeaction`` endpoint, relative to the
+            ``base_url``
+        :param **kwargs: Additional arguments will be combined into the JSON
+            body of the ``POST`` request and sent as input to the action.
+            These will be validated on the server.
+
+        :return: the output value of the action.
+
+        :raises RuntimeError: is raised if the action does not complete successfully.
+        """
         for k in kwargs.keys():
             if isinstance(kwargs[k], ClientBlobOutput):
                 kwargs[k] = {"href": kwargs[k].href, "media_type": kwargs[k].media_type}
@@ -95,33 +161,55 @@ class ThingClient:
             raise RuntimeError(f"Action did not complete successfully: {task}")
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
-        """Follow a link in a response object, by its `rel` attribute"""
+        """Follow a link in a response object, by its `rel` attribute.
+
+        :param response: is the dictionary returned by e.g. `.poll_task`.
+        :param rel: picks the link to follow by matching its ``rel``
+            item.
+
+        :return: the response to making a ``GET`` request to the link.
+        """
         href = get_link_href(response, rel)
         r = self.client.get(href)
         r.raise_for_status()
         return r
 
     @classmethod
-    def from_url(
-        cls, thing_url: str, client: Optional[httpx.Client] = None, **kwargs
-    ) -> Self:
-        """Create a ThingClient from a URL
+    def from_url(cls, thing_url: str, client: Optional[httpx.Client] = None) -> Self:
+        """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
         and return an instance of that subclass pointing at the Thing URL.
 
-        Additional `kwargs` will be passed to the subclass constructor, in
-        particular you may pass a `client` object (useful for testing).
+        :param thing_url: The base URL of the Thing, which should also be the
+            URL of its Thing Description.
+        :param client: is an optional `httpx.Client` object. If not present,
+            one will be created. This is particularly useful if you need to
+            set HTTP options, or if you want to work with a local server
+            object for testing purposes (see `fastapi.TestClient`).
+
+        :return: a `.ThingClient` subclass with properties and methods that
+            match the retrieved Thing Description (see :ref:`wot_thing`).
         """
         td_client = client or httpx
         r = td_client.get(thing_url)
         r.raise_for_status()
         subclass = cls.subclass_from_td(r.json())
-        return subclass(thing_url, client=client, **kwargs)
+        return subclass(thing_url, client=client)
 
     @classmethod
     def subclass_from_td(cls, thing_description: dict) -> type[Self]:
-        """Create a ThingClient subclass from a Thing Description"""
+        """Create a ThingClient subclass from a Thing Description.
+
+        Dynamically subclass `.ThingClient` to add properties and
+        methods for each property and action in the Thing Description.
+
+        :param thing_description: A wot_td_ as a dictionary, which will
+            be used to construct the class.
+
+        :return: a `.ThingClient` subclass with the right properties and
+            methods.
+        """
         my_thing_description = thing_description
 
         class Client(cls):  # type: ignore[valid-type, misc]
@@ -140,6 +228,8 @@ class ThingClient:
 
 
 class PropertyClientDescriptor:
+    """A base class for properties on `.ThingClient` objects."""
+
     pass
 
 
@@ -151,7 +241,28 @@ def property_descriptor(
     writeable: bool = True,
     property_path: Optional[str] = None,
 ) -> PropertyClientDescriptor:
-    """Create a correctly-typed descriptor that gets and/or sets a property"""
+    """Create a correctly-typed descriptor that gets and/or sets a property.
+
+    The returned `.PropertyClientDescriptor` will have ``__get__`` and
+    (optionally) ``__set__`` methods that are typed according to the
+    supplied ``model``. The descriptor should be added to a `.ThingClient`
+    subclass and used to access the relevant property via
+    `.ThingClient.get_property` and `.ThingClient.set_property`.
+
+    :param property_name: should be the name of the property (i.e. the
+        name it takes in the thing description, and also the name it is
+        assigned to in the class).
+    :param model: the Python ``type`` or a ``pydantic.BaseModel`` that
+        represents the datatype of the property.
+    :param description: text to use for a docstring.
+    :param readable: whether the property may be read (i.e. has ``__get__``).
+    :param writeable: whether the property may be written to.
+    :param property_path: the URL of the ``getproperty`` and ``setproperty``
+        HTTP endpoints. Currently these must both be the same. These are
+        relative to the ``base_url``, i.e. the URL of the Thing Description.
+
+    :return: a descriptor allowing access to the specified property.
+    """
 
     class P(PropertyClientDescriptor):
         name = property_name
@@ -183,8 +294,20 @@ def property_descriptor(
     return P()
 
 
-def add_action(cls: type[ThingClient], action_name: str, action: dict):
-    """Add an action to a ThingClient subclass"""
+def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
+    """Add an action to a ThingClient subclass.
+
+    A method will be added to the class that calls the provided action.
+    Currently, this will have a return type hint but no argument names
+    or type hints.
+
+    :param cls: the `.ThingClient` subclass to which we are adding the
+        action.
+    :param action_name: is both the name we assign the method to, and
+        the name of the action in the Thing Description.
+    :param action: a dictionary representing the action, in wot_td_
+        format.
+    """
 
     def action_method(self, **kwargs):
         return self.invoke_action(action_name, **kwargs)
@@ -197,7 +320,20 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict):
 
 
 def add_property(cls: type[ThingClient], property_name: str, property: dict):
-    """Add a property to a ThingClient subclass"""
+    """Add a property to a ThingClient subclass.
+
+    A descriptor will be added to the provided class that makes the
+    attribute ``property_name`` get and/or set the property described
+    by the ``property`` dictionary.
+
+
+    :param cls: the `.ThingClient` subclass to which we are adding the
+        property.
+    :param property_name: is both the name we assign the descriptor to, and
+        the name of the property in the Thing Description.
+    :param property: a dictionary representing the property, in wot_td_
+        format.
+    """
     setattr(
         cls,
         property_name,
