@@ -1,7 +1,11 @@
+.. _wot_cc:
+
 Web of Things Core Concepts
 ===========================
 
 LabThings is rooted in the `W3C Web of Things standards <WoT>`_. Using IP networking in labs is not new, though perhaps under-used. However lack of proper standardisation has stiffled widespread adoption. LabThings, rather than try to introduce new competing standards, uses the architecture and terminology introduced by the W3C Web of Things. A full description of the core architecture can be found in the `Web of Things (WoT) Architecture <https://www.w3.org/TR/wot-architecture/#sec-wot-architecture>`_ document. However, a brief outline of the concepts relevant to `labthings-fastapi` is given below.
+
+.. _wot_thing:
 
 Thing
 ---------
@@ -10,17 +14,25 @@ A `Thing` represents a piece of hardware or software. It could be a whole instru
 
 `labthings-fastapi` automatically generates a `Thing Description`_ to describe each `Thing`. Each function offered by the `Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
 
+.. _wot_properties
+
 Properties
 ----------
 
 As a rule of thumb, any attribute of your device that can be quickly read, or optionally written, should be a Property. For example, simple device settings, or status information (like a temperature) that takes negligible time to measure. Reading a property should never be a slow operation, as it is expected to be called frequently by clients. Properties are defined as "an Interaction Affordance that allows to read, write, or observe a state of the Thing" in the WoT_ standard. Similarly, writing to a property ought to be quick, and should not cause equipment to perform long-running operations. Properties are defined very similar to standard Python properties, using a decorator that adds them to the `Thing Description`_ and the HTTP API.
+
+.. _wot_actions:
 
 Actions
 -------
 
 Actions generally correspond to making equipment (or software) do something. For example, starting a data acquisition, moving a stage, or changing a setting that requires a significant amount of time to complete. The key point here is that Actions are typically more complex in functionality than simply setting or getting a property. For example, they can set multiple properties simultaneously (for example, auto-exposing a camera), or they can manipulate the state of the Thing over time, for example starting a long-running data acquisition.
 
+In WoT parlance, an Action is "invoked", and we refer to each time an Action is run as an "invocation".
+
 `labthings-fastapi` runs actions in background threads. This allows other actions and properties to be accessed while it is running. You define actions as methods of your `Thing` class using the decorator.
+
+.. _wot_events:
 
 Events
 ------
