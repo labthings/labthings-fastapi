@@ -20,3 +20,4 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 ## Code to tidy up or check
 * `actions/__init__.py:377` I've removed `as_responses` as it should always be true - this makes type hints correct. I should make `request` non-optional and update the 2 places where it's called.
 * `descriptors/action.py:254` should probably have a `Response` dependency and pass it to `list_invocations`.
+* `actions/invocation_model.py:47` might be better typed as `LogRecord`?

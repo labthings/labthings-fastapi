@@ -1,3 +1,8 @@
+"""Invocation Model.
+
+This module contains types used to describe an `.Invocation`.
+"""
+
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
@@ -11,15 +16,22 @@ from ..thing_description.model import Links
 
 
 class InvocationStatus(Enum):
+    """The current status of an `.Invocation`."""
+
     PENDING = "pending"
+    """The `.Invocation` has not yet been started."""
     RUNNING = "running"
+    """The `.Invocation` is running in its thread."""
     COMPLETED = "completed"
+    """The `.Invocation` finished successfully. A return value may be available."""
     CANCELLED = "cancelled"
+    """The `.Invocation` was cancelled and has finished."""
     ERROR = "error"
+    """The `.Invocation` terminated unexpectedly due to an error."""
 
 
 class LogRecordModel(BaseModel):
-    """A model to serialise logging.LogRecord objects"""
+    """A model to serialise `logging.LogRecord` objects."""
 
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
@@ -32,7 +44,13 @@ class LogRecordModel(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def generate_message(cls, data: Any):
+    def generate_message(cls, data: Any) -> Any:
+        """Ensure LogRecord objects have constructed their message.
+        
+        :param data: The LogRecord to process.
+        
+        :return: The LogRecord, with a message constructed.
+        """
         if not hasattr(data, "message"):
             if isinstance(data, logging.LogRecord):
                 try:
@@ -52,6 +70,14 @@ OutputT = TypeVar("OutputT")
 
 
 class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
+    """A model to serialise `.Invocation` objects when they are polled over HTTP.
+
+    The input and output models are generic parameters, to allow this model to
+    be used for specific Actions. These are usually set to `Any` because the
+    invocation endpoint is not specific to any one Action, and thus the types
+    are not known in advance.
+    """
+
     status: InvocationStatus
     id: uuid.UUID
     action: str
