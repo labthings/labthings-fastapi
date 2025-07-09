@@ -55,7 +55,7 @@ class DirectThingClient:
     """The path to the Thing on the server. Relative to the server's base URL."""
 
     def __init__(self, request: Request, **dependencies: Mapping[str, Any]):
-        """Wrapper for a `.Thing` that makes it work like a `.ThingClient`.
+        """Wrap a `.Thing` so it works like a `.ThingClient`.
 
         This class is designed to be used as a FastAPI dependency, and will
         retrieve a `.Thing` based on its ``thing_path`` attribute.
