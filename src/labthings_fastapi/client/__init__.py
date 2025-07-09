@@ -17,32 +17,72 @@ from pydantic import BaseModel
 
 from .outputs import ClientBlobOutput
 
-__all__ = ["ThingClient", "poll_task"]
+__all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
 
-def get_link(obj: dict, rel: str) -> Mapping:
-    """Retrieve a link from an object's `links` list, by its `rel` attribute."""
-    return next(link for link in obj["links"] if link["rel"] == rel)
+class ObjectHasNoLinksError(KeyError):
+    """We attempted to use the `links` key but it was not there.
+
+    `links` is used in several places, including in the representation of
+    `.Invocation` objects. It should be a list of dictionaries, each of
+    which represents a link, with `href` and `rel` keys.
+    """
 
 
-def get_link_href(obj: dict, rel: str) -> str:
-    """Retrieve the `href` from an object's `links` list, by its `rel` attribute."""
-    return get_link(obj, rel)["href"]
+def _get_link(obj: dict, rel: str) -> Mapping:
+    """Retrieve a link from an object's ``links`` list, by its ``rel`` attribute.
+
+    Various places in the wot_td_ feature a list of links. This is represented
+    in JSON as a property called ``links`` which is a list of objects that have
+    ``href`` and ``rel`` properties.
+
+    This function takes an object (which deserialises to a ``dict`` in Python)
+    and looks for its ``links`` item, then iterates through the objects there
+    to find the first one with a particular ``rel`` value. For example, we
+    use this to find the ``self`` link on an invocation.
+
+    :param obj: the deserialised JSON response from querying an invocation.
+        this should be a dictionary containing at least a ``links`` key, which
+        is a list of dictionaries, each with ``href`` and ``rel`` defined.
+    :param rel: the value of the ``rel`` key in the link we are looking for.
+
+    :return: a dictionary representing the link. It should contain at least
+        ``href`` and ``rel`` keys.
+
+    :raises ObjectHasNoLinksError: if there is no ``links`` item.
+    :raises KeyError: if there is no link with the specified ``rel`` value.
+    """
+    if "links" not in obj:
+        raise ObjectHasNoLinksError(f"Can't find any links on {obj}.")
+    try:
+        return next(link for link in obj["links"] if link["rel"] == rel)
+    except StopIteration:
+        raise KeyError(f"No link was found with rel='{rel}' on {obj}.")
 
 
-def task_href(t):
-    """Extract the endpoint address from a task dictionary."""
-    return get_link(t, "self")["href"]
+def invocation_href(invocation: dict) -> str:
+    """Extract the endpoint address from an invocation dictionary.
+
+    :param invocation: The invocation's dictionary representation, i.e. the
+        deserialised JSON response from starting or polling an action.
+
+    :return: The `href` value to poll the invocation.
+
+    .. note::
+
+        Exceptions may propagate from `._get_link`.
+    """
+    return _get_link(invocation, "self")["href"]
 
 
-def poll_task(
+def poll_invocation(
     client: httpx.Client,
-    task: dict,
+    invocation: dict,
     interval: float = 0.5,
     first_interval: float = 0.05,
 ) -> dict:
-    """Poll a task until it finishes, and return the output.
+    """Poll a invocation until it finishes, and return the output.
 
     When actions are invoked in a LabThings-FastAPI server, the
     initial POST request returns immediately. The returned invocation
@@ -51,22 +91,22 @@ def poll_task(
     output.
 
     :param client: the `httpx.Client` to use for HTTP requests.
-    :param task: the dictionary returned from the initial POST request.
+    :param invocation: the dictionary returned from the initial POST request.
     :param interval: sets how frequently we poll, in seconds.
     :param first_interval: sets how long we wait before the first
         polling request. Often, it makes sense for this to be a short
         interval, in case the action fails (or returns) immediately.
 
-    :return: the completed task as a dictionary.
+    :return: the completed invocation as a dictionary.
     """
     first_time = True
-    while task["status"] in ACTION_RUNNING_KEYWORDS:
+    while invocation["status"] in ACTION_RUNNING_KEYWORDS:
         time.sleep(first_interval if first_time else interval)
-        r = client.get(task_href(task))
+        r = client.get(invocation_href(invocation))
         r.raise_for_status()
-        task = r.json()
+        invocation = r.json()
         first_time = False
-    return task
+    return invocation
 
 
 class ThingClient:
@@ -144,32 +184,32 @@ class ThingClient:
                 kwargs[k] = {"href": kwargs[k].href, "media_type": kwargs[k].media_type}
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
-        task = poll_task(self.client, r.json())
-        if task["status"] == "completed":
+        invocation = poll_invocation(self.client, r.json())
+        if invocation["status"] == "completed":
             if (
-                isinstance(task["output"], Mapping)
-                and "href" in task["output"]
-                and "media_type" in task["output"]
+                isinstance(invocation["output"], Mapping)
+                and "href" in invocation["output"]
+                and "media_type" in invocation["output"]
             ):
                 return ClientBlobOutput(
-                    media_type=task["output"]["media_type"],
-                    href=task["output"]["href"],
+                    media_type=invocation["output"]["media_type"],
+                    href=invocation["output"]["href"],
                     client=self.client,
                 )
-            return task["output"]
+            return invocation["output"]
         else:
-            raise RuntimeError(f"Action did not complete successfully: {task}")
+            raise RuntimeError(f"Action did not complete successfully: {invocation}")
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
         """Follow a link in a response object, by its `rel` attribute.
 
-        :param response: is the dictionary returned by e.g. `.poll_task`.
+        :param response: is the dictionary returned by e.g. `.poll_invocation`.
         :param rel: picks the link to follow by matching its ``rel``
             item.
 
         :return: the response to making a ``GET`` request to the link.
         """
-        href = get_link_href(response, rel)
+        href = _get_link(response, rel)["href"]
         r = self.client.get(href)
         r.raise_for_status()
         return r

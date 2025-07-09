@@ -63,7 +63,7 @@ class DirectThingClient:
 
         :param request: This is a FastAPI dependency to access the
             `fastapi.Request` object, allowing access to various resources.
-        :param **dependencies**: Further arguments will be added
+        :param **dependencies: Further arguments will be added
             dynamically by subclasses, by duplicating this method and
             manipulating its signature. Adding arguments with annotated
             type hints instructs FastAPI to inject dependency arguments,
@@ -135,6 +135,34 @@ def property_descriptor(
     return P()
 
 
+class DependencyNameClashError(KeyError):
+    """A dependency argument name is used inconsistently.
+
+    A current limitation of `.DirectThingClient` is that the dependency
+    arguments (see dependencies_) are collected together in a single
+    dictionary. This makes the assumption that, if a name is reused, it is
+    reused for the same dependency.
+
+    When names are re-used, we check if the values match. If not, this
+    exception is raised.
+    """
+
+    def __init__(self, name: str, existing: type, new: type):
+        """Create a DependencyNameClashError.
+
+        See class docstring for an explanation of the error.
+
+        :param name: the name of the clashing dependencies.
+        :param existing: the dependency type annotation in the dictionary.
+        :param new: the clashing type annotation.
+        """
+        super().__init__(
+            f"{self.__doc__}\n\n"
+            f"This clash is with name: {name}.\n"
+            f"Its value is currently {existing}, which clashes with {new}."
+        )
+
+
 def add_action(
     attrs: dict[str, Any],
     dependencies: list[inspect.Parameter],
@@ -159,6 +187,8 @@ def add_action(
         attribute, i.e. we will set ``attrs[name]``, and also match
         the ``name`` in the supplied action descriptor.
     :param action: an `.ActionDescriptor` to be wrapped.
+
+    :raises DependencyNameClashError: if dependencies are inconsistent.
     """
 
     @wraps(action.func)
@@ -180,8 +210,8 @@ def add_action(
                 # Currently, each name may only have one annotation, across
                 # all actions - this is a limitation we should fix.
                 if existing_param.annotation != param.annotation:
-                    raise ValueError(
-                        f"Conflicting dependency injection for {param.name}"
+                    raise DependencyNameClashError(
+                        param.name, existing_param.annotation, param.annotation
                     )
                 included = True
         if not included:
@@ -193,10 +223,13 @@ def add_property(
 ) -> None:
     """Add a property to a DirectThingClient subclass.
 
+    We create a new descriptor using `.property_descriptor` and add it
+    to the ``attrs`` dictionary as ``property_name``.
+
     :param attrs: the attributes of a soon-to-be-created `.DirectThingClient`
         subclass. This will be passed to `type()` to create the subclass.
         We will add the property to this dictionary.
-    :param name: the name of the property. Should be the name of the
+    :param property_name: the name of the property. Should be the name of the
         attribute, i.e. we will set ``attrs[name]``.
     :param property: a `.PropertyDescriptor` to be wrapped.
     """

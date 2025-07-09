@@ -73,6 +73,7 @@ ignore = [
     "D213",  # incompatible with D212
     "DOC201",  # doesn't work with sphinx-style docstrings, use pydoclint
     "DOC501",  # doesn't work with sphinx-style docstrings, use pydoclint
+    "DOC502",  # doesn't work with sphinx-style docstrings, use pydoclint
 ]
 preview = true
 
