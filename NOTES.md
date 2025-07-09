@@ -21,6 +21,7 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
     - How a Thing is defined, how its endpoints are generated, and how the Thing Description is made
     - How properties work: get and set from Python vs HTTP
     - MJPEG Stream: what code is threaded, what is async, and how we communicate between the two.
+* `descriptors` will need to properly describe the lifecycle of `thing_setting` and/or eliminate it in favour of always using the descriptor.
 
 ## Code to tidy up or check
 * `actions/__init__.py:377` I've removed `as_responses` as it should always be true - this makes type hints correct. I should make `request` non-optional and update the 2 places where it's called.
