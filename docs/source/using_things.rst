@@ -19,6 +19,8 @@ Dynamic class generation
 
 The object returned by :meth:`.ThingClient.from_url` is an instance of a dynamically-created subclass of :class:`.ThingClient`. Dynamically creating the class is needed because we don't know what the methods and properties should be until we have downloaded the Thing Description. However, this means most code autocompletion tools, type checkers, and linters will not work well with these classes. In the future, LabThings-FastAPI will generate custom client subclasses that can be shared in client modules, which should fix these problems (see below).
 
+.. _things_from_things:
+
 Using Things from other Things
 ------------------------------
 
