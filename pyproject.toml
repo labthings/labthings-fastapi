@@ -87,6 +87,7 @@ check-style-mismatch = true
 show-filenames-in-every-violation-message = true
 check-return-types = false
 check-class-attributes = false  # prefer docstrings on the attributes
+check-yield-types = false  # use type annotations instead
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
