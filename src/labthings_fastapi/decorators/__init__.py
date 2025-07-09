@@ -37,7 +37,7 @@ not supported at this time.
 """
 
 from functools import wraps, partial
-from typing import Optional, Callable
+from typing import Optional, Callable, overload
 from ..descriptors import (
     ActionDescriptor,
     ThingProperty,
@@ -67,6 +67,17 @@ def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
     return ActionDescriptorSubclass(func, **kwargs)
 
 
+@overload
+def thing_action(func: Callable, **kwargs) -> ActionDescriptor: ...
+@overload
+def thing_action(
+    **kwargs,
+) -> Callable[
+    [
+        Callable,
+    ],
+    ActionDescriptor,
+]: ...
 @wraps(mark_thing_action)
 def thing_action(
     func: Optional[Callable] = None, **kwargs
