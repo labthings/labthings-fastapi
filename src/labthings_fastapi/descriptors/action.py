@@ -254,7 +254,7 @@ class ActionDescriptor:
             summary=f"All invocations of {self.name}.",
         )
         def list_invocations(action_manager: ActionManagerContextDep):
-            return action_manager.list_invocations(self, thing, as_responses=True)
+            return action_manager.list_invocations(self, thing)
 
     def action_affordance(
         self, thing: Thing, path: Optional[str] = None

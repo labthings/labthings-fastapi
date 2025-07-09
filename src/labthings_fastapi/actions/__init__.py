@@ -188,7 +188,7 @@ class Invocation(Thread):
             return self._status
 
     @property
-    def action(self) -> ActionDescriptor:
+    def action(self):
         """The `.ActionDescriptor` object running in this thread."""
         action = self.action_ref()
         assert action is not None, "The action for an `Invocation` has been deleted!"

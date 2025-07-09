@@ -24,6 +24,7 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 
 ## Code to tidy up or check
 * `actions/__init__.py:377` I've removed `as_responses` as it should always be true - this makes type hints correct. I should make `request` non-optional and update the 2 places where it's called.
+* `actions/__init__.py:191` I tried typing this as `ActionDescriptor` but this cases confusion because `mypy` seems to think the descriptor returned by the property will then be invoked with `__get__`. This is not correct. For now, I have removed the type annotation again to avoid the confusion. The resolution might be as simple as turning the `action` property into a method, but we should consider this more carefully with some testing rather than have me bodge it now.
 * `descriptors/action.py:254` should probably have a `Response` dependency and pass it to `list_invocations`.
 * `actions/invocation_model.py:47` might be better typed as `LogRecord`?
 * `client`
