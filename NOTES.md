@@ -39,3 +39,4 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
     * `client/in_server.py` needs a fairly thorough rewrite. It is probably efficient to do this after client code generation is merged.
 * `outputs/mjpeg_stream.py`: review the locks and stream termination
 * `tests/` still uses `poll_task` from `temp_client.py`. We should use `poll_invocation` from `client` instead (it's identical). We should also review how `TestClient` is used and perhaps make more use of the client module. This might want to wait until after code generation is implemented, as that will substantially change the client module.
+* `blocking_portal` should probably just be a property of `.Thing`.
