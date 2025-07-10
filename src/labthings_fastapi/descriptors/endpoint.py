@@ -1,3 +1,18 @@
+"""Add a FastAPI endpoint without making it an action.
+
+The `.EndpointDescriptor` wraps a function and marks it to be added to the
+HTTP API at the same time as the properties and actions of the host `.Thing`.
+This is intended to allow flexibility to implement endpoints that cannot be
+described in a Thing Description as actions or properties.
+
+It may use any `fastapi` responses or arguments, as it passes keyword
+arguments through to the relevant `fastapi` decorator.
+
+This will most usually be applied as a decorator with arguments, available
+as :deco:`.fastapi_endpoint`. See the documentation for that function for
+more detail.
+"""
+
 from __future__ import annotations
 from functools import partial, wraps
 
@@ -19,10 +34,11 @@ if TYPE_CHECKING:
     from ..thing import Thing
 
 HTTPMethod = Literal["get", "post", "put", "delete"]
+"""Valid HTTP verbs to use with `.fastapi_endpoint` or `.EndpointDescriptor`."""
 
 
 class EndpointDescriptor:
-    """A descriptor to allow Things to easily add other endpoints"""
+    """A descriptor to allow Things to easily add other endpoints."""
 
     def __init__(
         self,
@@ -31,6 +47,20 @@ class EndpointDescriptor:
         path: Optional[str] = None,
         **kwargs: Mapping,
     ):
+        """Initialise an EndpointDescriptor.
+
+        See `.fastapi_endpoint`, which is the usual way of instantiating this
+        class.
+
+        :param func: is the method (defined on a `.Thing`) wrapped by this
+            descriptor.
+        :param http_method: the HTTP verb we are responding to. This selects
+            the FastAPI decorator: ``"get"`` corresponds to ``@app.get``.
+        :param path: the URL, relative to the host `.Thing`, for the endpoint.
+        :param **kwargs: additional keyword arguments are passed to the
+            FastAPI decorator, allowing you to specify responses, OpenAPI
+            parameters, etc.
+        """
         self.func = func
         self.http_method = http_method
         self._path = path
@@ -43,10 +73,21 @@ class EndpointDescriptor:
     def __get__(self, obj: Thing, type=None) -> Callable: ...
 
     def __get__(self, obj: Optional[Thing], type=None) -> Union[Self, Callable]:
-        """The function, bound to an object as for a normal method.
+        """Bind the method to the host `.Thing` and return it.
+
+        When called on a `.Thing`, this descriptor returns the wrapped
+        function, with the `.Thing` bound as its first argument. This is
+        the usual behaviour for Python methods.
 
         If `obj` is None, the descriptor is returned, so we can get
         the descriptor conveniently as an attribute of the class.
+
+        :param obj: The `.Thing` on which the descriptor is defined, or ``None``.
+        :param type: The class on which the descriptor is defined.
+
+        :return: The wrapped function, bound to the `.Thing` (when called as
+            an instance attribute), or the descriptor itself (when called as
+            a class attribute).
         """
         if obj is None:
             return self
@@ -54,22 +95,22 @@ class EndpointDescriptor:
 
     @property
     def name(self):
-        """The name of the wrapped function"""
+        """The name of the wrapped function."""
         return self.func.__name__
 
     @property
     def path(self):
-        """The path of the endpoint (relative to the Thing)"""
+        """The path of the endpoint (relative to the Thing)."""
         return self._path or self.name
 
     @property
     def title(self):
-        """A human-readable title"""
+        """A human-readable title."""
         return get_summary(self.func) or self.name
 
     @property
     def description(self):
-        """A description of the endpoint"""
+        """A description of the endpoint."""
         return get_docstring(self.func, remove_summary=True)
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
