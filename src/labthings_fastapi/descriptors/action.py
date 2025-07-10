@@ -60,6 +60,14 @@ class ActionDescriptor:
     This class is responsible for generating the action description for
     the wot_td_ and creating the function that responds to ``POST``
     requests to invoke the action.
+
+    .. note::
+        Descriptors are instantiated once per class. This means that we cannot
+        assume there is only one action corresponding to this descriptor: there
+        may be multiple `.Thing` instances with the same descriptor. That is
+        why the host `.Thing` must be passed to many functions as an argument,
+        and why observers, for example, must be keyed by the `.Thing` rather
+        than kept as a property of ``self``.
     """
 
     def __init__(
