@@ -24,7 +24,7 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `descriptors` will need to properly describe the lifecycle of `thing_setting` and/or eliminate it in favour of always using the descriptor.
 * More detail of how and why to use dependencies other than the inter-thing dependencies.
 * A description of how actions are cancelled, perhaps in the new actions page?
-* A description of how the various dependencies work together to set up a new action - e.g. `InvocationID`, `CancelHook`, ...
+* A description of how the various dependencies work together to set up a new action - e.g. `InvocationID`, `CancelHook`, ... - added to module docstring
 * Do we need a conceptual page on concurre
 
 ## Code to tidy up or check
