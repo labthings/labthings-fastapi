@@ -1,7 +1,7 @@
 """FastAPI dependency for a blocking portal.
 
 This allows dependencies that are called by threaded code to send things back
-to the async event loop.
+to the async event loop. See concurrency_ for more details.
 
 Threaded code can call asynchronous code in the `anyio` event loop used by
 `fastapi`, if an `anyio.BlockingPortal` is used.
@@ -43,8 +43,11 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
         `.ThingServer`\ 's event loop.
     """
     portal = find_thing_server(request.app).blocking_portal
-    if portal is None:
-        raise RuntimeError("Could not get the blocking portal from the server.")
+    assert portal is not None, RuntimeError(
+        "Could not get the blocking portal from the server."
+        # This should never happen, as the blocking portal is added
+        # and removed in `.ThingServer.lifecycle`\ .
+    )
     return portal
 
 

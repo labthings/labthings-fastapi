@@ -1,3 +1,5 @@
+.. _concurrency:
+
 Concurrency in LabThings-FastAPI
 ==================================
 
