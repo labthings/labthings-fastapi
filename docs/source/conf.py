@@ -9,7 +9,7 @@
 project = "labthings-fastapi"
 copyright = "2024, Richard Bowman"
 author = "Richard Bowman"
-release = "0.0.1"
+release = "0.0.10"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -28,7 +28,7 @@ exclude_patterns = []
 default_role = "py:obj"
 
 autodoc2_packages = ["../../src/labthings_fastapi"]
-autodoc2_render_plugin = "myst"
+# autodoc2_render_plugin = "myst"
 autodoc2_class_docstring = "both"
 
 # autoapi_dirs = ["../../src/labthings_fastapi"]

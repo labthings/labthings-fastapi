@@ -1,3 +1,17 @@
+r"""FastAPI dependency to allow `.Thing`\ s to depend on each other.
+
+This module defines a mechanism to obtain a `.DirectThingClient` that
+wraps another `.Thing` on the same server. See things_from_things_ and
+dependencies_ for more detail.
+
+.. note::
+
+    `.direct_thing_client_dependency` may confuse linters and type
+    checkers, as types should not be the result of a function call.
+    You may wish to manually create an annotated type using
+    `.direct_thing_client_class`.
+"""
+
 from __future__ import annotations
 from typing import Annotated, Optional
 
@@ -12,7 +26,22 @@ def direct_thing_client_dependency(
     thing_path: str,
     actions: Optional[list[str]] = None,
 ) -> type[Thing]:
-    """A type annotation that causes FastAPI to supply a direct thing client
+    """Make an annotated type to allow Things to depend on each other.
+
+    This function returns an annotated type that may be used as a FastAPI
+    dependency. The dependency will return a `.DirectThingClient` that
+    wraps the specified `.Thing`. This should be a drop-in replacement for
+    `.ThingClient` so that code is consistent whether run in an action, or
+    in a script or notebook on a remote computer.
+
+    See things_from_things_ and dependencies_.
+
+    .. note::
+
+        `.direct_thing_client_dependency` may confuse linters and type
+        checkers, as types should not be the result of a function call.
+        You may wish to manually create an annotated type using
+        `.direct_thing_client_class`.
 
     :param thing_class: The class of the thing to connect to
     :param thing_path: The path to the thing on the server

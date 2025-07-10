@@ -16,6 +16,7 @@ subclass, defining the
 class MyImageBlob(Blob):
     media_type = "image/png"
 
+
 class MyThing(Thing):
     @thing_action
     def get_image(self) -> MyImageBlob:

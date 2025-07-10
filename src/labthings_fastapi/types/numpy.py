@@ -7,6 +7,7 @@ Usage:
 ```
 from labthings_fastapi.types.ndarray import NDArray
 
+
 def double(arr: NDArray) -> NDArray:
     return arr * 2  # arr is a numpy.ndarray
 ```
