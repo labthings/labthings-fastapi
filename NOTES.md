@@ -25,6 +25,7 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * More detail of how and why to use dependencies other than the inter-thing dependencies.
 * A description of how actions are cancelled, perhaps in the new actions page?
 * A description of how the various dependencies work together to set up a new action - e.g. `InvocationID`, `CancelHook`, ... - added to module docstring
+* A description of notifications/observers, including current status and planned improvements.
 
 ## Code to tidy up or check
 * `actions/__init__.py:377` I've removed `as_responses` as it should always be true - this makes type hints correct. I should make `request` non-optional and update the 2 places where it's called.
@@ -42,5 +43,6 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `blocking_portal` should probably just be a property of `.Thing`.
 * `dependencies/blocking_portal.py:49` I don't expect this exception to be raised. Is it worth a custom error? Or a test?
 * I've added `direct_thing_client_class` to `deps` and updated the dependencies example to use it. This is a change to recommended usage but not a change to the API beyond exposing another symbol.
+* `descriptors/action.py:198` has an Exception-swallowing block. If this is needed, we should make it more specific or justify why not.
 
 
