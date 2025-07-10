@@ -45,5 +45,6 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `dependencies/blocking_portal.py:49` I don't expect this exception to be raised. Is it worth a custom error? Or a test?
 * I've added `direct_thing_client_class` to `deps` and updated the dependencies example to use it. This is a change to recommended usage but not a change to the API beyond exposing another symbol.
 * `descriptors/action.py:198` has an Exception-swallowing block. If this is needed, we should make it more specific or justify why not.
+* `descriptors/property.py` will be substantially rewritten. I have copied over docstrings from another branch that describe the status quo, I realise they are confusing, but that's why we plan to change the module significantly.
 
 
