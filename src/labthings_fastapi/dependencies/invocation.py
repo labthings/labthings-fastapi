@@ -3,6 +3,32 @@
 There are a number of LabThings-FastAPI features that are specific to each
 invocation of an action.  These may be accessed using the dependencies_ in
 this module.
+
+It's important to understand how FastAPI handles dependencies when looking
+at the code in this module. Each dependency (i.e. each callable passed as
+the argument to `fastapi.Depends` in an annotated type) will be evaluated
+only once per HTTP request. This means that we don't need to cache
+`.InvocationID` and pass it between the functions, because the same ID
+will be passed to every dependency that has an argument with the annotated
+type `.InvocationID`.
+
+When an action is invoked with a ``POST`` request, the endpoint function
+responsible always has dependencies for the `.InvocationID` and
+`.CancelHook`. These are added to the `.Invocation` thread that is created.
+If the action declares dependencies with these types, it will receive the
+same objects. This avoids the need for the action to be aware of its
+`.Invocation`.
+
+.. note::
+
+    Currently, `.invocation_logger` is called from `.Invocation.run` with the
+    invocation ID as an argument, and is not a direct dependency of the action's
+    ``POST`` endpoint.
+
+    This doesn't duplicate the returned logger object, as
+    `logging.getLogger` may be called multiple
+    times and will return the same `logging.Logger` object provided it is
+    called with the same name.
 """
 
 from __future__ import annotations
@@ -109,7 +135,14 @@ class CancelEvent(threading.Event):
         self.invocation_id = id
 
     def raise_if_set(self):
-        """Raise a CancelledError if the event is set.
+        """Raise an exception if the event is set.
+
+        This is intended as a compact alternative to:
+
+        .. code-block::
+
+            if cancel_event.is_set():
+                raise InvocationCancelledError()
 
         :raises InvocationCancelledError: if the event has been cancelled.
         """
@@ -117,7 +150,14 @@ class CancelEvent(threading.Event):
             raise InvocationCancelledError("The action was cancelled.")
 
     def sleep(self, timeout: float):
-        """Sleep for a given time in seconds, but raise an exception if cancelled.
+        r"""Sleep for a given time in seconds, but raise an exception if cancelled.
+
+        This function can be used in place of `time.sleep`. It will usually behave
+        the same as `time.sleep`\ , but if the cancel event is set during the time
+        when we are sleeping, an exception is raised to interrupt the sleep and
+        cancel the action.
+
+        :param timeout: The time to sleep for, in seconds.
 
         :raises InvocationCancelledError: if the event has been cancelled.
         """
@@ -126,7 +166,15 @@ class CancelEvent(threading.Event):
 
 
 def invocation_cancel_hook(id: InvocationID) -> CancelHook:
-    """Get a cancel hook belonging to a particular invocation"""
+    """Make a cancel hook for a particular invocation.
+
+    This is for use as a FastAPI dependency, and will create a
+    `.CancelEvent` for use with a particular `.Invocation`.
+
+    :param id: The invocation ID, supplied by FastAPI.
+
+    :return: a `.CancelHook` event.
+    """
     return CancelEvent(id)
 
 
