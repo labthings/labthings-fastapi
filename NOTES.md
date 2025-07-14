@@ -50,6 +50,13 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `outputs/blob/blob.py` should use custom exceptions for `retrieve_data` and `to_dict`. We also need more unit tests for blobs, including error conditions and invalid URLs.
   - 428: should use a custom exception, possibly based on `AttributeError`.
   - 535: should use generic class methods to ensure the return type is an instance of `cls` rather than `Blob`. Same for `from_bytes`.
-* `docs/src/blobs.rst` could really do with doctest to stop the example going stale.
+* `docs/src/blobs.rst` could really do with doctest to stop the example going stale
+* `outputs/mjpeg_stream.py` could be simplified.
+  - `buffer_for_reading` is a pointless context manager, could be replaced with `ringbuffer_entry`
+  - many generic `RuntimeErrors` should have exceptions defined.
+  - Should we use `IndexError` when frames aren't available (or at least a subclass thereof)?
+  - Example code in the descriptor may want a doctest in due course.
+  - Could do with example code showing how it works in a simple camera?
+
 
 

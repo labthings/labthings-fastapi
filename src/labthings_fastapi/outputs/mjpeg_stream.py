@@ -1,9 +1,16 @@
+"""MJPEG Stream support.
+
+This module defines a descriptor that allows `.Thing` subclasses to expose an
+MJPEG stream. See `.MJPEGStreamDescriptor`.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, HTMLResponse
 from typing import (
+    Any,
     AsyncGenerator,
     AsyncIterator,
     Literal,
@@ -26,18 +33,36 @@ if TYPE_CHECKING:
 
 @dataclass
 class RingbufferEntry:
-    """A single entry in a ringbuffer"""
+    """A single entry in a ringbuffer.
+
+    This structure comprises one frame as a JPEG, plus a timestamp and
+    a buffer index. Each time a frame is added to the stream, it is
+    tagged with a timestamp and index, with the index increasing by
+    1 each time.
+    """
 
     frame: bytes
+    """The frame as a `bytes` object, which is a JPEG image for an MJPEG stream."""
     timestamp: datetime
+    """The time the frame was added to the ringbuffer."""
     index: int
+    """The index of the frame within the stream."""
 
 
 class MJPEGStreamResponse(StreamingResponse):
+    """A StreamingResponse that streams an MJPEG stream.
+
+    This response uses an async generator that yields `bytes`
+    objects, each of which is a JPEG file. We add the --frame markers and mime
+    types that mark it as an MJPEG stream. This is sufficient to enable it to
+    work in an `img` tag, with the `src` set to the MJPEG stream's endpoint.
+    """
+
     media_type = "multipart/x-mixed-replace; boundary=frame"
+    """The media_type used to describe the endpoint in FastAPI."""
 
     def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
-        """A StreamingResponse that streams an MJPEG stream
+        """Set up StreamingResponse that streams an MJPEG stream.
 
         This response is initialised with an async generator that yields `bytes`
         objects, each of which is a JPEG file. We add the --frame markers and mime
@@ -49,6 +74,11 @@ class MJPEGStreamResponse(StreamingResponse):
 
         NB the ``status_code`` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
+
+        :param gen: an async generator, yielding `bytes` objects each of which is
+            one image, in JPEG format.
+        :param status_code: The status code associated with the response, by default
+            a 200 code is returned.
         """
         self.frame_async_generator = gen
         StreamingResponse.__init__(
@@ -59,7 +89,14 @@ class MJPEGStreamResponse(StreamingResponse):
         )
 
     async def mjpeg_async_generator(self) -> AsyncGenerator[bytes, None]:
-        """A generator yielding an MJPEG stream"""
+        """Return a generator yielding an MJPEG stream.
+
+        This async generator wraps each incoming JPEG frame with the
+        ``--frame`` separator and content type header. It is the basis
+        of the response sent over HTTP (see ``__init__``).
+
+        :yield: JPEG frames, each with a ``--frame`` marker prepended.
+        """
         async for frame in self.frame_async_generator:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
             yield frame
@@ -67,7 +104,7 @@ class MJPEGStreamResponse(StreamingResponse):
 
 
 class MJPEGStream:
-    """Manage streaming images over HTTP as an MJPEG stream
+    """Manage streaming images over HTTP as an MJPEG stream.
 
     An MJPEGStream object handles accepting images (already in
     JPEG format) and streaming them to HTTP clients as a multipart
@@ -77,15 +114,25 @@ class MJPEGStream:
     call `add_frame` with JPEG image data.
 
     To add a stream to a `.Thing`, use the `.MJPEGStreamDescriptor`
-    which will handle creating an `MJPEGStream` object on first access,
+    which will handle creating an `.MJPEGStream` object on first access,
     and will also add it to the HTTP API.
 
     The MJPEG stream buffers the last few frames (10 by default) and
     also has a hook to notify the size of each frame as it is added.
-    The latter is used by OpenFlexure's autofocus routine.
+    The latter is used by OpenFlexure's autofocus routine. The
+    ringbuffer is intended to support clients receiving notification
+    of new frames, and then retrieving the frame (shortly) afterwards.
     """
 
     def __init__(self, ringbuffer_size: int = 10):
+        """Initialise an MJPEG stream.
+
+        See the class docstring for `.MJPEGStream`. Note that it will
+        often be initialised by `.MJPEGStreamDescriptor`.
+
+        :param ringbuffer_size: The number of frames to retain in
+            memory, to allow retrieval after the frame has been sent.
+        """
         self._lock = threading.Lock()
         self.condition = anyio.Condition()
         self._streaming = False
@@ -93,7 +140,12 @@ class MJPEGStream:
         self.reset(ringbuffer_size=ringbuffer_size)
 
     def reset(self, ringbuffer_size: Optional[int] = None):
-        """Reset the stream and optionally change the ringbuffer size"""
+        """Reset the stream and optionally change the ringbuffer size.
+
+        Discard all frames from the ringbuffer and reset the frame index.
+
+        :param ringbuffer_size: the number of frames to keep in memory.
+        """
         with self._lock:
             self._streaming = True
             n = ringbuffer_size or len(self._ringbuffer)
@@ -107,16 +159,31 @@ class MJPEGStream:
             ]
             self.last_frame_i = -1
 
-    def stop(self, portal: BlockingPortal):
-        """Stop the stream"""
+    def stop(self, portal: BlockingPortal) -> None:
+        """Stop the stream.
+
+        Stop the stream and cause all clients to disconnect.
+
+        :param portal: an `anyio.from_thread.BlockingPortal` that allows
+            this function to use the event loop to notify that the stream
+            should stop.
+        """
         with self._lock:
             self._streaming = False
             portal.start_task_soon(self.notify_stream_stopped)
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
-        """Return the ith frame acquired by the camera
+        """Return the ith frame acquired by the camera.
 
-        :param i: The index of the frame to read
+        The ringbuffer means we can retrieve frames even if they are not
+        the latest frame. Specifying ``i`` also makes it simple to ensure
+        that every frame in a stream is acquired.
+
+        :param i: The index of the frame to read.
+
+        :return: the frame, together with a timestamp and its index.
+
+        :raise ValueError: if the frame is not available.
         """
         if i < 0:
             raise ValueError("i must be >= 0")
@@ -132,17 +199,39 @@ class MJPEGStream:
 
     @asynccontextmanager
     async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
-        """Yields the ith frame as a bytes object
+        """Yield the ith frame as a bytes object.
+
+        Retrieve frame ``i`` from the ringbuffer.
+
+        This allows async code access to a frame in the ringbuffer.
+        The frame will not be copied, and should not be written to.
+        The frame may not exist after the function has completed (i.e.
+        after any ``with`` statement has finished).
+
+        Using a context manager is intended to allow future versions of this
+        code to manage access to the ringbuffer (e.g. allowing buffer re-use).
+        Currently, buffers are always created as fresh `bytes` objects, so
+        this context manager does not provide additional functionality
+        over `.MJPEGStream.ringbuffer_entry`.
 
         :param i: The index of the frame to read
+
+        :yield: The frame's data as `bytes`, along with timestamp and index.
         """
         entry = await self.ringbuffer_entry(i)
         yield entry.frame
 
     async def next_frame(self) -> int:
-        """Wait for the next frame, and return its index
+        """Wait for the next frame, and return its index.
 
-        :raises StopAsyncIteration: if the stream has stopped."""
+        This async function will yield until a new frame arrives, then return
+        its index. The index may then be used to retrieve the new frame
+        with `.MJPEGStream.buffer_for_reading`.
+
+        :return: the index of the next frame to arrive.
+
+        :raises StopAsyncIteration: if the stream has stopped.
+        """
         async with self.condition:
             await self.condition.wait()
             if not self._streaming:
@@ -150,26 +239,46 @@ class MJPEGStream:
             return self.last_frame_i
 
     async def grab_frame(self) -> bytes:
-        """Wait for the next frame, and return it
+        """Wait for the next frame, and return it.
 
-        This copies the frame for safety, so we can release the
-        read lock on the buffer.
+        This copies the frame for safety, so there is no need to release
+        or return the buffer.
+
+        :return: The next JPEG frame, as a `bytes` object.
         """
         i = await self.next_frame()
         async with self.buffer_for_reading(i) as frame:
             return copy(frame)
 
     async def next_frame_size(self) -> int:
-        """Wait for the next frame and return its size
+        """Wait for the next frame and return its size.
 
         This is useful if you want to use JPEG size as a sharpness metric.
+
+        :return: The size of the next JPEG frame, in bytes.
         """
         i = await self.next_frame()
         async with self.buffer_for_reading(i) as frame:
             return len(frame)
 
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
-        """A generator that yields frames as bytes"""
+        """Yield frames as bytes objects.
+
+        This generator will return frames from the MJPEG stream. These are
+        taken from the ringbuffer by `.MJPEGStream.buffer_for_reading` and
+        so should have any buffer-management considerations taken care of.
+
+        Code using this generator should complete as quickly as possible,
+        because future implementations may hold a lock while this function
+        yields. If lengthy processing is required, please copy the buffer
+        and continue processing elsewhere.
+
+        Note that this will wait for a new frame each time. There is no
+        guarantee that we won't skip frames.
+
+        :yield: the frames in sequence, as a `bytes` object containing
+            JPEG data.
+        """
         while self._streaming:
             try:
                 i = await self.next_frame()
@@ -182,20 +291,42 @@ class MJPEGStream:
                 return
 
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
-        """Return a StreamingResponse that streams an MJPEG stream"""
+        """Return a StreamingResponse that streams an MJPEG stream.
+
+        This wraps each frame with the required header to make the
+        multipart stream work, and sends it to the client via a
+        streaming response. It is sufficient to show up as a video
+        in an ``img`` tag, or to be streamed to disk as an MJPEG
+        format video.
+
+        :return: a streaming response in MJPEG format.
+        """
         return MJPEGStreamResponse(self.frame_async_generator())
 
     def add_frame(self, frame: bytes, portal: BlockingPortal) -> None:
-        """Return the next buffer in the ringbuffer to write to
+        """Add a JPEG to the MJPEG stream.
+
+        This function adds a frame to the stream. It may be called from
+        threaded code, but uses an `anyio.from_thread.BlockingPortal` to
+        call code in the `anyio` event loop, which is where notifications
+        are handled.
 
         :param frame: The frame to add
         :param portal: The blocking portal to use for scheduling tasks.
             This is necessary because tasks are handled asynchronously.
             The blocking portal may be obtained with a dependency, in
             `labthings_fastapi.dependencies.blocking_portal.BlockingPortal`.
+
+        :raises ValueError: if the supplied frame does not start with the JPEG
+            start bytes and end with the end bytes.
         """
-        assert frame[0] == 0xFF and frame[1] == 0xD8, ValueError("Invalid JPEG")
-        assert frame[-2] == 0xFF and frame[-1] == 0xD9, ValueError("Invalid JPEG")
+        if not (
+            frame[0] == 0xFF
+            and frame[1] == 0xD8
+            and frame[-2] == 0xFF
+            and frame[-1] == 0xD9
+        ):
+            raise ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
             entry.timestamp = datetime.now()
@@ -220,19 +351,33 @@ class MJPEGStream:
 
 
 class MJPEGStreamDescriptor:
-    """A descriptor that returns a MJPEGStream object when accessed
+    """A descriptor that returns a MJPEGStream object when accessed.
 
     If this descriptor is added to a `.Thing`, it will create an `.MJPEGStream`
     object when it is first accessed. It will also add two HTTP endpoints,
     one with the name of the descriptor serving the MJPEG stream, and another
     with `/viewer` appended, which serves a basic HTML page that views the stream.
 
+    This descriptor does not currently show up in the wot_td_.
     """
 
-    def __init__(self, **kwargs):
-        self._kwargs = kwargs
+    def __init__(self, **kwargs: dict[str, Any]):
+        """Initialise an MJPEGStreamDescriptor.
 
-    def __set_name__(self, owner, name):
+        :param **kwargs: keyword arguments are passed to the initialiser of
+            `.MJPEGStream`.
+        """
+        self._kwargs: Any = kwargs
+
+    def __set_name__(self, _owner: Thing, name: str) -> None:
+        """Remember the name to which we are assigned.
+
+        The name is important, as it will set the URL of the HTTP endpoint used
+        to access the stream.
+
+        :param _owner: the `.Thing` to which we are attached.
+        :param name: the name to which this descriptor is assigned.
+        """
         self.name = name
 
     @overload
@@ -241,17 +386,20 @@ class MJPEGStreamDescriptor:
     @overload
     def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...
 
-    def __get__(self, obj: Optional[Thing], type=None) -> Union[MJPEGStream, Self]:
-        """The value of the property
+    def __get__(
+        self, obj: Optional[Thing], type: type[Thing] | None = None
+    ) -> Union[MJPEGStream, Self]:
+        """Return the MJPEG Stream, or the descriptor object.
 
-        If ``obj`` is none (i.e. we are getting the attribute of the class),
-        we return the descriptor.
+        When accessed on the class, this ``__get__`` method will return the descriptor
+        object. This allows LabThings to add it to the HTTP API.
 
-        If no getter is set, we'll return either the initial value, or the value
-        from the object's ``__dict__``, i.e. we behave like a variable.
+        When accessed on the object, an `.MJPEGStream` is returned.
 
-        If a getter is set, we will use it, unless the property is observable, at
-        which point the getter is only ever used once, to set the initial value.
+        :param obj: the host `.Thing`, or ``None`` if accessed on the class.
+        :param type: the class on which we are defined.
+
+        :return: an `.MJPEGStream`, or this descriptor.
         """
         if obj is None:
             return self
@@ -262,10 +410,39 @@ class MJPEGStreamDescriptor:
             return obj.__dict__[self.name]
 
     async def viewer_page(self, url: str) -> HTMLResponse:
+        """Generate a trivial viewer page for the stream.
+
+        :param url: the URL of the stream.
+
+        :return: a trivial HTML page that views the stream.
+        """
         return HTMLResponse(f"<html><body><img src='{url}'></body></html>")
 
-    def add_to_fastapi(self, app: FastAPI, thing: Thing):
-        """Add the stream to the FastAPI app"""
+    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
+        """Add the stream to the FastAPI app.
+
+        We create two endpoints, one for the MJPEG stream (using the name of
+        the descriptor, relative to the host `.Thing`) and one serving a
+        basic viewer.
+
+        The example code below would create endpoints at ``/camera/stream``
+        and ``/camera/stream/viewer``.
+
+        .. code-block:: python
+
+            import labthings_fastapi as lt
+
+
+            class Camera(lt.Thing):
+                stream = MJPEGStreamDescriptor()
+
+
+            server = lt.ThingServer()
+            server.add_thing(Camera(), "/camera")
+
+        :param app: the `fastapi.FastAPI` application to which we are being added.
+        :param thing: the host `.Thing` instance.
+        """
         app.get(
             f"{thing.path}{self.name}",
             response_class=MJPEGStreamResponse,
