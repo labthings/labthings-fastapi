@@ -50,5 +50,6 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `outputs/blob/blob.py` should use custom exceptions for `retrieve_data` and `to_dict`. We also need more unit tests for blobs, including error conditions and invalid URLs.
   - 428: should use a custom exception, possibly based on `AttributeError`.
   - 535: should use generic class methods to ensure the return type is an instance of `cls` rather than `Blob`. Same for `from_bytes`.
+* `docs/src/blobs.rst` could really do with doctest to stop the example going stale.
 
 

@@ -606,6 +606,8 @@ class BlobDataManager:
     it holds only the `.ServerSideBlobData` object, which is where the data is
     stored. This means you should not rely on any custom attributes of a `.Blob`
     subclass being preserved when the `.Blob` is passed from one action to another.
+
+    See blobs_ for an overview of how `.Blob` objects should be used.
     """
 
     def __init__(self) -> None:
