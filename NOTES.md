@@ -47,5 +47,8 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `descriptors/action.py:198` has an Exception-swallowing block. If this is needed, we should make it more specific or justify why not.
 * `descriptors/property.py` will be substantially rewritten. I have copied over docstrings from another branch that describe the status quo, I realise they are confusing, but that's why we plan to change the module significantly.
 * `example_things/__init__.py` should be split up and renamed. Most of the things belong in tests, not in the module.
+* `outputs/blob/blob.py` should use custom exceptions for `retrieve_data` and `to_dict`. We also need more unit tests for blobs, including error conditions and invalid URLs.
+  - 428: should use a custom exception, possibly based on `AttributeError`.
+  - 535: should use generic class methods to ensure the return type is an instance of `cls` rather than `Blob`. Same for `from_bytes`.
 
 

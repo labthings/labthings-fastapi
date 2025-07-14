@@ -40,6 +40,14 @@ _thing_servers: WeakSet[ThingServer] = WeakSet()
 def find_thing_server(app: FastAPI) -> ThingServer:
     """Find the ThingServer associated with an app.
 
+    This function will return the `.ThingServer` object that contains
+    a particular `fastapi.FastAPI` app. The app is available as part
+    of the `fastapi.Request` object, so this makes it possible to
+    get the `.ThingServer` in dependency functions.
+
+    This function will not work as a dependency, but
+    `.thing_server_from_request` will.
+
     :param app: The `fastapi.FastAPI` application that implements the
         `.ThingServer`, i.e. this is ``thing_server.app``.
 
@@ -61,6 +69,16 @@ def thing_server_from_request(request: Request) -> ThingServer:
 
     This is for use as a FastAPI dependency, so the thing server is
     retrieved from the request object. See `.find_thing_server`.
+
+    It may be used as a dependency with:
+
+    .. code-block:: python
+
+        ServerDep = Annotated[ThingServer, Depends(thing_server_from_request)]
+
+    This is not provided as a ready-made annotated type because it would
+    introduce a hard dependency on the `.server` module and cause circular
+    references.
 
     :param request: is supplied automatically by FastAPI when used
         as a dependency.

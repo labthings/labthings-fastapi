@@ -1,3 +1,5 @@
+.. _blobs:
+
 Blob input/output
 =================
 
