@@ -1,3 +1,5 @@
+.. _labthings_cc
+
 LabThings Core Concepts
 =======================
 

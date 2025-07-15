@@ -2,8 +2,10 @@
 
 wot_td_ defines a schema for describing Things, using JSONSchema-like syntax
 for data types. This file contains pydantic models that describe that
-schema. For the meaning of the various objects, please refer to the schema
-definition within the W3C standard.
+schema. For the meaning of the various objects, please refer to the
+td_schema_definition_ within the W3C standard.
+
+.. _td_schema_definition: https://www.w3.org/TR/wot-thing-description11/
 
 This file was automatically generated, but has been customised to improve the
 types and simplify/combine objects.

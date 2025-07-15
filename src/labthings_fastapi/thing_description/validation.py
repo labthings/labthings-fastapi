@@ -4,6 +4,8 @@ We generate wot_td_ using `pydantic` models so there is a layer of
 validation applied every time one is created. However, this module allows
 the generated JSON document to be formally validated against the schema
 in the W3C specification, as an additional check.
+
+See wot_td_ for a link to the specification in human-readable format.
 """
 
 from importlib.resources import files

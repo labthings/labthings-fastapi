@@ -14,7 +14,7 @@ A `Thing` represents a piece of hardware or software. It could be a whole instru
 
 `labthings-fastapi` automatically generates a `Thing Description`_ to describe each `Thing`. Each function offered by the `Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
 
-.. _wot_properties
+.. _wot_properties:
 
 Properties
 ----------
@@ -55,3 +55,10 @@ Thing Description documents are higher-level than OpenAPI_ and focus on the capa
 .. _WoT: https://www.w3.org/WoT/
 .. _Thing Description: https://www.w3.org/TR/wot-thing-description/
 .. _OpenAPI: https://www.openapis.org/
+
+.. _wot_affordances:
+
+Interaction Affordances
+-----------------------
+
+The Web of Things standard often talks about Affordances. This is the collective term for _wot_properties, _wot_actions, and _wot_events.

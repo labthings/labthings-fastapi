@@ -69,6 +69,14 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
   - `introspection`:
     - There's a confusing TODO about path parameters in `fastapi_dependency_params`
     - There's a ValueError that might want subclassing in `input_model_from_signature`.
+  - `exceptions` will need to hoover up more exceptions. Do we define them here? probably yes...
+* `notifications` is empty - need to consolidate code from property/action/websocket.
+* `thing`:
+  - consolidate settings into an object?
+  - default `thing_state` does cacheing but this isn't really documented. Remove?
+  - thing_description should consolidate `path` and `base_url`. In fact, if we set `base_url` to be the path
+    to the TD, we can make everything else static.
+* General: there are a lot of class attributes/annotations that should maybe be in `__init__`. We need to pick a convention and stick to it, I have often defined class attrs next to the function(s) that use them, but that might be bad style?
 
 
 
