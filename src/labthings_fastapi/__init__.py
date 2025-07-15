@@ -1,3 +1,22 @@
+r"""LabThings-FastAPI.
+
+This is the top level module for LabThings-FastAPI, a library for building
+wot_cc_ devices using Python. There is documentation on readthedocs_,
+and the recommended place to start is :doc:`index`\ .
+
+This module contains a number of convenience
+imports and is intended to be imported using:
+
+.. code-block:: python
+
+    import labthings_fastapi as lt
+
+The example code elsewhere in the documentation generally follows this
+convention. Symbols in the top-level module mostly exist elsewhere in
+the package, but should be imported from here as a preference, to ensure
+code does not break if modules are rearranged.
+"""
+
 from .thing import Thing
 from .descriptors import ThingProperty, ThingSetting
 from .decorators import (
