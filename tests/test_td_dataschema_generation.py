@@ -4,7 +4,7 @@ from labthings_fastapi.thing_description import type_to_dataschema
 import json
 from pydantic import BaseModel
 from typing import Optional
-from labthings_fastapi.thing_description.model import DataSchema
+from labthings_fastapi.thing_description._model import DataSchema
 
 
 def ds_json_dict(ds: DataSchema) -> dict:

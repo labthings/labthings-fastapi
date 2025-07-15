@@ -23,7 +23,7 @@ from ..utilities.object_reference_to_object import (
 )
 from ..actions import ActionManager
 from ..thing import Thing
-from ..thing_description.model import ThingDescription
+from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers
 from ..outputs.blob import BlobDataManager
 

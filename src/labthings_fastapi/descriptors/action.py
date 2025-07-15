@@ -23,7 +23,7 @@ from ..utilities.introspection import (
 )
 from ..outputs.blob import BlobIOContextDep
 from ..thing_description import type_to_dataschema
-from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
+from ..thing_description._model import ActionAffordance, ActionOp, Form, Union
 from ..utilities import labthings_data, get_blocking_portal
 from ..exceptions import NotConnectedToServerError
 

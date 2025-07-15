@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 from ..utilities import model_to_dict
 from ..utilities.introspection import EmptyInput
-from ..thing_description.model import LinkElement
+from ..thing_description._model import LinkElement
 from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
 from ..dependencies.invocation import (
     CancelHook,

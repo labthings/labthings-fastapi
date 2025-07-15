@@ -18,7 +18,7 @@ from fastapi import Body, FastAPI
 
 from ..utilities import labthings_data, wrap_plain_types_in_rootmodel
 from ..utilities.introspection import get_summary, get_docstring
-from ..thing_description.model import PropertyAffordance, Form, DataSchema, PropertyOp
+from ..thing_description._model import PropertyAffordance, Form, DataSchema, PropertyOp
 from ..thing_description import type_to_dataschema
 from ..exceptions import NotConnectedToServerError
 

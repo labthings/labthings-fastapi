@@ -61,7 +61,8 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
   - Could do with example code showing how it works in a simple camera?
 * `server`: could do with some more specific exceptions.
 * `server.cli`: need a model for config.
-
+* `thing_description`:
+  - Custom exception for `recursion_limit`
 
 
 

@@ -47,6 +47,7 @@ intersphinx_mapping = {
     "fastapi": ("https://fastapi.tiangolo.com", None),
     "anyio": ("https://anyio.readthedocs.io/en/stable/", None),
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
+    "jsonschema": ("https://python-jsonschema.readthedocs.io/en/stable/", None),
 }
 
 myst_enable_extensions = ["fieldlist"]

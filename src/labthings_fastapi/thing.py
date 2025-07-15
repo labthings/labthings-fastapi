@@ -23,7 +23,7 @@ from anyio.to_thread import run_sync
 from pydantic import BaseModel
 
 from .descriptors import ThingProperty, ThingSetting, ActionDescriptor
-from .thing_description.model import ThingDescription, NoSecurityScheme
+from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
