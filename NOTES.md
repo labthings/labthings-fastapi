@@ -27,6 +27,8 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * A description of how the various dependencies work together to set up a new action - e.g. `InvocationID`, `CancelHook`, ... - added to module docstring
 * A description of notifications/observers, including current status and planned improvements.
 * Mention `fastapi_endpoint` somewhere that talks about defining `Thing`s
+* Server configuration files.
+* A page on documentation (Thing Description vs OpenAPI), I find there are many references to "TD and OpenAPI" anbd it would be nice to have a single target.
 
 ## Code to tidy up or check
 * `actions/__init__.py:377` I've removed `as_responses` as it should always be true - this makes type hints correct. I should make `request` non-optional and update the 2 places where it's called.
@@ -57,6 +59,9 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
   - Should we use `IndexError` when frames aren't available (or at least a subclass thereof)?
   - Example code in the descriptor may want a doctest in due course.
   - Could do with example code showing how it works in a simple camera?
+* `server`: could do with some more specific exceptions.
+* `server.cli`: need a model for config.
+
 
 
 
