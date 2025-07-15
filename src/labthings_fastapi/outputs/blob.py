@@ -696,7 +696,7 @@ because it requires access to the `BlobDataManager` and the `url_for` function
 from the FastAPI app.
 """
 
-url_to_blobdata_ctx = ContextVar[Callable[[str], BlobData]]("url_to_blobdata")
+url_to_blobdata_ctx = ContextVar[Callable[[str], ServerSideBlobData]]("url_to_blobdata")
 """This context variable gives access to a function that makes BlobData objects
 from a URL, by retrieving them from the
 [`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
@@ -744,7 +744,7 @@ async def blob_serialisation_context_manager(
         blob_id = blob_manager.add_blob(blob)
         return str(url_for("download_blob", blob_id=blob_id))
 
-    def url_to_blobdata(url: str) -> BlobData:
+    def url_to_blobdata(url: str) -> ServerSideBlobData:
         m = re.search(r"blob/([0-9a-z\-]+)", url)
         if not m:
             raise HTTPException(
