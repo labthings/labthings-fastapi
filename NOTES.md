@@ -63,6 +63,12 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
 * `server.cli`: need a model for config.
 * `thing_description`:
   - Custom exception for `recursion_limit`
+* `utilities`:
+  - `LabThingsObjectData` probably doesn't need to be a pydantic dataclass.
+    - Do we want to centralise other key data in here, like `_settings_file_path` and `_labthings_blocking_portal`?
+  - `introspection`:
+    - There's a confusing TODO about path parameters in `fastapi_dependency_params`
+    - There's a ValueError that might want subclassing in `input_model_from_signature`.
 
 
 
