@@ -1,5 +1,4 @@
-"""
-Handle notification of events, property, and action status changes
+"""Handle notification of events, property, and action status changes.
 
 There are several kinds of "event" in the WoT vocabulary, not all of which
 are called Event, which is why this module is called `notifications`.
@@ -34,11 +33,15 @@ if TYPE_CHECKING:
 async def relay_notifications_to_websocket(
     websocket: WebSocket, receive_stream: ObjectReceiveStream
 ) -> None:
-    """Relay objects from a stream to a websocket as JSON
+    """Relay objects from a stream to a websocket as JSON.
 
-    Interaction affordances (events, actions) that we've registered with will
+    wot_affordances_ (events, actions) that we've registered with will
     post messages to the queue: this function takes those messages from the
     queue and passes them to the websocket.
+
+    :param websocket: the WebSocket we are communicating over.
+    :param receive_stream: an `anyio.abc.ObjectReceiveStream` that will
+        yield objects that we send over the websocket.
     """
     async with receive_stream:
         async for item in receive_stream:
@@ -48,10 +51,17 @@ async def relay_notifications_to_websocket(
 async def process_messages_from_websocket(
     websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
 ) -> None:
-    """Process messages received from a websocket
+    r"""Process messages received from a websocket.
 
     Currently, this will allow us to observe properties, by registering
     (or de-registering) for those properties.
+
+    :param websocket: the WebSocket we are communicating over.
+    :param send_stream: an `anyio.abc.ObjectSendStream` that we
+        use to register for events, i.e. data sent to that stream will
+        be sent through this websocket, by `.relay_notifications_to_websocket`\ .
+    :param thing: the `.Thing` we are attached to. The websocket is specific to
+        one `.Thing`, and this is it.
     """
     while True:
         try:
@@ -70,7 +80,15 @@ async def process_messages_from_websocket(
 
 
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
-    """Handle communication to a client via websocket"""
+    r"""Handle communication to a client via websocket.
+
+    This function handles a websocket connection to a `.Thing`\ 's websocket
+    endpoint. It can add observers to properties and actions, and will forward
+    notifications from the property or action back to the websocket.
+
+    :param thing: the `.Thing` the websocket is attached to.
+    :param websocket: the web socket that has been created.
+    """
     await websocket.accept()
     send_stream, receive_stream = create_memory_object_stream[dict]()
     async with create_task_group() as tg:

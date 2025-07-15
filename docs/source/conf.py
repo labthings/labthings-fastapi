@@ -48,6 +48,7 @@ intersphinx_mapping = {
     "anyio": ("https://anyio.readthedocs.io/en/stable/", None),
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
     "jsonschema": ("https://python-jsonschema.readthedocs.io/en/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 myst_enable_extensions = ["fieldlist"]

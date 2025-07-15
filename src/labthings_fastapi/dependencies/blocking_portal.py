@@ -46,7 +46,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     assert portal is not None, RuntimeError(
         "Could not get the blocking portal from the server."
         # This should never happen, as the blocking portal is added
-        # and removed in `.ThingServer.lifecycle`\ .
+        # and removed in `.ThingServer.lifecycle`.
     )
     return portal
 

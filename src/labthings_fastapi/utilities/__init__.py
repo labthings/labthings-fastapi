@@ -55,12 +55,12 @@ class LabThingsObjectData:
     """
 
     property_observers: Dict[str, WeakSet] = Field(default_factory=dict)
-    """The observers added to each property.
+    r"""The observers added to each property.
     
     Keys are property names, values are weak sets used by `.ThingProperty`\ .
     """
     action_observers: Dict[str, WeakSet] = Field(default_factory=dict)
-    """The observers added to each action.
+    r"""The observers added to each action.
     
     Keys are action names, values are weak sets used by
     `.ActionDescriptor`\ .

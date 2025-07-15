@@ -72,7 +72,9 @@ class EndpointDescriptor:
     @overload
     def __get__(self, obj: Thing, type=None) -> Callable: ...
 
-    def __get__(self, obj: Optional[Thing], type=None) -> Union[Self, Callable]:
+    def __get__(
+        self, obj: Optional[Thing], type: type[Thing] | None = None
+    ) -> Union[Self, Callable]:
         """Bind the method to the host `.Thing` and return it.
 
         When called on a `.Thing`, this descriptor returns the wrapped
@@ -114,7 +116,16 @@ class EndpointDescriptor:
         return get_docstring(self.func, remove_summary=True)
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing):
-        """Add this function to a FastAPI app, bound to a particular Thing."""
+        """Add an endpoint for this function to a FastAPI app.
+
+        We will add an endpoint to the app, bound to a particular `.Thing`.
+        The URL will be prefixed with the `.Thing` path, i.e. the specified
+        URL (which defaults to the name of this descriptor) is relative to
+        the host `.Thing`.
+
+        :param app: the `fastapi.FastAPI` application we are adding to.
+        :param thing: the `.Thing` we're bound to.
+        """
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
         bound_function = partial(self.func, thing)
