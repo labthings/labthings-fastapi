@@ -30,7 +30,7 @@ class ThingServer:
         self.app = FastAPI(lifespan=self.lifespan)
         self.set_cors_middleware()
         self.settings_folder = settings_folder or "./settings"
-        self.action_manager = ActionManager()
+        self.action_manager = ActionManager(self)
         self.action_manager.attach_to_app(self.app)
         self.blob_data_manager = BlobDataManager()
         self.blob_data_manager.attach_to_app(self.app)

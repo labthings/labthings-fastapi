@@ -19,7 +19,7 @@ from ..dependencies.invocation import (
     InvocationCancelledError,
     invocation_logger,
 )
-from ..outputs.blob import BlobIOContextDep
+from ..outputs.blob import Blob, BlobDataManager
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -40,6 +40,7 @@ class Invocation(Thread):
         self,
         action: ActionDescriptor,
         thing: Thing,
+        blob_data_manager: BlobDataManager,
         input: Optional[BaseModel] = None,
         dependencies: Optional[dict[str, Any]] = None,
         default_stop_timeout: float = 5,
@@ -55,6 +56,8 @@ class Invocation(Thread):
         self.input = input if input is not None else EmptyInput()
         self.dependencies = dependencies if dependencies is not None else {}
         self.cancel_hook = cancel_hook
+
+        self._blob_data_manager = blob_data_manager
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
         self._ID = id if id is not None else uuid.uuid4()  # Task ID
@@ -181,6 +184,9 @@ class Invocation(Thread):
             ret = action.__get__(thing)(**kwargs, **self.dependencies)
 
             with self._status_lock:
+                if isinstance(ret, Blob):
+                    blob_id = self._blob_data_manager.add_blob(ret.data)
+                    ret.href = f"/blob/{blob_id}"
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
                 self.action.emit_changed_event(self.thing, self._status)
@@ -241,7 +247,8 @@ class DequeLogHandler(logging.Handler):
 class ActionManager:
     """A class to manage a collection of actions"""
 
-    def __init__(self):
+    def __init__(self, server):
+        self._server = server
         self._invocations = {}
         self._invocations_lock = Lock()
 
@@ -271,6 +278,7 @@ class ActionManager:
             dependencies=dependencies,
             id=id,
             cancel_hook=cancel_hook,
+            blob_data_manager=self._server.blob_data_manager,
         )
         self.append_invocation(thread)
         thread.start()
@@ -312,7 +320,7 @@ class ActionManager:
         """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""
 
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
-        def list_all_invocations(request: Request, _blob_manager: BlobIOContextDep):
+        def list_all_invocations(request: Request):
             return self.list_invocations(as_responses=True, request=request)
 
         @app.get(
@@ -320,9 +328,7 @@ class ActionManager:
             response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}},
         )
-        def action_invocation(
-            id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep
-        ):
+        def action_invocation(id: uuid.UUID, request: Request):
             try:
                 with self._invocations_lock:
                     return self._invocations[id].response(request=request)
@@ -346,7 +352,7 @@ class ActionManager:
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_output(id: uuid.UUID, _blob_manager: BlobIOContextDep):
+        def action_invocation_output(id: uuid.UUID):
             """Get the output of an action invocation
 
             This returns just the "output" component of the action invocation. If the
