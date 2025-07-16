@@ -43,7 +43,7 @@ def find_raw_thing_by_class(
         def endpoint(other_thing: OtherThingDep):
             pass
 
-    LabThings will supply this argument automatically through the dependencies_
+    LabThings will supply this argument automatically through the :ref:`dependencies`
     mechanism.
 
     Note that this function *returns* a dependency - it should be called with
@@ -112,4 +112,6 @@ def raw_thing_dependency(cls: type[ThingInstance]) -> type[ThingInstance]:
     :return: An annotated type that works as a dependency to supply an
         instance of ``cls`` at runtime.
     """
-    return Annotated[cls, Depends(find_raw_thing_by_class(cls))]  # type: ignore[return-value]
+    return Annotated[  # type: ignore[return-value]
+        cls, Depends(find_raw_thing_by_class(cls))
+    ]

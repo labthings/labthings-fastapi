@@ -15,7 +15,7 @@ projects based on LabThings, if they wish to expose their own CLI.
     or replace the command line interface in the future.
 
 For examples of how to run the server from the command line, see
-the tutorial page tutorial_running_.
+the tutorial page :ref:`tutorial_running`.
 """
 
 from argparse import ArgumentParser, Namespace

@@ -15,7 +15,7 @@ The server API is accessed over an HTTP requests, allowing client code (see belo
 Everything is a Thing
 ---------------------
 
-As described in wot_cc_, a Thing represents a piece of hardware or software. LabThings-FastAPI automatically generates a wot_td_ to describe each Thing. Each function offered by the Thing is either a Property or Action (LabThings-FastAPI does not yet support Events). These are termed "interaction affordances" in WoT_ terminology.
+As described in :ref:`wot_cc`, a Thing represents a piece of hardware or software. LabThings-FastAPI automatically generates a :ref:`wot_td` to describe each Thing. Each function offered by the Thing is either a Property or Action (LabThings-FastAPI does not yet support Events). These are termed "interaction affordances" in WoT_ terminology.
 
 Code on the LabThings FastAPI Server is composed of Things, however these can call generic Python functions/classes. The entire HTTP API served by the server is defined by `.Thing` objects. As such the full API is composed of the actions and properties (and perhaps eventually events) defined in each Thing.
 

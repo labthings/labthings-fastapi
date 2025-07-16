@@ -31,7 +31,14 @@ dev = [
   "ruff>=0.1.3",
   "types-jsonschema",
   "Pillow",
+  "flake8",
+  "flake8-pyproject",
+  "flake8-docstrings",
+  "flake8-rst",
+  "flake8-rst-docstrings",
   "pydoclint",
+  "sphinx-rtd-theme",
+  "sphinx>=7.2",
 ]
 
 [project.urls]
@@ -91,6 +98,20 @@ check-yield-types = false  # use type annotations instead
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
+
+[tool.flake8]
+extend-ignore = ["DOC301"]
+max-line-length = 88
+rst-roles = [
+    "class",
+    "func",
+    "ref",
+    "deco",
+    "doc",
+]
+rst-directives = [
+    "todo",
+]
 
 [project.scripts]
 labthings-server = "labthings_fastapi.server.cli:serve_from_cli"

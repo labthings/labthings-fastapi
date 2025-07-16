@@ -64,7 +64,7 @@ def input_model_from_signature(
 
         LabThings-FastAPI does not currently support actions that take
         positional arguments, because this does not convert nicely into
-        JSONSchema or Thing Description documents (see wot_td_).
+        JSONSchema or Thing Description documents (see :ref:`wot_td`).
 
     :param func: the function to analyse.
     :param remove_first_positional_arg: Remove the first argument from the
@@ -135,7 +135,7 @@ def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     injection system to thing actions. Any function parameter that has a
     type hint annotated with `fastapi.Depends` will be treated as a
     dependency, and thus be supplied automatically when it is called over
-    HTTP. See dependencies_ for an overview.
+    HTTP. See :ref:`dependencies` for an overview.
 
     We give special treatment to dependency parameters, as they must not
     appear in the input model, and they must be supplied by the

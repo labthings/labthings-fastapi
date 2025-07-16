@@ -35,8 +35,8 @@ ACTION_POST_NOTICE = """
 ## Important note
 
 This `POST` request starts an Action, i.e. the server will do something
-that may continue after the HTTP request has been responded to.  The 
-response will always be an ActionInvocation object, that details the current 
+that may continue after the HTTP request has been responded to.  The
+response will always be an ActionInvocation object, that details the current
 status of the action and provides an interface to poll for completion.
 
 If the action completes within a specified timeout, we will return
@@ -47,9 +47,9 @@ its progress.
 """
 
 ACTION_GET_DESCRIPTION = """
-This will include times and input values, as well as output values for 
-actions that have completed. These actions will also show up under the 
-`action_invocations` endpoint, and can also be retrieved individually 
+This will include times and input values, as well as output values for
+actions that have completed. These actions will also show up under the
+`action_invocations` endpoint, and can also be retrieved individually
 using the link included in each action.
 """
 
@@ -58,7 +58,7 @@ class ActionDescriptor:
     """Wrap actions to enable them to be run over HTTP.
 
     This class is responsible for generating the action description for
-    the wot_td_ and creating the function that responds to ``POST``
+    the :ref:`wot_td` and creating the function that responds to ``POST``
     requests to invoke the action.
 
     .. note::
@@ -113,10 +113,12 @@ class ActionDescriptor:
         self.invocation_model.__name__ = f"{self.name}_invocation"
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor: ...
+    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor:  # noqa: D105
+        ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable: ...
+    def __get__(self, obj: Thing, type=None) -> Callable:  # noqa: D105
+        ...
 
     def __get__(
         self, obj: Optional[Thing], type: Optional[type[Thing]] = None
@@ -336,7 +338,7 @@ class ActionDescriptor:
     ) -> ActionAffordance:
         """Represent the property in a Thing Description.
 
-        This function describes the Action in wot_td_ format.
+        This function describes the Action in :ref:`wot_td` format.
 
         :param thing: The `.Thing` to which the action is attached.
         :param path: The prefix applied to all endpoints associated with the

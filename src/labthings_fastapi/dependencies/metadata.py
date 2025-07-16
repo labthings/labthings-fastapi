@@ -1,6 +1,6 @@
 """FastAPI dependency to get metadata from all Things.
 
-This module defines a FastAPI dependency (see dependencies_) that will
+This module defines a FastAPI dependency (see :ref:`dependencies`) that will
 retrieve metadata from every `.Thing` on the server. This is intended to
 simplify the task of adding metadata to data collected by `.Thing` instances.
 """
@@ -45,7 +45,7 @@ def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
     possibility in very short actions.
 
     :param request: the `fastapi.Request` object, supplied automatically when
-        used as a dependency. See dependencies_.
+        used as a dependency. See :ref:`dependencies`.
 
     :return: a function that returns a dictionary of metadata.
     """

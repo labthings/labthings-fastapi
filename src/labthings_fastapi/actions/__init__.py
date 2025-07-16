@@ -3,7 +3,8 @@
 :ref:`wot_actions` are represented by methods, decorated with the `.thing_action`
 decorator.
 
-See the actions_ documentation for a top-level overview of actions in LabThings-FastAPI.
+See the :ref:`actions` documentation for a top-level overview of actions in
+LabThings-FastAPI.
 
 Developer notes
 ---------------

@@ -60,6 +60,8 @@ switched to using `pydoclint` directly, and configured it in `pyproject.toml`. I
   - Example code in the descriptor may want a doctest in due course.
   - Could do with example code showing how it works in a simple camera?
 * `server`: could do with some more specific exceptions.
+  - `__init__:80` does this need to be a global? I think it might work without, and flake8 complains.
+    I've silenced it at the import and also the global line.
 * `server.cli`: need a model for config.
 * `thing_description`:
   - Custom exception for `recursion_limit`

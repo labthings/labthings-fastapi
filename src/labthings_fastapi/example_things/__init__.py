@@ -111,9 +111,9 @@ class MyThing(Thing):
 
     @thing_action
     def action_with_only_kwargs(self, **kwargs: dict) -> None:
-        """Do something that takes **kwargs.
+        r"""Do something that takes \**kwargs.
 
-        :param **kwargs: Keyword arguments.
+        :param \**kwargs: Keyword arguments.
         """
         pass
 

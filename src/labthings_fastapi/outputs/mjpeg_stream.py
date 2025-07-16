@@ -358,13 +358,13 @@ class MJPEGStreamDescriptor:
     one with the name of the descriptor serving the MJPEG stream, and another
     with `/viewer` appended, which serves a basic HTML page that views the stream.
 
-    This descriptor does not currently show up in the wot_td_.
+    This descriptor does not currently show up in the :ref:`wot_td`.
     """
 
     def __init__(self, **kwargs: dict[str, Any]):
-        """Initialise an MJPEGStreamDescriptor.
+        r"""Initialise an MJPEGStreamDescriptor.
 
-        :param **kwargs: keyword arguments are passed to the initialiser of
+        :param \**kwargs: keyword arguments are passed to the initialiser of
             `.MJPEGStream`.
         """
         self._kwargs: Any = kwargs
@@ -381,10 +381,10 @@ class MJPEGStreamDescriptor:
         self.name = name
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self: ...
+    def __get__(self, obj: Literal[None], type=None) -> Self: ...  # noqa: D105
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...
+    def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...  # noqa: D105
 
     def __get__(
         self, obj: Optional[Thing], type: type[Thing] | None = None

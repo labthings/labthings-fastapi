@@ -1,10 +1,18 @@
-"""Descriptors to add wot_affordances_ to `.Thing` subclasses.
+"""Descriptors to add :ref:`wot_affordances` to `.Thing` subclasses.
 
 This module will likely be removed in the next release.
 """
 
-from .action import ActionDescriptor as ActionDescriptor
-from .property import ThingProperty as ThingProperty
-from .property import ThingSetting as ThingSetting
-from .endpoint import EndpointDescriptor as EndpointDescriptor
-from .endpoint import HTTPMethod as HTTPMethod
+from .action import ActionDescriptor
+from .property import ThingProperty
+from .property import ThingSetting
+from .endpoint import EndpointDescriptor
+from .endpoint import HTTPMethod
+
+__all__ = [
+    "ActionDescriptor",
+    "ThingProperty",
+    "ThingSetting",
+    "EndpointDescriptor",
+    "HTTPMethod",
+]

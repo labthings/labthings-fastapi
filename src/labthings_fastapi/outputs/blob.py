@@ -4,25 +4,25 @@ The `.`.Blob`` class is used when you need to return something file-like that ca
 easily (or efficiently) be converted to JSON. This is useful for returning large objects
 like images, especially where an existing file-type is the obvious way to handle it.
 
-There is a documentation page on blobs_ that explains how to use
+There is a documentation page on :ref:`blobs` that explains how to use
 this mechanism.
 
 To return a file from an action, you should declare its return type as a `.Blob`
 subclass, defining the
 `.Blob.media_type` attribute.
 
-```python
-class MyImageBlob(Blob):
-    media_type = "image/png"
+.. code-block:: python
+
+    class MyImageBlob(Blob):
+        media_type = "image/png"
 
 
-class MyThing(Thing):
-    @thing_action
-    def get_image(self) -> MyImageBlob:
-        # Do something to get the image data
-        data = self._get_image_data()
-        return MyImageBlob.from_bytes(data)
-```
+    class MyThing(Thing):
+        @thing_action
+        def get_image(self) -> MyImageBlob:
+            # Do something to get the image data
+            data = self._get_image_data()
+            return MyImageBlob.from_bytes(data)
 
 The action should then return an instance of that subclass, with data supplied
 either as a `bytes` object or a file on disk. If files are used, it's your
@@ -124,7 +124,7 @@ class ServerSideBlobData(BlobData, Protocol):
 
     id: Optional[uuid.UUID] = None
     """A unique identifier for this BlobData object.
-    
+
     The ID is set when the BlobData object is added to the BlobDataManager.
     It is used to retrieve the BlobData object from the manager.
     """
@@ -216,7 +216,7 @@ class BlobFile:
     """A unique ID to identify the data in a `.BlobManager`."""
 
     def __init__(self, file_path: str, media_type: str, **kwargs):
-        """Create a `.BlobFile` to wrap data stored on disk.
+        r"""Create a `.BlobFile` to wrap data stored on disk.
 
         `.BlobFile` objects wrap data stored on disk as files. They
         are not usually instantiated directly, but made using
@@ -224,7 +224,7 @@ class BlobFile:
 
         :param file_path: is the path to the file.
         :param media_type: is the MIME type of the data.
-        :param **kwargs: will be added to the object as instance
+        :param \**kwargs: will be added to the object as instance
             attributes. This may be used to stop temporary directories
             from being garbage collected while the `.Blob` exists.
 
@@ -283,7 +283,7 @@ class BlobFile:
 class Blob(BaseModel):
     """A container for binary data that may be retrieved over HTTP.
 
-    See blobs_ for more information on how to use this class.
+    See :ref:`blobs` for more information on how to use this class.
 
     A `.Blob` may be created to hold data using the class methods
     `.Blob.from_bytes`, `.Blob.from_file` or `.Blob.from_temporary_directory`.
@@ -298,14 +298,14 @@ class Blob(BaseModel):
 
     href: str
     """The URL where the data may be retrieved.
-    
-    `.Blob` objects on a `.ThingServer` are assigned a URL when they are 
+
+    `.Blob` objects on a `.ThingServer` are assigned a URL when they are
     serialised to JSON. This allows them to be downloaded as binary data in a
     separate HTTP request.
-    
+
     `.Blob` objects created by a `.ThingClient` contain a URL pointing to the
     data, which will be downloaded when it is requred.
-    
+
     `.Blob` objects that store their data in a file or in memory will have the
     ``href`` attribute set to the special value `blob://local`.
     """
@@ -313,8 +313,8 @@ class Blob(BaseModel):
     """The MIME type of the data. This should be overridden in subclasses."""
     rel: Literal["output"] = "output"
     """The relation of this link to the host object.
-    
-    Currently, `.Blob` objects are found in the output of actions_, so they
+
+    Currently, `.Blob` objects are found in the output of :ref:`actions`, so they
     always have ``rel = "output"``.
     """
     description: str = (
@@ -325,7 +325,7 @@ class Blob(BaseModel):
 
     _data: Optional[ServerSideBlobData] = None
     """This object holds the data, either in memory or as a file.
-    
+
     If `_data` is `None`, then the Blob has not been deserialised yet, and the
     `href` should point to a valid address where the data may be downloaded.
     """
@@ -607,7 +607,7 @@ class BlobDataManager:
     stored. This means you should not rely on any custom attributes of a `.Blob`
     subclass being preserved when the `.Blob` is passed from one action to another.
 
-    See blobs_ for an overview of how `.Blob` objects should be used.
+    See :ref:`blobs` for an overview of how `.Blob` objects should be used.
     """
 
     def __init__(self) -> None:
@@ -687,10 +687,10 @@ class BlobDataManager:
 
 blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
 """This context variable gives access to a function that makes BlobData objects
-downloadable, by assigning a URL and adding them to the 
+downloadable, by assigning a URL and adding them to the
 [`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
 
-It is only available within a 
+It is only available within a
 [`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
 because it requires access to the `BlobDataManager` and the `url_for` function
 from the FastAPI app.
@@ -701,7 +701,7 @@ url_to_blobdata_ctx = ContextVar[Callable[[str], ServerSideBlobData]]("url_to_bl
 from a URL, by retrieving them from the
 [`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
 
-It is only available within a 
+It is only available within a
 [`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
 because it requires access to the `BlobDataManager`.
 """
@@ -729,7 +729,7 @@ async def blob_serialisation_context_manager(
     `.BlobDataManager`\ .
 
     This function will usually be called from a FastAPI dependency. See
-    dependencies_ for more on that mechanism.
+    :ref:`dependencies` for more on that mechanism.
 
     :param request: the `fastapi.Request` object, used to access the server
         and ``url_for`` method.

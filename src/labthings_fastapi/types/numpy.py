@@ -1,16 +1,17 @@
 """Basic support for numpy arrays in Pydantic models.
 
-We define a type alias `NDArray` which is a numpy array, annotated
+We define a type alias `.NDArray` which is a numpy array, annotated
 to allow `pydantic` to convert it to and from JSON (as an array-of-arrays).
 
-Usage:
-```
-from labthings_fastapi.types.ndarray import NDArray
+This should allow numpy arrays to be used without explicit conversion:
+
+.. code-block:: python
+
+    from labthings_fastapi.types.ndarray import NDArray
 
 
-def double(arr: NDArray) -> NDArray:
-    return arr * 2  # arr is a numpy.ndarray
-```
+    def double(arr: NDArray) -> NDArray:
+        return arr * 2  # arr is a numpy.ndarray
 
 The implementation is not super elegant: it isn't recursive so has only been
 defined for up to 6d arrays. Specifying the dimensionality might be a nice
@@ -102,7 +103,7 @@ but correct.
 
 In the future it would be good to replace this type with several types of
 different, specified dimensionality. That would make for much less horrible
-wot_td_ representations, as well as giving useful information about the datatype
+:ref:`wot_td` representations, as well as giving useful information about the datatype
 returned.
 """
 

@@ -33,7 +33,7 @@ class ObjectHasNoLinksError(KeyError):
 def _get_link(obj: dict, rel: str) -> Mapping:
     """Retrieve a link from an object's ``links`` list, by its ``rel`` attribute.
 
-    Various places in the wot_td_ feature a list of links. This is represented
+    Various places in the :ref:`wot_td` feature a list of links. This is represented
     in JSON as a property called ``links`` which is a list of objects that have
     ``href`` and ``rel`` properties.
 
@@ -160,7 +160,7 @@ class ThingClient:
         r.raise_for_status()
 
     def invoke_action(self, path: str, **kwargs):
-        """Invoke an action on the Thing.
+        r"""Invoke an action on the Thing.
 
         This method will make the initial POST request to invoke an action,
         then poll the resulting invocation until it completes. If successful,
@@ -171,7 +171,7 @@ class ThingClient:
 
         :param path: the URI of the ``invokeaction`` endpoint, relative to the
             ``base_url``
-        :param **kwargs: Additional arguments will be combined into the JSON
+        :param \**kwargs: Additional arguments will be combined into the JSON
             body of the ``POST`` request and sent as input to the action.
             These will be validated on the server.
 
@@ -244,7 +244,7 @@ class ThingClient:
         Dynamically subclass `.ThingClient` to add properties and
         methods for each property and action in the Thing Description.
 
-        :param thing_description: A wot_td_ as a dictionary, which will
+        :param thing_description: A :ref:`wot_td` as a dictionary, which will
             be used to construct the class.
 
         :return: a `.ThingClient` subclass with the right properties and
@@ -345,7 +345,7 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
         action.
     :param action_name: is both the name we assign the method to, and
         the name of the action in the Thing Description.
-    :param action: a dictionary representing the action, in wot_td_
+    :param action: a dictionary representing the action, in :ref:`wot_td`
         format.
     """
 
@@ -371,7 +371,7 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict):
         property.
     :param property_name: is both the name we assign the descriptor to, and
         the name of the property in the Thing Description.
-    :param property: a dictionary representing the property, in wot_td_
+    :param property: a dictionary representing the property, in :ref:`wot_td`
         format.
     """
     setattr(

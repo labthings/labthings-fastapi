@@ -4,7 +4,7 @@ When `.Thing` objects interact on the server, it can be very useful to
 use an interface that is identical to the `.ThingClient` used to access
 the same `.Thing` remotely. This means that code can run either on the
 server or on a client, e.g. in a Jupyter notebook where it is much
-easier to debug. See things_from_things_ for more detail.
+easier to debug. See :ref:`things_from_things` for more detail.
 
 Currently `.DirectThingClient` is not a subclass of `.ThingClient`,
 that may need to change. It's a good idea to create a
@@ -55,7 +55,7 @@ class DirectThingClient:
     """The path to the Thing on the server. Relative to the server's base URL."""
 
     def __init__(self, request: Request, **dependencies: Mapping[str, Any]):
-        """Wrap a `.Thing` so it works like a `.ThingClient`.
+        r"""Wrap a `.Thing` so it works like a `.ThingClient`.
 
         This class is designed to be used as a FastAPI dependency, and will
         retrieve a `.Thing` based on its ``thing_path`` attribute.
@@ -63,7 +63,7 @@ class DirectThingClient:
 
         :param request: This is a FastAPI dependency to access the
             `fastapi.Request` object, allowing access to various resources.
-        :param **dependencies: Further arguments will be added
+        :param \**dependencies: Further arguments will be added
             dynamically by subclasses, by duplicating this method and
             manipulating its signature. Adding arguments with annotated
             type hints instructs FastAPI to inject dependency arguments,
@@ -139,7 +139,7 @@ class DependencyNameClashError(KeyError):
     """A dependency argument name is used inconsistently.
 
     A current limitation of `.DirectThingClient` is that the dependency
-    arguments (see dependencies_) are collected together in a single
+    arguments (see :ref:`dependencies`) are collected together in a single
     dictionary. This makes the assumption that, if a name is reused, it is
     reused for the same dependency.
 
@@ -247,7 +247,7 @@ def direct_thing_client_class(
     thing_path: str,
     actions: Optional[list[str]] = None,
 ) -> type[DirectThingClient]:
-    """Create a DirectThingClient from a Thing class and a path.
+    r"""Create a DirectThingClient from a Thing class and a path.
 
     This is a class, not an instance: it's designed to be a FastAPI dependency.
 
@@ -258,11 +258,11 @@ def direct_thing_client_class(
         dependencies we need.
 
     :return: a subclass of `DirectThingClient` with attributes that match the
-        properties and actions of ``thing_class``. The ``__init__` method
+        properties and actions of ``thing_class``. The ``__init__`` method
         will have annotations that instruct FastAPI to supply all the
         dependencies needed by its actions.
 
-        This class may be used as a FastAPI dependency: see things_from_things_.
+        This class may be used as a FastAPI dependency: see :ref:`things_from_things`.
     """
 
     def init_proxy(self, request: Request, **dependencies: Mapping[str, Any]):

@@ -4,8 +4,8 @@ This module provides a function that will retrieve the `.ThingServer`
 based on the `fastapi.Request` object. It may be used as a dependency with
 ``Annotated[ThingServer, Depends(thing_server_from_request)]``.
 
-See dependencies_ for more information on the dependency mechanism,
-and things_from_things_ for more on how `.Things` interact.
+See :ref:`dependencies` for more information on the dependency mechanism,
+and :ref:`things_from_things` for more on how `.Things` interact.
 
 .. note::
 

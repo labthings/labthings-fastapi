@@ -24,7 +24,9 @@ from ..utilities.object_reference_to_object import (
 from ..actions import ActionManager
 from ..thing import Thing
 from ..thing_description._model import ThingDescription
-from ..dependencies.thing_server import _thing_servers
+from ..dependencies.thing_server import _thing_servers  # noqa: F401
+
+# `_thing_servers` is used as a global from `ThingServer.__init__`
 from ..outputs.blob import BlobDataManager
 
 # A path should be made up of names separated by / as a path separator.
@@ -45,8 +47,8 @@ class ThingServer:
       load and save their settings from disk.
     * Configure the server to allow cross-origin requests (required if
       we use a web app that is not served from the `.ThingServer`).
-    * Manage the threads used to run actions_.
-    * Manage blobs_ to allow binary data to be returned.
+    * Manage the threads used to run :ref:`actions`.
+    * Manage :ref:`blobs` to allow binary data to be returned.
     * Allow threaded code to call functions in the event loop, by providing
       an `anyio.from_thread.BlockingPortal`.
     """
@@ -59,8 +61,8 @@ class ThingServer:
         set up and shut down the `.Thing` instances), and configuring it
         to allow cross-origin requests.
 
-        We also create the `.ActionManager` to manage actions_ and the
-        `.BlobManager` to manage the downloading of blobs_.
+        We also create the `.ActionManager` to manage :ref:`actions` and the
+        `.BlobManager` to manage the downloading of :ref:`blobs`.
 
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
@@ -76,7 +78,7 @@ class ThingServer:
         self._things: dict[str, Thing] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
-        global _thing_servers
+        global _thing_servers  # noqa: F824
         _thing_servers.add(self)
 
     app: FastAPI
@@ -146,7 +148,7 @@ class ThingServer:
 
         :param thing: The `.Thing` instance to add to the server.
         :param path: the relative path to access the thing on the server. Must only
-        contain alphanumeric characters, hyphens, or underscores.
+            contain alphanumeric characters, hyphens, or underscores.
 
         :raise ValueError: if ``path`` contains invalid characters.
         :raise KeyError: if a `.Thing` has already been added at ``path``.
@@ -227,14 +229,14 @@ class ThingServer:
             """Describe all the things available from this server.
 
             This returns a dictionary, where the keys are the paths to each
-            `.Thing` attached to the server, and the values are wot_td_ documents
+            `.Thing` attached to the server, and the values are :ref:`wot_td` documents
             represented as `.ThingDescription` objects. These should enable
             clients to see all the capabilities of the `.Thing` instances and
             access them over HTTP.
 
             :param request: is supplied automatically by FastAPI.
 
-            :return: a dictionary mapping Thing paths to wot_td_ objects, which
+            :return: a dictionary mapping Thing paths to :ref:`wot_td` objects, which
                 are `pydantic.BaseModel` subclasses that get serialised to
                 dictionaries.
             """
@@ -250,8 +252,8 @@ class ThingServer:
             :param request: is supplied automatically by FastAPI.
 
             :return: a list of paths pointing to `.Thing` instances. These
-                URLs will return the wot_td_ of one `.Thing` each.
-            """
+                URLs will return the :ref:`wot_td` of one `.Thing` each.
+            """  # noqa: D403 (URLs is correct capitalisation)
             return {
                 t: f"{str(request.base_url).rstrip('/')}{t}"
                 for t in thing_server.things.keys()
@@ -264,7 +266,7 @@ def server_from_config(config: dict) -> ThingServer:
     This function creates a `.ThingServer` and adds a number of `.Thing`
     instances from a configuration dictionary.
 
-    :param config: A dictionary, in the format used by config_files_
+    :param config: A dictionary, in the format used by :ref:`config_files`
 
     :return: A `.ThingServer` with instances of the specified `.Thing`
         subclasses attached. The server will not be started by this

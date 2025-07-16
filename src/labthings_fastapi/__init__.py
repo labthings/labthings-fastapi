@@ -1,8 +1,10 @@
 r"""LabThings-FastAPI.
 
 This is the top level module for LabThings-FastAPI, a library for building
-wot_cc_ devices using Python. There is documentation on readthedocs_,
+:ref:`wot_cc` devices using Python. There is documentation on readthedocs_,
 and the recommended place to start is :doc:`index`\ .
+
+.. _readthedocs: https://labthings-fastapi.readthedocs.io/
 
 This module contains a number of convenience
 imports and is intended to be imported using:

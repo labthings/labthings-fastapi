@@ -28,9 +28,9 @@ One goal of LabThings-FastAPI is to make code portable between a client (e.g. a 
 
 A `.DirectThingClient` class will call actions and properties of other `.Thing` subclasses using the same interface that would be used by a remote client, which means code for an action may be developed as an HTTP client, for example in a Jupyter notebook, and then moved to the server with minimal changes. Currently, there are a few differences in behaviour between working locally or remotely, most notably the return types (which are usually Pydantic models on the server, and currently dictionaries on the client). This should be improved in the future.
 
-It is also possible for a `.Thing` to access other `.Thing` instances directly. This gives access to functionality that is only available in Python, i.e. not available through a `.ThingClient` over HTTP. However, the `.Thing` must then be supplied manually with any dependencies_ required by its actions, and the public API as defined by the wot_td_ is no longer enforced.
+It is also possible for a `.Thing` to access other `.Thing` instances directly. This gives access to functionality that is only available in Python, i.e. not available through a `.ThingClient` over HTTP. However, the `.Thing` must then be supplied manually with any :ref:`dependencies` required by its actions, and the public API as defined by the :ref:`wot_td` is no longer enforced.
 
-Actions that make use of other `.Thing` objects on the same server should access them using dependencies_.
+Actions that make use of other `.Thing` objects on the same server should access them using :ref:`dependencies`.
 
 Planned future development: static code generation
 --------------------------------------------------

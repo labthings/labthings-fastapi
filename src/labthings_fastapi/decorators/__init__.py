@@ -1,8 +1,8 @@
 """Mark the Interaction Affordances of a Thing.
 
-See wot_cc_ for definitions of Interaction Affordance and other terms.
+See :ref:`wot_cc` for definitions of Interaction Affordance and other terms.
 
-LabThings generates a wot_td_ to allow actions, properties, and
+LabThings generates a :ref:`wot_td` to allow actions, properties, and
 events to be used by client code. The descriptions of each "interaction
 affordance" rely on docstrings and Python type hints to provide a full
 description of the parameters, so it's important that you use these
@@ -49,13 +49,13 @@ from ..utilities.introspection import return_type
 
 
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
-    """Mark a method of a Thing as an Action.
+    r"""Mark a method of a Thing as an Action.
 
     We replace the function with a descriptor that's a
     subclass of `.ActionDescriptor`
 
     :param func: The function to be decorated.
-    :param **kwargs: Additional keyword arguments are passed to the constructor
+    :param \**kwargs: Additional keyword arguments are passed to the constructor
         of `.ActionDescriptor`.
 
     :return: An `.ActionDescriptor` wrapping the method.
@@ -69,6 +69,8 @@ def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
 
 @overload
 def thing_action(func: Callable, **kwargs) -> ActionDescriptor: ...
+
+
 @overload
 def thing_action(
     **kwargs,
@@ -78,6 +80,8 @@ def thing_action(
     ],
     ActionDescriptor,
 ]: ...
+
+
 @wraps(mark_thing_action)
 def thing_action(
     func: Optional[Callable] = None, **kwargs
@@ -90,16 +94,16 @@ def thing_action(
         ActionDescriptor,
     ]
 ):
-    """Mark a method of a `.Thing` as a LabThings Action.
+    r"""Mark a method of a `.Thing` as a LabThings Action.
 
     Methods decorated with :deco:`thing_action` will be available to call
-    over HTTP as actions. See actions_ for an introduction to the concept
+    over HTTP as actions. See :ref:`actions` for an introduction to the concept
     of actions.
 
     This decorator may be used with or without arguments.
 
     :param func: The method to be decorated as an action.
-    :param **kwargs: Keyword arguments are passed to the constructor
+    :param \**kwargs: Keyword arguments are passed to the constructor
         of `.ActionDescriptor`.
 
     :return: Whether used with or without argumnts, the result is that
@@ -199,7 +203,7 @@ def fastapi_endpoint(
 
     This decorator will cause a method of a `.Thing` to be directly added to
     the HTTP API, bypassing the machinery underlying Action and Property
-    affordances. Such endpoints will not be documented in the wot_td_ but
+    affordances. Such endpoints will not be documented in the :ref:`wot_td` but
     may be used as the target of links. For example, this could allow a file
     to be downloaded from the `.Thing` at a known URL, or serve a video stream
     that wouldn't be supported as a `.Blob`\ .
@@ -227,7 +231,7 @@ def fastapi_endpoint(
 
     :param method: The HTTP verb this endpoint responds to.
     :param path: The path, relative to the host `.Thing` base URL.
-    :param **kwargs: Additional keyword arguments are passed to the
+    :param \**kwargs: Additional keyword arguments are passed to the
         `fastapi.FastAPI.get` decorator if ``method`` is ``get``, or to
         the equivalent decorator for other HTTP verbs.
 

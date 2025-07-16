@@ -1,8 +1,8 @@
 r"""FastAPI dependency to allow `.Thing`\ s to depend on each other.
 
 This module defines a mechanism to obtain a `.DirectThingClient` that
-wraps another `.Thing` on the same server. See things_from_things_ and
-dependencies_ for more detail.
+wraps another `.Thing` on the same server. See :ref:`things_from_things` and
+:ref:`dependencies` for more detail.
 
 .. note::
 
@@ -34,7 +34,7 @@ def direct_thing_client_dependency(
     `.ThingClient` so that code is consistent whether run in an action, or
     in a script or notebook on a remote computer.
 
-    See things_from_things_ and dependencies_.
+    See :ref:`things_from_things` and :ref:`dependencies`.
 
     .. note::
 

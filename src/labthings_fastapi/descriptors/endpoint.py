@@ -47,7 +47,7 @@ class EndpointDescriptor:
         path: Optional[str] = None,
         **kwargs: Mapping,
     ):
-        """Initialise an EndpointDescriptor.
+        r"""Initialise an EndpointDescriptor.
 
         See `.fastapi_endpoint`, which is the usual way of instantiating this
         class.
@@ -57,7 +57,7 @@ class EndpointDescriptor:
         :param http_method: the HTTP verb we are responding to. This selects
             the FastAPI decorator: ``"get"`` corresponds to ``@app.get``.
         :param path: the URL, relative to the host `.Thing`, for the endpoint.
-        :param **kwargs: additional keyword arguments are passed to the
+        :param \**kwargs: additional keyword arguments are passed to the
             FastAPI decorator, allowing you to specify responses, OpenAPI
             parameters, etc.
         """
@@ -67,10 +67,10 @@ class EndpointDescriptor:
         self.kwargs = kwargs
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self: ...
+    def __get__(self, obj: Literal[None], type=None) -> Self: ...  # noqa: D105
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable: ...
+    def __get__(self, obj: Thing, type=None) -> Callable: ...  # noqa: D105
 
     def __get__(
         self, obj: Optional[Thing], type: type[Thing] | None = None

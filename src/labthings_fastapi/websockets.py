@@ -35,7 +35,7 @@ async def relay_notifications_to_websocket(
 ) -> None:
     """Relay objects from a stream to a websocket as JSON.
 
-    wot_affordances_ (events, actions) that we've registered with will
+    :ref:`wot_affordances` (events, actions) that we've registered with will
     post messages to the queue: this function takes those messages from the
     queue and passes them to the websocket.
 

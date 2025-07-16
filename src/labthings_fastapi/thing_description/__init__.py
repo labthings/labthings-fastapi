@@ -207,7 +207,7 @@ def jsonschema_to_dataschema(
 ) -> JSONSchema:
     """Convert a data type description from JSONSchema to Thing Description.
 
-    wot_td_ represents datatypes with DataSchemas, which are almost but not
+    :ref:`wot_td` represents datatypes with DataSchemas, which are almost but not
     quite JSONSchema format. There are two main tasks to convert them:
 
     Resolving references
@@ -280,7 +280,7 @@ def jsonschema_to_dataschema(
 
 
 def type_to_dataschema(t: type, **kwargs) -> DataSchema:
-    """Convert a Python type to a Thing Description DataSchema.
+    r"""Convert a Python type to a Thing Description DataSchema.
 
     This makes use of pydantic's `schema_of` function to create a
     json schema, then applies some fixes to make a DataSchema
@@ -293,7 +293,7 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
     `title` field.
 
     :param t: the Python datatype or `pydantic.BaseModel` subclass.
-    :param **kwargs: Additional keyword arguments passed to the
+    :param \**kwargs: Additional keyword arguments passed to the
         `.DataSchema` constructor, often including ``title``.
 
     :return: a `.DataSchema` representing the type.

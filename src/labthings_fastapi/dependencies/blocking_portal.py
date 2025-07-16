@@ -1,7 +1,7 @@
 """FastAPI dependency for a blocking portal.
 
 This allows dependencies that are called by threaded code to send things back
-to the async event loop. See concurrency_ for more details.
+to the async event loop. See :ref:`concurrency` for more details.
 
 Threaded code can call asynchronous code in the `anyio` event loop used by
 `fastapi`, if an `anyio.BlockingPortal` is used.
@@ -36,7 +36,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     This is for use as a FastAPI dependency, to allow threaded code to call
     async code. See the module-level docstring for `.blocking_portal`.
 
-    :param request: The `fastapi.Request` object, supplied by the dependencies_
+    :param request: The `fastapi.Request` object, supplied by the :ref:`dependencies`
         mechanism.
 
     :return: the `anyio.from_thread.BlockingPortal` allowing access to te

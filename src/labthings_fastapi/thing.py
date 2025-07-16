@@ -1,7 +1,7 @@
 """A class to represent hardware or software Things.
 
 The `.Thing` class enables most of the functionality of this library,
-and is the way in to most of its features. See wot_cc_ and labthings_cc_
+and is the way in to most of its features. See :ref:`wot_cc` and :ref:`labthings_cc`
 for more.
 """
 
@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Thing:
-    """Represents a Thing, as defined by the Web of Things standard.
+    r"""Represents a Thing, as defined by the Web of Things standard.
 
     This class should encapsulate the code that runs a piece of hardware, or provides
     a particular function - it will correspond to a path on the server, and a Thing
@@ -46,20 +46,21 @@ class Thing:
     -----------------
 
     * ``__init__``: You should accept any arguments you need to configure the Thing
-      in ``__init__``. Don't initialise any hardware at this time, as your Thing may
-      be instantiated quite early, or even at import time.
+        in ``__init__``. Don't initialise any hardware at this time, as your Thing may
+        be instantiated quite early, or even at import time.
     * ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
-      should start and stop communications with the hardware. This is Python's standard
-      "context manager" protocol. The arguments of ``__exit__`` will be ``None`` unless
-      an exception has occurred. You should be safe to ignore them, and just include
-      code that will close down your hardware. It's equivalent to a ``finally`:` block.
+        should start and stop communications with the hardware. This is Python's
+        "context manager" protocol. The arguments of ``__exit__`` will be ``None``
+        except after errors. You should be safe to ignore them, and just include
+        code that will close down your hardware, which is equivalent to a
+        ``finally:`` block.
     * Properties and Actions are defined using decorators: the :deco:`.thing_action`
-      decorator declares a method to be an action, which will run when it's triggered,
-      and the :deco:`.thing_property` decorator (or `.ThingProperty` descriptor) does
-      the same for a property. See the documentation on those functions for more
-      detail.
+        decorator declares a method to be an action, which will run when it's triggered,
+        and the :deco:`.thing_property` decorator (or `.ThingProperty` descriptor) does
+        the same for a property. See the documentation on those functions for more
+        detail.
     * `title` will be used in various places as the human-readable name of your Thing,
-      so it makes sense to set this in a subclass.
+        so it makes sense to set this in a subclass.
 
     There are various LabThings methods that you should avoid overriding unless you
     know what you are doing: anything not mentioned above that's defined in `Thing` is
@@ -70,7 +71,7 @@ class Thing:
     title: str
     """A human-readable description of the Thing"""
     _labthings_blocking_portal: Optional[BlockingPortal] = None
-    """See concurrency_ for why blocking portal is needed."""
+    """See :ref:`concurrency` for why blocking portal is needed."""
     path: Optional[str]
     """The path at which the `.Thing` is exposed over HTTP."""
 
@@ -112,14 +113,14 @@ class Thing:
         :param server: The server to attach this Thing to.
         :param path: The root URL for the Thing.
         :param setting_storage_path: The path on disk to save the any Thing Settings
-        to. This should be the path to a json file. If it does not exist it will be
-        created.
+            to. This should be the path to a json file. If it does not exist it will be
+            created.
 
         Attaching the `.Thing` to a `.ThingServer` allows the `.Thing` to start
         actions, load its settings from the correct place, and create HTTP endpoints
         to allow it to be accessed from the HTTP API.
 
-        We create HTTP endpoints for all wot_affordances_ on the `.Thing`, as well
+        We create HTTP endpoints for all :ref:`wot_affordances` on the `.Thing`, as well
         as any `.EndpointDescriptor` descriptors.
         """
         self.path = path
@@ -200,7 +201,8 @@ class Thing:
 
         :param setting_storage_path: The path where the settings should be stored.
         """
-        # Ensure that the settings path isn't set during loading or saving will be triggered
+        # Ensure that the settings path isn't set during loading or saving will be
+        # triggered
         self._setting_storage_path = None
         thing_name = type(self).__name__
         if os.path.exists(setting_storage_path):
@@ -212,7 +214,10 @@ class Thing:
                         self._settings[key].set_without_emit(self, value)
                     else:
                         _LOGGER.warning(
-                            "Cannot set %s from persistent storage as %s has no matching setting.",
+                            (
+                                "Cannot set %s from persistent storage as %s "
+                                "has no matching setting."
+                            ),
                             key,
                             thing_name,
                         )
@@ -276,7 +281,7 @@ class Thing:
         The w3c Web of Things working group defined a standard representation
         of a Thing, which provides a high-level description of the actions,
         properties, and events that it exposes. This endpoint delivers a JSON
-        representation of the wot_td_ for this Thing.
+        representation of the :ref:`wot_td` for this Thing.
 
         :param path: the URL pointing to this Thing.
         :param base: the base URL for all URLs in the thing description.

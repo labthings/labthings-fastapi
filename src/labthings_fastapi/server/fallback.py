@@ -24,8 +24,8 @@ class FallbackApp(FastAPI):
         This app is used to display a single page, which explains why the
         LabThings server cannot start.
 
-        :param *args: is passed to `fastapi.FastAPI.__init__`\ .
-        :param **kwargs: is passed to `fastapi.FastAPI.__init__`\ .
+        :param \*args: is passed to `fastapi.FastAPI.__init__`\ .
+        :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
         """
         super().__init__(*args, **kwargs)
         self.labthings_config = None

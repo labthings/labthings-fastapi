@@ -1,7 +1,7 @@
 """FastAPI dependencies for invocation-specific resources.
 
 There are a number of LabThings-FastAPI features that are specific to each
-invocation of an action.  These may be accessed using the dependencies_ in
+invocation of an action.  These may be accessed using the :ref:`dependencies` in
 this module.
 
 It's important to understand how FastAPI handles dependencies when looking
@@ -42,7 +42,7 @@ import threading
 def invocation_id() -> uuid.UUID:
     """Generate a UUID for an action invocation.
 
-    This is for use as a FastAPI dependency (see dependencies_).
+    This is for use as a FastAPI dependency (see :ref:`dependencies`).
 
     Because `fastapi` only evaluates each dependency once per HTTP
     request, the `.UUID` we generate here is available to all of
@@ -96,7 +96,7 @@ InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]
 """A FastAPI dependency supplying a logger for the action invocation.
 
 This calls `.invocation_logger` to generate a logger for the current
-invocation. For details of how to use dependencies, see dependencies_.
+invocation. For details of how to use dependencies, see :ref:`dependencies`.
 """
 
 

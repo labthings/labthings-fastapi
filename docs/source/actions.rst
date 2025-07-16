@@ -8,7 +8,7 @@ terms, any method of a `.Thing` that we want to be able to call over HTTP
 should be decorated as an Action, using :deco:`.thing_action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
-wot_cc_ includes a section on wot_actions_ that introduces the general concept.
+:ref:`wot_cc` includes a section on wot_:ref:`actions` that introduces the general concept.
 
 Running actions via HTTP
 ------------------------
@@ -54,6 +54,6 @@ the Thing Description, so it is important to use them consistently.
 There are some function arguments that are not considered input parameters.
 The first is ``self`` (the first positional argument), which is always the
 `.Thing` on which the argument is defined. The other special arguments are
-dependencies_, which use annotated type hints to tell LabThings to
+:ref:`dependencies`, which use annotated type hints to tell LabThings to
 supply resources needed by the action. Most often, this is a way of accessing
 other `.Things` on the same server.

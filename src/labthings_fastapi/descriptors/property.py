@@ -1,9 +1,9 @@
 """Define a descriptor to represent properties.
 
-wot_properties_ are represented in LabThings by `.ThingProperty` descriptors.
+:ref:`wot_properties` are represented in LabThings by `.ThingProperty` descriptors.
 These descriptors work similarly to regular Python properties or attributes,
 with the addition of features that allow them to be accessed over HTTP and
-documented in the wot_td_ and OpenAPI documents.
+documented in the :ref:`wot_td` and OpenAPI documents.
 
 This module defines the `.ThingProperty` class.
 """
@@ -55,31 +55,32 @@ class ThingProperty:
         which work in a similar way to Python properties.
 
         `.ThingProperty` can behave in several different ways:
-        - If no ``getter`` or ``setter`` is specified, it will behave like a simple
-            data attribute (i.e. a variable). If ``observable`` is ``True``, it is
-            possible to register for notifications when the value is set. In this
-            case, an ``initial_value`` is required.
-        - If a ``getter`` is specified and ``observable`` is ``False``, the ``getter``
-            will be called when the property is accessed, and its return value
-            will be the property's value, just like the builtin ``property``. The
-            property will be read-only both locally and via HTTP.
-        - If a ``getter`` is specified and ``observable`` is ``True``, the ``getter``
-            is used instead of ``initial_value`` but thereafter the property
-            behaves like a variable. The ``getter`` is only on first access.
-            The property may be written to locally, and whether it's writable
-            via HTTP depends on the ``readonly`` argument.
-        - If both a ``getter`` and ``setter`` are specified and ``observable`` is
-            ``False``,
-            the property behaves like a Python property, with the ``getter`` being
-            called when the property is accessed, and the ``setter`` being called
-            when the property is set. The property is read-only via HTTP if
-            ``readonly`` is ``True``. It may always be written to locally.
-        - If ``observable`` is ``True`` and a ``setter`` is specified, the property
-            will behave like a variable, but will call the ``setter``
-            when the property is set. The ``setter`` may perform tasks like sending
-            the updated value to the hardware, but it is not responsible for
-            remembering the value. The initial value is set via the ``getter`` or
-            ``initial_value``.
+
+        * If no ``getter`` or ``setter`` is specified, it will behave like a simple
+          data attribute (i.e. a variable). If ``observable`` is ``True``, it is
+          possible to register for notifications when the value is set. In this
+          case, an ``initial_value`` is required.
+        * If a ``getter`` is specified and ``observable`` is ``False``, the ``getter``
+          will be called when the property is accessed, and its return value
+          will be the property's value, just like the builtin ``property``. The
+          property will be read-only both locally and via HTTP.
+        * If a ``getter`` is specified and ``observable`` is ``True``, the ``getter``
+          is used instead of ``initial_value`` but thereafter the property
+          behaves like a variable. The ``getter`` is only on first access.
+          The property may be written to locally, and whether it's writable
+          via HTTP depends on the ``readonly`` argument.
+        * If both a ``getter`` and ``setter`` are specified and ``observable`` is
+          ``False``,
+          the property behaves like a Python property, with the ``getter`` being
+          called when the property is accessed, and the ``setter`` being called
+          when the property is set. The property is read-only via HTTP if
+          ``readonly`` is ``True``. It may always be written to locally.
+        * If ``observable`` is ``True`` and a ``setter`` is specified, the property
+          will behave like a variable, but will call the ``setter``
+          when the property is set. The ``setter`` may perform tasks like sending
+          the updated value to the hardware, but it is not responsible for
+          remembering the value. The initial value is set via the ``getter`` or
+          ``initial_value``.
 
 
         :param model: The type of the property. This is optional, because it is
@@ -91,8 +92,9 @@ class ThingProperty:
             websockets. This causes the setter to run code in the async event loop
             that will notify a list of subscribers each time the property is set.
             Currently, only websockets can be used to observe properties.
-        :param description: A description of the property, used in the API documentation.
-            LabThings will attempt to take this from the docstring if not supplied.
+        :param description: A description of the property, used in the API
+            documentation. LabThings will attempt to take this from the docstring
+            if not supplied.
         :param title: A human-readable title for the property, used in the API
             documentation. Defaults to the first line of the docstring, or the name
             of the property.
@@ -216,7 +218,7 @@ class ThingProperty:
         :param value: the new property value, to be sent to observers.
 
         :raises NotConnectedToServerError: if the Thing that is calling the property
-        update is not connected to a server with a running event loop.
+            update is not connected to a server with a running event loop.
         """
         runner = obj._labthings_blocking_portal
         if not runner:
@@ -251,7 +253,7 @@ class ThingProperty:
         """The name of the property.
 
         This should be consistent between the class definition and the
-        wot_td_ as well as appearing in the URLs for getting and setting.
+        :ref:`wot_td` as well as appearing in the URLs for getting and setting.
         """
         return self._name
 
@@ -301,7 +303,7 @@ class ThingProperty:
         :param path: the URL of the `.Thing`. If not present, we will retrieve
             the ``path`` from ``thing``.
 
-        :return: A description of the wot_property_ in wot_td_ format.
+        :return: A description of the property in :ref:`wot_td` format.
         """
         path = path or thing.path
         ops = [PropertyOp.readproperty]

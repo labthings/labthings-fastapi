@@ -56,12 +56,12 @@ class LabThingsObjectData:
 
     property_observers: Dict[str, WeakSet] = Field(default_factory=dict)
     r"""The observers added to each property.
-    
+
     Keys are property names, values are weak sets used by `.ThingProperty`\ .
     """
     action_observers: Dict[str, WeakSet] = Field(default_factory=dict)
     r"""The observers added to each action.
-    
+
     Keys are action names, values are weak sets used by
     `.ActionDescriptor`\ .
     """
@@ -85,7 +85,7 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
 def get_blocking_portal(obj: Thing) -> Optional[BlockingPortal]:
     """Retrieve a blocking portal from a Thing.
 
-    See concurrency_ for more details.
+    See :ref:`concurrency` for more details.
 
     When a `.Thing` is attached to a `.ThingServer` and the `.ThingServer`
     is started, it sets an attribute on each `.Thing` to allow it to

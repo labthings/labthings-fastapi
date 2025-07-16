@@ -4,7 +4,7 @@ The symbols in this module are type annotations that can be used in
 the arguments of Action methods (or FastAPI endpoints) to
 automatically supply the required dependencies.
 
-See the documentation on dependencies_ for more details of how to use
+See the documentation on :ref:`dependencies` for more details of how to use
 these.
 """
 
