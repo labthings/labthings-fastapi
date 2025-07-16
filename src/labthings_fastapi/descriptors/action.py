@@ -23,7 +23,7 @@ from ..utilities.introspection import (
     input_model_from_signature,
     return_type,
 )
-from ..outputs.blob import BlobIOContextDep
+
 from ..thing_description import type_to_dataschema
 from ..thing_description.model import ActionAffordance, ActionOp, Form, Union
 from ..utilities import labthings_data, get_blocking_portal
@@ -178,7 +178,6 @@ class ActionDescriptor:
         # the function to the decorator.
         def start_action(
             action_manager: ActionManagerContextDep,
-            _blob_manager: BlobIOContextDep,
             request: Request,
             body,
             id: InvocationID,
