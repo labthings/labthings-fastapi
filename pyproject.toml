@@ -86,6 +86,10 @@ ignore = [
 ]
 preview = true
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "DOC"]
+"docs/*" = ["D", "DOC"]
+
 [tool.pydoclint]
 style = "sphinx"
 arg-type-hints-in-docstring = false
@@ -109,6 +113,7 @@ max-line-length = 88
 rst-roles = [
     "class",
     "func",
+    "mod",
     "ref",
     "deco",
     "doc",
