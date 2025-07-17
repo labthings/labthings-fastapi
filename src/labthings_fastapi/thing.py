@@ -91,7 +91,7 @@ class Thing:
             return self
 
     async def __aexit__(
-        self, exc_t: type[Exception] | None, exc_v: Exception | None, exc_tb: Any
+        self, exc_t: Any | None, exc_v: Any | None, exc_tb: Any
     ) -> None:
         """Wrap context management functions, if they exist.
 
@@ -156,7 +156,7 @@ class Thing:
     _settings_store: Optional[dict[str, ThingSetting]] = None
 
     @property
-    def _settings(self) -> Optional[dict[str, ThingSetting]]:
+    def _settings(self) -> dict[str, ThingSetting]:
         """A private property that returns a dict of all settings for this Thing.
 
         Each dict key is the name of the setting, the corresponding value is the
