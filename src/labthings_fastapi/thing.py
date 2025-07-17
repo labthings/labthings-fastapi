@@ -6,7 +6,8 @@ for more.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Optional
+from typing_extensions import Self
 from collections.abc import Mapping
 import logging
 import os
