@@ -134,7 +134,7 @@ def serve_from_cli(
 
     :return: the `.ThingServer` instance created, if ``dry_run`` is ``True``.
 
-    :raises BaseException: if the server cannot start, and the ``fallback``
+    :raise BaseException: if the server cannot start, and the ``fallback``
         option is not specified.
     """
     args = parse_args(argv)

@@ -31,7 +31,7 @@ def validate_thing_description(td: dict) -> None:
 
     :param td: the Thing Description to be validated.
 
-    :raises jsonschema.exceptions.ValidationError: if the Thing Description is
+    :raise jsonschema.exceptions.ValidationError: if the Thing Description is
         invalid.
     """
     start = time.time()

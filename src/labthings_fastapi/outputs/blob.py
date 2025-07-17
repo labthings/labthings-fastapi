@@ -228,7 +228,7 @@ class BlobFile:
             attributes. This may be used to stop temporary directories
             from being garbage collected while the `.Blob` exists.
 
-        :raises IOError: if the file specified does not exist.
+        :raise IOError: if the file specified does not exist.
         """
         if not os.path.exists(file_path):
             raise IOError("Tried to return a file that doesn't exist.")
@@ -348,10 +348,10 @@ class Blob(BaseModel):
 
         :return: the `.Blob` object (i.e. ``self``), after retrieving the data.
 
-        :raises ValueError: if the ``href`` is set as ``"blob://local"`` but
+        :raise ValueError: if the ``href`` is set as ``"blob://local"`` but
             the ``_data`` attribute has not been set. This happens when the
             `.Blob` is being constructed using `.Blob.from_bytes` or similar.
-        :raises LookupError: if the `.Blob` is being constructed from a URL
+        :raise LookupError: if the `.Blob` is being constructed from a URL
             and the URL does not correspond to a `.BlobData` instance that
             exists on this server (i.e. one that has been previously created
             and added to the `.BlobManager` as the result of a previous action).
@@ -389,7 +389,7 @@ class Blob(BaseModel):
         :return: a JSON-serialisable dictionary with a URL that allows
             the `.Blob` to be downloaded from the `.BlobManager`.
 
-        :raises LookupError: if the context variable providing access to the
+        :raise LookupError: if the context variable providing access to the
             `.BlobManager` is not available. This usually means the `.Blob` is
             being serialised somewhere other than the output of an action.
         """
@@ -442,7 +442,7 @@ class Blob(BaseModel):
 
         :return: the data store wrapping data on disk or in memory.
 
-        :raises  ValueError: if there is no data stored on disk or in memory.
+        :raise  ValueError: if there is no data stored on disk or in memory.
         """
         if self._data is None:
             raise ValueError("This Blob has no data.")
@@ -583,7 +583,7 @@ def blob_type(media_type: str) -> type[Blob]:
 
     :return: a subclass of `.Blob` with the specified default media type.
 
-    :raises ValueError: if the media type contains ``'`` or ``\``.
+    :raise ValueError: if the media type contains ``'`` or ``\``.
     """
     if "'" in media_type or "\\" in media_type:
         raise ValueError("media_type must not contain single quotes or backslashes")
@@ -631,7 +631,7 @@ class BlobDataManager:
         :return: a unique ID identifying the data. This forms part of
             the URL to download the data.
 
-        :raises ValueError: if the `.ServerSideBlobData` object already
+        :raise ValueError: if the `.ServerSideBlobData` object already
             has an ``id`` attribute but is not in the dictionary of
             data. This suggests the object has been added to another
             `.BlobDataManager`, which should never happen.

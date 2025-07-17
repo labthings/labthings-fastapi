@@ -101,7 +101,7 @@ class ThingProperty:
         :param getter: A function that gets the value of the property.
         :param setter: A function that sets the value of the property.
 
-        :raises ValueError: if the initial value or type are missing or incorrectly
+        :raise ValueError: if the initial value or type are missing or incorrectly
             specified.
         """
         if getter and initial_value is not None:
@@ -217,7 +217,7 @@ class ThingProperty:
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
 
-        :raises NotConnectedToServerError: if the Thing that is calling the property
+        :raise NotConnectedToServerError: if the Thing that is calling the property
             update is not connected to a server with a running event loop.
         """
         runner = obj._labthings_blocking_portal

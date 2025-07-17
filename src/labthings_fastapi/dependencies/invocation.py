@@ -144,7 +144,7 @@ class CancelEvent(threading.Event):
             if cancel_event.is_set():
                 raise InvocationCancelledError()
 
-        :raises InvocationCancelledError: if the event has been cancelled.
+        :raise InvocationCancelledError: if the event has been cancelled.
         """
         if self.is_set():
             raise InvocationCancelledError("The action was cancelled.")
@@ -159,7 +159,7 @@ class CancelEvent(threading.Event):
 
         :param timeout: The time to sleep for, in seconds.
 
-        :raises InvocationCancelledError: if the event has been cancelled.
+        :raise InvocationCancelledError: if the event has been cancelled.
         """
         if self.wait(timeout):
             raise InvocationCancelledError("The action was cancelled.")

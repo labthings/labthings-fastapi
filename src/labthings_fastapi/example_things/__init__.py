@@ -125,7 +125,7 @@ class ThingWithBrokenAffordances(Thing):
     def broken_action(self):
         """Do something that raises an exception.
 
-        :raises RuntimeError: every time.
+        :raise RuntimeError: every time.
         """
         raise RuntimeError("This is a broken action")
 
@@ -133,7 +133,7 @@ class ThingWithBrokenAffordances(Thing):
     def broken_property(self):
         """Raise an exception when the property is accessed.
 
-        :raises RuntimeError: every time.
+        :raise RuntimeError: every time.
         """
         raise RuntimeError("This is a broken property")
 
@@ -144,7 +144,7 @@ class ThingThatCantInstantiate(Thing):
     def __init__(self):
         """Fail to initialise.
 
-        :raises RuntimeError: every time.
+        :raise RuntimeError: every time.
         """
         raise RuntimeError("This thing can't be instantiated")
 
@@ -155,7 +155,7 @@ class ThingThatCantStart(Thing):
     def __enter__(self):
         """Fail to start the thing.
 
-        :raises RuntimeError: every time.
+        :raise RuntimeError: every time.
         """
         raise RuntimeError("This thing can't start")
 

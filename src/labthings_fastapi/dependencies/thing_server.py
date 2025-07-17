@@ -53,7 +53,7 @@ def find_thing_server(app: FastAPI) -> ThingServer:
 
     :return: the `.ThingServer` that owns the ``app``.
 
-    :raises RuntimeError: if there is no `.ThingServer` associated
+    :raise RuntimeError: if there is no `.ThingServer` associated
         with the current FastAPI application. This should only happen
         if this function is called on a `fastapi.FastAPI` instance
         that was not created by a `.ThingServer`.

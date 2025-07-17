@@ -340,7 +340,7 @@ class Thing:
         :param property_name: the property to register for.
         :param stream: the stream used to send events.
 
-        :raises KeyError: if the requested name is not defined on this Thing.
+        :raise KeyError: if the requested name is not defined on this Thing.
         """
         prop = getattr(self.__class__, property_name)
         if not isinstance(prop, ThingProperty):
@@ -353,7 +353,7 @@ class Thing:
         :param action_name: the action to register for.
         :param stream: the stream used to send events.
 
-        :raises KeyError: if the requested name is not defined on this Thing.
+        :raise KeyError: if the requested name is not defined on this Thing.
         """
         action = getattr(self.__class__, action_name)
         if not isinstance(action, ActionDescriptor):

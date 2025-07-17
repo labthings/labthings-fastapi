@@ -200,8 +200,8 @@ def get_docstring(obj: Any, remove_summary: bool = False) -> Optional[str]:
 
     :param obj: Any Python object.
     :param remove_summary: whether to remove the summary line, if present.
-    :returns: str: The object's docstring.
 
+    :return: The object's docstring.
     """
     ds = obj.__doc__
     if not ds:
@@ -217,8 +217,7 @@ def get_summary(obj: Any) -> Optional[str]:
     """Return the first line of the dosctring of an object.
 
     :param obj: Any Python object
-    :returns: str: First line of object docstring, or ``None``.
-
+    :return: First line of object docstring, or ``None``.
     """
     docs = get_docstring(obj)
     if docs:

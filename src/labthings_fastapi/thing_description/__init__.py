@@ -34,7 +34,7 @@ def is_a_reference(d: JSONSchema) -> bool:
 
     :param d: A JSONSchema dictionary.
 
-    :returns: ``True`` if the dictionary contains ``$ref``.
+    :return: ``True`` if the dictionary contains ``$ref``.
     """
     return "$ref" in d
 
@@ -190,7 +190,7 @@ def check_recursion(depth: int, limit: int) -> None:
     :param depth: the current recursion depth.
     :param limit: the maximum recursion depth.
 
-    :raises ValueError: if we exceed the recursion depth.
+    :raise ValueError: if we exceed the recursion depth.
     """
     if depth > limit:
         raise ValueError(
@@ -298,7 +298,7 @@ def type_to_dataschema(t: type, **kwargs) -> DataSchema:
 
     :return: a `.DataSchema` representing the type.
 
-    :raises ValidationError: if the datatype cannot be represented
+    :raise ValidationError: if the datatype cannot be represented
         by a `.DataSchema`.
     """
     if hasattr(t, "model_json_schema"):

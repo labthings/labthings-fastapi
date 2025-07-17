@@ -50,8 +50,8 @@ def _get_link(obj: dict, rel: str) -> Mapping:
     :return: a dictionary representing the link. It should contain at least
         ``href`` and ``rel`` keys.
 
-    :raises ObjectHasNoLinksError: if there is no ``links`` item.
-    :raises KeyError: if there is no link with the specified ``rel`` value.
+    :raise ObjectHasNoLinksError: if there is no ``links`` item.
+    :raise KeyError: if there is no link with the specified ``rel`` value.
     """
     if "links" not in obj:
         raise ObjectHasNoLinksError(f"Can't find any links on {obj}.")
@@ -177,7 +177,7 @@ class ThingClient:
 
         :return: the output value of the action.
 
-        :raises RuntimeError: is raised if the action does not complete successfully.
+        :raise RuntimeError: is raised if the action does not complete successfully.
         """
         for k in kwargs.keys():
             if isinstance(kwargs[k], ClientBlobOutput):

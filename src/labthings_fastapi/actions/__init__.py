@@ -224,7 +224,7 @@ class Invocation(Thread):
 
         See `.Invocation.status` for status values.
 
-        :raises Exception: any exception raised in the action function will
+        :raise Exception: any exception raised in the action function will
             propagate through this method. Usually, this will just cause the
             thread to terminate after setting ``status`` to ``ERROR`` and
             saving the exception to ``self._exception``.
@@ -461,7 +461,7 @@ class ActionManager:
 
             :return: Details of the invocation.
 
-            :raises HTTPException: with code ``404`` if the invocation is not
+            :raise HTTPException: with code ``404`` if the invocation is not
                 found.
             """
             try:
@@ -500,7 +500,7 @@ class ActionManager:
             :return: The output of the invocation, as a `pydantic.BaseModel`
                 instance. If this is a `.Blob`, it may be returned directly.
 
-            :raises HTTPException: with code ``404`` if the invocation is not
+            :raise HTTPException: with code ``404`` if the invocation is not
                 found.
             """
             with self._invocations_lock:
@@ -539,7 +539,7 @@ class ActionManager:
 
             :param id: The unique ID of the invocation to cancel (from the URL).
 
-            :raises HTTPException: with code ``404`` if the invocation is not
+            :raise HTTPException: with code ``404`` if the invocation is not
                 found, or ``503`` if the invocation is not currently running.
             """
             with self._invocations_lock:

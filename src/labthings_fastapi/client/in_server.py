@@ -188,7 +188,7 @@ def add_action(
         the ``name`` in the supplied action descriptor.
     :param action: an `.ActionDescriptor` to be wrapped.
 
-    :raises DependencyNameClashError: if dependencies are inconsistent.
+    :raise DependencyNameClashError: if dependencies are inconsistent.
     """
 
     @wraps(action.func)

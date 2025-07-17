@@ -230,7 +230,7 @@ class MJPEGStream:
 
         :return: the index of the next frame to arrive.
 
-        :raises StopAsyncIteration: if the stream has stopped.
+        :raise StopAsyncIteration: if the stream has stopped.
         """
         async with self.condition:
             await self.condition.wait()
@@ -317,7 +317,7 @@ class MJPEGStream:
             The blocking portal may be obtained with a dependency, in
             `labthings_fastapi.dependencies.blocking_portal.BlockingPortal`.
 
-        :raises ValueError: if the supplied frame does not start with the JPEG
+        :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
         """
         if not (

@@ -201,7 +201,7 @@ class ActionDescriptor:
         :param obj: The `.Thing` on which the action is being observed.
         :param status: The status of the action, to be sent to observers.
 
-        :raises NotConnectedToServerError: if the Thing calling the action is not
+        :raise NotConnectedToServerError: if the Thing calling the action is not
             connected to a server with a running event loop.
         """
         try:
