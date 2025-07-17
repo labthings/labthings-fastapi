@@ -179,3 +179,9 @@ def invocation_cancel_hook(id: InvocationID) -> CancelHook:
 
 
 CancelHook = Annotated[CancelEvent, Depends(invocation_cancel_hook)]
+"""FastAPI dependency for an event that allows invocations to be cancelled.
+
+This is an annotated type that returns a `.CancelEvent`, which can be used
+to raise `.InvocationCancelledError` exceptions if the invocation is
+cancelled, usually by a ``DELETE`` request to the invocation's URL.
+"""
