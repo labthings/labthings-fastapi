@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.11", "3.12", "3.13"]
+        python: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v3
@@ -55,6 +55,7 @@ jobs:
         run: ruff format --check .
 
       - name: Lint with Flake8 (for docstrings)
+        if: ${{ contains('3.12,3.13', matrix.python) }}
         run: flake8 src
 
       - name: Test with pytest
