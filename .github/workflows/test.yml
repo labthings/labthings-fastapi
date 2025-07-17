@@ -54,6 +54,10 @@ jobs:
       - name: Format with Ruff
         run: ruff format --check .
 
+      - name: Lint with Flake8 (for docstrings)
+        if: ${{ contains('3.12,3.13', matrix.python) }}
+        run: flake8 src
+
       - name: Test with pytest
         run: pytest --cov=src --cov-report=lcov
 

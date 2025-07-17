@@ -1,5 +1,4 @@
-"""
-A collection of utility functions to analyse types and metadata
+"""A collection of utility functions to analyse types and metadata.
 
 Many parts of LabThings require us to use type annotations to
 generate schemas/validation/documentation. This is done using
@@ -20,18 +19,32 @@ from fastapi.dependencies.utils import analyze_param, get_typed_signature
 
 
 class EmptyObject(BaseModel):
+    """A model representing an object with no required keys."""
+
     model_config = ConfigDict(extra="allow")
 
 
 class StrictEmptyObject(EmptyObject):
+    """A model representing an object that must have no keys."""
+
     model_config = ConfigDict(extra="forbid")
 
 
 class EmptyInput(RootModel):
+    """Represent the input of an action that has no required parameters.
+
+    This may be either a dictionary or ``None``.
+    """
+
     root: Optional[EmptyObject] = None
 
 
 class StrictEmptyInput(EmptyInput):
+    """Represent the input of an action that never takes parameters.
+
+    This may be either an empty dictionary or ``None``.
+    """
+
     root: Optional[StrictEmptyObject] = None
 
 
@@ -45,21 +58,27 @@ def input_model_from_signature(
     This is deliberately quite a lot more basic than
     `pydantic.decorator.ValidatedFunction` because it is designed
     to handle JSON input. That means that we don't want positional
-    arguments, unless there's exactly one (in which case we have a
-    single value, not an object, and this may or may not be supported).
+    arguments.
 
-    This will fail for position-only arguments, though that may change
-    in the future.
+    .. note::
 
+        LabThings-FastAPI does not currently support actions that take
+        positional arguments, because this does not convert nicely into
+        JSONSchema or Thing Description documents (see :ref:`wot_td`).
+
+    :param func: the function to analyse.
     :param remove_first_positional_arg: Remove the first argument from the
         model (this is appropriate for methods, as the first argument,
         self, is baked in when it's called, but is present in the
         signature).
     :param ignore: Ignore arguments that have the specified name.
         This is useful for e.g. dependencies that are injected by LabThings.
-    :returns: A pydantic model class describing the input parameters
 
-    TODO: deal with (or exclude) functions with a single positional parameter
+    :return: A pydantic model class describing the input parameters
+
+    :raise TypeError: if positional arguments are used: this is not supported.
+    :raise ValueError: if ``remove_first_positional_arg`` is true but there
+        is no initial positional argument.
     """
     parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
     if remove_first_positional_arg:
@@ -109,29 +128,29 @@ def input_model_from_signature(
     return model
 
 
-def function_dependencies(
-    func: Callable, dependency_types: Sequence[Type]
-) -> Dict[str, tuple[type, type]]:
-    """Determine whether a function's arguments require dependencies
-
-    The return value maps argument names to a tuple of (type, full_type)
-    where `full_type` is the annotation without simplification, i.e.
-    it will include the contents of any Annotated objects.
-    """
-    type_hints = get_type_hints(func, include_extras=False)
-    full_type_hints = get_type_hints(func, include_extras=True)
-    return {
-        name: (type_, full_type_hints[name])
-        for name, type_ in type_hints.items()
-        if type_ in dependency_types
-    }
-
-
 def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
-    """Find the arguments of a function that are FastAPI dependencies
+    """Find the arguments of a function that are FastAPI dependencies.
 
     This allows us to "pass through" the full power of the FastAPI dependency
-    injection system to thing actions.
+    injection system to thing actions. Any function parameter that has a
+    type hint annotated with `fastapi.Depends` will be treated as a
+    dependency, and thus be supplied automatically when it is called over
+    HTTP. See :ref:`dependencies` for an overview.
+
+    We give special treatment to dependency parameters, as they must not
+    appear in the input model, and they must be supplied by the
+    `.DirectThingClient` wrapper to make the signature identical to that
+    of the `.ThingClient` over HTTP.
+
+    .. note::
+
+        Path and query parameters are ignored. These should not be used as action
+        parameters, and will most likely raise an error when the `.Thing` is
+        added to FastAPI.
+
+    :param func: a function to inspect.
+
+    :return: a list of parameter objects that are annotated as dependencies.
     """
     # TODO: this currently ignores path parameters
     sig = get_typed_signature(func)
@@ -149,7 +168,12 @@ def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
 
 
 def return_type(func: Callable) -> Type:
-    """Determine the return type of a function."""
+    """Determine the return type of a function.
+
+    :param func: a function to inspect
+
+    :return: the return type of the function.
+    """
     sig = inspect.signature(func)
     if sig.return_annotation == inspect.Signature.empty:
         return Any  # type: ignore[return-value]
@@ -160,23 +184,24 @@ def return_type(func: Callable) -> Type:
         return type_hints["return"]
 
 
-def get_docstring(obj: Any, remove_summary=False) -> Optional[str]:
-    """Return the docstring of an object
+def get_docstring(obj: Any, remove_summary: bool = False) -> Optional[str]:
+    """Return the docstring of an object.
 
-    If `remove_newlines` is `True` (default), newlines are removed from the string.
+    Get the docstring of an object, optionally removing the initial "summary"
+    line.
+
     If `remove_summary` is `True` (not default), and the docstring's second line
     is blank, the first two lines are removed.  If the docstring follows the
     convention of a one-line summary, a blank line, and a description, this will
     get just the description.
 
-    If `remove_newlines` is `False`, the docstring is processed by
+    The docstring is processed by
     `inspect.cleandoc()` to remove whitespace from the start of each line.
 
-    :param obj: Any Python object
-    :param remove_newlines: bool (Default value = True)
-    :param remove_summary: bool (Default value = False)
-    :returns: str: Object docstring
+    :param obj: Any Python object.
+    :param remove_summary: whether to remove the summary line, if present.
 
+    :return: The object's docstring.
     """
     ds = obj.__doc__
     if not ds:
@@ -189,11 +214,10 @@ def get_docstring(obj: Any, remove_summary=False) -> Optional[str]:
 
 
 def get_summary(obj: Any) -> Optional[str]:
-    """Return the first line of the dosctring of an object
+    """Return the first line of the dosctring of an object.
 
     :param obj: Any Python object
-    :returns: str: First line of object docstring
-
+    :return: First line of object docstring, or ``None``.
     """
     docs = get_docstring(obj)
     if docs:

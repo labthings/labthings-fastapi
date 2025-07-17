@@ -1,3 +1,9 @@
+"""Support for additional output formats.
+
+Currently, this submodule provides an MJPEG Stream output. See
+`.MJPEGStreamDescriptor`.
+"""
+
 from .mjpeg_stream import MJPEGStream, MJPEGStreamDescriptor
 
 # __all__ enables convenience imports from this module.

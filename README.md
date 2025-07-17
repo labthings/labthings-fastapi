@@ -32,7 +32,7 @@ You can install this repository with `pip install labthings-fastapi`. It may at 
 
 ## Developer notes
 
-The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit.
+The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit. `flake8` is also run in CI, primarily to enable stricter checks on docstrings. It is run as `flake8 src`.
 
 Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
 ```

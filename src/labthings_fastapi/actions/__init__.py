@@ -1,8 +1,24 @@
+"""Actions module.
+
+:ref:`wot_actions` are represented by methods, decorated with the `.thing_action`
+decorator.
+
+See the :ref:`actions` documentation for a top-level overview of actions in
+LabThings-FastAPI.
+
+Developer notes
+---------------
+
+Currently much of the code related to Actions is in `.thing_action` and the
+underlying `.ActionDescriptor`. This is likely to be refactored in the near
+future.
+"""
+
 from __future__ import annotations
 import datetime
 import logging
 from collections import deque
-from threading import Event, Thread, Lock
+from threading import Thread, Lock
 from typing import MutableSequence, Optional, Any
 import uuid
 from typing import TYPE_CHECKING
@@ -12,8 +28,8 @@ from pydantic import BaseModel
 
 from ..utilities import model_to_dict
 from ..utilities.introspection import EmptyInput
-from ..thing_description.model import LinkElement
-from .invocation_model import InvocationModel, InvocationStatus
+from ..thing_description._model import LinkElement
+from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
 from ..dependencies.invocation import (
     CancelHook,
     InvocationCancelledError,
@@ -27,26 +43,53 @@ if TYPE_CHECKING:
     from ..thing import Thing
 
 ACTION_INVOCATIONS_PATH = "/action_invocations"
+"""The API route used to list `.Invocation` objects."""
 
 
 class Invocation(Thread):
-    """A Thread subclass that retains output values and tracks progress
+    """A Thread subclass that retains output values and tracks progress.
 
-    TODO: In the future this should probably not be a Thread subclass, but might run in
-    a thread anyway.
+    `.Invocation` threads add several bits of functionality compared to the base
+    `threading.Thread`.
+
+    * They are instantiated with an `.ActionDescriptor` and a `.Thing`
+      rather than a target function (see ``__init__``).
+    * Each invocation is assigned a unique ``ID`` to allow it to be polled
+      over HTTP.
+    * A `.CancelHook` is provided to allow the invocation to stop gracefully
+      if it is cancelled by the user.
     """
 
     def __init__(
         self,
         action: ActionDescriptor,
         thing: Thing,
+        id: uuid.UUID,
         input: Optional[BaseModel] = None,
         dependencies: Optional[dict[str, Any]] = None,
-        default_stop_timeout: float = 5,
         log_len: int = 1000,
-        id: Optional[uuid.UUID] = None,
         cancel_hook: Optional[CancelHook] = None,
     ):
+        """Create a thread to run an action and track its outputs.
+
+        :param action: provides the function that we run, as well as metadata
+            and type information. The descriptor is not bound to an object, so we
+            supply the `.Thing` it's bound to when the function is run.
+        :param thing: is the object on which we are running the ``action``, i.e.
+            it is supplied to the function wrapped by ``action`` as the ``self``
+            argument.
+        :param id: is a `uuid.UUID` used to identify the invocation, for example
+            when polling its status via HTTP.
+        :param input: is a `pydantic.BaseModel` representing the body of the HTTP
+            request that invoked the action. It is supplied to the function as
+            keyword arguments.
+        :param dependencies: is a dictionary of keyword arguments, supplied by
+            FastAPI by its dependency injection mechanism.
+        :param log_len: sets the number of log entries that will be held in
+            memory by the invocation's logger.
+        :param cancel_hook: is a `threading.Event` subclass that tells the
+            invocation it's time to stop. See `.CancelHook`.
+        """
         Thread.__init__(self, daemon=True)
 
         # keep track of the corresponding ActionDescriptor
@@ -57,11 +100,7 @@ class Invocation(Thread):
         self.cancel_hook = cancel_hook
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
-        self._ID = id if id is not None else uuid.uuid4()  # Task ID
-
-        # Event to track if the user has requested stop
-        self.stopping: Event = Event()
-        self.default_stop_timeout: float = default_stop_timeout
+        self._ID = id  # Task ID
 
         # How long to keep the invocation after it finishes
         self.retention_time = action.retention_time
@@ -79,61 +118,65 @@ class Invocation(Thread):
 
     @property
     def id(self) -> uuid.UUID:
-        """
-        UUID for the thread. Note this not the same as the native thread ident.
-        """
+        """UUID for the thread. Note this not the same as the native thread ident."""
         return self._ID
 
     @property
     def output(self) -> Any:
-        """
-        Return value of the Action. If the Action is still running, returns None.
-        """
+        """Return value of the Action. If the Action is still running, returns None."""
         with self._status_lock:
             return self._return_value
 
     @property
-    def log(self):
+    def log(self) -> list[LogRecordModel]:
         """A list of log items generated by the Action."""
         with self._status_lock:
             return list(self._log)
 
     @property
     def status(self) -> InvocationStatus:
-        """
-        Current running status of the thread.
+        """Current running status of the thread.
 
-        ==============  =============================================
-        Status          Meaning
-        ==============  =============================================
-        ``pending``     Not yet started
-        ``running``     Currently in-progress
-        ``completed``   Finished without error
-        ``cancelled``   Thread stopped after a cancel request
-        ``error``       Exception occurred in thread
-        ==============  =============================================
+        See `.InvocationStatus` for the values and their meanings.
         """
         with self._status_lock:
             return self._status
 
     @property
     def action(self):
-        return self.action_ref()
+        """The `.ActionDescriptor` object running in this thread."""
+        action = self.action_ref()
+        assert action is not None, "The action for an `Invocation` has been deleted!"
+        return action
 
     @property
-    def thing(self):
-        return self.thing_ref()
+    def thing(self) -> Thing:
+        """The `.Thing` to which the action is bound, i.e. this is ``self``."""
+        thing = self.thing_ref()
+        assert thing is not None, "The `Thing` on which an action was run is missing!"
+        return thing
 
-    def cancel(self):
-        """Cancel the task by requesting the code to stop
+    def cancel(self) -> None:
+        """Cancel the task by requesting the code to stop.
 
-        This is very much not guaranteed to work: the action must use
-        a CancelHook dependency and periodically check it.
+        This is an opt-in feature: the action must use
+        a `.CancelHook` dependency and periodically check it.
         """
         if self.cancel_hook is not None:
             self.cancel_hook.set()
 
-    def response(self, request: Optional[Request] = None):
+    def response(self, request: Optional[Request] = None) -> InvocationModel:
+        """Generate a representation of the invocation suitable for HTTP.
+
+        When an invocation is polled, we return a JSON object that includes
+        its status, any log entries, a return value (if completed), and a link
+        to poll for updates.
+
+        :param request: is used to generate the ``href`` in the response, which
+            should retrieve an updated version of this response.
+
+        :return: an `.InvocationModel` representing this `.Invocation`.
+        """
         if request:
             href = str(request.url_for("action_invocation", id=self.id))
         else:
@@ -156,8 +199,36 @@ class Invocation(Thread):
             log=self.log,
         )
 
-    def run(self):
-        """Overrides default threading.Thread run() method"""
+    def run(self) -> None:
+        """Run the action and track progress.
+
+        `.Invocation` overrides the default `threading.Thread.run` method to
+        add ways to track its progress and capture the return value.
+
+        The code to be run is the function wrapped in the `.ActionDescriptor`
+        that is passed in as ``action``. Its arguments are the associated
+        `.Thing` (the first argument, i.e. ``self``), the ``input`` model
+        (split into keyword arguments for each field), and any ``dependencies``
+        (also as keyword arguments).
+
+        We update the status of the action by setting ``self._status`` and
+        emitting a changed event. This runs async code in the event loop that
+        informs any clients listening over websockets that the event's status
+        has changed.
+
+        Logs are retained by a custom log handler, and are included when the
+        `.Invocation` is serialised over HTTP.
+
+        If exceptions are raised by the action code, these are caught and
+        stored. The status is then set to ERROR and the thread terminates.
+
+        See `.Invocation.status` for status values.
+
+        :raise Exception: any exception raised in the action function will
+            propagate through this method. Usually, this will just cause the
+            thread to terminate after setting ``status`` to ``ERROR`` and
+            saving the exception to ``self._exception``.
+        """
         try:
             self.action.emit_changed_event(self.thing, self._status)
 
@@ -207,50 +278,60 @@ class Invocation(Thread):
 
 
 class DequeLogHandler(logging.Handler):
+    """A log handler that stores entries in memory."""
+
     def __init__(
         self,
         dest: MutableSequence,
-        level=logging.INFO,
+        level: int = logging.INFO,
     ):
-        """Set up a log handler that appends messages to a list.
+        """Set up a log handler that appends messages to a deque.
 
-        This log handler will first filter by ``thread``, if one is
-        supplied.  This should be a ``threading.Thread`` object.
-        Only log entries from the specified thread will be
-        saved.
+        .. warning::
+            This log handler does not currently rotate or truncate
+            the list - so if you use it on a thread that produces a
+            lot of log messages, you may run into memory problems.
 
-        ``dest`` should specify a deque, to which we will append
-        each log entry as it comes in. This is assumed to be thread
-        safe.
+            Using a `.deque` with a finite capacity helps to mitigate
+            this.
 
-        NB this log handler does not currently rotate or truncate
-        the list - so if you use it on a thread that produces a
-        lot of log messages, you may run into memory problems.
-
-
+        :param dest: should specify a deque, to which we will append
+            each log entry as it comes in. This is assumed to be thread
+            safe.
+        :param level: sets the level of the logger. For most invocations,
+            a log level of `logging.INFO` is appropriate.
         """
         logging.Handler.__init__(self)
         self.setLevel(level)
         self.dest = dest
 
-    def emit(self, record):
-        """Save a log record to the destination deque"""
+    def emit(self, record: logging.LogRecord) -> None:
+        """Save a log record to the destination deque.
+
+        :param record: the `logging.LogRecord` object to add.
+        """
         self.dest.append(record)
 
 
 class ActionManager:
-    """A class to manage a collection of actions"""
+    """A class to manage a collection of actions."""
 
     def __init__(self):
+        """Set up an `.ActionManager`."""
         self._invocations = {}
         self._invocations_lock = Lock()
 
     @property
-    def invocations(self):
+    def invocations(self) -> list[Invocation]:
+        """A list of all the `.Invocation` objects running or recently completed."""
         with self._invocations_lock:
             return list(self._invocations.values())
 
-    def append_invocation(self, invocation: Invocation):
+    def append_invocation(self, invocation: Invocation) -> None:
+        """Add an `.Invocation` to the `.ActionManager`.
+
+        :param invocation: The `.Invocation` to add.
+        """
         with self._invocations_lock:
             self._invocations[invocation.id] = invocation
 
@@ -263,7 +344,28 @@ class ActionManager:
         dependencies: dict[str, Any],
         cancel_hook: CancelHook,
     ) -> Invocation:
-        """Invoke an action, returning the thread where it's running"""
+        """Invoke an action, returning the thread where it's running.
+
+        See `.Invocation` for more details.
+
+        :param action: provides the function that we run, as well as metadata
+            and type information. The descriptor is not bound to an object, so we
+            supply the `.Thing` it's bound to when the function is run.
+        :param thing: is the object on which we are running the ``action``, i.e.
+            it is supplied to the function wrapped by ``action`` as the ``self``
+            argument.
+        :param id: is a `uuid.UUID` used to identify the invocation, for example
+            when polling its status via HTTP.
+        :param input: is a `pydantic.BaseModel` representing the body of the HTTP
+            request that invoked the action. It is supplied to the function as
+            keyword arguments.
+        :param dependencies: is a dictionary of keyword arguments, supplied by
+            FastAPI by its dependency injection mechanism.
+        :param cancel_hook: is a `threading.Event` subclass that tells the
+            invocation it's time to stop. See `.CancelHook`.
+
+        :return: an `.Invocation` object that has been started.
+        """
         thread = Invocation(
             action=action,
             thing=thing,
@@ -277,7 +379,11 @@ class ActionManager:
         return thread
 
     def get_invocation(self, id: uuid.UUID) -> Invocation:
-        """Retrieve an invocation by ID"""
+        """Retrieve an invocation by ID.
+
+        :param id: the unique ID of the action to retrieve.
+        :return: the `.Invocation` object.
+        """
         with self._invocations_lock:
             return self._invocations[id]
 
@@ -285,19 +391,38 @@ class ActionManager:
         self,
         action: Optional[ActionDescriptor] = None,
         thing: Optional[Thing] = None,
-        as_responses: bool = False,
         request: Optional[Request] = None,
     ) -> list[InvocationModel]:
-        """All of the invocations currently managed"""
+        """All of the invocations currently managed.
+
+        Returns a list of `.InvocationModel` instances representing all the
+        invocations that are currently running, or have recently completed and
+        not yet expired.
+
+        :param action: filters out only the invocations of a particular
+            `.ActionDescriptor`. Note that if there are two Things
+            of the same subclass, filtering by action will return invocations
+            on either `.Thing`.
+        :param thing: returns only invocations of actions on a particular `.Thing`.
+            This will often be combined with filtering by ``action`` to give the
+            list of invocations returned by a GET request on an action endpoint.
+        :param request: is used to pass a `fastapi.Request` object to the
+            `.Invocation.response` method. Doing so ensures the URL returned as
+            ``href`` in the response matches the address used to communicate with
+            the server (i.e. it uses `fastapi.Request.url_for` instead of a path
+            generated from a string).
+
+        :return: A list of invocations, optionally filtered by Thing and/or Action.
+        """
         return [
-            i.response(request=request) if as_responses else i
+            i.response(request=request)
             for i in self.invocations
             if thing is None or i.thing == thing
             if action is None or i.action == action
         ]
 
     def expire_invocations(self):
-        """Delete invocations that have passed their expiry time"""
+        """Delete invocations that have passed their expiry time."""
         to_delete = []
         with self._invocations_lock:
             for k, v in self._invocations.items():
@@ -308,12 +433,15 @@ class ActionManager:
             for k in to_delete:
                 del self._invocations[k]
 
-    def attach_to_app(self, app: FastAPI):
-        """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI"""
+    def attach_to_app(self, app: FastAPI) -> None:
+        """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI.
+
+        :param app: The `fastapi.FastAPI` application to which we add the endpoints.
+        """
 
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
         def list_all_invocations(request: Request, _blob_manager: BlobIOContextDep):
-            return self.list_invocations(as_responses=True, request=request)
+            return self.list_invocations(request=request)
 
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}",
@@ -322,7 +450,20 @@ class ActionManager:
         )
         def action_invocation(
             id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep
-        ):
+        ) -> InvocationModel:
+            """Return a description of a specific action.
+
+            :param id: The action's ID (from the path).
+            :param request: FastAPI dependency for the request object, used to
+                find URLs via ``url_for``.
+            :param _blob_manager: FastAPI dependency that enables `.Blob` objects
+                to be serialised.
+
+            :return: Details of the invocation.
+
+            :raise HTTPException: with code ``404`` if the invocation is not
+                found.
+            """
             try:
                 with self._invocations_lock:
                     return self._invocations[id].response(request=request)
@@ -347,10 +488,20 @@ class ActionManager:
             },
         )
         def action_invocation_output(id: uuid.UUID, _blob_manager: BlobIOContextDep):
-            """Get the output of an action invocation
+            """Get the output of an action invocation.
 
             This returns just the "output" component of the action invocation. If the
             output is a file, it will return the file.
+
+            :param id: The action's ID (from the path).
+            :param _blob_manager: FastAPI dependency that enables `.Blob` objects
+                to be serialised.
+
+            :return: The output of the invocation, as a `pydantic.BaseModel`
+                instance. If this is a `.Blob`, it may be returned directly.
+
+            :raise HTTPException: with code ``404`` if the invocation is not
+                found.
             """
             with self._invocations_lock:
                 try:
@@ -384,7 +535,13 @@ class ActionManager:
             },
         )
         def delete_invocation(id: uuid.UUID) -> None:
-            """Cancel an action invocation"""
+            """Cancel an action invocation.
+
+            :param id: The unique ID of the invocation to cancel (from the URL).
+
+            :raise HTTPException: with code ``404`` if the invocation is not
+                found, or ``503`` if the invocation is not currently running.
+            """
             with self._invocations_lock:
                 try:
                     invocation: Any = self._invocations[id]

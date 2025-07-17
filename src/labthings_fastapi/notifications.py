@@ -1,5 +1,4 @@
-"""
-Handle notification of events, property, and action status changes
+"""Handle notification of events, property, and action status changes.
 
 There are several kinds of "event" in the WoT vocabulary, not all of which
 are called Event, which is why this module is called `notifications`.
@@ -20,4 +19,6 @@ from __future__ import annotations
 
 
 class Listener:
+    """A placeholder class for objects that listen for notifications."""
+
     pass

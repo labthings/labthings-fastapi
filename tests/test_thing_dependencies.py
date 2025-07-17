@@ -152,7 +152,7 @@ def test_conflicting_dependencies():
         def action_five(self, thing_two: ThingTwoDep) -> str:
             return thing_two.action_two()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(lt.client.in_server.DependencyNameClashError):
         lt.deps.direct_thing_client_dependency(ThingFour, "/thing_four/")
 
 
