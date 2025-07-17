@@ -77,7 +77,7 @@ def thing_server_from_request(request: Request) -> ThingServer:
         ServerDep = Annotated[ThingServer, Depends(thing_server_from_request)]
 
     This is not provided as a ready-made annotated type because it would
-    introduce a hard dependency on the `.server` module and cause circular
+    introduce a hard dependency on the :mod:`.server` module and cause circular
     references.
 
     :param request: is supplied automatically by FastAPI when used

@@ -39,6 +39,7 @@ Non-Thing dependencies
 LabThings provides several other dependencies, which can usually be imported directly as annotated types. For example, if your action needs to display messages as it runs, you may use an `.InvocationLogger`:
 
 .. code-block:: python
+    
     import labthings_fastapi as lt
 
     class NoisyCounter(lt.Thing):

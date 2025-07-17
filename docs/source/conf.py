@@ -72,6 +72,7 @@ canonical_fq_names = [
     "labthings_fastapi.actions.ActionManager",
     "labthings_fastapi.descriptors.endpoint.EndpointDescriptor",
     "labthings_fastapi.dependencies.invocation.invocation_logger",
+    "labthings_fastapi.utilities.introspection.EmptyObject",
 ]
 
 

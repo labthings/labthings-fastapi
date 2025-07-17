@@ -68,7 +68,7 @@ def invocation_id() -> uuid.UUID:
 InvocationID = Annotated[uuid.UUID, Depends(invocation_id)]
 """A FastAPI dependency that supplies the invocation ID.
 
-This calls `.invocation_id` to generate a new `.UUID`. It is used
+This calls :func:`.invocation_id` to generate a new `.UUID`. It is used
 to supply the invocation ID when an action is invoked.
 
 Any dependency of an action may access the invocation ID by

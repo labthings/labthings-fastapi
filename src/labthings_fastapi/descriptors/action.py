@@ -3,7 +3,16 @@
 from __future__ import annotations
 from functools import partial
 import inspect
-from typing import TYPE_CHECKING, Annotated, Any, Callable, Optional, Literal, overload
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Callable,
+    Optional,
+    Literal,
+    Union,
+    overload,
+)
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI, Request, BackgroundTasks
@@ -23,7 +32,7 @@ from ..utilities.introspection import (
 )
 from ..outputs.blob import BlobIOContextDep
 from ..thing_description import type_to_dataschema
-from ..thing_description._model import ActionAffordance, ActionOp, Form, Union
+from ..thing_description._model import ActionAffordance, ActionOp, Form
 from ..utilities import labthings_data, get_blocking_portal
 from ..exceptions import NotConnectedToServerError
 

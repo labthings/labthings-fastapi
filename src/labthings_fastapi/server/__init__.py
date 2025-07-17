@@ -3,7 +3,7 @@
 LabThings wraps the `fastapi.FastAPI` application in a `.ThingServer`, which
 provides the tools to serve and manage `.Thing` instances.
 
-See the :doc:`tutorial` for examples of how to set up a `.ThingServer`.
+See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations

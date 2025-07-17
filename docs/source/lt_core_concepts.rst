@@ -1,4 +1,4 @@
-.. _labthings_cc
+.. _labthings_cc:
 
 LabThings Core Concepts
 =======================

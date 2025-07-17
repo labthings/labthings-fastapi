@@ -13,7 +13,7 @@ import os
 import json
 from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
-from fastapi import Request
+from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
 from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
@@ -25,7 +25,7 @@ from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint, WebSocket
+from .websockets import websocket_endpoint
 
 
 if TYPE_CHECKING:

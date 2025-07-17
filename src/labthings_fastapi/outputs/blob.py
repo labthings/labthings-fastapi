@@ -1,6 +1,6 @@
 """BLOB Output Module.
 
-The `.`.Blob`` class is used when you need to return something file-like that can't
+The ``.Blob`` class is used when you need to return something file-like that can't
 easily (or efficiently) be converted to JSON. This is useful for returning large objects
 like images, especially where an existing file-type is the obvious way to handle it.
 
@@ -765,4 +765,4 @@ async def blob_serialisation_context_manager(
 BlobIOContextDep: TypeAlias = Annotated[
     BlobDataManager, Depends(blob_serialisation_context_manager)
 ]
-"""A dependency that enables `Blob`s to be serialised and deserialised."""
+"""A dependency that enables `.Blob` to be serialised and deserialised."""

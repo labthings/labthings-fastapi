@@ -34,7 +34,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     r"""Return the blocking portal from our ThingServer.
 
     This is for use as a FastAPI dependency, to allow threaded code to call
-    async code. See the module-level docstring for `.blocking_portal`.
+    async code. See the module-level docstring for :mod:`.blocking_portal`.
 
     :param request: The `fastapi.Request` object, supplied by the :ref:`dependencies`
         mechanism.
