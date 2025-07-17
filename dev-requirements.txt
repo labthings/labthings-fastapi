@@ -66,6 +66,7 @@ flake8==7.3.0
     #   flake8-pyproject
     #   flake8-rst
     #   flake8-rst-docstrings
+    #   pydoclint
 flake8-docstrings==1.7.0
     # via labthings-fastapi (pyproject.toml)
 flake8-pyproject==1.2.3

@@ -36,7 +36,7 @@ dev = [
   "flake8-docstrings",
   "flake8-rst",
   "flake8-rst-docstrings",
-  "pydoclint",
+  "pydoclint[flake8]",
   "sphinx-rtd-theme",
   "sphinx>=7.2",
   "sphinx-autoapi",
@@ -90,17 +90,6 @@ preview = true
 "tests/*" = ["D", "DOC"]
 "docs/*" = ["D", "DOC"]
 
-[tool.pydoclint]
-style = "sphinx"
-arg-type-hints-in-docstring = false
-skip-checking-short-docstrings = false
-allow-init-docstring = true
-check-style-mismatch = true
-show-filenames-in-every-violation-message = true
-check-return-types = false
-check-class-attributes = false  # prefer docstrings on the attributes
-check-yield-types = false  # use type annotations instead
-
 [tool.mypy]
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
 
@@ -121,6 +110,15 @@ rst-roles = [
 rst-directives = [
     "todo",
 ]
+style = "sphinx"
+arg-type-hints-in-docstring = false
+skip-checking-short-docstrings = false
+allow-init-docstring = true
+check-style-mismatch = true
+show-filenames-in-every-violation-message = true
+check-return-types = false
+check-class-attributes = false  # prefer docstrings on the attributes
+check-yield-types = false  # use type annotations instead
 
 [project.scripts]
 labthings-server = "labthings_fastapi.server.cli:serve_from_cli"

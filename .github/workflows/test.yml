@@ -54,6 +54,9 @@ jobs:
       - name: Format with Ruff
         run: ruff format --check .
 
+      - name: Lint with Flake8 (for docstrings)
+        run: flake8 src
+
       - name: Test with pytest
         run: pytest --cov=src --cov-report=lcov
 
