@@ -54,6 +54,12 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
+# The next section deals with skipping names. Because various modules import
+# symbols with `from x import y`, those symbols are duplicated by apidoc.
+# The logic below defines a function that skips functions we've pulled into
+# the public API, and functions that are used elsewhere, to ensure they
+# are documented exactly once, at the fully qualified name specified.
+
 skipper_log = logging.getLogger("skipper")
 skipper_log.addHandler(logging.FileHandler("./skipper.log", mode="w"))
 skipper_log.setLevel(logging.DEBUG)
