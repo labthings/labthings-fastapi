@@ -1,6 +1,3 @@
-import logging
-import labthings_fastapi
-
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -54,15 +51,29 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
-skipper_log = logging.getLogger("skipper")
-skipper_log.addHandler(logging.FileHandler("./skipper.log", mode="w"))
-skipper_log.setLevel(logging.DEBUG)
-
-convenience_modules = {
-    "labthings_fastapi": labthings_fastapi.__all__,
-    "labthings_fastapi.deps": labthings_fastapi.deps.__all__,
-}
 canonical_fq_names = [
+    "labthings_fastapi.Thing",
+    "labthings_fastapi.ThingProperty",
+    "labthings_fastapi.ThingSetting",
+    "labthings_fastapi.thing_property",
+    "labthings_fastapi.thing_setting",
+    "labthings_fastapi.thing_action",
+    "labthings_fastapi.fastapi_endpoint",
+    "labthings_fastapi.deps.outputs",
+    "labthings_fastapi.deps.blob",
+    "labthings_fastapi.deps.ThingServer",
+    "labthings_fastapi.deps.cli",
+    "labthings_fastapi.deps.ThingClient",
+    "labthings_fastapi.deps.get_blocking_portal",
+    "labthings_fastapi.deps.BlockingPortal",
+    "labthings_fastapi.deps.InvocationID",
+    "labthings_fastapi.deps.InvocationLogger",
+    "labthings_fastapi.deps.CancelHook",
+    "labthings_fastapi.deps.GetThingStates",
+    "labthings_fastapi.deps.raw_thing_dependency",
+    "labthings_fastapi.deps.direct_thing_client_dependency",
+    "labthings_fastapi.deps.direct_thing_client_class",
+    "labthings_fastapi.deps.DirectThingClient",
     "labthings_fastapi.descriptors.action.ActionDescriptor",
     "labthings_fastapi.outputs.blob.BlobDataManager",
     "labthings_fastapi.actions.invocation_model.InvocationModel",
@@ -84,8 +95,6 @@ def unqual(name):
 
 canonical_names = {unqual(n): n for n in canonical_fq_names}
 
-skipper_log.info("Convenience modules: %s.", convenience_modules)
-
 
 def skip_public_api(app, what, name: str, obj, skip, options):
     """Skip documenting members that are re-exported from the public API."""
@@ -94,10 +103,6 @@ def skip_public_api(app, what, name: str, obj, skip, options):
     if unqual in canonical_names and name != canonical_names[unqual]:
         skip = True
         return skip
-    for conv, all in convenience_modules.items():
-        if unqual in all and name != f"{conv}.{unqual}":
-            skipper_log.warning(f"skipping {name}")
-            skip = True
     return skip
 
 
