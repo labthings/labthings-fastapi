@@ -39,6 +39,7 @@ dev = [
   "pydoclint",
   "sphinx-rtd-theme",
   "sphinx>=7.2",
+  "sphinx-autoapi",
 ]
 
 [project.urls]
@@ -100,7 +101,10 @@ check-yield-types = false  # use type annotations instead
 plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
 
 [tool.flake8]
-extend-ignore = ["DOC301"]
+extend-ignore = [
+  "DOC301",  # allow class + __init__ docstrings
+  "D202",  # conflicts with ruff format
+]
 max-line-length = 88
 rst-roles = [
     "class",

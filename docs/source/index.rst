@@ -15,7 +15,7 @@ Documentation for LabThings-FastAPI
    concurrency.rst
    using_things.rst
 
-   apidocs/index
+   autoapi/index
 
 `labthings-fastapi` implements a Web of Things interface for laboratory hardware using Python. This is a ground-up rewrite of python-labthings_, replacing Flask 1 and Marshmallow with FastAPI and Pydantic. It is the underlying framework for v3 of the `OpenFlexure Microscope software <https://gitlab.com/openflexure/openflexure-microscope-server/>`_.
 

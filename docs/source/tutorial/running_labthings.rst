@@ -1,4 +1,4 @@
-.. _tutorial_running
+.. _tutorial_running:
 
 Running LabThings-FastAPI
 =========================
