@@ -54,6 +54,13 @@ jobs:
       - name: Format with Ruff
         run: ruff format --check .
 
+      - name: Lint with Flake8 (for docstrings)
+        if: ${{ contains('3.12,3.13', matrix.python) }}
+        # Flake8 crashes on Python < 3.12, so we exclude those versions.
+        # Flake8 is primarily here to lint the docstrings, which
+        # does not need to happen under multiple versions.
+        run: flake8 src
+
       - name: Test with pytest
         run: pytest --cov=src --cov-report=lcov
 

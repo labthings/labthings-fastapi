@@ -1,26 +1,38 @@
+.. _wot_cc:
+
 Web of Things Core Concepts
 ===========================
 
 LabThings is rooted in the `W3C Web of Things standards <WoT>`_. Using IP networking in labs is not new, though perhaps under-used. However lack of proper standardisation has stiffled widespread adoption. LabThings, rather than try to introduce new competing standards, uses the architecture and terminology introduced by the W3C Web of Things. A full description of the core architecture can be found in the `Web of Things (WoT) Architecture <https://www.w3.org/TR/wot-architecture/#sec-wot-architecture>`_ document. However, a brief outline of the concepts relevant to `labthings-fastapi` is given below.
 
+.. _wot_thing:
+
 Thing
 ---------
 
-A `Thing` represents a piece of hardware or software. It could be a whole instrument (e.g. a microscope), a component within an instrument (e.g. a translation stage or camera), or a piece of software (e.g. code to tile together large area scans). `Thing`s in `labthings-fastapi` are Python classes that define Properties, Actions, and Events (see below). A Thing (sometimes called a "Web Thing") is defined by W3C as "an abstraction of a physical or a virtual entity whose metadata and interfaces are described by a WoT Thing description."
+A Thing represents a piece of hardware or software. It could be a whole instrument (e.g. a microscope), a component within an instrument (e.g. a translation stage or camera), or a piece of software (e.g. code to tile together large area scans). Things in `labthings-fastapi` are Python classes that define Properties, Actions, and Events (see below). A Thing (sometimes called a "Web Thing") is defined by W3C as "an abstraction of a physical or a virtual entity whose metadata and interfaces are described by a WoT Thing description."
 
-`labthings-fastapi` automatically generates a `Thing Description`_ to describe each `Thing`. Each function offered by the `Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
+`labthings-fastapi` automatically generates a `Thing Description`_ to describe each `.Thing`. Each function offered by the `.Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
+
+.. _wot_properties:
 
 Properties
 ----------
 
 As a rule of thumb, any attribute of your device that can be quickly read, or optionally written, should be a Property. For example, simple device settings, or status information (like a temperature) that takes negligible time to measure. Reading a property should never be a slow operation, as it is expected to be called frequently by clients. Properties are defined as "an Interaction Affordance that allows to read, write, or observe a state of the Thing" in the WoT_ standard. Similarly, writing to a property ought to be quick, and should not cause equipment to perform long-running operations. Properties are defined very similar to standard Python properties, using a decorator that adds them to the `Thing Description`_ and the HTTP API.
 
+.. _wot_actions:
+
 Actions
 -------
 
 Actions generally correspond to making equipment (or software) do something. For example, starting a data acquisition, moving a stage, or changing a setting that requires a significant amount of time to complete. The key point here is that Actions are typically more complex in functionality than simply setting or getting a property. For example, they can set multiple properties simultaneously (for example, auto-exposing a camera), or they can manipulate the state of the Thing over time, for example starting a long-running data acquisition.
 
+In WoT parlance, an Action is "invoked", and we refer to each time an Action is run as an "invocation".
+
 `labthings-fastapi` runs actions in background threads. This allows other actions and properties to be accessed while it is running. You define actions as methods of your `Thing` class using the decorator.
+
+.. _wot_events:
 
 Events
 ------
@@ -31,5 +43,22 @@ Common examples are notifying clients when a Property is changed, or when an Act
 
 A good example of this might be having Things automatically pause data-acquisition Actions upon detection of an overheat or interlock Event from another Thing. Events are not currently implemented in `labthings-fastapi`, but are planned for future releases.
 
+.. _wot_td:
+
+Thing Description
+-----------------
+
+Each :ref:`wot_thing` is documented by a Thing Description, which is a JSON document describing all of the ways to interact with that Thing. The WoT_ standard defines the `Thing Description`_ and includes a JSON Schema against which it may be validated.
+
+Thing Description documents are higher-level than OpenAPI_ and focus on the capabilities of the Thing, rather than the HTTP endpoints. In general you would expect more HTTP endpoints than there are interaction affordances, so in principle client code based on a Thing Description should be more meaningful. However, OpenAPI is a much more widely adopted standard and so both forms of documentation are generated by LabThings-FastAPI.
+
 .. _WoT: https://www.w3.org/WoT/
 .. _Thing Description: https://www.w3.org/TR/wot-thing-description/
+.. _OpenAPI: https://www.openapis.org/
+
+.. _wot_affordances:
+
+Interaction Affordances
+-----------------------
+
+The Web of Things standard often talks about Affordances. This is the collective term for _wot_properties, _wot_actions, and _wot_events.

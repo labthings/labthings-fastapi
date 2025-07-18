@@ -3,7 +3,9 @@
 
 # labthings-fastapi
 
-A FastAPI based library to implement a [Web of Things] interface for laboratory hardware using Python. This is a ground-up rewrite of [python-labthings], replacing Flask 1 and Marshmallow with FastAPI and Pydantic. It is the underlying framework for v3 of the [OpenFlexure Microscope software].
+A FastAPI based library to implement a [Web of Things] interface for laboratory hardware using Python. This is a ground-up rewrite of [python-labthings], based on FastAPI and Pydantic. It is the underlying framework for v3 of the [OpenFlexure Microscope software].
+
+Documentation, including install instructions, is available on [readthedocs].
 
 Features include:
 
@@ -18,7 +20,7 @@ Features include:
     - Dependency injection is used to manage relationships between Things and dependency on the server
 * Async HTTP handling
     - Starlette (used by FastAPI) can handle requests asynchronously - potential for websockets/events (not used much yet)
-    - `Thing` code is still, for now, threaded. I intend to make it possible to write async things in the future, but don't intend it to become mandatory
+    - `Thing` code is still, for now, threaded. It may become possible to write async things in the future, but won't become mandatory
 * Smaller codebase
     - FastAPI more or less completely eliminates OpenAPI generation code from our codebase
     - Thing Description generation is very much simplified by the new structure (multiple Things instead of one massive Thing with many extensions)
@@ -28,11 +30,11 @@ Features include:
 
 ## Installation
 
-You can install this repository with `pip install labthings-fastapi`. It may at some point be renamed to `labthings` v2. For the latest development version, either clone it and run `pip install -e .[dev]` to work on it, or just `pip install https://gitlab.com/rwb27/labthings-fastapi.git`.
+See [readthedocs] for installation instructions that are automatically tested. You can install this package with `pip install labthings-fastapi`. It may at some point be renamed to `labthings` v2. For the latest development version, either clone it and run `pip install -e .[dev]` to work on it, or just `pip install https://gitlab.com/rwb27/labthings-fastapi.git`.
 
 ## Developer notes
 
-The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit.
+The code is linted with `ruff .`, type checked with `mypy src`, and tested with `pytest`. These all run in CI with GitHub Actions. The codebase is not even `v0.1` yet so it's still subject to summary rearrangement. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit. `flake8` is also run in CI, primarily to enable stricter checks on docstrings. It is run as `flake8 src`. `ruff` and `flake8` are both configured from `pyproject.toml`.
 
 Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
 ```
@@ -44,9 +46,10 @@ All changes to the codebase should go via pull requests, and should only be merg
 
 ## Demo
 
-See the [examples folder](./examples/) for a runnable demo.
+See [readthedocs] for a runnable demo.
 
 [Web of Things]: https://www.w3.org/WoT/
 [python-labthings]: https://github.com/labthings/python-labthings/
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
 [pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
+[readthedocs]: https://labthings-fastapi.readthedocs.io/

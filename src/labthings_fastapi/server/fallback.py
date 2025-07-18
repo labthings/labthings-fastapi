@@ -1,12 +1,32 @@
+"""A fallback server for LabThings.
+
+If the ``fallback`` option is given when ``labthings-server`` is run, we will
+still start an HTTP server even if we cannot run LabThings with the specified
+configuration. This means that something will still be viewable at the
+expected URL, which is helpful if LabThings is running as a service, or
+on embedded hardware.
+"""
+
 import json
 from traceback import format_exception
+from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
 
 
 class FallbackApp(FastAPI):
-    def __init__(self, *args, **kwargs):
+    """A basic FastAPI application to serve a LabThings error page."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        r"""Set up a simple error server.
+
+        This app is used to display a single page, which explains why the
+        LabThings server cannot start.
+
+        :param \*args: is passed to `fastapi.FastAPI.__init__`\ .
+        :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
+        """
         super().__init__(*args, **kwargs)
         self.labthings_config = None
         self.labthings_server = None
@@ -50,7 +70,11 @@ ERROR_PAGE = """
 
 
 @app.get("/")
-async def root():
+async def root() -> HTMLResponse:
+    """Display the LabThings error page.
+
+    :return: a response that serves the error as an HTML page.
+    """
     error_message = f"{app.labthings_error}"
     # use traceback.format_exception to get full traceback as list
     # this ends in newlines, but needs joining to be a single string
@@ -76,5 +100,14 @@ async def root():
 
 
 @app.get("/{path:path}")
-async def redirect_to_root(path: str):
+async def redirect_to_root(path: str) -> RedirectResponse:
+    """Redirect all paths on the server to the error page.
+
+    If any URL other than the error page is requested, this server will
+    redirect it to the error page.
+
+    :param path: The path requested.
+
+    :return: a response redirecting to the error page.
+    """
     return RedirectResponse(url="/")
