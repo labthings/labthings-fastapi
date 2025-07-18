@@ -37,7 +37,7 @@ Planned future development: static code generation
 
 In the future, `labthings_fastapi` will generate custom client subclasses. These will have the methods and properties defined in a Python module, including type annotations. This will allow static analysis (e.g. with MyPy) and IDE autocompletion to work. Most packages that provide a `Thing` subclass will want to release a client package that is generated automatically in this way. The intention is to make it possible to add custom Python code to this client, for example to handle specialised return types more gracefully or add convenience methods. Generated client code does mean there will be more packages to install on the client in order to use a particular Thing. However, the significant benefits of having a properly defined interface should make this worthwhile.
 
-Return types are also currently not consistent between client and server code: currently, the HTTP implementation of `.ThingClient` deserialises the JSON response and returns it directly, meaning that `pydantic.BaseModel` subclasses become dictionaries. This behaviour should change in the future to be consistent between client and server. Most liekly, this will mean Pydantic models are used in both cases.
+Return types are also currently not consistent between client and server code: currently, the HTTP implementation of `.ThingClient` deserialises the JSON response and returns it directly, meaning that `pydantic.BaseModel` subclasses become dictionaries. This behaviour should change in the future to be consistent between client and server. Most likely, this will mean Pydantic models are used in both cases.
 
 
 

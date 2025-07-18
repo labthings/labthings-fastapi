@@ -46,7 +46,7 @@ All changes to the codebase should go via pull requests, and should only be merg
 
 ## Demo
 
-See [readthecods] for a runnable demo.
+See [readthedocs] for a runnable demo.
 
 [Web of Things]: https://www.w3.org/WoT/
 [python-labthings]: https://github.com/labthings/python-labthings/

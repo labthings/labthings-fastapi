@@ -9,6 +9,7 @@ Documentation for LabThings-FastAPI
    wot_core_concepts.rst
    lt_core_concepts.rst
    tutorial/index.rst
+   examples.rst
    actions.rst
    dependencies/dependencies.rst
    blobs.rst
