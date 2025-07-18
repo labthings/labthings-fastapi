@@ -10,9 +10,9 @@ LabThings is rooted in the `W3C Web of Things standards <WoT>`_. Using IP networ
 Thing
 ---------
 
-A `Thing` represents a piece of hardware or software. It could be a whole instrument (e.g. a microscope), a component within an instrument (e.g. a translation stage or camera), or a piece of software (e.g. code to tile together large area scans). `Thing`s in `labthings-fastapi` are Python classes that define Properties, Actions, and Events (see below). A Thing (sometimes called a "Web Thing") is defined by W3C as "an abstraction of a physical or a virtual entity whose metadata and interfaces are described by a WoT Thing description."
+A Thing represents a piece of hardware or software. It could be a whole instrument (e.g. a microscope), a component within an instrument (e.g. a translation stage or camera), or a piece of software (e.g. code to tile together large area scans). Things in `labthings-fastapi` are Python classes that define Properties, Actions, and Events (see below). A Thing (sometimes called a "Web Thing") is defined by W3C as "an abstraction of a physical or a virtual entity whose metadata and interfaces are described by a WoT Thing description."
 
-`labthings-fastapi` automatically generates a `Thing Description`_ to describe each `Thing`. Each function offered by the `Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
+`labthings-fastapi` automatically generates a `Thing Description`_ to describe each `.Thing`. Each function offered by the `.Thing` is either a Property, Action, or Event. These are termed "interaction affordances" in WoT_ terminology.
 
 .. _wot_properties:
 

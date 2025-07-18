@@ -16,7 +16,7 @@ then install labthings with:
     :start-after: BEGIN install
     :end-before: END install
 
-To define a simple example ``Thing``, paste the following into a python file, ``counter.py``:
+To define a simple example ``Thing``, paste the following into a Python file, ``counter.py``:
 
 .. literalinclude:: counter.py
     :language: python
