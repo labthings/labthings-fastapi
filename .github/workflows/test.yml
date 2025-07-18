@@ -54,6 +54,9 @@ jobs:
       - name: Format with Ruff
         run: ruff format --check .
 
+      - name: Check spelling
+        run: codespell .
+
       - name: Lint with Flake8 (for docstrings)
         if: ${{ contains('3.12,3.13', matrix.python) }}
         # Flake8 crashes on Python < 3.12, so we exclude those versions.

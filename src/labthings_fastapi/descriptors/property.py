@@ -208,7 +208,7 @@ class ThingProperty:
     def emit_changed_event(self, obj: Thing, value: Any) -> None:
         """Notify subscribers that the property has changed.
 
-        This function is run when properties are upadated. It must be run from
+        This function is run when properties are updated. It must be run from
         within a thread. This could be the `Invocation` thread of a running action, or
         the property should be updated over via a client/http. It must be run from a
         thread as it is communicating with the event loop via an `asyncio` blocking

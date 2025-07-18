@@ -119,7 +119,7 @@ class MyThing(Thing):
 
 
 class ThingWithBrokenAffordances(Thing):
-    """A Thing that raises exceptions in actions/properites."""
+    """A Thing that raises exceptions in actions/properties."""
 
     @thing_action
     def broken_action(self):

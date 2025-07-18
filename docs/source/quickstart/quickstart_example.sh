@@ -1,4 +1,4 @@
-echo "Setting up environemnt"
+echo "Setting up environment"
 # BEGIN venv
 python -m venv .venv --prompt labthings
 source .venv/bin/activate  # or .venv/Scripts/activate on Windows

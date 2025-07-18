@@ -39,7 +39,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
     :param request: The `fastapi.Request` object, supplied by the :ref:`dependencies`
         mechanism.
 
-    :return: the `anyio.from_thread.BlockingPortal` allowing access to te
+    :return: the `anyio.from_thread.BlockingPortal` allowing access to the
         `.ThingServer`\ 's event loop.
     """
     portal = find_thing_server(request.app).blocking_portal

@@ -48,12 +48,12 @@ def test_thing_with_broken_affordances():
         thing.broken_property()
 
 
-def test_thing_that_cant_instantiate():
+def test_thing_that_cannot_instantiate():
     with pytest.raises(Exception):
         ThingThatCantInstantiate()
 
 
-def test_thing_that_cant_start():
+def test_thing_that_cannot_start():
     thing = ThingThatCantStart()
     assert isinstance(thing, ThingThatCantStart)
     with pytest.raises(Exception):
