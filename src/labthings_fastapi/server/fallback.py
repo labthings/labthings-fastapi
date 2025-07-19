@@ -50,7 +50,7 @@ ERROR_PAGE = """
     </style>
 </head>
 <body>
-    <h1>LabThings Could't Load</h1>
+    <h1>LabThings Couldn't Load</h1>
     <p>Something went wrong when setting up your LabThings server.</p>
     <p>Please check your configuration and try again.</p>
     <p>More details may be shown below:</p>

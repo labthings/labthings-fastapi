@@ -209,7 +209,7 @@ class MJPEGStream:
         after any ``with`` statement has finished).
 
         Using a context manager is intended to allow future versions of this
-        code to manage access to the ringbuffer (e.g. allowing buffer re-use).
+        code to manage access to the ringbuffer (e.g. allowing buffer reuse).
         Currently, buffers are always created as fresh `bytes` objects, so
         this context manager does not provide additional functionality
         over `.MJPEGStream.ringbuffer_entry`.

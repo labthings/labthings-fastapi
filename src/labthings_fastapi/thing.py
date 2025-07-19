@@ -258,7 +258,7 @@ class Thing:
         it requires calls e.g. to a serial instrument, bear in mind it may be called
         quite often and shouldn't take too long.
 
-        Some measure of cacheing here is a nice aim for the future, but not yet
+        Some measure of caching here is a nice aim for the future, but not yet
         implemented.
         """
         if self._labthings_thing_state is None:

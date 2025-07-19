@@ -1,0 +1,24 @@
+[codespell]
+
+skip = *.git,
+       *.pyc,
+       __pycache__,
+       ./build,
+       ./dist,
+       ./docs/_build,
+       ./htmlcov,
+       ./src/openflexure_microscope_server/static,
+       .venv,
+       *.egg-info,
+       report.xml,
+       dev-requirements.txt,
+       coverage.yml,
+       coverage.lcov,
+       coverage.xml,
+       LICENSE,
+
+# The regex allows it to also check snake case strings. This stops codespell doing
+# autocorrection. If a lot of changes are needed this can be commented out.
+# Having this does mean that contractions in variable names will be marked as spelt
+# incorrectly.
+regex = [a-zA-Z0-9\-'’]+

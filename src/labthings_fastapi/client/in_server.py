@@ -143,7 +143,7 @@ class DependencyNameClashError(KeyError):
     dictionary. This makes the assumption that, if a name is reused, it is
     reused for the same dependency.
 
-    When names are re-used, we check if the values match. If not, this
+    When names are reused, we check if the values match. If not, this
     exception is raised.
     """
 

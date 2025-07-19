@@ -304,7 +304,7 @@ class Blob(BaseModel):
     separate HTTP request.
 
     `.Blob` objects created by a `.ThingClient` contain a URL pointing to the
-    data, which will be downloaded when it is requred.
+    data, which will be downloaded when it is required.
 
     `.Blob` objects that store their data in a file or in memory will have the
     ``href`` attribute set to the special value `blob://local`.
@@ -457,7 +457,7 @@ class Blob(BaseModel):
         this property to download the output.
 
         This property is read-only. You should also only read it once, as no
-        guarantees are given about cacheing - reading it many times risks
+        guarantees are given about caching - reading it many times risks
         reading the file from disk many times, or re-downloading an artifact.
 
         :return: a `bytes` object containing the data.
@@ -714,7 +714,7 @@ async def blob_serialisation_context_manager(
 
     In order to serialise a `.Blob` to a JSON-serialisable dictionary, we must
     add it to the `.BlobDataManager` and use that to generate a URL. This
-    requres that the serialisation code (which may be nested deep within a
+    requires that the serialisation code (which may be nested deep within a
     `pydantic.BaseModel`) has access to the `.BlobDataManager` and also the
     `fastapi.Request.url_for` method. At time of writing, there was not an
     obvious way to pass these functions in to the serialisation code.

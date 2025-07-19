@@ -39,7 +39,7 @@ Events
 
 An event "describes an event source that pushes data asynchronously from the Thing to the Consumer. Here not state, but state transitions (i.e., events) are communicated. Events MAY be triggered through conditions that are not exposed as Properties."
 
-Common examples are notifying clients when a Property is changed, or when an Action starts or finishes. However, Thing developers can introduce new Events such as warnings, status messages, and logs. For example, a device may emit an events when the internal temperature gets too high, or when an interlock is tripped. This Event can then be pushed to both users AND other Things, allowing automtic response to external conditions.
+Common examples are notifying clients when a Property is changed, or when an Action starts or finishes. However, Thing developers can introduce new Events such as warnings, status messages, and logs. For example, a device may emit an events when the internal temperature gets too high, or when an interlock is tripped. This Event can then be pushed to both users AND other Things, allowing automatic response to external conditions.
 
 A good example of this might be having Things automatically pause data-acquisition Actions upon detection of an overheat or interlock Event from another Thing. Events are not currently implemented in `labthings-fastapi`, but are planned for future releases.
 

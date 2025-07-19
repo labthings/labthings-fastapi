@@ -36,7 +36,7 @@ You can also interact with it from another Python instance, for example by runni
 .. literalinclude:: counter_client.py
     :language: python
 
-It's best to write ``Thing`` subclasses in Python packages that can be imported. This makes them easier to re-use and distribute, and also allows us to run a LabThings server from the command line, configured by a configuration file. An example config file is below:
+It's best to write ``Thing`` subclasses in Python packages that can be imported. This makes them easier to reuse and distribute, and also allows us to run a LabThings server from the command line, configured by a configuration file. An example config file is below:
 
 .. literalinclude:: example_config.json
     :language: JSON
