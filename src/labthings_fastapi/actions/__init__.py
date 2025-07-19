@@ -131,7 +131,14 @@ class Invocation(Thread):
 
     @property
     def output(self) -> Any:
-        """Return value of the Action. If the Action is still running, returns None."""
+        """Return value of the Action. If the Action is still running, returns None.
+
+        :raise NoBlobManagerError: If this is called in a context where the blob
+            manager context variables are not available. This stops errors being raised
+            later once the blob is returned and tries to serialise. If the errors
+            happen during serialisation the stack-trace will not clearly identify
+            the route with the missing dependency.
+        """
         try:
             blobdata_to_url_ctx.get()
         except LookupError as e:
