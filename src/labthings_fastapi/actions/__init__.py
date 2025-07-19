@@ -35,7 +35,7 @@ from ..dependencies.invocation import (
     InvocationCancelledError,
     invocation_logger,
 )
-from ..outputs.blob import BlobIOContextDep
+from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -44,6 +44,14 @@ if TYPE_CHECKING:
 
 ACTION_INVOCATIONS_PATH = "/action_invocations"
 """The API route used to list `.Invocation` objects."""
+
+
+class NoBlobManagerError(RuntimeError):
+    """Raised if an API route accesses Invocation outputs without a BlobIOContextDep.
+
+    Any access to an invocation output must have BlobIOContextDep as a dependency, as
+    the output may be a blob, and the blob needs this context to resolve its URL.
+    """
 
 
 class Invocation(Thread):
@@ -123,7 +131,23 @@ class Invocation(Thread):
 
     @property
     def output(self) -> Any:
-        """Return value of the Action. If the Action is still running, returns None."""
+        """Return value of the Action. If the Action is still running, returns None.
+
+        :raise NoBlobManagerError: If this is called in a context where the blob
+            manager context variables are not available. This stops errors being raised
+            later once the blob is returned and tries to serialise. If the errors
+            happen during serialisation the stack-trace will not clearly identify
+            the route with the missing dependency.
+        """
+        try:
+            blobdata_to_url_ctx.get()
+        except LookupError as e:
+            raise NoBlobManagerError(
+                "An invocation output has been requested from a api route that "
+                "doesn't have a BlobIOContextDep dependency. This dependency is needed "
+                " for blobs to identify their url."
+            ) from e
+
         with self._status_lock:
             return self._return_value
 

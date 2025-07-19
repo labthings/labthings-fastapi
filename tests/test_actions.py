@@ -18,6 +18,30 @@ def action_partial(client: TestClient, url: str):
     return run
 
 
+def test_get_action_invocations():
+    """Test that running "get" on an action returns a list of invocations."""
+    with TestClient(server.app) as client:
+        # When we start the action has no invocations
+        invocations_before = client.get("/thing/increment_counter").json()
+        assert invocations_before == []
+        # Start the action
+        r = client.post("/thing/increment_counter")
+        assert r.status_code in (200, 201)
+        # Now it is started, there is a list of 1 dictionary containing the
+        # invocation information.
+        invocations_after = client.get("/thing/increment_counter").json()
+        assert len(invocations_after) == 1
+        assert isinstance(invocations_after, list)
+        assert isinstance(invocations_after[0], dict)
+        assert "status" in invocations_after[0]
+        assert "id" in invocations_after[0]
+        assert "action" in invocations_after[0]
+        assert "href" in invocations_after[0]
+        assert "timeStarted" in invocations_after[0]
+        # Let the task finish before ending the test
+        poll_task(client, r.json())
+
+
 def test_counter():
     with TestClient(server.app) as client:
         before_value = client.get("/thing/counter").json()

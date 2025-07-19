@@ -339,7 +339,9 @@ class ActionDescriptor:
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations(action_manager: ActionManagerContextDep):
+        def list_invocations(
+            action_manager: ActionManagerContextDep, _blob_manager: BlobIOContextDep
+        ):
             return action_manager.list_invocations(self, thing)
 
     def action_affordance(
