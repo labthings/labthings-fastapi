@@ -136,7 +136,7 @@ def test_invalid_thing():
 def test_fallback():
     """test the fallback option
 
-    startd a dummy server with an error page -
+    started a dummy server with an error page -
     it terminates once the server starts.
     """
     config_json = json.dumps(
@@ -155,7 +155,7 @@ def test_invalid_config():
         check_serve_from_cli(["-c", "non_existent_file.json"])
 
 
-def test_thing_that_cant_start():
+def test_thing_that_cannot_start():
     """Check it fails for a thing that can't start"""
     config_json = json.dumps(
         {

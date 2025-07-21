@@ -54,11 +54,11 @@ def test_fallback_with_server():
 
 
 def test_fallback_with_log():
-    app.log_history = "Fake log conetent"
+    app.log_history = "Fake log content"
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
         assert "Something went wrong" in html
         assert "No logging info available" not in html
         assert "<p>Logging info</p>" in html
-        assert "Fake log conetent" in html
+        assert "Fake log content" in html

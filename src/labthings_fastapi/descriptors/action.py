@@ -249,7 +249,7 @@ class ActionDescriptor:
 
         This function creates two functions to handle ``GET`` and ``POST``
         requests to the action's endpoint, and adds them to the `fastapi.FastAPI`
-        aplication.
+        application.
 
         :param app: The `fastapi.FastAPI` app to add the endpoint to.
         :param thing: The `.Thing` to which the action is attached. Bear in

@@ -42,7 +42,7 @@ def is_a_reference(d: JSONSchema) -> bool:
 def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
     """Look up a reference in a JSONSchema.
 
-    JSONSchema allows references, where chunks of JSON may be re-used.
+    JSONSchema allows references, where chunks of JSON may be reused.
     Thing Description does not allow references, so we need to resolve
     them and paste them in-line.
 
@@ -93,7 +93,7 @@ def is_an_object(d: JSONSchema) -> bool:
 def convert_object(d: JSONSchema) -> JSONSchema:
     """Convert an object from JSONSchema to Thing Description.
 
-    Convert JSONSchema objets to Thing Description datatypes.
+    Convert JSONSchema objects to Thing Description datatypes.
 
     Currently, this deletes the ``additionalProperties`` keyword, which is
     not supported by Thing Description.

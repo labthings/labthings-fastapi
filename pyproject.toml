@@ -40,6 +40,7 @@ dev = [
   "sphinx-rtd-theme",
   "sphinx>=7.2",
   "sphinx-autoapi",
+  "codespell",
 ]
 
 [project.urls]

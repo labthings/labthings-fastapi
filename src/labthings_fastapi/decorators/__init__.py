@@ -106,7 +106,7 @@ def thing_action(
     :param \**kwargs: Keyword arguments are passed to the constructor
         of `.ActionDescriptor`.
 
-    :return: Whether used with or without argumnts, the result is that
+    :return: Whether used with or without arguments, the result is that
         the method is wrapped in an `.ActionDescriptor`, so it can be
         called as usual, but will also be exposed over HTTP.
     """
