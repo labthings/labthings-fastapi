@@ -1,6 +1,7 @@
 [codespell]
 
 skip = *.git,
+       ./.vscode,
        *.pyc,
        __pycache__,
        ./build,
