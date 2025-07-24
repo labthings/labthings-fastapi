@@ -20,7 +20,7 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
-from .descriptors import ThingProperty, ThingSetting
+from .thing_property import property, ThingSetting
 from .decorators import (
     thing_property,
     thing_setting,
@@ -42,7 +42,7 @@ from .utilities import get_blocking_portal
 # re-export style, we may switch in the future.
 __all__ = [
     "Thing",
-    "ThingProperty",
+    "property",
     "ThingSetting",
     "thing_property",
     "thing_setting",
