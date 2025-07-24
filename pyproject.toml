@@ -4,7 +4,7 @@ version = "0.0.11"
 authors = [
   { name="Richard Bowman", email="richard.bowman@cantab.net" },
 ]
-description = "A test implementation of LabThings using FastAPI"
+description = "An implementation of LabThings using FastAPI"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -44,8 +44,8 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/rwb27/labthings-fastapi"
-"Bug Tracker" = "https://github.com/rwb27/labthings-fastapi/issues"
+"Homepage" = "https://github.com/labthings/labthings-fastapi"
+"Bug Tracker" = "https://github.com/labthings/labthings-fastapi/issues"
 
 [build-system]
 requires = ["hatchling"]
