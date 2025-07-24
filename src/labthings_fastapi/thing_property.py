@@ -46,7 +46,15 @@ Properties can be defined in two ways as shown below:
 
 from __future__ import annotations
 import builtins
-from typing import Annotated, Generic, Self, TypeAlias, TypeVar, overload, TYPE_CHECKING
+from typing import (
+    Annotated,
+    Callable,
+    Generic,
+    Self,
+    TypeVar,
+    overload,
+    TYPE_CHECKING,
+)
 import typing
 from weakref import WeakSet
 
@@ -108,10 +116,13 @@ class MissingTypeError(DocstringToMessage, TypeError):
     """
 
 
+# fmt: off
 Value = TypeVar("Value")
-ValueFactory: TypeAlias = callable[[None], Value]
-ValueGetter: TypeAlias = callable[[Thing], Value]
-ValueSetter: TypeAlias = callable[[Thing, Value], None]
+if TYPE_CHECKING:
+    ValueFactory = Callable[[None,], Value]
+    ValueGetter = Callable[[Thing,], Value]
+    ValueSetter = Callable[[Thing, Value], None]
+# fmt: on
 
 
 # D103 ignores missing docstrings on overloads. This shouldn't be raised on overloads.
@@ -124,9 +135,9 @@ def property(default_factory: ValueFactory, readonly: bool = False) -> Value: ..
 
 
 def property(
-    default: Value | ValueGetter | None,
+    default: Value | ValueGetter | None = None,
     *,
-    default_factory: ValueFactory | None,
+    default_factory: ValueFactory | None = None,
     readonly: bool = False,
 ) -> Value | FunctionalProperty[Value]:
     r"""Define a Property on a `.Thing`\ .
@@ -192,7 +203,7 @@ def property(
         return FunctionalProperty[return_type(func)](
             fget=func,
         )
-    return DataProperty(  # type: ignore[return-type]
+    return DataProperty(  # type: ignore[return-value]
         default=default,
         default_factory=default_factory,
         readonly=readonly,
@@ -355,7 +366,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         """Return the observers of this property.
 
         Each observer in this set will be notified when the property is changed.
-        See ``.ThingProperty.emit_changed_event``
+        See ``.DataProperty.emit_changed_event``
 
         :param obj: the `.Thing` to which we are attached.
 
@@ -399,7 +410,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         """Notify subscribers that the property has changed.
 
         This function may only be run in the `anyio` event loop. See
-        `.ThingProperty.emit_changed_event`.
+        `.DataProperty.emit_changed_event`.
 
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
@@ -494,12 +505,28 @@ def setting(
 ) -> ThingSetting[Value]:
     r"""Define a Setting on a `.Thing`\ .
 
+    A setting is a property that is saved to disk
+
     This function defines a setting, which is a special Property that will
-    be saved to disk and reloaded next time the `.Thing` is run. It is
-    otherwise very similar to `.property` with the exception that it may
-    only be used as a field, i.e. not as a decorator. Settings may not
+    be saved to disk, so it persists even when the LabThings server is
+    restarted. It is otherwise very similar to `.property` with the exception
+    that it may only be used as a field, i.e. not as a decorator. Settings may not
     be implemented with getter and setter methods, as this can conflict
     with loading and saving to disk.
+
+    A type annotation is required, and should follow the same constraints as
+    for :deco:`.property`.
+
+    If the type is a pydantic BaseModel, then the setter must also be able to accept
+    the dictionary representation of this BaseModel as this is what will be used to
+    set the Setting when loading from disk on starting the server.
+
+    .. note::
+        If a setting is mutated rather than set, this will not trigger saving.
+        For example: if a Thing has a setting called ``dictsetting`` holding the
+        dictionary ``{"a": 1, "b": 2}`` then ``self.dictsetting = {"a": 2, "b": 2}``
+        would trigger saving but ``self.dictsetting[a] = 2`` would not, as the
+        setter for ``dictsetting`` is never called.
 
     :param default: is the default value. Either this or
         ``default_factory`` must be specified.
@@ -528,11 +555,11 @@ def setting(
 
 
 class ThingSetting(DataProperty[Value], Generic[Value]):
-    """A `.ThingProperty` that persists on disk.
+    """A `.DataProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
 
-    A `.ThingSetting` is a `.ThingProperty` with extra functionality for triggering
+    A `.ThingSetting` is a `.DataProperty` with extra functionality for triggering
     a `.Thing` to save its settings.
 
     Note: If a setting is mutated rather than assigned to, this will not trigger saving.

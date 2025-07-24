@@ -21,7 +21,8 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .descriptors import ThingProperty, ThingSetting, ActionDescriptor
+from .thing_property import BaseProperty, ThingSetting
+from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -57,9 +58,12 @@ class Thing:
         ``finally:`` block.
     * Properties and Actions are defined using decorators: the :deco:`.thing_action`
         decorator declares a method to be an action, which will run when it's triggered,
-        and the :deco:`.thing_property` decorator (or `.ThingProperty` descriptor) does
-        the same for a property. See the documentation on those functions for more
-        detail.
+        and the :deco:`.property` decorator does the same for a property.
+
+        Properties may also be defined using dataclass-style syntax, if they do
+        not need getter and setter functions.
+
+        See the documentation on those functions for more detail.
     * `title` will be used in various places as the human-readable name of your Thing,
         so it makes sense to set this in a subclass.
 
@@ -344,7 +348,7 @@ class Thing:
         :raise KeyError: if the requested name is not defined on this Thing.
         """
         prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, ThingProperty):
+        if not isinstance(prop, BaseProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
 

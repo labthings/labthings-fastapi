@@ -21,14 +21,17 @@ class DocstringToMessage:
 
         :param message: the optional message.
         """
+        # type: ignore[call-arg] is used here because mypy can't know
+        # that this is a mixin, and super() will be an exception (which does
+        # accept a string argument to `__init__`).
         doc = inspect.cleandoc(self.__doc__) if self.__doc__ else None
         if message:
             if doc and self.append_to_message:
-                super().__init__(message + "\n\n" + doc)
+                super().__init__(message + "\n\n" + doc)  # type: ignore[call-arg]
             else:
-                super().__init__(message)
+                super().__init__(message)  # type: ignore[call-arg]
         elif doc:
-            super().__init__(doc)
+            super().__init__(doc)  # type: ignore[call-arg]
         else:
             super().__init__()
 
@@ -36,8 +39,8 @@ class DocstringToMessage:
 class NotConnectedToServerError(DocstringToMessage, RuntimeError):
     """The Thing is not connected to a server.
 
-    This exception is called if a ThingAction is called or
-    is a ThingProperty is updated on a Thing that is not
+    This exception is called if an Action is called or
+    a `.DataProperty` is updated on a Thing that is not
     connected to a ThingServer. A server connection is needed
     to manage asynchronous behaviour.
     """

@@ -5,6 +5,7 @@ There is some behaviour common to most of these, and `.BaseDescriptor` centralis
 the code that implements it.
 """
 
+from __future__ import annotations
 from typing import overload, Generic, Self, TypeVar, TYPE_CHECKING
 
 from .utilities.introspection import get_summary
@@ -35,7 +36,7 @@ class BaseDescriptor(Generic[Value]):
         e.g. `property`.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialise a BaseDescriptor."""
         self._name: str | None = None
         self._title: str | None = None
@@ -125,7 +126,7 @@ class BaseDescriptor(Generic[Value]):
     def __get__(self, obj: Thing, type: type | None = None) -> Value: ...  # noqa: D105
 
     @overload
-    def __get__(self, type: type) -> Self: ...  # noqa: D105
+    def __get__(self, obj: None, type: type) -> Self: ...  # noqa: D105
 
     def __get__(self, obj: Thing | None, type: type | None = None) -> Value | Self:
         """Return the value or the descriptor, as per `property`.
@@ -144,7 +145,7 @@ class BaseDescriptor(Generic[Value]):
             accessed on an instance, or the descriptor object if accessed on a class.
         """
         if obj is not None:
-            return self.instance_get(obj, type)
+            return self.instance_get(obj)
         return self
 
     def instance_get(self, obj: Thing) -> Value:

@@ -20,10 +20,8 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
-from .thing_property import property, ThingSetting
+from .thing_property import property, setting, DataProperty, ThingSetting
 from .decorators import (
-    thing_property,
-    thing_setting,
     thing_action,
     fastapi_endpoint,
 )
@@ -43,9 +41,9 @@ from .utilities import get_blocking_portal
 __all__ = [
     "Thing",
     "property",
+    "setting",
+    "DataProperty",
     "ThingSetting",
-    "thing_property",
-    "thing_setting",
     "thing_action",
     "fastapi_endpoint",
     "deps",
