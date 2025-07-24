@@ -16,7 +16,7 @@ class DocstringToMessage:
 
     append_to_message: bool = True
 
-    def __init__(self, message: str | None):
+    def __init__(self, message: str | None = None):
         """Initialise an error with a message or its docstring.
 
         :param message: the optional message.

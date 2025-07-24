@@ -7,8 +7,8 @@ moved into the unit tests.
 import time
 from typing import Any, Optional, Annotated
 from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action, thing_property
-from labthings_fastapi.descriptors import ThingProperty
+from labthings_fastapi.decorators import thing_action
+from labthings_fastapi.thing_property import property as lt_property
 from pydantic import Field
 
 
@@ -94,15 +94,11 @@ class MyThing(Thing):
             time.sleep(delay)
             self.increment_counter()
 
-    counter = ThingProperty(
-        model=int, initial_value=0, readonly=True, description="A pointless counter"
-    )
+    counter: int = lt_property(0, readonly=True)
+    "A pointless counter"
 
-    foo = ThingProperty(
-        model=str,
-        initial_value="Example",
-        description="A pointless string for demo purposes.",
-    )
+    foo: str = lt_property("Example")
+    "A pointless string for demo purposes."
 
     @thing_action
     def action_without_arguments(self) -> None:
@@ -129,7 +125,7 @@ class ThingWithBrokenAffordances(Thing):
         """
         raise RuntimeError("This is a broken action")
 
-    @thing_property
+    @lt_property
     def broken_property(self):
         """Raise an exception when the property is accessed.
 

@@ -46,6 +46,7 @@ Properties can be defined in two ways as shown below:
 
 from __future__ import annotations
 import builtins
+from types import EllipsisType
 from typing import (
     Annotated,
     Callable,
@@ -135,7 +136,7 @@ def property(default_factory: ValueFactory, readonly: bool = False) -> Value: ..
 
 
 def property(
-    default: Value | ValueGetter | None = None,
+    default: Value | ValueGetter | EllipsisType = ...,
     *,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,
@@ -195,6 +196,11 @@ def property(
     as ``mypy`` will check that the default is valid for the type of the
     field, and won't raise an error about assigning, for example, an
     instance of ``DataProperty[int]`` to a field annotated as ``int``.
+
+    Finally, the type of the ``default`` argument includes `.EllipsisType`
+    so that we can use ``...`` as its default value. This allows us to
+    distinguish between ``default`` not being set (``...``) and a desired
+    default value of ``None``.
     """
     if callable(default):
         # If the default is callable, we're being used as a decorator
@@ -231,7 +237,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
 
     def __init__(
         self,
-        default: Value | None = None,
+        default: Value | EllipsisType = ...,
         *,
         default_factory: ValueFactory | None,
         readonly: bool = False,
@@ -256,7 +262,9 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         ``__init__``.
 
         :param default: the default value. This or ``default_factory`` must
-            be provided.
+            be provided. Note that, as ``None`` is a valid default value,
+            this uses ``...`` instead as a way of checking whether ``default``
+            has been set.
         :param default_factory: a function that returns the default value.
             This is appropriate for datatypes such as lists, where using
             a mutable default value can lead to odd behaviour.
@@ -268,13 +276,17 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             factory function are specified.
         :raises MissingDefaultError: if no default is provided.
         """
-        if default_factory is not None:
-            if default is not None:
-                raise OverspecifiedDefaultError()
-            self._default_value: Value = default_factory()
-        if default is None:
+        if default_factory is not None and default is not ...:
+            raise OverspecifiedDefaultError()
+        if default_factory is None and default is ...:
             raise MissingDefaultError()
-        self._default_value: Value = default
+        # The default value will come from whichever of `default` and `default_factory`
+        # is specified. The two checks above ensure that exactly one will exist.
+        self._default_value: Value
+        if default_factory:
+            self._default_value = default_factory
+        else:
+            self._default_value = default
         self.readonly = readonly
         self._type: type | None = None  # Will be set in __set_name__
 
@@ -498,7 +510,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
 
 
 def setting(
-    default: Value | None = None,
+    default: Value | EllipsisType = ...,
     *,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,

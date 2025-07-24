@@ -3,7 +3,8 @@ from fastapi.testclient import TestClient
 
 
 class TestThing(lt.Thing):
-    alive = lt.ThingProperty(bool, False, description="Is the thing alive?")
+    alive: bool = lt.property(False)
+    "Whether the thing is alive."
 
     def __enter__(self):
         print("setting up TestThing from __enter__")

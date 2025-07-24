@@ -9,18 +9,21 @@ from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
 class TestThing(lt.Thing):
-    boolprop = lt.ThingProperty(bool, False, description="A boolean property")
-    stringprop = lt.ThingProperty(str, "foo", description="A string property")
+    boolprop: bool = lt.property(False)
+    "A boolean property"
+
+    stringprop: str = lt.property("foo")
+    "A string property"
 
     _undoc = None
 
-    @lt.thing_property
+    @lt.property
     def undoc(self):
         return self._undoc
 
     _float = 1.0
 
-    @lt.thing_property
+    @lt.property
     def floatprop(self) -> float:
         return self._float
 
@@ -45,12 +48,12 @@ server.add_thing(thing, "/thing")
 
 def test_instantiation_with_type():
     """
-    Check the internal model (data type) of the ThingSetting descriptor is a BaseModel
+    Check the internal model (data type) of the DataProperty descriptor is a BaseModel
 
     To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
     types.
     """
-    prop = lt.ThingProperty(bool, False)
+    prop: bool = lt.property(False)
     assert issubclass(prop.model, BaseModel)
 
 
@@ -59,7 +62,7 @@ def test_instantiation_with_model():
         a: int = 1
         b: float = 2.0
 
-    prop = lt.ThingProperty(MyModel, MyModel())
+    prop: MyModel = lt.property(MyModel())
     assert prop.model is MyModel
 
 
@@ -71,7 +74,7 @@ def test_property_get_and_set():
         assert after_value.json() == test_str
 
 
-def test_ThingProperty():
+def test_boolprop():
     with TestClient(server.app) as client:
         r = client.get("/thing/boolprop")
         assert r.json() is False
@@ -123,7 +126,7 @@ def test_setting_from_thread():
 
 
 def test_setting_without_event_loop():
-    """Test that an exception is raised if updating a ThingProperty
+    """Test that an exception is raised if updating a DataProperty
     without connecting the Thing to a running server with an event loop.
     """
     # This test may need to change, if we change the intended behaviour
