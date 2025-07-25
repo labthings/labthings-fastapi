@@ -93,7 +93,7 @@ preview = true
 "docs/*" = ["D", "DOC"]
 
 [tool.mypy]
-plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
+plugins = ["pydantic.mypy"]
 
 [tool.flake8]
 extend-ignore = [

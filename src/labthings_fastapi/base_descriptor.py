@@ -17,11 +17,31 @@ Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""
 
 
-class NameNotSetError(AttributeError):
-    """Descriptor name is not yet available.
+class DescriptorNotAddedToClassError(RuntimeError):
+    """Descriptor has not yet been added to a class.
 
-    This error is raised if the name of an affordance is accessed
-    before ``__set_name__`` has been called on the descriptor.
+    This error is raised if certain properties of descriptors are accessed
+    before ``__set_name__`` has been called on the descriptor.  ``__set_name``
+    is part of the descriptor protocol, and is called when a class is defined
+    to notify the descriptor of its name and owning class.
+
+    If you see this error, it often means that a descriptor has been instantiated
+    but not attached to a class, for example:
+
+    .. code-block:: python
+
+        import labthings as lt
+
+
+        class Test(lt.Thing):
+            myprop: int = lt.property(0)  # This is OK
+
+
+        orphaned_prop: int = lt.property(0)  # Not OK
+
+        Test.myprop.model  # Evaluates to a pydantic model
+
+        orphaned_prop.model  # Raises this exception
     """
 
 
@@ -44,6 +64,9 @@ class BaseDescriptor(Generic[Value]):
         # We set the instance __doc__ to None so the descriptor class docstring
         # doesn't get picked up by OpenAPI/Thing Description.
         self.__doc__ = None
+        # We explicitly check when __set_name__ is called, so we can raise helpful
+        # errors
+        self._set_name_called: bool = False
 
     def __set_name__(self, owner: type[Thing], name: str) -> None:
         r"""Take note of the name to which the descriptor is assigned.
@@ -58,6 +81,21 @@ class BaseDescriptor(Generic[Value]):
         # Remember the name to which we're assigned. Accessed by the read only
         # property ``name``.
         self._name = name
+        self._set_name_called = True
+
+    def assert_set_name_called(self):
+        """Raise an exception if ``__set_name__`` has not yet been called.
+
+        :raises DescriptorNotAddedToClassError: if ``__set_name__`` has not yet
+            been called.
+        """
+        if not self._set_name_called:
+            raise DescriptorNotAddedToClassError(
+                f"{self.__class__.__name__} must be assigned to an attribute of "
+                "a class, as part of the class definition. This exception is "
+                "raised because `__set_name__` has not yet been called, which "
+                "usually means it was not instantiated as a class attribute."
+            )
 
     @property
     def name(self) -> str:
@@ -74,8 +112,10 @@ class BaseDescriptor(Generic[Value]):
         :raises NameNotSetError: if it is accessed before the descriptor
             has been notified of its name.
         """
-        if self._name is None:
-            raise NameNotSetError
+        self.assert_set_name_called()
+        assert self._name is not None
+        # The assert statement is mostly for typing: if assert_set_name_called
+        # doesn't raise an error, self._name has been set.
         return self._name
 
     @property

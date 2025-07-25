@@ -53,17 +53,30 @@ def test_instantiation_with_type():
     To send the data over HTTP LabThings-FastAPI uses Pydantic models to describe data
     types.
     """
-    prop: bool = lt.property(False)
-    assert issubclass(prop.model, BaseModel)
+
+    # This will not work unless the property is assigned to a thing
+    class TestThing(lt.Thing):
+        prop: bool = lt.property(False)
+
+    assert issubclass(TestThing.prop.model, BaseModel)
 
 
-def test_instantiation_with_model():
+def test_instantiation_with_model() -> None:
     class MyModel(BaseModel):
         a: int = 1
         b: float = 2.0
 
-    prop: MyModel = lt.property(MyModel())
-    assert prop.model is MyModel
+    class Dummy:
+        prop: MyModel = lt.property(MyModel())
+
+        @lt.property
+        def func_prop(self) -> MyModel:
+            return MyModel()
+
+    assert Dummy.prop.model is MyModel  # type: ignore[attr-defined]
+    # Dummy.prop is typed as MyModel, but it's a descriptor
+
+    assert Dummy.func_prop.model is MyModel
 
 
 def test_property_get_and_set():

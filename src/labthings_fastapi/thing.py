@@ -21,7 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .thing_property import BaseProperty, ThingSetting
+from .thing_property import DataProperty, ThingSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -348,7 +348,7 @@ class Thing:
         :raise KeyError: if the requested name is not defined on this Thing.
         """
         prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, BaseProperty):
+        if not isinstance(prop, DataProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
 

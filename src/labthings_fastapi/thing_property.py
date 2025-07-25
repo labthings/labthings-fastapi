@@ -60,17 +60,16 @@ import typing
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import RootModel
+from pydantic import BaseModel, RootModel
 
-from labthings_fastapi.thing_description import type_to_dataschema
-from labthings_fastapi.thing_description._model import (
+from .thing_description import type_to_dataschema
+from .thing_description._model import (
     DataSchema,
     Form,
     PropertyAffordance,
     PropertyOp,
 )
-from labthings_fastapi.utilities import labthings_data
-
+from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
 from .base_descriptor import BaseDescriptor
 from .exceptions import (
@@ -120,7 +119,7 @@ class MissingTypeError(DocstringToMessage, TypeError):
 # fmt: off
 Value = TypeVar("Value")
 if TYPE_CHECKING:
-    ValueFactory = Callable[[None,], Value]
+    ValueFactory = Callable[[], Value]
     ValueGetter = Callable[[Thing,], Value]
     ValueSetter = Callable[[Thing, Value], None]
 # fmt: on
@@ -132,7 +131,9 @@ def property(default: ValueGetter) -> FunctionalProperty[Value]: ...  # noqa: D1
 @overload  # use as `field: int = property(0)``
 def property(default: Value, *, readonly: bool = False) -> Value: ...  # noqa: D103
 @overload  # use as `field: int = property(default_factory=lambda: 0)`
-def property(default_factory: ValueFactory, readonly: bool = False) -> Value: ...  # noqa: D103
+def property(
+    *, default_factory: Callable[[], Value], readonly: bool = False
+) -> Value: ...  # noqa: D103
 
 
 def property(
@@ -206,7 +207,7 @@ def property(
         # If the default is callable, we're being used as a decorator
         # without arguments.
         func = default
-        return FunctionalProperty[return_type(func)](
+        return FunctionalProperty(
             fget=func,
         )
     return DataProperty(  # type: ignore[return-value]
@@ -224,8 +225,106 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
     means the value should be available over HTTP).
 
     `.BaseProperty` should not be used directly, instead it is recommended to
-    use `.property` to declare properties on you `.Thing` subclass.
+    use `.property` to declare properties on your `.Thing` subclass.
     """
+
+    def __init__(self) -> None:
+        """Initialise a BaseProperty."""
+        super().__init__()
+        self._type: type | None = None
+        self._model: type[BaseModel] | None = None
+        self.readonly: bool = False
+
+    @builtins.property
+    def value_type(self) -> type[Value]:
+        """The type of this descriptor's value."""
+        if self._type is None:
+            raise MissingTypeError("This property does not have a valid type.")
+        return self._type
+
+    @builtins.property
+    def model(self) -> type[BaseModel]:
+        """A Pydantic model for the property's type."""
+        if self._model is None:
+            self._model = wrap_plain_types_in_rootmodel(self.value_type)
+        return self._model
+
+    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
+        """Add this action to a FastAPI app, bound to a particular Thing.
+
+        :param app: The FastAPI application we are adding endpoints to.
+        :param thing: The `.Thing` we are adding the endpoints for.
+        """
+        # We can't use the decorator in the usual way, because we'd need to
+        # annotate the type of `body` with `self.model` which is only defined
+        # at runtime.
+        # The solution below is to manually add the annotation, before passing
+        # the function to the decorator.
+        if not self.readonly:
+
+            def set_property(body):  # We'll annotate body later
+                if isinstance(body, RootModel):
+                    body = body.root
+                return self.__set__(thing, body)
+
+            set_property.__annotations__["body"] = Annotated[self.model, Body()]
+            assert thing.path is not None
+            app.put(
+                thing.path + self.name,
+                status_code=201,
+                response_description="Property set successfully",
+                summary=f"Set {self.title}",
+                description=f"## {self.title}\n\n{self.description or ''}",
+            )(set_property)
+
+        @app.get(
+            thing.path + self.name,
+            response_model=self.model,
+            response_description=f"Value of {self.name}",
+            summary=self.title,
+            description=f"## {self.title}\n\n{self.description or ''}",
+        )
+        def get_property():
+            return self.__get__(thing)
+
+    def property_affordance(
+        self, thing: Thing, path: str | None = None
+    ) -> PropertyAffordance:
+        """Represent the property in a Thing Description.
+
+        :param thing: the `.Thing` to which we are attached.
+        :param path: the URL of the `.Thing`. If not present, we will retrieve
+            the ``path`` from ``thing``.
+
+        :return: A description of the property in :ref:`wot_td` format.
+        """
+        path = path or thing.path
+        ops = [PropertyOp.readproperty]
+        if not self.readonly:
+            ops.append(PropertyOp.writeproperty)
+        forms = [
+            Form[PropertyOp](
+                href=path + self.name,
+                op=ops,
+            ),
+        ]
+        data_schema: DataSchema = type_to_dataschema(self.model)
+        pa: PropertyAffordance = PropertyAffordance(
+            title=self.title,
+            forms=forms,
+            description=self.description,
+        )
+        # We merge the data schema with the property affordance (which subclasses the
+        # DataSchema model) with the affordance second so its values take priority.
+        # Note that this works because all of the fields that get filled in by
+        # DataSchema are optional - so the PropertyAffordance is still valid without
+        # them.
+        return PropertyAffordance(
+            **{
+                **data_schema.model_dump(exclude_none=True),
+                **pa.model_dump(exclude_none=True),
+            }
+        )
 
 
 class DataProperty(BaseProperty[Value], Generic[Value]):
@@ -276,17 +375,20 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             factory function are specified.
         :raises MissingDefaultError: if no default is provided.
         """
+        super().__init__()
         if default_factory is not None and default is not ...:
             raise OverspecifiedDefaultError()
         if default_factory is None and default is ...:
             raise MissingDefaultError()
         # The default value will come from whichever of `default` and `default_factory`
         # is specified. The two checks above ensure that exactly one will exist.
-        self._default_value: Value
-        if default_factory:
-            self._default_value = default_factory
-        else:
-            self._default_value = default
+        if default_factory is None:
+            assert default is not ...  # Already checked above, this is for mypy.
+
+            def default_factory() -> Value:
+                return default
+
+        self._default_factory: ValueFactory = default_factory
         self.readonly = readonly
         self._type: type | None = None  # Will be set in __set_name__
 
@@ -350,6 +452,12 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
                 f"No type hint was found for property {name} on {owner}."
             )
 
+    @builtins.property
+    def value_type(self) -> type[Value]:
+        """The type of the descriptor's value."""
+        self.assert_set_name_called()
+        return super().value_type
+
     def instance_get(self, obj: Thing) -> Value:
         """Return the property's value.
 
@@ -358,10 +466,11 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         :param obj: The `.Thing` on which the property is being accessed.
         :return: the value of the property.
         """
-        try:
-            return obj.__dict__[self.name]
-        except KeyError:
-            return self._default_value
+        if self.name not in obj.__dict__:
+            # Note that a static default is converted to a factory function
+            # in __init__.
+            obj.__dict__[self.name] = self._default_factory()
+        return obj.__dict__[self.name]
 
     def __set__(self, obj: Thing, value: Value) -> None:
         """Set the property's value.
@@ -431,82 +540,6 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             await observer.send(
                 {"messageType": "propertyStatus", "data": {self._name: value}}
             )
-
-    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
-        """Add this action to a FastAPI app, bound to a particular Thing.
-
-        :param app: The FastAPI application we are adding endpoints to.
-        :param thing: The `.Thing` we are adding the endpoints for.
-        """
-        # We can't use the decorator in the usual way, because we'd need to
-        # annotate the type of `body` with `self.model` which is only defined
-        # at runtime.
-        # The solution below is to manually add the annotation, before passing
-        # the function to the decorator.
-        if not self.readonly:
-
-            def set_property(body):  # We'll annotate body later
-                if isinstance(body, RootModel):
-                    body = body.root
-                return self.__set__(thing, body)
-
-            set_property.__annotations__["body"] = Annotated[self.model, Body()]
-            app.put(
-                thing.path + self.name,
-                status_code=201,
-                response_description="Property set successfully",
-                summary=f"Set {self.title}",
-                description=f"## {self.title}\n\n{self.description or ''}",
-            )(set_property)
-
-        @app.get(
-            thing.path + self.name,
-            response_model=self.model,
-            response_description=f"Value of {self.name}",
-            summary=self.title,
-            description=f"## {self.title}\n\n{self.description or ''}",
-        )
-        def get_property():
-            return self.__get__(thing)
-
-    def property_affordance(
-        self, thing: Thing, path: str | None = None
-    ) -> PropertyAffordance:
-        """Represent the property in a Thing Description.
-
-        :param thing: the `.Thing` to which we are attached.
-        :param path: the URL of the `.Thing`. If not present, we will retrieve
-            the ``path`` from ``thing``.
-
-        :return: A description of the property in :ref:`wot_td` format.
-        """
-        path = path or thing.path
-        ops = [PropertyOp.readproperty]
-        if not self.readonly:
-            ops.append(PropertyOp.writeproperty)
-        forms = [
-            Form[PropertyOp](
-                href=path + self.name,
-                op=ops,
-            ),
-        ]
-        data_schema: DataSchema = type_to_dataschema(self.model)
-        pa: PropertyAffordance = PropertyAffordance(
-            title=self.title,
-            forms=forms,
-            description=self.description,
-        )
-        # We merge the data schema with the property affordance (which subclasses the
-        # DataSchema model) with the affordance second so its values take priority.
-        # Note that this works because all of the fields that get filled in by
-        # DataSchema are optional - so the PropertyAffordance is still valid without
-        # them.
-        return PropertyAffordance(
-            **{
-                **data_schema.model_dump(exclude_none=True),
-                **pa.model_dump(exclude_none=True),
-            }
-        )
 
 
 def setting(
@@ -605,11 +638,9 @@ class ThingSetting(DataProperty[Value], Generic[Value]):
         :param value: the new value of the setting.
         """
         obj.__dict__[self.name] = value
-        if self._setter:
-            self._setter(obj, value)
 
 
-class FunctionalProperty(BaseProperty[Value], Generic[Value], builtins.property):
+class FunctionalProperty(BaseProperty[Value], Generic[Value]):
     """A property that uses a getter and a setter.
 
     For properties that should work like variables, use `.DataProperty`. For
@@ -632,7 +663,9 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value], builtins.property)
 
         :param fget: the getter function, called when the property is read.
         """
+        super().__init__()
         self._fget: ValueGetter = fget
+        self._type = return_type(self._fget)
         self._fset: ValueSetter | None = None
         self.readonly: bool = True
 
@@ -667,8 +700,9 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value], builtins.property)
         :return: this descriptor (i.e. ``self``). This allows use as a decorator.
         """
         self._fget = fget
-        if fget.__doc__:
-            self.__doc__ = fget.__doc__
+        self._type = return_type(self._fget)
+        self.__doc__ = fget.__doc__
+        return self
 
     def setter(self, fset: ValueSetter) -> Self:
         """Set the setter function of the property.
@@ -701,8 +735,9 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value], builtins.property)
         """
         self._fset = fset
         self.readonly = False
+        return self
 
-    def deleter(self, fdel: callable) -> Self:
+    def deleter(self, fdel: Callable) -> Self:
         """Set a deleter function. Currently unsupported.
 
         :param fdel: The function called when the attribute is deleted.
@@ -730,6 +765,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value], builtins.property)
 
         :raises ReadOnlyPropertyError: if the property cannot be set.
         """
-        if self.fset:
-            self.fset(obj, value)
-        raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
+        if self.fset is None:
+            raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
+        self.fset(obj, value)

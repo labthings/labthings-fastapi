@@ -21,7 +21,7 @@ class DocstringToMessage:
 
         :param message: the optional message.
         """
-        # type: ignore[call-arg] is used here because mypy can't know
+        # We ignore call-arg within this function because mypy can't know
         # that this is a mixin, and super() will be an exception (which does
         # accept a string argument to `__init__`).
         doc = inspect.cleandoc(self.__doc__) if self.__doc__ else None
