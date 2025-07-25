@@ -21,7 +21,7 @@ from typing import Any, Mapping, Optional, Union
 from pydantic import BaseModel
 from ..descriptors.action import ActionDescriptor
 
-from ..descriptors.property import ThingProperty
+from ..thing_property import BaseProperty
 from ..utilities import attributes
 from . import PropertyClientDescriptor
 from ..thing import Thing
@@ -219,7 +219,7 @@ def add_action(
 
 
 def add_property(
-    attrs: dict[str, Any], property_name: str, property: ThingProperty
+    attrs: dict[str, Any], property_name: str, property: BaseProperty
 ) -> None:
     """Add a property to a DirectThingClient subclass.
 
@@ -238,7 +238,7 @@ def add_property(
         property.model,
         description=property.description,
         writeable=not property.readonly,
-        readable=True,  # TODO: make this configurable in ThingProperty
+        readable=True,
     )
 
 
@@ -283,7 +283,7 @@ def direct_thing_client_class(
     }
     dependencies: list[inspect.Parameter] = []
     for name, item in attributes(thing_class):
-        if isinstance(item, ThingProperty):
+        if isinstance(item, BaseProperty):
             add_property(client_attrs, name, item)
         elif isinstance(item, ActionDescriptor):
             if actions is None or name in actions:

@@ -10,16 +10,13 @@ import time
 
 
 class CancellableCountingThing(lt.Thing):
-    counter = lt.ThingProperty(int, 0, observable=False)
-    check = lt.ThingProperty(
-        bool,
-        False,
-        observable=False,
-        description=(
-            "This variable is used to check that the action can detect a cancel event "
-            "and react by performing another task, in this case, setting this variable."
-        ),
-    )
+    counter: int = lt.property(0)
+    check: bool = lt.property(False)
+    """Whether the count has been cancelled.
+    
+    This variable is used to check that the action can detect a cancel event
+    and react by performing another task, in this case, setting this variable.
+    """
 
     @lt.thing_action
     def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):

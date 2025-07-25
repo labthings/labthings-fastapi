@@ -11,21 +11,17 @@ import labthings_fastapi as lt
 
 
 class TestThing(lt.Thing):
-    boolsetting = lt.ThingSetting(bool, False, description="A boolean setting")
-    stringsetting = lt.ThingSetting(str, "foo", description="A string setting")
-    dictsetting = lt.ThingSetting(
-        dict, {"a": 1, "b": 2}, description="A dictionary setting"
-    )
+    boolsetting: bool = lt.setting(False)
+    "A boolean setting"
 
-    _float = 1.0
+    stringsetting: str = lt.setting("foo")
+    "A string setting"
 
-    @lt.thing_setting
-    def floatsetting(self) -> float:
-        return self._float
+    dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
+    "A dictionary setting"
 
-    @floatsetting.setter
-    def floatsetting(self, value: float):
-        self._float = value
+    floatsetting: float = lt.setting(1.0)
+    "A float setting"
 
     @lt.thing_action
     def toggle_boolsetting(self):

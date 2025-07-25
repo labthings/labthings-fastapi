@@ -13,7 +13,7 @@ class ThingOne(lt.Thing):
         lt.Thing.__init__(self)
         self._a = 0
 
-    @lt.thing_property
+    @lt.property
     def a(self):
         return self._a
 

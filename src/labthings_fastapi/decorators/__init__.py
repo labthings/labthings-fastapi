@@ -40,12 +40,9 @@ from functools import wraps, partial
 from typing import Optional, Callable, overload
 from ..descriptors import (
     ActionDescriptor,
-    ThingProperty,
-    ThingSetting,
     EndpointDescriptor,
     HTTPMethod,
 )
-from ..utilities.introspection import return_type
 
 
 def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
@@ -121,79 +118,6 @@ def thing_action(
         return mark_thing_action(func, **kwargs)
     else:
         return partial(mark_thing_action, **kwargs)
-
-
-def thing_property(func: Callable) -> ThingProperty:
-    """Mark a method of a Thing as a LabThings Property.
-
-    This should be used as a decorator with a getter and a setter
-    just like a standard python `property` decorator. If extra functionality
-    is not required in the decorator, then using the `.ThingProperty` class
-    directly may allow for clearer code
-
-    Properties should always have a type annotation. This type annotation
-    will be used in automatic documentation and also to serialise the value
-    to JSON when it is sent over th network. This mean that the type of your
-    property should either be JSON serialisable (i.e. simple built-in types)
-    or a subclass of `pydantic.BaseModel`.
-
-    :param func: A method to use as the getter for the new property.
-
-    :return: A `.ThingProperty` descriptor that works like `property` but
-        allows the value to be read over HTTP.
-    """
-    # Replace the function with a `Descriptor` that's a `ThingProperty`
-    return ThingProperty(
-        return_type(func),
-        readonly=True,
-        observable=False,
-        getter=func,
-    )
-
-
-def thing_setting(func: Callable) -> ThingSetting:
-    """Mark a method of a Thing as a LabThings Setting.
-
-    A setting is a property that is saved to disk, so it persists even when
-    the LabThings server is restarted.
-
-    This should be used as a decorator with a getter and a setter
-    just like a standard python property decorator. If extra functionality
-    is not required in the decorator, then using the `ThingSetting` class
-    directly may allow for clearer code where the property works like a
-    variable.
-
-    When creating a setting using this decorator, you must always add a setter
-    as it is used to load the value from disk. This follows the same syntax as
-    for `property`, i.e. a second function with the same name, decorated with
-    ``@my_property_name.setter``.
-
-    A type annotation is required, and should follow the same constraints as
-    for :deco:`thing_property`.
-
-    If the type is a pydantic BaseModel, then the setter must also be able to accept
-    the dictionary representation of this BaseModel as this is what will be used to
-    set the Setting when loading from disk on starting the server.
-
-    .. note::
-        If a setting is mutated rather than set, this will not trigger saving.
-        For example: if a Thing has a setting called ``dictsetting`` holding the
-        dictionary ``{"a": 1, "b": 2}`` then ``self.dictsetting = {"a": 2, "b": 2}``
-        would trigger saving but ``self.dictsetting[a] = 2`` would not, as the
-        setter for ``dictsetting`` is never called.
-
-    :param func: A method to use as the getter for the new property.
-
-    :return: A `.ThingSetting` descriptor that works like `property` but
-        allows the value to be read over HTTP and saves it to disk.
-    """
-    # Replace the function with a `Descriptor` that's a `ThingSetting`
-    return ThingSetting(
-        return_type(func),
-        readonly=True,
-        observable=False,
-        getter=func,
-    )
 
 
 def fastapi_endpoint(
