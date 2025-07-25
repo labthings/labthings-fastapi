@@ -255,6 +255,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         :param app: The FastAPI application we are adding endpoints to.
         :param thing: The `.Thing` we are adding the endpoints for.
         """
+        assert thing.path is not None
         # We can't use the decorator in the usual way, because we'd need to
         # annotate the type of `body` with `self.model` which is only defined
         # at runtime.
@@ -268,7 +269,6 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
                 return self.__set__(thing, body)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
-            assert thing.path is not None
             app.put(
                 thing.path + self.name,
                 status_code=201,
