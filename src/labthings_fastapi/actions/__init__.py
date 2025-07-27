@@ -33,6 +33,7 @@ from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
 from ..dependencies.invocation import (
     CancelHook,
     InvocationCancelledError,
+    InvocationError,
     invocation_logger,
 )
 from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
@@ -280,9 +281,15 @@ class Invocation(Thread):
                 self._status = InvocationStatus.COMPLETED
                 self.action.emit_changed_event(self.thing, self._status)
         except InvocationCancelledError:
-            logger.error(f"Invocation {self.id} was cancelled.")
+            logger.info(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
+                self.action.emit_changed_event(self.thing, self._status)
+        except InvocationError as e:
+            logger.error(e)
+            with self._status_lock:
+                self._status = InvocationStatus.ERROR
+                self._exception = e
                 self.action.emit_changed_event(self.thing, self._status)
         except Exception as e:  # skipcq: PYL-W0703
             logger.exception(e)

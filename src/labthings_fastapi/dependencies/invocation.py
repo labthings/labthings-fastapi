@@ -117,6 +117,20 @@ class InvocationCancelledError(BaseException):
     """
 
 
+class InvocationError(RuntimeError):
+    """The invocation ended in an anticipated error state.
+
+    When this error is raised, action execution stops as expected. The exception will be
+    logged at error level without a traceback, and the invocation will return with
+    error status.
+
+    Unlike other types of unhandled error in a LabThings action this will not cause
+    ASGI traceback. The ASGI traceback provides useful debug information to be logged
+    for developers. However, for simple errors with known causes this is information
+    overload for an average user.
+    """
+
+
 class CancelEvent(threading.Event):
     """An Event subclass that enables cancellation of actions.
 

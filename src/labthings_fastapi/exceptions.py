@@ -7,6 +7,7 @@
 from .dependencies.invocation import (
     InvocationCancelledError as InvocationCancelledError,
 )
+from .dependencies.invocation import InvocationError as InvocationError
 
 
 class NotConnectedToServerError(RuntimeError):
