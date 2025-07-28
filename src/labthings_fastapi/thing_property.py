@@ -23,7 +23,7 @@ Properties can be defined in two ways as shown below:
         @lt.property
         def remaining(self) -> int:
             "The number of steps remaining."
-            return self.remaining - self.count
+            return self.target - self.count
 
         @remaining.setter
         def remaining(self, value: int) -> None:
