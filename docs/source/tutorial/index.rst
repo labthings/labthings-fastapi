@@ -7,6 +7,8 @@ LabThings-FastAPI tutorial
 
    installing_labthings.rst
    running_labthings.rst
+   writing_a_thing.rst
+   properties.rst
 
 ..
    In due course, these pages should exist...
