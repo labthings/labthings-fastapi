@@ -210,7 +210,7 @@ def property(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 def property(
-    getter: ValueGetter | None = None,
+    getter: ValueGetter | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
@@ -250,6 +250,9 @@ def property(
         if used as a decorator, or a `.DataProperty` if used as
         a field.
 
+    :raises MissingDefaultError: if no valid default value is supplied,
+        and a getter is not in use.
+
     **Typing Notes**
 
     This function has somewhat complicated type hints, for two reasons.
@@ -275,9 +278,15 @@ def property(
     distinguish between ``default`` not being set (``...``) and a desired
     default value of ``None``.
     """
-    if callable(getter):
+    if getter is not ...:
         # If the default is callable, we're being used as a decorator
         # without arguments.
+        if not callable(getter):
+            raise MissingDefaultError(
+                "A non-callable getter was passed to `property`. Usually,"
+                "this means the default value was not passed as a keyword "
+                "argument, which is required."
+            )
         return FunctionalProperty(
             fget=getter,
         )
@@ -790,7 +799,7 @@ def setting(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 def setting(
-    getter: ValueGetter | None = None,
+    getter: ValueGetter | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
@@ -843,17 +852,24 @@ def setting(
 
     :return: a setting descriptor.
 
+    :raises MissingDefaultError: if no valid default is supplied.
+
     **Typing Notes**
 
     The return type of this function is a "white lie" in order to allow
     dataclass-style type annotations
     """
-    if callable(default):
+    if getter is not ...:
         # If the default is callable, we're being used as a decorator
         # without arguments.
-        func = default
+        if not callable(getter):
+            raise MissingDefaultError(
+                "A non-callable getter was passed to `property`. Usually,"
+                "this means the default value was not passed as a keyword "
+                "argument, which is required."
+            )
         return FunctionalSetting(
-            fget=func,
+            fget=getter,
         )
     return DataSetting(  # type: ignore[return-value]
         default_factory=default_factory_from_arguments(default, default_factory),
