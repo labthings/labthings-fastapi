@@ -104,13 +104,13 @@ class BaseDescriptor(Generic[Value]):
         When the descriptor is assigned to an attribute of a class, we
         remember the name of the attribute. There will be some time in
         between the descriptor being instantiated and the name being set.
-        If this is accessed before we know the name, we will raise an exception.
+
+        We call `.BaseDescriptor.assert_set_name_called` so an exception will
+        be raised if this property is accessed before the descriptor has been
+        assigned to a class attribute.
 
         The ``name`` of :ref:`wot_affordances` is used in their URL and in
         the :ref:`gen_docs` served by LabThings.
-
-        :raises NameNotSetError: if it is accessed before the descriptor
-            has been notified of its name.
         """
         self.assert_set_name_called()
         assert self._name is not None

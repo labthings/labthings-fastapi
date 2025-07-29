@@ -11,6 +11,13 @@ import labthings_fastapi as lt
 
 
 class TestThing(lt.Thing):
+    """A test `.Thing` with some settings and actions."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Initialize functional settings with default values
+        self._floatsetting: float = 1.0
+
     boolsetting: bool = lt.setting(False)
     "A boolean setting"
 
@@ -20,8 +27,25 @@ class TestThing(lt.Thing):
     dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
     "A dictionary setting"
 
-    floatsetting: float = lt.setting(1.0)
-    "A float setting"
+    @lt.setting
+    def floatsetting(self) -> float:
+        """A float setting."""
+        return self._floatsetting
+
+    @floatsetting.setter
+    def floatsetting(self, value: float):
+        self._floatsetting = value
+
+    @lt.setting
+    def readonlysetting(self) -> str:
+        """A read-only setting."""
+        return "This is read-only"
+
+    @readonlysetting.setter
+    def readonlysetting(self, value: str):
+        pass
+
+    readonlysetting.readonly = True
 
     @lt.thing_action
     def toggle_boolsetting(self):
@@ -52,6 +76,7 @@ def _settings_dict(
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
         "dictsetting": dictsetting,
+        "readonlysetting": "This is read-only",
     }
 
 
@@ -73,10 +98,14 @@ def test_setting_available(thing):
     assert not thing.boolsetting
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
+    assert thing.readonlysetting == "This is read-only"
 
 
-def test_settings_save(thing, server):
-    """Check updated settings are saved to disk"""
+def test_functional_settings_save(thing, server):
+    """Check updated settings are saved to disk
+
+    ``floatsetting`` is a functional setting, we should also test
+    a `.DataSetting` for completeness."""
     setting_file = _get_setting_file(server, "/thing")
     server.add_thing(thing, "/thing")
     # No setting file created when first added
@@ -90,6 +119,43 @@ def test_settings_save(thing, server):
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
+
+
+def test_data_settings_save(thing, server):
+    """Check updated settings are saved to disk
+
+    This uses ``intsetting`` which is a `.DataSetting` so it tests
+    a different code path to the functional setting above."""
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    # No setting file created when first added
+    assert not os.path.isfile(setting_file)
+    with TestClient(server.app) as client:
+        r = client.put("/thing/boolsetting", json=True)
+        assert r.status_code == 201
+        r = client.get("/thing/boolsetting")
+        assert r.json() is True
+        assert os.path.isfile(setting_file)
+        with open(setting_file, "r", encoding="utf-8") as file_obj:
+            # Check settings on file match expected dictionary
+            assert json.load(file_obj) == _settings_dict(boolsetting=True)
+
+
+def test_readonly_setting(thing, server):
+    """Check read-only settings cannot be set remotely."""
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    # No setting file created when first added
+    assert not os.path.isfile(setting_file)
+    with TestClient(server.app) as client:
+        # Check we can read it over HTTP
+        r = client.get("/thing/readonlysetting")
+        assert r.json() == "This is read-only"
+        assert r.status_code == 200
+        # Attempt to set read-only setting
+        r = client.put("/thing/readonlysetting", json="new value")
+        assert r.status_code == 405
+        assert not os.path.isfile(setting_file)  # No file created
 
 
 def test_settings_dict_save(thing, server):

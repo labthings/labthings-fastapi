@@ -21,7 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .thing_property import DataProperty, ThingSetting
+from .thing_property import DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -157,14 +157,14 @@ class Thing:
 
     # A private variable to hold the list of settings so it doesn't need to be
     # iterated through each time it is read
-    _settings_store: Optional[dict[str, ThingSetting]] = None
+    _settings_store: Optional[dict[str, BaseSetting]] = None
 
     @property
-    def _settings(self) -> dict[str, ThingSetting]:
+    def _settings(self) -> dict[str, BaseSetting]:
         """A private property that returns a dict of all settings for this Thing.
 
         Each dict key is the name of the setting, the corresponding value is the
-        ThingSetting class (a descriptor). This can be used to directly get the
+        BaseSetting class (a descriptor). This can be used to directly get the
         descriptor so that the value can be set without emitting signals, such
         as on startup.
         """
@@ -173,7 +173,7 @@ class Thing:
 
         self._settings_store = {}
         for name, attr in class_attributes(self):
-            if isinstance(attr, ThingSetting):
+            if isinstance(attr, BaseSetting):
                 self._settings_store[name] = attr
         return self._settings_store
 

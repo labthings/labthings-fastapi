@@ -82,6 +82,19 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 
+# Note on ignored linter codes:
+# D103 refers to missing docstrings. I have ignored this on @overload definitions
+# because they shouldn't have docstrings - the docstring belongs only on the
+# function they overload.
+# E302 refers to whitespace around function definitions. I have ignored this
+# between @overload definitions and the function they overload, because
+# it's clearer to keep them all together. Otherwise, the @overload block is easy
+# to miss.
+# DOC201 and D401 are ignored on properties. Because we are overriding the
+# builtin `property`, we are using `@builtins.property` which is not recognised
+# by pydoclint as a property. I've therefore ignored those codes manually.
+
+
 # The following exceptions are raised only when creating/setting up properties.
 class OverspecifiedDefaultError(DocstringToMessage, ValueError):
     """The default value has been specified more than once.
@@ -125,18 +138,16 @@ if TYPE_CHECKING:
 # fmt: on
 
 
-# D103 ignores missing docstrings on overloads. This shouldn't be raised on overloads.
+# See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
 def property(default: ValueGetter) -> FunctionalProperty[Value]: ...  # noqa: D103
 @overload  # use as `field: int = property(0)``
 def property(default: Value, *, readonly: bool = False) -> Value: ...  # noqa: D103
-@overload  # use as `field: int = property(default_factory=lambda: 0)`
-def property(
+@overload  # use as `field: int = property(default_factory=lambda: 0)` # noqa: E302
+def property(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
-) -> Value: ...  # noqa: D103
-
-
-def property(
+) -> Value: ...
+def property(  # noqa: E302
     default: Value | ValueGetter | EllipsisType = ...,
     *,
     default_factory: ValueFactory | None = None,
@@ -237,14 +248,29 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
 
     @builtins.property
     def value_type(self) -> type[Value]:
-        """The type of this descriptor's value."""
+        """The type of this descriptor's value.
+
+        :raises MissingTypeError: if the type has not been set.
+        :return: the type of the descriptor's value.
+        """  # noqa: D401 # see note at the top of the file
         if self._type is None:
             raise MissingTypeError("This property does not have a valid type.")
         return self._type
 
     @builtins.property
     def model(self) -> type[BaseModel]:
-        """A Pydantic model for the property's type."""
+        """A Pydantic model for the property's type.
+
+        `pydantic` models are used to serialise and deserialise values from
+        and to JSON. If the property is defined with a type hint that is not
+        a `pydantic.BaseModel` subclass, this property will ensure it is
+        wrapped in a `pydantic.RootModel` so it can be used with FastAPI.
+
+        If `.BaseProperty.value_type` is already a `pydantic.BaseModel`
+        subclass, this returns it unchanged.
+
+        :return: a Pydantic model for the property's type.
+        """  # noqa: D401 # see note at the top of the file
         if self._model is None:
             self._model = wrap_plain_types_in_rootmodel(self.value_type)
         return self._model
@@ -299,6 +325,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         :return: A description of the property in :ref:`wot_td` format.
         """
         path = path or thing.path
+        assert path is not None, "Cannot create a property affordance without a path"
         ops = [PropertyOp.readproperty]
         if not self.readonly:
             ops.append(PropertyOp.writeproperty)
@@ -453,8 +480,8 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             )
 
     @builtins.property
-    def value_type(self) -> type[Value]:
-        """The type of the descriptor's value."""
+    def value_type(self) -> type[Value]:  # noqa: DOC201
+        """The type of the descriptor's value."""  # noqa: D401
         self.assert_set_name_called()
         return super().value_type
 
@@ -472,16 +499,20 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             obj.__dict__[self.name] = self._default_factory()
         return obj.__dict__[self.name]
 
-    def __set__(self, obj: Thing, value: Value) -> None:
+    def __set__(
+        self, obj: Thing, value: Value, emit_changed_event: bool = True
+    ) -> None:
         """Set the property's value.
 
         This sets the property's value, and notifies any observers.
 
         :param obj: the `.Thing` to which we are attached.
         :param value: the new value for the property.
+        :param emit_changed_event: whether to emit a changed event.
         """
         obj.__dict__[self.name] = value
-        self.emit_changed_event(obj, value)
+        if emit_changed_event:
+            self.emit_changed_event(obj, value)
 
     def _observers_set(self, obj: Thing):
         """Return the observers of this property.
@@ -542,104 +573,6 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             )
 
 
-def setting(
-    default: Value | EllipsisType = ...,
-    *,
-    default_factory: ValueFactory | None = None,
-    readonly: bool = False,
-) -> ThingSetting[Value]:
-    r"""Define a Setting on a `.Thing`\ .
-
-    A setting is a property that is saved to disk
-
-    This function defines a setting, which is a special Property that will
-    be saved to disk, so it persists even when the LabThings server is
-    restarted. It is otherwise very similar to `.property` with the exception
-    that it may only be used as a field, i.e. not as a decorator. Settings may not
-    be implemented with getter and setter methods, as this can conflict
-    with loading and saving to disk.
-
-    A type annotation is required, and should follow the same constraints as
-    for :deco:`.property`.
-
-    If the type is a pydantic BaseModel, then the setter must also be able to accept
-    the dictionary representation of this BaseModel as this is what will be used to
-    set the Setting when loading from disk on starting the server.
-
-    .. note::
-        If a setting is mutated rather than set, this will not trigger saving.
-        For example: if a Thing has a setting called ``dictsetting`` holding the
-        dictionary ``{"a": 1, "b": 2}`` then ``self.dictsetting = {"a": 2, "b": 2}``
-        would trigger saving but ``self.dictsetting[a] = 2`` would not, as the
-        setter for ``dictsetting`` is never called.
-
-    :param default: is the default value. Either this or
-        ``default_factory`` must be specified.
-    :param default_factory: should return your default value.
-        This may be used as an alternative to ``default`` if you
-        need to use a mutable datatype. For example, it would be
-        better to specify ``default_factory=list`` than
-        ``default=[]`` because the second form would be shared
-        between all `.Thing`\ s with this setting.
-    :param readonly: whether the setting should be read-only
-        via the `.ThingClient` interface (i.e. over HTTP or via
-        a `.DirectThingClient`).
-
-    :return: a setting descriptor.
-
-    **Typing Notes**
-
-    The return type of this function is a "white lie" in order to allow
-    dataclass-style type annotations
-    """
-    return ThingSetting(
-        default=default,
-        default_factory=default_factory,
-        readonly=readonly,
-    )
-
-
-class ThingSetting(DataProperty[Value], Generic[Value]):
-    """A `.DataProperty` that persists on disk.
-
-    A setting can be accessed via the HTTP API and is persistent between sessions.
-
-    A `.ThingSetting` is a `.DataProperty` with extra functionality for triggering
-    a `.Thing` to save its settings.
-
-    Note: If a setting is mutated rather than assigned to, this will not trigger saving.
-    For example: if a Thing has a setting called `dictsetting` holding the dictionary
-    `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
-    but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
-    called.
-
-    The setting otherwise acts just like a normal variable.
-    """
-
-    def __set__(self, obj: Thing, value: Value):
-        """Set the setting's value.
-
-        This will cause the settings to be saved to disk.
-
-        :param obj: the `.Thing` to which we are attached.
-        :param value: the new value of the setting.
-        """
-        super().__set__(obj, value)
-        obj.save_settings()
-
-    def set_without_emit(self, obj: Thing, value: Value):
-        """Set the property's value, but do not emit event to notify the server.
-
-        This function is not expected to be used externally. It is called during
-        initial setup so that the setting can be set from disk before the server
-        is fully started.
-
-        :param obj: the `.Thing` to which we are attached.
-        :param value: the new value of the setting.
-        """
-        obj.__dict__[self.name] = value
-
-
 class FunctionalProperty(BaseProperty[Value], Generic[Value]):
     """A property that uses a getter and a setter.
 
@@ -669,9 +602,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self._fset: ValueSetter | None = None
         self.readonly: bool = True
 
-    # Note: DOC201 and DOC401 are ignored on these properties, as
-    # they only apply to functions. Pydoclint doesn't recognise these
-    # as properties, because we use `builtins.property` and not `property`.
     @builtins.property
     def fget(self) -> ValueGetter:  # noqa: DOC201
         """The getter function."""  # noqa: D401
@@ -768,3 +698,196 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         if self.fset is None:
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
         self.fset(obj, value)
+
+
+@overload  # use as a decorator  @setting
+def setting(default: ValueGetter) -> FunctionalSetting[Value]: ...  # noqa: D103
+@overload  # use as `field: int = setting(0)``
+def setting(default: Value, *, readonly: bool = False) -> Value: ...  # noqa: D103
+@overload  # use as `field: int = setting(default_factory=lambda: 0)`  # noqa: E302
+def setting(  # noqa: D103
+    *, default_factory: Callable[[], Value], readonly: bool = False
+) -> Value: ...
+def setting(  # noqa: E302
+    default: ValueGetter | Value | EllipsisType = ...,
+    *,
+    default_factory: ValueFactory | None = None,
+    readonly: bool = False,
+) -> FunctionalSetting[Value] | Value:
+    r"""Define a Setting on a `.Thing`\ .
+
+    A setting is a property that is saved to disk
+
+    This function defines a setting, which is a special Property that will
+    be saved to disk, so it persists even when the LabThings server is
+    restarted. It is otherwise very similar to `.property`\ .
+
+    A type annotation is required, and should follow the same constraints as
+    for :deco:`.property`.
+
+    Every ``setting`` on a `.Thing` will be read each time the settings are
+    saved, which may be quite frequent. This means your getter must not take
+    too long to run, or have side-effects. Settings that use getters and
+    setters may be removed in the future pending the outcome of `#159`_.
+
+    .. _`#159`: https://github.com/labthings/labthings-fastapi/issues/159
+
+    If the type is a pydantic BaseModel, then the setter must also be able to accept
+    the dictionary representation of this BaseModel as this is what will be used to
+    set the Setting when loading from disk on starting the server.
+
+    .. note::
+        If a setting is mutated rather than set, this will not trigger saving.
+        For example: if a Thing has a setting called ``dictsetting`` holding the
+        dictionary ``{"a": 1, "b": 2}`` then ``self.dictsetting = {"a": 2, "b": 2}``
+        would trigger saving but ``self.dictsetting[a] = 2`` would not, as the
+        setter for ``dictsetting`` is never called.
+
+    :param default: is the default value. Either this or
+        ``default_factory`` must be specified.
+
+        When ``setting`` is used as a decorator, the function
+        being decorated is passed as the first argument, which is
+        why this argument also accepts callable objects. Callable
+        default values are not supported. If you want to set your
+        default value with a function, see ``default_factory``.
+    :param default_factory: should return your default value.
+        This may be used as an alternative to ``default`` if you
+        need to use a mutable datatype. For example, it would be
+        better to specify ``default_factory=list`` than
+        ``default=[]`` because the second form would be shared
+        between all `.Thing`\ s with this setting.
+    :param readonly: whether the setting should be read-only
+        via the `.ThingClient` interface (i.e. over HTTP or via
+        a `.DirectThingClient`).
+
+    :return: a setting descriptor.
+
+    **Typing Notes**
+
+    The return type of this function is a "white lie" in order to allow
+    dataclass-style type annotations
+    """
+    if callable(default):
+        # If the default is callable, we're being used as a decorator
+        # without arguments.
+        func = default
+        return FunctionalSetting(
+            fget=func,
+        )
+    return DataSetting(  # type: ignore[return-value]
+        default=default,
+        default_factory=default_factory,
+        readonly=readonly,
+    )
+
+
+class BaseSetting(BaseProperty[Value], Generic[Value]):
+    r"""A base class for settings.
+
+    This is a subclass of `.BaseProperty` that is used to define settings.
+    It is not intended to be used directly, but via `.setting` and the
+    two concrete implementations: `.DataSetting` and `.FunctionalSetting`\ .
+    """
+
+    def set_without_emit(self, obj: Thing, value: Value) -> None:
+        """Set the setting's value without emitting an event.
+
+        This is used to set the setting's value without notifying observers.
+        It is used during initialisation to set the value from disk before
+        the server is fully started.
+
+        :param obj: the `.Thing` to which we are attached.
+        :param value: the new value of the setting.
+
+        :raises NotImplementedError: this method should be implemented in subclasses.
+        """
+        raise NotImplementedError("This method should be implemented in subclasses.")
+
+
+class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
+    """A `.DataProperty` that persists on disk.
+
+    A setting can be accessed via the HTTP API and is persistent between sessions.
+
+    A `.ThingSetting` is a `.DataProperty` with extra functionality for triggering
+    a `.Thing` to save its settings.
+
+    Note: If a setting is mutated rather than assigned to, this will not trigger saving.
+    For example: if a Thing has a setting called `dictsetting` holding the dictionary
+    `{"a": 1, "b": 2}` then `self.dictsetting = {"a": 2, "b": 2}` would trigger saving
+    but `self.dictsetting[a] = 2` would not, as the setter for `dictsetting` is never
+    called.
+
+    The setting otherwise acts just like a normal variable.
+    """
+
+    def __set__(
+        self, obj: Thing, value: Value, emit_changed_event: bool = True
+    ) -> None:
+        """Set the setting's value.
+
+        This will cause the settings to be saved to disk.
+
+        :param obj: the `.Thing` to which we are attached.
+        :param value: the new value of the setting.
+        :param emit_changed_event: whether to emit a changed event.
+        """
+        super().__set__(obj, value, emit_changed_event)
+        obj.save_settings()
+
+    def set_without_emit(self, obj: Thing, value: Value) -> None:
+        """Set the property's value, but do not emit event to notify the server.
+
+        This function is not expected to be used externally. It is called during
+        initial setup so that the setting can be set from disk before the server
+        is fully started.
+
+        :param obj: the `.Thing` to which we are attached.
+        :param value: the new value of the setting.
+        """
+        super().__set__(obj, value, emit_changed_event=False)
+
+
+class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[Value]):
+    """A `.FunctionalProperty` that persists on disk.
+
+    A setting can be accessed via the HTTP API and is persistent between sessions.
+
+    A `.ThingSetting` is a `.FunctionalProperty` with extra functionality for
+    triggering a `.Thing` to save its settings.
+
+    Note: If a setting is mutated rather than assigned to, this will not trigger
+    saving. For example: if a Thing has a setting called ``dictsetting`` holding
+    the dictionary ``{"a": 1, "b": 2}`` then ``self.dictsetting = {"a": 2, "b": 2}``
+    would trigger saving but ``self.dictsetting[a] = 2`` would not, as the setter
+    for ``dictsetting`` is never called.
+
+    The setting otherwise acts just like a `.FunctionalProperty``, i.e. it uses a
+    getter and a setter function.
+    """
+
+    def __set__(self, obj: Thing, value: Value) -> None:
+        """Set the setting's value.
+
+        This will cause the settings to be saved to disk.
+
+        :param obj: the `.Thing` to which we are attached.
+        :param value: the new value of the setting.
+        """
+        super().__set__(obj, value)
+        obj.save_settings()
+
+    def set_without_emit(self, obj: Thing, value: Value) -> None:
+        """Set the property's value, but do not emit event to notify the server.
+
+        This function is not expected to be used externally. It is called during
+        initial setup so that the setting can be set from disk before the server
+        is fully started.
+
+        :param obj: the `.Thing` to which we are attached.
+        :param value: the new value of the setting.
+        """
+        # FunctionalProperty does not emit changed events, so no special
+        # behaviour is needed.
+        super().__set__(obj, value)
