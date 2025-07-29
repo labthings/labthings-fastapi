@@ -89,11 +89,16 @@ ignore = [
 preview = true
 
 [tool.ruff.lint.per-file-ignores]
+# Tests are currently not fully docstring-ed, we'll ignore this for now.
 "tests/*" = ["D", "DOC"]
+# Typing tests do have docstrings, but it's not helpful to insist on imperative
+# mood etc.
+"typing_tests/*" = ["D404", "D401"]
 "docs/*" = ["D", "DOC"]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+
 
 [tool.flake8]
 extend-ignore = [
