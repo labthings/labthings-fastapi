@@ -83,9 +83,11 @@ if TYPE_CHECKING:
 
 
 # Note on ignored linter codes:
+#
 # D103 refers to missing docstrings. I have ignored this on @overload definitions
 # because they shouldn't have docstrings - the docstring belongs only on the
 # function they overload.
+# D105 is the same as D103, but for __init__ (i.e. magic methods).
 # E302 refers to whitespace around function definitions. I have ignored this
 # between @overload definitions and the function they overload, because
 # it's clearer to keep them all together. Otherwise, the @overload block is easy
@@ -138,6 +140,54 @@ if TYPE_CHECKING:
 # fmt: on
 
 
+def default_factory_from_arguments(
+    default: Value | EllipsisType = ...,
+    default_factory: ValueFactory | None = None,
+) -> ValueFactory:
+    """Process default arguments to get a default factory function.
+
+    This function takes the ``default`` and ``default_factory`` arguments
+    and will either return the ``default_factory`` if it is provided, or
+    will wrap the default value provided in a factory function.
+
+    This is used to avoid repeating the logic of checking whether a default
+    value or a factory function has been provided, and it returns a factory
+    rather than a default value so that it may be called multiple times to
+    get copies of the default value.
+
+    This function also ensures the default is specified exactly once, and
+    raises exceptions if it is not.
+
+    This logic originally lived only in the initialiser of `.DataProperty`
+    but it was needed in the `.property` and `.setting` functions in order
+    to correctly type them (so that specifying both or neither of the
+    ``default`` and ``default_factory`` arguments would raise an error
+    with mypy).
+
+    :param default: the default value, or an ellipsis if not specified.
+    :param default_factory: a function that returns the default value.
+    :return: a function that returns the default value.
+    :raises OverspecifiedDefaultError: if both ``default`` and
+        ``default_factory`` are specified.
+    :raises MissingDefaultError: if neither ``default`` nor ``default_factory``
+        are specified.
+    """
+    if default is ... and default_factory is None:
+        # If the default is an ellipsis, we have no default value.
+        # This is not allowed for DataProperty, so we raise an error.
+        raise MissingDefaultError()
+    if default is not ... and default_factory is not None:
+        # If both default and default_factory are set, we raise an error.
+        raise OverspecifiedDefaultError()
+    if default is not ...:
+
+        def default_factory() -> Value:
+            return default
+
+    assert callable(default_factory), "The default_factory must be callable."
+    return default_factory
+
+
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
 def property(default: ValueGetter) -> FunctionalProperty[Value]: ...  # noqa: D103
@@ -166,7 +216,8 @@ def property(  # noqa: E302
     or a subclass of `pydantic.BaseModel`.
 
     :param default: is the default value. Either this or
-        ``default_factory`` must be specified.
+        ``default_factory`` must be specified. Specifying both
+        or neither will raise an exception.
 
         When ``property`` is used as a decorator, the function
         being decorated is passed as the first argument, which is
@@ -222,8 +273,7 @@ def property(  # noqa: E302
             fget=func,
         )
     return DataProperty(  # type: ignore[return-value]
-        default=default,
-        default_factory=default_factory,
+        default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
     )
 
@@ -361,11 +411,17 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     written to like a regular Python variable.
     """
 
+    @overload
+    def __init__(self, default: Value, *, readonly: bool = False) -> None: ...  # noqa: D105
+    @overload
+    def __init__(
+        self, *, default_factory: ValueFactory, readonly: bool = False
+    ) -> None: ...  # noqa: D105
     def __init__(
         self,
         default: Value | EllipsisType = ...,
         *,
-        default_factory: ValueFactory | None,
+        default_factory: ValueFactory | None = None,
         readonly: bool = False,
     ):
         """Create a property that acts like a regular variable.
@@ -397,25 +453,11 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         :param readonly: if ``True``, the property may not be written to via
             HTTP, or via `.DirectThingClient` objects, i.e. it may only be
             set as an attribute of the `.Thing` and not from a client.
-
-        :raises OverspecifiedDefaultError: if both a default and a default
-            factory function are specified.
-        :raises MissingDefaultError: if no default is provided.
         """
         super().__init__()
-        if default_factory is not None and default is not ...:
-            raise OverspecifiedDefaultError()
-        if default_factory is None and default is ...:
-            raise MissingDefaultError()
-        # The default value will come from whichever of `default` and `default_factory`
-        # is specified. The two checks above ensure that exactly one will exist.
-        if default_factory is None:
-            assert default is not ...  # Already checked above, this is for mypy.
-
-            def default_factory() -> Value:
-                return default
-
-        self._default_factory: ValueFactory = default_factory
+        self._default_factory = default_factory_from_arguments(
+            default=default, default_factory=default_factory
+        )
         self.readonly = readonly
         self._type: type | None = None  # Will be set in __set_name__
 
@@ -776,8 +818,7 @@ def setting(  # noqa: E302
             fget=func,
         )
     return DataSetting(  # type: ignore[return-value]
-        default=default,
-        default_factory=default_factory,
+        default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
     )
 
