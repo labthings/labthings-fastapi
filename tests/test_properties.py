@@ -9,10 +9,10 @@ from labthings_fastapi.exceptions import NotConnectedToServerError
 
 
 class TestThing(lt.Thing):
-    boolprop: bool = lt.property(False)
+    boolprop: bool = lt.property(default=False)
     "A boolean property"
 
-    stringprop: str = lt.property("foo")
+    stringprop: str = lt.property(default="foo")
     "A string property"
 
     _undoc = None
@@ -56,7 +56,7 @@ def test_instantiation_with_type():
 
     # This will not work unless the property is assigned to a thing
     class TestThing(lt.Thing):
-        prop: bool = lt.property(False)
+        prop: bool = lt.property(default=False)
 
     assert issubclass(TestThing.prop.model, BaseModel)
 
@@ -67,7 +67,7 @@ def test_instantiation_with_model() -> None:
         b: float = 2.0
 
     class Dummy:
-        prop: MyModel = lt.property(MyModel())
+        prop: MyModel = lt.property(default=MyModel())
 
         @lt.property
         def func_prop(self) -> MyModel:

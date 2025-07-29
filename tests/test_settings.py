@@ -18,10 +18,10 @@ class TestThing(lt.Thing):
         # Initialize functional settings with default values
         self._floatsetting: float = 1.0
 
-    boolsetting: bool = lt.setting(False)
+    boolsetting: bool = lt.setting(default=False)
     "A boolean setting"
 
-    stringsetting: str = lt.setting("foo")
+    stringsetting: str = lt.setting(default="foo")
     "A string setting"
 
     dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})

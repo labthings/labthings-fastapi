@@ -16,8 +16,8 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
     import labthings_fastapi as lt
 
     class Light(lt.Thing):
-        brightness: int = lt.property(100)
-        is_on: bool = lt.property(False, readonly=true)
+        brightness: int = lt.property(default=100)
+        is_on: bool = lt.property(default=False, readonly=true)
 
         @lt.action
         def toggle(self):

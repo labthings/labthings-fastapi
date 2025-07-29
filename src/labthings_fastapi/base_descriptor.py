@@ -34,10 +34,10 @@ class DescriptorNotAddedToClassError(RuntimeError):
 
 
         class Test(lt.Thing):
-            myprop: int = lt.property(0)  # This is OK
+            myprop: int = lt.property(default=0)  # This is OK
 
 
-        orphaned_prop: int = lt.property(0)  # Not OK
+        orphaned_prop: int = lt.property(default=0)  # Not OK
 
         Test.myprop.model  # Evaluates to a pydantic model
 

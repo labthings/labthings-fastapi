@@ -15,14 +15,14 @@ Data properties behave like variables: they simply store a value that is used by
     import labthings_fastapi as lt
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42)
+        my_property: int = lt.property(default=42)
 
 The example above defines a property called `my_property` that has a default value of `42`. Note the type hint `int` which indicates that the property should hold an integer value. This is important, as the type will be enforced when the property is written to via HTTP, and it will appear in :ref:`gen_docs`. By default, this property may be read or written to by HTTP requests. If you want to make it read-only, you can set the `readonly` parameter to `True`:
 
 .. code-block:: python
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42, readonly=True)
+        my_property: int = lt.property(default=42, readonly=True)
 
 Note that the ``readonly`` parameter only affects *client* code, i.e. it may not be written to via HTTP requests or `.DirectThingClient` instances. However, the property can still be modified by the Thing's code, e.g. in response to an action or another property change as ``self.my_property = 100``.
 
@@ -31,7 +31,7 @@ It is a good idea to make sure there is a docstring for your property. This will
 .. code-block:: python
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42, readonly=True)
+        my_property: int = lt.property(default=42, readonly=True)
         """A property that holds an integer value."""
 
 You don't need to include the type in the docstring, as it will be inferred from the type hint. However, you can include additional information about the property, such as its units or any constraints on its value.
@@ -48,7 +48,7 @@ It is also possible to have properties that run code when they are read or writt
     import labthings_fastapi as lt
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42)
+        my_property: int = lt.property(default=42)
         """A property that holds an integer value."""
 
         @lt.property
@@ -65,7 +65,7 @@ Functional properties may also have a "setter" method, which is called when the 
     import labthings_fastapi as lt
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42)
+        my_property: int = lt.property(default=42)
         """A property that holds an integer value."""
 
         @lt.property
@@ -85,7 +85,7 @@ Adding a setter makes the property read-write (if only a getter is present, it m
     import labthings_fastapi as lt
 
     class MyThing(lt.Thing):
-        my_property: int = lt.property(42)
+        my_property: int = lt.property(default=42)
         """A property that holds an integer value."""
 
         @lt.property

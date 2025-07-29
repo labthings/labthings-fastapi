@@ -22,7 +22,7 @@ class TestThing(lt.Thing):
             time.sleep(1)
             self.increment_counter()
 
-    counter: int = lt.property(0, readonly=True)
+    counter: int = lt.property(default=0, readonly=True)
     "A pointless counter"
 
 

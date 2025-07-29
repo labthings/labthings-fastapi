@@ -13,7 +13,7 @@ class TestThing(lt.Thing):
         """Increment the counter"""
         self.counter += 1
 
-    counter: int = lt.property(0, readonly=True)
+    counter: int = lt.property(default=0, readonly=True)
     "A pointless counter"
 
 
