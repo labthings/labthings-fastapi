@@ -65,8 +65,8 @@ class TestPropertyDefaultsMatch(lt.Thing):
     intprop2: int = lt.property(default="foo")  # type: ignore[assignment]
     intprop3: int = lt.property(default_factory=optional_int_factory)  # type: ignore[assignment]
 
-    # Data properies must always have a default, so this line should fail
-    # with mypy. It will also raise an excetion at runtime, and there's a
+    # Data properties must always have a default, so this line should fail
+    # with mypy. It will also raise an exception at runtime, and there's a
     # test for that run with pytest.
     intprop4: int = lt.property()  # type: ignore[call-overload]
     "This property should cause mypy to throw an error, as it has no default."
