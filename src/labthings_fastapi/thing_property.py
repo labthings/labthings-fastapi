@@ -90,10 +90,7 @@ if TYPE_CHECKING:
 # because they shouldn't have docstrings - the docstring belongs only on the
 # function they overload.
 # D105 is the same as D103, but for __init__ (i.e. magic methods).
-# E302 refers to whitespace around function definitions. I have ignored this
-# between @overload definitions and the function they overload, because
-# it's clearer to keep them all together. Otherwise, the @overload block is easy
-# to miss.
+# DOC101 and DOC103 are also a result of overloads not having docstrings
 # DOC201 and D401 are ignored on properties. Because we are overriding the
 # builtin `property`, we are using `@builtins.property` which is not recognised
 # by pydoclint as a property. I've therefore ignored those codes manually.
@@ -203,16 +200,16 @@ def default_factory_from_arguments(
 
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
-def property(
+def property(  # noqa: D103
     getter: Callable[[Any], Value],
-) -> FunctionalProperty[Value]: ...  # noqa: D103
+) -> FunctionalProperty[Value]: ...
 @overload  # use as `field: int = property(0)``
 def property(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
 @overload  # use as `field: int = property(default_factory=lambda: 0)` # noqa: E302
 def property(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
-def property(  # noqa: E302
+def property(
     getter: ValueGetter | None = None,
     *,
     default: Value | EllipsisType = ...,
@@ -231,15 +228,12 @@ def property(  # noqa: E302
     property should either be JSON serialisable (i.e. simple built-in types)
     or a subclass of `pydantic.BaseModel`.
 
-    :param default: is the default value. Either this or
+    :param getter: is a method of a class that returns the value
+        of this property. This is usually supplied by using ``property``
+        as a decorator.
+    :param default: is the default value. Either this, ``getter`` or
         ``default_factory`` must be specified. Specifying both
         or neither will raise an exception.
-
-        When ``property`` is used as a decorator, the function
-        being decorated is passed as the first argument, which is
-        why this argument also accepts callable objects. Callable
-        default values are not supported. If you want to set your
-        default value with a function, see ``default_factory``.
     :param default_factory: should return your default value.
         This may be used as an alternative to ``default`` if you
         need to use a mutable datatype. For example, it would be
@@ -427,11 +421,13 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     """
 
     @overload
-    def __init__(self, default: Value, *, readonly: bool = False) -> None: ...  # noqa: D105
+    def __init__(  # noqa: D105,D107,DOC101,DOC103
+        self, default: Value, *, readonly: bool = False
+    ) -> None: ...
     @overload
-    def __init__(
+    def __init__(  # noqa: D105,D107,DOC101,DOC103
         self, *, default_factory: ValueFactory, readonly: bool = False
-    ) -> None: ...  # noqa: D105
+    ) -> None: ...
     def __init__(
         self,
         default: Value | EllipsisType = ...,
@@ -784,16 +780,16 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
 
 @overload  # use as a decorator  @setting
-def setting(
+def setting(  # noqa: D103
     getter: Callable[[Any], Value],
-) -> FunctionalSetting[Value]: ...  # noqa: D103
+) -> FunctionalSetting[Value]: ...
 @overload  # use as `field: int = setting(0)``
 def setting(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
-@overload  # use as `field: int = setting(default_factory=lambda: 0)`  # noqa: E302
+@overload  # use as `field: int = setting(default_factory=lambda: 0)`
 def setting(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
-def setting(  # noqa: E302
+def setting(
     getter: ValueGetter | None = None,
     *,
     default: Value | EllipsisType = ...,
@@ -829,14 +825,12 @@ def setting(  # noqa: E302
         would trigger saving but ``self.dictsetting[a] = 2`` would not, as the
         setter for ``dictsetting`` is never called.
 
-    :param default: is the default value. Either this or
-        ``default_factory`` must be specified.
-
-        When ``setting`` is used as a decorator, the function
-        being decorated is passed as the first argument, which is
-        why this argument also accepts callable objects. Callable
-        default values are not supported. If you want to set your
-        default value with a function, see ``default_factory``.
+    :param getter: is a method of a class that returns the value
+        of this property. This is usually supplied by using ``property``
+        as a decorator.
+    :param default: is the default value. Either this, ``getter`` or
+        ``default_factory`` must be specified. Specifying both
+        or neither will raise an exception.
     :param default_factory: should return your default value.
         This may be used as an alternative to ``default`` if you
         need to use a mutable datatype. For example, it would be

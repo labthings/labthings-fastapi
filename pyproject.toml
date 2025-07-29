@@ -105,6 +105,8 @@ extend-ignore = [
   "DOC301",  # allow class + __init__ docstrings
   "D202",  # conflicts with ruff format
   "F401",  # already implemented by ruff, which respects "import x as x"
+  "E301",  # leave this to ruff (blank lines)
+  "E302",  # leave this to ruff (blank lines)
   "E501",  # leave this to ruff (line length), #noqa may exceed max line length.
 ]
 max-line-length = 88
