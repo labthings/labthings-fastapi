@@ -94,10 +94,10 @@ class MyThing(Thing):
             time.sleep(delay)
             self.increment_counter()
 
-    counter: int = lt_property(0, readonly=True)
+    counter: int = lt_property(default=0, readonly=True)
     "A pointless counter"
 
-    foo: str = lt_property("Example")
+    foo: str = lt_property(default="Example")
     "A pointless string for demo purposes."
 
     @thing_action

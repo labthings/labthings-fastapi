@@ -49,9 +49,11 @@ import builtins
 from types import EllipsisType
 from typing import (
     Annotated,
+    Any,
     Callable,
     Generic,
     Self,
+    TypeAlias,
     TypeVar,
     overload,
     TYPE_CHECKING,
@@ -131,13 +133,24 @@ class MissingTypeError(DocstringToMessage, TypeError):
     """
 
 
-# fmt: off
 Value = TypeVar("Value")
 if TYPE_CHECKING:
-    ValueFactory = Callable[[], Value]
-    ValueGetter = Callable[[Thing,], Value]
-    ValueSetter = Callable[[Thing, Value], None]
-# fmt: on
+    # It's hard to type check methods, because the type of ``self``
+    # will be a subclass of `.Thing`, and `Callable` types are
+    # contravariant in their arguments (i.e.
+    # ``Callable[[SpecificThing,], Value])`` is not a subtype of
+    # ``Callable[[Thing,], Value]``.
+    # It is probably not particularly important for us to check th
+    # type of ``self`` when decorating methods, so it is left as
+    # ``Any`` to avoid the major confusion that would result from
+    # trying to type it more tightly.
+    #
+    # Note: in ``@overload`` definitions, it's sometimes necessary
+    # to avoid the use of these aliases, as ``mypy`` can't
+    # pick which variant is in use without the explicit `Callable`.
+    ValueFactory: TypeAlias = Callable[[], Value]
+    ValueGetter: TypeAlias = Callable[[Any], Value]
+    ValueSetter: TypeAlias = Callable[[Any, Value], None]
 
 
 def default_factory_from_arguments(
@@ -190,16 +203,19 @@ def default_factory_from_arguments(
 
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
-def property(default: ValueGetter) -> FunctionalProperty[Value]: ...  # noqa: D103
+def property(
+    getter: Callable[[Any], Value],
+) -> FunctionalProperty[Value]: ...  # noqa: D103
 @overload  # use as `field: int = property(0)``
-def property(default: Value, *, readonly: bool = False) -> Value: ...  # noqa: D103
+def property(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
 @overload  # use as `field: int = property(default_factory=lambda: 0)` # noqa: E302
 def property(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 def property(  # noqa: E302
-    default: Value | ValueGetter | EllipsisType = ...,
+    getter: ValueGetter | None = None,
     *,
+    default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,
 ) -> Value | FunctionalProperty[Value]:
@@ -265,12 +281,11 @@ def property(  # noqa: E302
     distinguish between ``default`` not being set (``...``) and a desired
     default value of ``None``.
     """
-    if callable(default):
+    if callable(getter):
         # If the default is callable, we're being used as a decorator
         # without arguments.
-        func = default
         return FunctionalProperty(
-            fget=func,
+            fget=getter,
         )
     return DataProperty(  # type: ignore[return-value]
         default_factory=default_factory_from_arguments(default, default_factory),
@@ -423,7 +438,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         *,
         default_factory: ValueFactory | None = None,
         readonly: bool = False,
-    ):
+    ) -> None:
         """Create a property that acts like a regular variable.
 
         `.DataProperty` descriptors function just like variables, in that
@@ -697,13 +712,39 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
                     return self._myprop
 
                 @myprop.setter
-                def myprop(self, val: int):
+                def set_myprop(self, val: int) -> None:
                     self._myprop = val
 
                 myprop.readonly = True  # Prevent client code from setting it
 
+        .. note::
+
+            The example code above is not quite what would be done for the built-in
+            ``@property`` decorator, because our setter does not have the same name
+            as the getter. Using a different name avoids type checkers such as
+            ``mypy`` raising an error that the getter has been redefined with a
+            different type. The behaviour is identical whether the setter and getter
+            have the same name or not. The only difference is that the `.Thing`
+            will have an additional method called ``set_myprop`` in the example
+            above.
+
         :param fset: The new setter function.
         :return: this descriptor (i.e. ``self``). This allows use as a decorator.
+
+        **Typing Notes**
+
+        Python's built-in ``property`` is treated as a special case by ``mypy``
+        and others, and our descriptor is not treated in the same way.
+        Naming the setter and getter the same is required by `builtins.property`
+        because the property must be overwritten when the setter is added, as
+        `builtins.property` is not mutable.
+
+        Our descriptor is mutable, so the setter may be added without having to
+        overwrite the object. While it would be nice to use exactly the same
+        conventions as `builtins.property`, it currently causes type errors that
+        must be silenced manually. We suggest using a different name for the setter
+        as an alternative to adding ``# type: ignore[no-redef]`` to the setter
+        function.
         """
         self._fset = fset
         self.readonly = False
@@ -743,16 +784,19 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
 
 @overload  # use as a decorator  @setting
-def setting(default: ValueGetter) -> FunctionalSetting[Value]: ...  # noqa: D103
+def setting(
+    getter: Callable[[Any], Value],
+) -> FunctionalSetting[Value]: ...  # noqa: D103
 @overload  # use as `field: int = setting(0)``
-def setting(default: Value, *, readonly: bool = False) -> Value: ...  # noqa: D103
+def setting(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`  # noqa: E302
 def setting(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 def setting(  # noqa: E302
-    default: ValueGetter | Value | EllipsisType = ...,
+    getter: ValueGetter | None = None,
     *,
+    default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,
 ) -> FunctionalSetting[Value] | Value:

@@ -7,8 +7,10 @@ See README.md for more details.
 """
 
 import labthings_fastapi as lt
+from labthings_fastapi.thing_property import FunctionalProperty
 
 from typing import assert_type
+import typing
 
 
 def optional_int_factory() -> int | None:
@@ -21,6 +23,29 @@ def int_factory() -> int:
     return 0
 
 
+unbound_prop = lt.property(default=0)
+"""A property that is not bound to a Thing.
+
+This will go wrong at runtime if we access its ``model`` but it should
+have its type inferred as an `int`.
+"""
+assert_type(unbound_prop, int)
+
+unbound_prop_2 = lt.property(default_factory=int_factory)
+"""A property that is not bound to a Thing, with a factory."""
+
+assert_type(unbound_prop_2, int)
+
+
+@lt.property
+def strprop(self) -> str:
+    """A functional property that should not cause mypy errors."""
+    return "foo"
+
+
+assert_type(strprop, FunctionalProperty[str])
+
+
 class TestPropertyDefaultsMatch(lt.Thing):
     """A Thing that checks our property type hints are working.
 
@@ -30,14 +55,14 @@ class TestPropertyDefaultsMatch(lt.Thing):
 
     # These properties should not cause mypy errors, as the default matches
     # the type hint.
-    intprop: int = lt.property(0)
-    optionalintprop: int | None = lt.property(None)
-    optionalintprop2: int | None = lt.property(0)
+    intprop: int = lt.property(default=0)
+    optionalintprop: int | None = lt.property(default=None)
+    optionalintprop2: int | None = lt.property(default=0)
     optionalintprop3: int | None = lt.property(default_factory=optional_int_factory)
 
     # This property should cause mypy to throw an error, as the default is a string.
     # The type hint is an int, so this should cause a mypy error.
-    intprop2: int = lt.property("foo")  # type: ignore[assignment]
+    intprop2: int = lt.property(default="foo")  # type: ignore[assignment]
     intprop3: int = lt.property(default_factory=optional_int_factory)  # type: ignore[assignment]
 
     # Data properies must always have a default, so this line should fail
@@ -69,7 +94,7 @@ assert_type(test_defaults_match.optionalintprop3, int | None)
 class TestExplicitDescriptor(lt.Thing):
     """A Thing that checks our explicit descriptor type hints are working."""
 
-    intprop1 = lt.DataProperty[int](0)
+    intprop1 = lt.DataProperty[int](default=0)
     """A DataProperty that should not cause mypy errors."""
 
     intprop2 = lt.DataProperty[int](default_factory=int_factory)
@@ -84,13 +109,13 @@ class TestExplicitDescriptor(lt.Thing):
     This error is caught correctly when called via `lt.property`.
     """
 
-    intprop4 = lt.DataProperty[int]("foo")  # type: ignore[call-overload]
+    intprop4 = lt.DataProperty[int](default="foo")  # type: ignore[call-overload]
     """This property should cause mypy to throw an error, as the default is a string."""
 
     intprop5 = lt.DataProperty[int]()  # type: ignore[call-overload]
     """This property should cause mypy to throw an error, as it has no default."""
 
-    optionalintprop1 = lt.DataProperty[int | None](None)
+    optionalintprop1 = lt.DataProperty[int | None](default=None)
     """A DataProperty that should not cause mypy errors."""
 
     optionalintprop2 = lt.DataProperty[int | None](default_factory=optional_int_factory)
@@ -119,6 +144,14 @@ assert_type(TestExplicitDescriptor.optionalintprop1, lt.DataProperty[int | None]
 assert_type(TestExplicitDescriptor.optionalintprop2, lt.DataProperty[int | None])
 assert_type(TestExplicitDescriptor.optionalintprop3, lt.DataProperty[int | None])
 
+Val = typing.TypeVar("Val")
+Thing = typing.TypeVar("Thing", bound=lt.Thing)
+
+
+def f_property(getter: typing.Callable[..., Val]) -> FunctionalProperty[Val]:
+    """A function that returns a DataProperty with a getter."""
+    return FunctionalProperty(getter)
+
 
 class TestFunctionalProperty(lt.Thing):
     """A Thing that checks our functional property type hints are working."""
@@ -134,7 +167,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop2.setter
-    def intprop2(self, value: int):
+    def set_intprop2(self, value: int):
         """Setter for intprop2."""
         pass
 
@@ -142,10 +175,32 @@ class TestFunctionalProperty(lt.Thing):
 
     @lt.property
     def intprop3(self) -> int:
-        """Cause mypy to throw an error as the setter is wrongly typed."""
+        """This getter is fine, but the setter should fail type checking."""
         return 0
 
     @intprop3.setter
-    def intprop3(self, value: str):
-        """Setter for intprop3."""
+    def set_intprop3(self, value: str) -> None:
+        """Setter for intprop3. It's got the wrong type so should fail."""
         pass
+
+    @f_property
+    def fprop(self) -> int:
+        """A functional property that should not cause mypy errors."""
+        return 0
+
+    @strprop.setter
+    def set_fprop(self, value: int) -> None:
+        """Setter for strprop. This should fail type checking."""
+        pass
+
+
+assert_type(TestFunctionalProperty.intprop1, FunctionalProperty[int])
+assert_type(TestFunctionalProperty.intprop2, FunctionalProperty[int])
+assert_type(TestFunctionalProperty.intprop3, FunctionalProperty[int])
+assert_type(TestFunctionalProperty.fprop, FunctionalProperty[int])
+
+test_functional_property = TestFunctionalProperty()
+assert_type(test_functional_property.intprop1, int)
+assert_type(test_functional_property.intprop2, int)
+assert_type(test_functional_property.intprop3, int)
+assert_type(test_functional_property.fprop, int)
