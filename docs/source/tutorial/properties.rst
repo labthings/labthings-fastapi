@@ -3,7 +3,16 @@
 Properties
 =========================
 
-:ref:`wot_properties` are values that can be read and written on a Thing. They are used to represent the state of the Thing, such as its current temperature, brightness, or status. Properties can be read using a ``GET`` request and written using a ``PUT`` or ``POST`` request. You can add properties to a `.Thing` by using `.property` (usually imported as ``lt.property``).
+
+
+Properties are values that can be read from and written to a Thing. They are used to represent the state of the Thing, such as its current temperature, brightness, or status. :ref:`wot_properties` are a key concept in the Web of Things standard.
+
+LabThings implements properties in a very similar way to the built-in Python `~builtins.property`. The key difference is that defining an attribute as a `.property` means that the property will be listed in the :ref:`gen_td` and exposed over HTTP. This is important for two reasons:
+
+* Only properties declared using `.property` (usually imported as ``lt.property``) can be accessed over HTTP. Regular attributes or properties using `builtins.property` are only available to your `.Thing` internally, except in some special cases.
+* Communication between `.Thing`\ s within a LabThings server should be done using a `.DirectThingClient` class. The purpose of `.DirectThingClient` is to provide the same interface as a `.ThingClient` over HTTP, so it will also only expose functionality described in the Thing Description.
+
+You can add properties to a `.Thing` by using `.property` (usually imported as ``lt.property``).
 
 Data properties
 -------------------------
@@ -78,7 +87,9 @@ Functional properties may also have a "setter" method, which is called when the 
             """Set the value of twice_my_property."""
             self.my_property = value // 2
 
-Adding a setter makes the property read-write (if only a getter is present, it must be read-only). It is possible to make a property read-only for clients by setting its ``readonly`` attribute: this has the same behaviour as for data properties, i.e. it prevents the property from being written to via HTTP requests or `.DirectThingClient` instances, but it can still be modified by the Thing's code.
+Adding a setter makes the property read-write (if only a getter is present, it must be read-only). 
+
+It is possible to make a property read-only for clients by setting its ``readonly`` attribute: this has the same behaviour as for data properties.
 
 .. code-block:: python
 
@@ -101,7 +112,21 @@ Adding a setter makes the property read-write (if only a getter is present, it m
         # Make the property read-only for clients
         twice_my_property.readonly = True
 
-Functional properties may not be observed, as they are not backed by a simple value. If you need to notify clients when the value changes, you can use a data property that is updated by the functional property.
+In the example above, ``twice_my_property`` may be set by code within ``MyThing`` but cannot be written to via HTTP requests or `.DirectThingClient` instances.
+
+Functional properties may not be observed, as they are not backed by a simple value. If you need to notify clients when the value changes, you can use a data property that is updated by the functional property. In the example above, ``my_property`` may be observed, while ``twice_my_property`` cannot be observed. It would be possible to observe changes in ``my_property`` and then query ``twice_my_property`` for its new value.
+
+HTTP interface
+--------------
+
+LabThings is primarily controlled using HTTP. Mozilla have a good `Overview of HTTP`_ that is worth a read if you are unfamiliar with the concept of requests, or what ``GET`` and ``PUT`` mean.
+
+Each property in LabThings will be assigned a URL, which allows it to be read and (optionally) written to. The easiest way to explore this is in the interactive OpenAPI documentation, served by your LabThings server at ``/docs``\ . Properties can be read using a ``GET`` request and written using a ``PUT`` request.
+
+LabThings follows the `HTTP Protocol Binding`_ from the Web of Things standard. That's quite a detailed document: for a gentle introduction to HTTP and what a request means, see 
+
+.. _`Overview of HTTP`: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview
+.. _`HTTP Protocol Binding`: https://w3c.github.io/wot-binding-templates/bindings/protocols/http/index.html
 
 Observable properties
 -------------------------

@@ -336,7 +336,7 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
         # need to cope with a list of targets.
         if isinstance(a, ast.Assign):
             targets = a.targets
-        else:  # Annotated asignments have only one target, so make it a list.
+        else:  # Annotated assignments have only one target, so make it a list.
             targets = [a.target]
 
         # Clean up the docstring as per the usual rules
