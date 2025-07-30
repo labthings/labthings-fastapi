@@ -111,10 +111,16 @@ def test_functional_settings_save(thing, server):
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app) as client:
+        # We write a new value to the property with a PUT request
         r = client.put("/thing/floatsetting", json=2.0)
+        # A 201 return code means the operation succeeded (i.e.
+        # the property was written to)
         assert r.status_code == 201
+        # We check the value with a GET request
         r = client.get("/thing/floatsetting")
         assert r.json() == 2.0
+        # After successfully writing to the setting, it should
+        # have created a settings file.
         assert os.path.isfile(setting_file)
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
@@ -128,13 +134,19 @@ def test_data_settings_save(thing, server):
     a different code path to the functional setting above."""
     setting_file = _get_setting_file(server, "/thing")
     server.add_thing(thing, "/thing")
-    # No setting file created when first added
+    # The settings file should not be created yet - it's created the
+    # first time we write to a setting.
     assert not os.path.isfile(setting_file)
     with TestClient(server.app) as client:
+        # Change the value using a PUT request
         r = client.put("/thing/boolsetting", json=True)
+        # Check the value was written successfully (201 response code)
         assert r.status_code == 201
+        # Check the value is what we expect
         r = client.get("/thing/boolsetting")
         assert r.json() is True
+        # After successfully writing to the setting, it should
+        # have created a settings file.
         assert os.path.isfile(setting_file)
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
