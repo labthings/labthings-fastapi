@@ -11,7 +11,7 @@ class MockProperty(BaseDescriptor[str]):
 
     # The line below isn't defined on a `Thing`, so mypy
     # errors - but we ignore this for testing.
-    def instance_get(obj) -> str:  # type: ignore[override]
+    def instance_get(self, _obj) -> str:  # type: ignore[override]
         return "An example value."
 
 

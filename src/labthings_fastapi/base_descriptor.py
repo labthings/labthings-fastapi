@@ -298,6 +298,8 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
     :param cls: The class to inspect
     :return: A mapping of attribute names to docstrings. Note that this will be
         wrapped in a `types.MappingProxyType` to prevent accidental modification.
+
+    :raises TypeError: if the supplied object is not a class.
     """
     # For a helpful article on how this works, see:
     # https://davidism.com/attribute-docstrings/
@@ -310,8 +312,10 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
     # any guarantee docstrings are available.
     try:
         src = inspect.getsource(cls)
-    except OSError:
+    except (OSError, AttributeError):
         # An OSError is raised if the source is not available.
+        # An AttributeError is raised if the source was loaded from
+        # a WindowsPath object, perhaps using ``runpy``
         return {}
     # The line below parses the class to get a syntax tree.
     module_ast = ast.parse(textwrap.dedent(src))
