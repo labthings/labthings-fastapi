@@ -9,7 +9,7 @@ See README.md for more details.
 import labthings_fastapi as lt
 from labthings_fastapi.thing_property import FunctionalProperty
 
-from typing import assert_type
+from typing_extensions import assert_type
 import typing
 
 

@@ -6,7 +6,8 @@ the code that implements it.
 """
 
 from __future__ import annotations
-from typing import overload, Generic, Self, TypeVar, TYPE_CHECKING
+from typing import overload, Generic, TypeVar, TYPE_CHECKING
+from typing_extensions import Self
 
 from .utilities.introspection import get_summary
 

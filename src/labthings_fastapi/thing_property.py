@@ -52,12 +52,12 @@ from typing import (
     Any,
     Callable,
     Generic,
-    Self,
     TypeAlias,
     TypeVar,
     overload,
     TYPE_CHECKING,
 )
+from typing_extensions import Self
 import typing
 from weakref import WeakSet
 
