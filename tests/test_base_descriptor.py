@@ -16,6 +16,12 @@ class MockProperty(BaseDescriptor[str]):
 
 
 class Example:
+    """A class containing some attributes that may or may not have docstrings.
+
+    We will use code in `base_descriptor` to inspect this class and test it finds
+    the right docstrings.
+    """
+
     my_constant: int = 10
     "A number that is all mine."
 
