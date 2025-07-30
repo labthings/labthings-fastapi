@@ -6,10 +6,16 @@ the code that implements it.
 """
 
 from __future__ import annotations
-from typing import overload, Generic, TypeVar, TYPE_CHECKING
+import ast
+import inspect
+from itertools import pairwise
+import textwrap
+from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
+from types import MappingProxyType
+from weakref import WeakKeyDictionary
 from typing_extensions import Self
 
-from .utilities.introspection import get_summary
+from .utilities.introspection import get_docstring, get_summary
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -53,8 +59,29 @@ class BaseDescriptor(Generic[Value]):
 
     * The descriptor remembers the name it's assigned to in ``name``, for use in
         :ref:`gen_docs`\ .
+    * The descriptor inspects its owning class, and looks for an attribute
+        docstring (i.e. a string constant immediately following the attribute
+        assignment).
     * When called as a class attribute, the descriptor returns itself, as done by
         e.g. `property`.
+    * The docstring and name are used to provide a ``title`` and ``description``
+        that may be used in :ref:`gen_docs` and elsewhere.
+
+    .. code-block:: python
+
+        class Example:
+            my_prop = BaseDescriptor()
+            '''My Property.
+
+            This is a nice long docstring describing my property, which
+            can span multiple lines.
+            '''
+
+
+        p = Example.my_prop
+        assert p.name == "my_prop"
+        assert p.title == "My Property."
+        assert p.description.startswith("This is")
     """
 
     def __init__(self) -> None:
@@ -73,8 +100,13 @@ class BaseDescriptor(Generic[Value]):
         r"""Take note of the name to which the descriptor is assigned.
 
         This is called when the descriptor is assigned to an attribute of a class.
-        This function just remembers the name, so it can be used in
-        :ref:`gen_docs`\ .
+        This function remembers the name, so it can be used in :ref:`gen_docs`\ .
+
+        This function also inspects the owning class, and will retrieve the
+        docstring for its attribute. This allows us to use a string immediately
+        after the descriptor is defined, rather than passing the docstring as
+        an argument.
+        See `.get_class_attribute_docstrings` for more details.
 
         :param owner: the `.Thing` subclass to which we are being attached.
         :param name: the name to which we have been assigned.
@@ -83,6 +115,12 @@ class BaseDescriptor(Generic[Value]):
         # property ``name``.
         self._name = name
         self._set_name_called = True
+
+        # Check for docstrings on the owning class, and retrieve the one for
+        # this attribute (identified by `name`).
+        attr_docs = get_class_attribute_docstrings(owner)
+        if name in attr_docs:
+            self.__doc__ = attr_docs[name]
 
     def assert_set_name_called(self):
         """Raise an exception if ``__set_name__`` has not yet been called.
@@ -160,6 +198,7 @@ class BaseDescriptor(Generic[Value]):
         As the first line of the docstring (if present) is used as the
         ``title`` in :ref:`gen_docs` it will be removed from this property.
         """
+        return get_docstring(self, remove_summary=True)
 
     # I have ignored D105 (missing docstrings) on the overloads - these should not
     # exist on @overload definitions.
@@ -213,3 +252,102 @@ class BaseDescriptor(Generic[Value]):
             "__instance_get__ must be defined on BaseDescriptor subclasses. \n\n"
             "See BaseDescriptor.__instance_get__ for details."
         )
+
+
+_class_attribute_docstring_cache: WeakKeyDictionary[type, Mapping[str, str]] = (
+    WeakKeyDictionary()
+)
+
+
+def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
+    """Retrieve docstrings for the attributes of a class.
+
+    Python formally supports ``__doc__`` attributes on classes and functions, and
+    this means that classes and methods can self-describe in a way that is picked
+    up by documentation tools. There isn't currently a language feature specifically
+    provided to annotate other attributes of a class, but there is a convention
+    that seems almost universally adopted by documentation tools, which is to
+    add a string literal immediately after the attribute assignment. While it's
+    not a formal language feature, Python does explicitly allow these string
+    literals (which don't have any other purpose) to enable documentation tools
+    to document attributes.
+
+    This function inspects a class, and returns a dictionary mapping attribute
+    names to docstrings, where the docstring is a string immediately following
+    the attribute. For example:
+
+    .. code-block:: python
+
+        class Example:
+            my_constant: int = 10
+            "A number that is all mine."
+
+
+        docs = get_class_attribute_docstrings(Example)
+
+        assert docs["my_constant"] == "A number that is all mine."
+
+
+    .. note::
+
+        This function relies on re-parsing the source of the class, so it will
+        not work on classes that are not defined in a file (for example, if you
+        just paste the example above into a Python interpreter). In that case,
+        an empty dictionary is returned.
+
+    :param cls: The class to inspect
+    :return: A mapping of attribute names to docstrings. Note that this will be
+        wrapped in a `types.MappingProxyType` to prevent accidental modification.
+    """
+    # For a helpful article on how this works, see:
+    # https://davidism.com/attribute-docstrings/
+    if cls in _class_attribute_docstring_cache:  # Attempt to use the cache
+        return _class_attribute_docstring_cache[cls]
+
+    # We start by getting hold of the source code of our class. This requires
+    # the class to be loaded from a file, which is nearly always the case.
+    # We will simply return an empty dictionary if this fails: there is never
+    # any guarantee docstrings are available.
+    try:
+        src = inspect.getsource(cls)
+    except OSError:
+        # An OSError is raised if the source is not available.
+        return {}
+    # The line below parses the class to get a syntax tree.
+    module_ast = ast.parse(textwrap.dedent(src))
+    assert isinstance(module_ast, ast.Module)
+    class_def = module_ast.body[0]
+    if not isinstance(class_def, ast.ClassDef):
+        raise TypeError("The object supplied was not a class.")
+    # Work through each pair of nodes, looking for an assignment followed by
+    # a string.
+    docs: dict[str, str] = {}
+    for a, b in pairwise(class_def.body):
+        if not isinstance(a, ast.Assign | ast.AnnAssign):
+            continue  # The first node isn't an assignment
+        if (
+            not isinstance(b, ast.Expr)
+            or not isinstance(b.value, ast.Constant)
+            or not isinstance(b.value.value, str)
+        ):
+            continue  # The second node must be a string constant
+
+        # Assignments may have multiple targets (a=b=c) so we
+        # need to cope with a list of targets.
+        if isinstance(a, ast.Assign):
+            targets = a.targets
+        else:  # Annotated asignments have only one target, so make it a list.
+            targets = [a.target]
+
+        # Clean up the docstring as per the usual rules
+        doc = inspect.cleandoc(b.value.value)
+
+        for target in targets:
+            if not isinstance(target, ast.Name):
+                # We only care about things assigned to plain names. Assignment to
+                # attributes of objects, or items in dictionaries, are irrelevant.
+                continue
+            docs[target.id] = doc
+
+    _class_attribute_docstring_cache[cls] = MappingProxyType(docs)
+    return _class_attribute_docstring_cache[cls]
