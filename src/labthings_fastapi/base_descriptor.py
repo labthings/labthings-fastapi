@@ -295,6 +295,15 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
         just paste the example above into a Python interpreter). In that case,
         an empty dictionary is returned.
 
+        The same limitation means dynamically defined classes will result in
+        an empty dictionary.
+
+    .. note::
+
+        This function uses a cache, so subsequent calls on the same class will
+        return a cached value. As dynamic classes are not supported, this is
+        not expected to be a problem.
+
     :param cls: The class to inspect
     :return: A mapping of attribute names to docstrings. Note that this will be
         wrapped in a `types.MappingProxyType` to prevent accidental modification.

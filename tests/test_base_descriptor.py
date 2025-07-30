@@ -45,6 +45,10 @@ def test_docstrings_are_cached():
     """Check that the docstrings aren't being regenerated every time."""
     docs1 = get_class_attribute_docstrings(Example)
     docs2 = get_class_attribute_docstrings(Example)
+    # The dictionary of attribute docstrings is cached, keyed on the
+    # class. The test below checks the same object is returned, not
+    # just one with the same values in it - this implies the cache
+    # is working.
     assert docs1 is docs2
 
 
