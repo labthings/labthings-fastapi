@@ -77,7 +77,7 @@ jobs:
         run: mypy src
       
       - name: Type tests with MyPy
-        run: mypy --warn-unused-ignores ./typing_tests/
+        run: mypy --warn-unused-ignores typing_tests
 
   test-with-unpinned-deps:
     runs-on: ubuntu-latest
