@@ -72,5 +72,13 @@ def test_basedescriptor_fallback():
 
 
 def test_basedescriptor_get():
+    """Check the __get__ function works
+
+    BaseDescriptor provides an implementation of __get__ that
+    returns the descriptor when accessed as a class attribute,
+    and calls `instance_get` when accessed as the attribute of
+    an instance. This test checks both those scenarios.
+    """
     e = Example()
     assert e.my_property == "An example value."
+    assert isinstance(Example.my_property, MockProperty)
