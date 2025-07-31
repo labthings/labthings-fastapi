@@ -807,7 +807,7 @@ def setting(
 ) -> FunctionalSetting[Value] | Value:
     r"""Define a Setting on a `.Thing`\ .
 
-    A setting is a property that is saved to disk
+    A setting is a property that is saved to disk.
 
     This function defines a setting, which is a special Property that will
     be saved to disk, so it persists even when the LabThings server is
