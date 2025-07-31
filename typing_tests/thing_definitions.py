@@ -59,6 +59,7 @@ class TestPropertyDefaultsMatch(lt.Thing):
     optionalintprop: int | None = lt.property(default=None)
     optionalintprop2: int | None = lt.property(default=0)
     optionalintprop3: int | None = lt.property(default_factory=optional_int_factory)
+    optionalintprop4: int | None = lt.property(default_factory=int_factory)
 
     # This property should cause mypy to throw an error, as the default is a string.
     # The type hint is an int, so this should cause a mypy error.
