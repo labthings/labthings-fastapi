@@ -39,12 +39,80 @@ class Example:
     a body giving a longer description of what's going on.
     """
 
+    my_property_with_only_description = MockProperty()
+    """
+    This is a poorly formatted docstring that does not have
+    a one-line title. It should result in the property name
+    being used as a title, and this text as description.
+    """
+
+    # This line looks like an attribute assignment with a docstring,
+    # but it's not - because we are not assigning to a simple name.
+    # This tests that such assignments won't cause errors.
+    my_property_with_nice_docs.attribute = "dummy value"
+    """A spurious docstring."""
+
+    # As above, this is testing that we safely ignore assignments
+    # that are not to simple names. The code below should not
+    # cause an error, but will cause a ``continue`` statement
+    # to skip actions, testing another code path when the
+    # class is analysed.
+    dict_attribute = {}
+    dict_attribute["foo"] = "bar"
+    """Here is a spurious docstring that should be ignored."""
+
+    base_descriptor = BaseDescriptor()
+    """This descriptor should raise NotImplementedError."""
+
 
 def test_docstrings_are_retrieved():
-    """Check that the docstring can be picked up from the class definition."""
+    """Check that the docstring can be picked up from the class definition.
+
+    This test checks that:
+    * We get docstrings for exactly the attributes we expect.
+    * The one-line docstrings are picked up correctly.
+    * The docstring-inspection code isn't confused by spurious docstrings
+      next to assignments that are not to simple names. (see comments on
+      the class definition of `Example`).
+
+    Detection and interpretation of multiline docstrings is tested in
+    `test_basedescriptor_with_good_docstring`.
+    """
     docs = get_class_attribute_docstrings(Example)
     assert docs["my_constant"] == "A number that is all mine."
     assert docs["my_property"] == "Docs for my_property."
+    expected_names = [
+        "my_constant",
+        "my_property",
+        "my_property_with_nice_docs",
+        "my_property_with_only_description",
+        "base_descriptor",
+    ]
+    assert set(docs.keys()) == set(expected_names)
+
+
+def test_non_classes_raise_errors():
+    """Check we validate the input object.
+
+    If `get_class_attribute_docstrings` is called on something other than
+    a class, we should raise an error.
+    """
+
+    def dummy():
+        pass
+
+    with pytest.raises(TypeError):
+        get_class_attribute_docstrings(dummy)
+
+
+def test_uncheckable_class():
+    """Check we don't crash if we can't check a class.
+
+    If `inspect.getsource` fails, we should return an empty dict.
+    """
+    MyClass = type("MyClass", (), {"intattr": 10})
+    doc = get_class_attribute_docstrings(MyClass)
+    assert doc == {}
 
 
 def test_docstrings_are_cached():
@@ -64,6 +132,26 @@ def test_basedescriptor_with_good_docstring():
     assert prop.name == "my_property_with_nice_docs"
     assert prop.title == "Title goes here."
     assert prop.description.startswith("The docstring")
+
+
+def test_basedescriptor_with_oneline_docstring():
+    """Check we get the right documentation properties for a one-liner."""
+    prop = Example.my_property
+    assert prop.name == "my_property"
+    assert prop.title == "Docs for my_property."
+    assert prop.description.startswith("Docs for my_property.")
+
+
+def test_basedescriptor_with_bad_multiline_docstring():
+    """Check a docstring with no title produces the expected result.
+
+    A multiline docstring with no title (i.e. no blank second line)
+    should result in the whole docstring being used as the description.
+    """
+    prop = Example.my_property_with_only_description
+    assert prop.name == "my_property_with_only_description"
+    assert prop.title == "This is a poorly formatted docstring that does not have"
+    assert prop.description.startswith("This is a poorly formatted")
 
 
 def test_basedescriptor_orphaned():
@@ -92,3 +180,6 @@ def test_basedescriptor_get():
     e = Example()
     assert e.my_property == "An example value."
     assert isinstance(Example.my_property, MockProperty)
+    with pytest.raises(NotImplementedError):
+        # BaseDescriptor requires `instance_get` to be overridden.
+        e.base_descriptor
