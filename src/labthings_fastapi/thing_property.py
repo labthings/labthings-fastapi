@@ -15,7 +15,7 @@ Properties can be defined in two ways as shown below:
         "A counter that knows what's remaining."
 
         count: int = lt.property(default=0, readonly=True)
-        "The number of times we've increnented the counter."
+        "The number of times we've incremented the counter."
 
         target: int = lt.property(default=10)
         "The number of times to increment before we stop."
@@ -184,7 +184,8 @@ def default_factory_from_arguments(
     """
     if default is ... and default_factory is None:
         # If the default is an ellipsis, we have no default value.
-        # This is not allowed for DataProperty, so we raise an error.
+        # Not having a default_factory alongside this
+        # is not allowed for DataProperty, so we raise an error.
         raise MissingDefaultError()
     if default is not ... and default_factory is not None:
         # If both default and default_factory are set, we raise an error.

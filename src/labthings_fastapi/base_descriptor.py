@@ -28,7 +28,7 @@ class DescriptorNotAddedToClassError(RuntimeError):
     """Descriptor has not yet been added to a class.
 
     This error is raised if certain properties of descriptors are accessed
-    before ``__set_name__`` has been called on the descriptor.  ``__set_name``
+    before ``__set_name__`` has been called on the descriptor.  ``__set_name__``
     is part of the descriptor protocol, and is called when a class is defined
     to notify the descriptor of its name and owning class.
 
@@ -122,7 +122,7 @@ class BaseDescriptor(Generic[Value]):
         if name in attr_docs:
             self.__doc__ = attr_docs[name]
 
-    def assert_set_name_called(self):
+    def assert_set_name_called(self) -> None:
         """Raise an exception if ``__set_name__`` has not yet been called.
 
         :raises DescriptorNotAddedToClassError: if ``__set_name__`` has not yet
