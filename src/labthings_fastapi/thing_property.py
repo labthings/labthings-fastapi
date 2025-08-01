@@ -921,7 +921,7 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
 
-    A `.ThingSetting` is a `.DataProperty` with extra functionality for triggering
+    A `.DataSetting` is a `.DataProperty` with extra functionality for triggering
     a `.Thing` to save its settings.
 
     Note: If a setting is mutated rather than assigned to, this will not trigger saving.
@@ -965,7 +965,7 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
 
-    A `.ThingSetting` is a `.FunctionalProperty` with extra functionality for
+    A `.FunctionalSetting` is a `.FunctionalProperty` with extra functionality for
     triggering a `.Thing` to save its settings.
 
     Note: If a setting is mutated rather than assigned to, this will not trigger
