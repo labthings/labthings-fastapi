@@ -292,7 +292,9 @@ def property(
     Finally, the type of the ``default`` argument includes `.EllipsisType`
     so that we can use ``...`` as its default value. This allows us to
     distinguish between ``default`` not being set (``...``) and a desired
-    default value of ``None``.
+    default value of ``None``. Similarly, ``...`` is the default value for
+    ``getter`` so we can raise a more helpful error if a non-callable
+    value is passed as the first argument.
     """
     if getter is not ...:
         # If the default is callable, we're being used as a decorator
@@ -863,12 +865,14 @@ def setting(
 
     :return: a setting descriptor.
 
-    :raises MissingDefaultError: if no valid default is supplied.
+    :raises MissingDefaultError: if no valid default or getter is supplied.
+    :raises OverspecifiedDefaultError: if the default is specified more
+        than once (e.g. ``default``, ``default_factory``, or ``getter``).
 
     **Typing Notes**
 
-    The return type of this function is a "white lie" in order to allow
-    dataclass-style type annotations
+    See the typing notes on `.property` as they all apply to `.setting` as
+    well.
     """
     if getter is not ...:
         # If the default is callable, we're being used as a decorator
