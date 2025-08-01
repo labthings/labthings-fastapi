@@ -697,14 +697,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         """The setter function."""  # noqa: D401
         return self._fset
 
-    @builtins.property
-    def fdel(self) -> None:  # noqa: DOC201
-        """The deleter function.
-
-        This function always returns ``None`` as deleters are not yet supported.
-        """  # noqa: D401
-        return None
-
     def getter(self, fget: ValueGetter) -> Self:
         """Set the getter function of the property.
 
@@ -777,18 +769,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self._fset = fset
         self.readonly = False
         return self
-
-    def deleter(self, fdel: Callable) -> Self:
-        """Set a deleter function. Currently unsupported.
-
-        :param fdel: The function called when the attribute is deleted.
-        :return: The descriptor (i.e. ``self``).
-
-        :raises NotImplementedError: every time, because it is not supported.
-        """
-        raise NotImplementedError(
-            "Deleter functions are not supported for FunctionalProperty."
-        )
 
     def instance_get(self, obj: Thing) -> Value:
         """Get the value of the property.
