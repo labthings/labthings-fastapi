@@ -160,6 +160,10 @@ def default_factory_from_arguments(
     and will either return the ``default_factory`` if it is provided, or
     will wrap the default value provided in a factory function.
 
+    Note that this wrapping does not copy the default value each time it is
+    called, so mutable default values are **only** safe if supplied as a
+    factory function.
+
     This is used to avoid repeating the logic of checking whether a default
     value or a factory function has been provided, and it returns a factory
     rather than a default value so that it may be called multiple times to
@@ -195,7 +199,8 @@ def default_factory_from_arguments(
         def default_factory() -> Value:
             return default
 
-    assert callable(default_factory), "The default_factory must be callable."
+    if not callable(default_factory):
+        raise MissingDefaultError("The default_factory must be callable.")
     return default_factory
 
 
@@ -204,12 +209,20 @@ def default_factory_from_arguments(
 def property(  # noqa: D103
     getter: Callable[[Any], Value],
 ) -> FunctionalProperty[Value]: ...
-@overload  # use as `field: int = property(0)``
-def property(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
-@overload  # use as `field: int = property(default_factory=lambda: 0)` # noqa: E302
+
+
+@overload  # use as `field: int = property(default=0)`
+def property(  # noqa: D103
+    *, default: Value, readonly: bool = False
+) -> Value: ...
+
+
+@overload  # use as `field: int = property(default_factory=lambda: 0)`
 def property(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
+
+
 def property(
     getter: ValueGetter | EllipsisType = ...,
     *,
@@ -253,6 +266,8 @@ def property(
 
     :raises MissingDefaultError: if no valid default value is supplied,
         and a getter is not in use.
+    :raises OverspecifiedDefaultError: if the default is specified more
+        than once (e.g. ``default``, ``default_factory``, or ``getter``).
 
     **Typing Notes**
 
@@ -287,6 +302,11 @@ def property(
                 "A non-callable getter was passed to `property`. Usually,"
                 "this means the default value was not passed as a keyword "
                 "argument, which is required."
+            )
+        if default_factory or default is not ...:
+            raise OverspecifiedDefaultError(
+                "A getter was specified at the same time as a default. Only "
+                "one of a getter, default, and default_factory may be used."
             )
         return FunctionalProperty(
             fget=getter,
@@ -434,10 +454,12 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     def __init__(  # noqa: D105,D107,DOC101,DOC103
         self, default: Value, *, readonly: bool = False
     ) -> None: ...
+
     @overload
     def __init__(  # noqa: D105,D107,DOC101,DOC103
         self, *, default_factory: ValueFactory, readonly: bool = False
     ) -> None: ...
+
     def __init__(
         self,
         default: Value | EllipsisType = ...,
@@ -793,12 +815,20 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 def setting(  # noqa: D103
     getter: Callable[[Any], Value],
 ) -> FunctionalSetting[Value]: ...
-@overload  # use as `field: int = setting(0)``
-def setting(*, default: Value, readonly: bool = False) -> Value: ...  # noqa: D103
+
+
+@overload  # use as `field: int = setting(default=0)``
+def setting(  # noqa: D103
+    *, default: Value, readonly: bool = False
+) -> Value: ...
+
+
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`
 def setting(  # noqa: D103
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
+
+
 def setting(
     getter: ValueGetter | EllipsisType = ...,
     *,
@@ -865,9 +895,14 @@ def setting(
         # without arguments.
         if not callable(getter):
             raise MissingDefaultError(
-                "A non-callable getter was passed to `property`. Usually,"
+                "A non-callable getter was passed to `setting`. Usually,"
                 "this means the default value was not passed as a keyword "
                 "argument, which is required."
+            )
+        if default_factory or default is not ...:
+            raise OverspecifiedDefaultError(
+                "A getter was specified at the same time as a default. Only "
+                "one of a getter, default, and default_factory may be used."
             )
         return FunctionalSetting(
             fget=getter,
