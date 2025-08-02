@@ -11,7 +11,8 @@ class MockProperty(BaseDescriptor[str]):
 
     # The line below isn't defined on a `Thing`, so mypy
     # errors - but we ignore this for testing.
-    def instance_get(self, _obj) -> str:  # type: ignore[override]
+    def instance_get(self, _obj) -> str:
+        """This is called by BaseProperty.__get__."""
         return "An example value."
 
 
@@ -183,3 +184,70 @@ def test_basedescriptor_get():
     with pytest.raises(NotImplementedError):
         # BaseDescriptor requires `instance_get` to be overridden.
         e.base_descriptor
+
+
+class MockFunctionalProperty(MockProperty):
+    """A mock property class with a setter decorator.
+
+    This class is used by test_decorator_different_names.
+    """
+
+    def __init__(self, fget):
+        """Add a mock getter and initialise variables."""
+        super().__init__()
+        self._getter = fget
+        self._setter = None
+        self._names = []
+
+    def setter(self, fset):
+        """Can be used as a decorator to add a setter."""
+        self._setter = fset
+        return self
+
+    def __set_name__(self, owner, name):
+        """Check how many times __set_name__ is called."""
+        self._names.append(name)
+        super().__set_name__(owner, name)
+
+
+class DecoratorExample:
+    """A class that has decorators defined on it.
+
+    This class is used by test_decorator_different_names.
+    """
+
+    @MockFunctionalProperty
+    def prop1(self):
+        """A getter function that returns a string."""
+        return "prop1 value"
+
+    @prop1.setter
+    def prop1(self, _val):
+        """A getter for prop1, with the same name"""
+        pass
+
+    @MockFunctionalProperty
+    def prop2(self):
+        """A getter function that returns a string."""
+        return "prop2 value"
+
+    @prop2.setter
+    def set_prop2(self, val):
+        """A setter that is not called prop2"""
+        pass
+
+
+def test_decorator_different_names():
+    """Test what happens when `lt.property` is used as a decorator.
+
+    `mypy` gets confused by the property-style syntax of decorating a
+    getter and setter with the same name. This test checks what happens
+    when a getter and setter with different names are used.
+
+    There is potential for confusion here in `__set_name__`.
+    """
+    E = DecoratorExample
+    assert E.prop1.name == "prop1"
+    assert E.prop1._names == ["prop1"]
+    assert E.prop2.name == "prop2"
+    assert E.prop2._names == ["prop2", "set_prop2"]
