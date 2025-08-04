@@ -187,6 +187,7 @@ def test_setting_available(thing):
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
+    assert thing.dictsetting == {"a": 1, "b": 2}
 
 
 def test_functional_settings_save(thing, server):
