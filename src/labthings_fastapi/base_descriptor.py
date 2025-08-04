@@ -52,6 +52,89 @@ class DescriptorNotAddedToClassError(RuntimeError):
     """
 
 
+class DescriptorAddedToClassTwiceError(RuntimeError):
+    """A Descriptor has been added to a class more than once.
+
+    This error is raised if ``__set_name__`` is called more than once on a
+    descriptor. This happens when either the same descriptor instance is
+    used twice in one class definition, or if a descriptor instance is used
+    on more than one class.
+
+    .. note::
+
+        `.FunctionalProperty` includes a special case that will ignore the
+        ``__set_name__`` call corresponding to the setter. This allows the
+        property to be defined like ``prop4`` below, even though it does
+        assign the descriptor to two names. That behaviour is specific to
+        `.FunctionalProperty` and `.FunctionalSetting` and is not part of
+        `.BaseDescriptor` because `.BaseDescriptor` has no setter.
+
+        ``mypy`` does not allow custom property-like descriptors to follow the
+        syntax used by the built-in ``property`` of giving both the getter and
+        setter functions the same name: this causes an error because it is
+        a redefinition. We suggest using a different name for the setter to
+        work around this, hence the need for an exception.
+
+    .. code-block:: python
+
+        class MyDescriptor(BaseDescriptor):
+            "An example descriptor that inherits from BaseDescriptor."
+
+            def __init__(getter=None):
+                "Initialise the descriptor, allowing use as a decorator."
+                self._getter = getter
+
+            def setter(self, setter):
+                "Add a setter to the descriptor."
+                self._setter = setter
+                return self
+
+
+        class Example:
+            "An example class with descriptors."
+
+            # prop1 is fine - only used once.
+            prop1 = MyDescriptor()
+
+            # prop2 reuses the name ``prop2`` which may confuse ``mypy`` but
+            # will only call ``__set_name__`` once.
+            @MyDescriptor
+            def prop2(self):
+                "A dummy property"
+                return False
+
+            @prop2.setter
+            def prop2(self, val):
+                "Set the dummy property"
+                pass
+
+            # prop3a and prop3b will cause this error
+            prop3a = MyDescriptor()
+            prop3b = MyDescriptor()
+
+            # prop4 and set_prop4 will cause this error on BaseDescriptor
+            # but there is a specific exception in FunctionalProperty
+            # to allow this form.
+            @MyDescriptor
+            def prop4(self):
+                "An example property with two names"
+                return True
+
+            @prop4.setter
+            def set_prop4(self, val):
+                "A setter for prop4 that is not named prop4."
+                pass
+
+    .. note::
+
+        Because this exception is raised in ``__set_name__`` it will not
+        appear to come from the descriptor assignment, but instead it will
+        be raised at the end of the class definition. The descriptor name(s)
+        should be in the error message.
+
+    """
+
+
 class BaseDescriptor(Generic[Value]):
     r"""A base class for descriptors in LabThings-FastAPI.
 
@@ -95,6 +178,7 @@ class BaseDescriptor(Generic[Value]):
         # We explicitly check when __set_name__ is called, so we can raise helpful
         # errors
         self._set_name_called: bool = False
+        self._owner_name: str = ""
 
     def __set_name__(self, owner: type[Thing], name: str) -> None:
         r"""Take note of the name to which the descriptor is assigned.
@@ -111,10 +195,17 @@ class BaseDescriptor(Generic[Value]):
         :param owner: the `.Thing` subclass to which we are being attached.
         :param name: the name to which we have been assigned.
         """
+        if self._set_name_called:
+            raise DescriptorAddedToClassTwiceError(
+                f"The descriptor {self._name} on {self._owner_name} has been "
+                f"added to a class a second time ({owner.__qualname__}.{name}). "
+                "This descriptor may only be added to a class once."
+            )
         # Remember the name to which we're assigned. Accessed by the read only
         # property ``name``.
-        self._name = name
         self._set_name_called = True
+        self._name = name
+        self._owner_name = owner.__qualname__
 
         # Check for docstrings on the owning class, and retrieve the one for
         # this attribute (identified by `name`).

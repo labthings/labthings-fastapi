@@ -2,6 +2,7 @@ import pytest
 from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
     DescriptorNotAddedToClassError,
+    DescriptorAddedToClassTwiceError,
     get_class_attribute_docstrings,
 )
 
@@ -210,44 +211,75 @@ class MockFunctionalProperty(MockProperty):
         super().__set_name__(owner, name)
 
 
-class DecoratorExample:
-    """A class that has decorators defined on it.
-
-    This class is used by test_decorator_different_names.
-    """
-
-    @MockFunctionalProperty
-    def prop1(self):
-        """A getter function that returns a string."""
-        return "prop1 value"
-
-    @prop1.setter
-    def prop1(self, _val):
-        """A getter for prop1, with the same name"""
-        pass
-
-    @MockFunctionalProperty
-    def prop2(self):
-        """A getter function that returns a string."""
-        return "prop2 value"
-
-    @prop2.setter
-    def set_prop2(self, val):
-        """A setter that is not called prop2"""
-        pass
-
-
 def test_decorator_different_names():
-    """Test what happens when `lt.property` is used as a decorator.
+    """Check that adding a descriptor to a class twice raises the right error.
 
-    `mypy` gets confused by the property-style syntax of decorating a
-    getter and setter with the same name. This test checks what happens
-    when a getter and setter with different names are used.
+    Much confusion will result if a ``BaseDescriptor`` is added to a class twice
+    or added to two different classes. This test checks an error is raised when
+    that happens.
 
-    There is potential for confusion here in `__set_name__`.
+    Note that there is an exception to this in `.FunctionalProperty` and that
+    exception is tested in ``test_property.py`` in this folder.
     """
-    E = DecoratorExample
-    assert E.prop1.name == "prop1"
-    assert E.prop1._names == ["prop1"]
-    assert E.prop2.name == "prop2"
-    assert E.prop2._names == ["prop2", "set_prop2"]
+    # First, very obviously double-assign a BaseDescriptor
+    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+
+        class ExplicitExample:
+            """An example class."""
+
+            prop1 = BaseDescriptor()
+            prop2 = prop1
+
+    # The exception occurs at the end of the class definition, so check we include
+    # the property names.
+    assert "prop1" in str(excinfo.value)
+    assert "prop2" in str(excinfo.value)
+
+    # The next form of properties works and doesn't trigger the error, but is
+    # flagged (arguably spuriously) as an error by mypy.
+    class ValidExceptInMyPy:
+        """An example class that fails type checking but is valid Python."""
+
+        @MockFunctionalProperty
+        def prop1(self):
+            return False
+
+        @prop1.setter
+        def prop1(self, val):
+            pass
+
+    # This workaround satisfies MyPy but double-assigns the descriptor.
+    # It should raise an error here, but is a special case in
+    # `.FunctionalProperty.__set_name__` so will be OK for `.FunctionalProperty`
+    # and `.FunctionalSetting` as a result.
+    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+
+        class DecoratorExample:
+            """Another example class."""
+
+            @MockFunctionalProperty
+            def prop1(self):
+                return False
+
+            @prop1.setter
+            def set_prop1(self, val):
+                pass
+
+    # The exception occurs at the end of the class definition, so check we include
+    # the property names.
+    assert "prop1" in str(excinfo.value)
+    assert "set_prop1" in str(excinfo.value)
+
+    # For good measure, check re-use across classes is also prevented.
+    class FirstExampleClass:
+        prop = BaseDescriptor()
+
+    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+
+        class SecondExampleClass:
+            prop = FirstExampleClass.prop
+
+    # The message should mention names and classes
+    assert "prop" in str(excinfo.value)
+    assert "FirstExampleClass" in str(excinfo.value)
+    assert "SecondExampleClass" in str(excinfo.value)
