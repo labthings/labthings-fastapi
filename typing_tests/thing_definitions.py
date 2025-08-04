@@ -190,7 +190,12 @@ class TestFunctionalProperty(lt.Thing):
 
     @lt.property
     def intprop2(self) -> int:
-        """This property should not cause mypy errors and is writeable."""
+        """This property should not cause mypy errors and is writeable.
+
+        This property has a getter and setter, so it can be read and written
+        from other code within the Thing. However, we make it read-only for
+        client code (over HTTP or a DirectThingClient).
+        """
         return 0
 
     @intprop2.setter
@@ -198,7 +203,10 @@ class TestFunctionalProperty(lt.Thing):
         """Setter for intprop2."""
         pass
 
-    intprop2.readonly = True  # This should be an OK thing to do.
+    # Make the property read-only in the Thing Description and for HTTP
+    # clients, or DirectThingClients. See property documentation on
+    # readthedocs for examples.
+    intprop2.readonly = True
 
     @lt.property
     def intprop3(self) -> int:
