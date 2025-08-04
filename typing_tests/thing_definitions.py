@@ -3,7 +3,7 @@
 This module checks that code defining a Thing may be type checked using
 mypy.
 
-See README.md for more details.
+See README.md for how it's run.
 """
 
 import labthings_fastapi as lt
@@ -27,12 +27,19 @@ unbound_prop = lt.property(default=0)
 """A property that is not bound to a Thing.
 
 This will go wrong at runtime if we access its ``model`` but it should
-have its type inferred as an `int`.
+have its type inferred as an `int`. This is intended to let mypy check
+the default is of the correct type when used with dataclass-style syntax
+(``prop: int = lt.property(default=0)`` ).
 """
 assert_type(unbound_prop, int)
 
 unbound_prop_2 = lt.property(default_factory=int_factory)
-"""A property that is not bound to a Thing, with a factory."""
+"""A property that is not bound to a Thing, with a factory.
+
+As with `.unbound_prop` this won't work at runtime, but its type should
+be inferred as `int` (which allows checking the default type matches
+the attribute type annotation, when used on a class).
+"""
 
 assert_type(unbound_prop_2, int)
 
@@ -73,7 +80,16 @@ class TestPropertyDefaultsMatch(lt.Thing):
     "This property should cause mypy to throw an error, as it has no default."
 
     listprop: list[int] = lt.property(default_factory=list)
-    "A list property with a default factory. Note the default factory is a less specific type."
+    """A list property with a default factory.
+    
+    Note the default factory is a less specific type.
+    
+    Default types must be compatible with the attribute type, but not 
+    necessarily the same. This tests a common scenario, where the default (an
+    empty list) is compatible, but not the same as ``list[int]`` .
+
+    Note this is "tested" simply by the absence of `mypy` errors.
+    """
 
 
 # Check that the type hints on an instance of the class are correct.
@@ -84,6 +100,7 @@ assert_type(test_defaults_match.intprop3, int)
 assert_type(test_defaults_match.optionalintprop, int | None)
 assert_type(test_defaults_match.optionalintprop2, int | None)
 assert_type(test_defaults_match.optionalintprop3, int | None)
+assert_type(test_defaults_match.optionalintprop4, int | None)
 
 # NB the types of the class attributes will be the same as the instance attributes
 # because of the type hint on `lt.property`. This is incorrect (the class attributes
@@ -93,7 +110,16 @@ assert_type(test_defaults_match.optionalintprop3, int | None)
 
 
 class TestExplicitDescriptor(lt.Thing):
-    """A Thing that checks our explicit descriptor type hints are working."""
+    r"""A Thing that checks our explicit descriptor type hints are working.
+
+    This tests `.DataProperty` descriptors work as intended when used directly,
+    rather than via ``lt.property``\ .
+
+    ``lt.property`` has a "white lie" on its return type, which makes it
+    work with dataclass-style syntax (type annotation on the class attribute
+    rather than part of the descriptor). It's therefore useful to test
+    the underlying class as well.
+    """
 
     intprop1 = lt.DataProperty[int](default=0)
     """A DataProperty that should not cause mypy errors."""

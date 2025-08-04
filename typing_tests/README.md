@@ -3,7 +3,7 @@
 The codebase is type-checked with `mypy src/` and tested with `pytest`, however neither of these explicitly check that `mypy` can infer the correct types for `Thing` attributes like properties and actions. The Python files in this folder are intended to be checked using:
 
 ```terminal
-mypy --warn-unused-ignores .\typing_tests\
+mypy --warn-unused-ignores typing_tests
 ```
 
 The files include valid code that's accompanied by `assert_type` statements (which check the inferred types are what we expect them to be) as well as invalid code where the expected `mypy` errors are ignored. This tests for expected errors - if an expected error is not thrown, it will cause an `unused-ignore` error.
