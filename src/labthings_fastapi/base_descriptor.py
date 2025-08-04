@@ -348,6 +348,13 @@ class BaseDescriptor(Generic[Value]):
         )
 
 
+# get_class_attribute_docstrings is a relatively expensive function that
+# will be called potentially quite a few times on the same class. It will
+# return the same result each time (because it depends only on the source
+# code of the class, which can't change), so it makes sense to cache it.
+#
+# We use weak keys to avoid messing up garbage collection, and cache the
+# mapping of attribute names to attribute docstrings.
 _class_attribute_docstring_cache: WeakKeyDictionary[type, Mapping[str, str]] = (
     WeakKeyDictionary()
 )
