@@ -75,7 +75,6 @@ from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
 from .base_descriptor import BaseDescriptor
 from .exceptions import (
-    DocstringToMessage,
     NotConnectedToServerError,
     ReadOnlyPropertyError,
 )
@@ -97,7 +96,7 @@ if TYPE_CHECKING:
 
 
 # The following exceptions are raised only when creating/setting up properties.
-class OverspecifiedDefaultError(DocstringToMessage, ValueError):
+class OverspecifiedDefaultError(ValueError):
     """The default value has been specified more than once.
 
     This error is raised when a `.DataProperty` is instantiated with both a
@@ -105,7 +104,7 @@ class OverspecifiedDefaultError(DocstringToMessage, ValueError):
     """
 
 
-class MissingDefaultError(DocstringToMessage, ValueError):
+class MissingDefaultError(ValueError):
     """The default value has not been specified.
 
     This error is raised when a `.DataProperty` is instantiated without a
@@ -113,7 +112,7 @@ class MissingDefaultError(DocstringToMessage, ValueError):
     """
 
 
-class InconsistentTypeError(DocstringToMessage, TypeError):
+class InconsistentTypeError(TypeError):
     """Different type hints have been given for a property.
 
     Every property should have a type hint, which may be provided in a few
@@ -122,7 +121,7 @@ class InconsistentTypeError(DocstringToMessage, TypeError):
     """
 
 
-class MissingTypeError(DocstringToMessage, TypeError):
+class MissingTypeError(TypeError):
     """No type hints have been given for a property.
 
     Every property should have a type hint, which may be provided in a few
