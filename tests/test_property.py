@@ -20,9 +20,9 @@ from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 
 
 def test_default_factory_from_arguments():
-    """Check the function that implements default/default_factory
+    """Check the function that implements default/default_factory behaves correctly.
 
-    behaves correctly. It should always return a function that
+    It should always return a function that
     returns a default value, and should error if both arguments
     are provided, or if none are provided.
     """
