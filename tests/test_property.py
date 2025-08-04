@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import pydantic
 import pytest
 from labthings_fastapi import thing_property as tp
+from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 
 
 def test_default_factory_from_arguments():
@@ -216,3 +217,35 @@ def test_baseproperty_add_to_fastapi():
     entry = openapi["paths"]["/example/prop"]
     # Check it declares the right methods
     assert set(entry.keys()) == set(["get", "put"])
+
+
+def test_decorator_exception():
+    r"""Check decorators work as expected when the setter has a different name.
+
+    This is done to satisfy ``mypy`` and more information is in the
+    documentation for `.property`\ , `.DescriptorAddedToClassTwiceError`
+    and `.FunctionalProperty.__set_name__`\ .
+    """
+    # The exception should be specific - a simple double assignment is
+    # still an error
+    with pytest.raises(DescriptorAddedToClassTwiceError):
+
+        class BadExample:
+            """A class with a wrongly reused descriptor."""
+
+            prop1: int = tp.property(default=0)
+            prop2: int = prop1
+
+    # The example below should be exempted from the rule, i.e. no error
+    class Example:
+        @tp.property
+        def prop(self) -> bool:
+            """An example getter."""
+
+        @prop.setter
+        def set_prop(self, val: bool) -> None:
+            """A setter named differently."""
+            pass
+
+    assert Example.prop.name == "prop"
+    assert Example.prop is Example.set_prop
