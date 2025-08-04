@@ -194,6 +194,9 @@ class BaseDescriptor(Generic[Value]):
 
         :param owner: the `.Thing` subclass to which we are being attached.
         :param name: the name to which we have been assigned.
+
+        :raises DescriptorAddedToClassTwiceError: if the descriptor has been
+            assigned to two class attributes.
         """
         if self._set_name_called:
             raise DescriptorAddedToClassTwiceError(

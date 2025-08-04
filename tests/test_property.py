@@ -247,5 +247,7 @@ def test_decorator_exception():
             """A setter named differently."""
             pass
 
+    assert isinstance(Example.prop, tp.FunctionalProperty)
     assert Example.prop.name == "prop"
-    assert Example.prop is Example.set_prop
+    assert not isinstance(Example.set_prop, tp.FunctionalProperty)
+    assert callable(Example.set_prop)

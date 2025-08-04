@@ -689,57 +689,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self._fset: ValueSetter | None = None
         self.readonly: bool = True
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
-        r"""Check for double-assignment and avoid confusing behaviour.
-
-        This function enables code that looks like the following:
-
-        .. code-block:: python
-
-            import labthings_fastapi as lt
-
-
-            class Example(lt.Thing):
-                "An example class with a property"
-
-                @lt.property
-                def prop(self) -> bool:
-                    "An example property."
-                    return True
-
-                @prop.setter
-                def set_prop(self, val: bool) -> None:
-                    "A setter that is not named `prop` to avoid mypy errors"
-                    pass
-
-        ``mypy`` does not allow custom property-like descriptors to follow the
-        syntax used by the built-in ``property`` of giving both the getter and
-        setter functions the same name: this causes an error because it is
-        a redefinition. We suggest using a different name for the setter to
-        work around this. However, that then means the same descriptor appears
-        as two different attributes, e.g. ``prop1`` and ``set_prop1``\ .
-
-        This function tests for that special case, and uses the first
-        (i.e. getter's) name for :ref:`gen_docs` and does not raise an error.
-
-        See `.DescriptorAddedToClassTwiceError` for more details.
-
-        :param owner: the `.Thing` on which we are defined.
-        :param name: the name of the attribute to which we are assigned.
-        """
-        if self._set_name_called:
-            if (
-                owner.__qualname__ == self._owner_name
-                and self.fset
-                and name == self.fset.__name__
-                and self.name == self.fget.__name__
-            ):
-                # `__set_name__` is being called because of a differently-named
-                # setter. This should be allowed. We won't call super, as it has
-                # already been called for the getter
-                return
-        return super().__set_name__(owner, name)
-
     @builtins.property
     def fget(self) -> ValueGetter:  # noqa: DOC201
         """The getter function."""  # noqa: D401
@@ -765,7 +714,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         return self
 
     def setter(self, fset: ValueSetter) -> Self:
-        """Set the setter function of the property.
+        r"""Set the setter function of the property.
 
         This function returns the descriptor, so it may be used as a decorator.
 
@@ -818,9 +767,21 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         must be silenced manually. We suggest using a different name for the setter
         as an alternative to adding ``# type: ignore[no-redef]`` to the setter
         function.
+
+        It will cause problems elsewhere in the code if descriptors are assigned
+        to more than one attrubute, and this is checked in
+        `.BaseDescriptor.__set_name__`\ . We therefore return the setter rather
+        than the descriptor if the names don't match. The type hint does not
+        reflect this, as it would cause problems when the names do match (the
+        descriptor would become a ``FunctionalProperty | Callable`` and thus
+        typing errors would happen whenever it's accessed).
         """
         self._fset = fset
         self.readonly = False
+        if fset.__name__ != self.fget.__name__:
+            # Don't return the descriptor if it's named differently.
+            # see typing notes in docstring.
+            return fset  # type: ignore[return-value]
         return self
 
     def instance_get(self, obj: Thing) -> Value:
