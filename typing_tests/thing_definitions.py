@@ -171,8 +171,8 @@ assert_type(TestExplicitDescriptor.optionalintprop1, lt.DataProperty[int | None]
 assert_type(TestExplicitDescriptor.optionalintprop2, lt.DataProperty[int | None])
 assert_type(TestExplicitDescriptor.optionalintprop3, lt.DataProperty[int | None])
 
+
 Val = typing.TypeVar("Val")
-Thing = typing.TypeVar("Thing", bound=lt.Thing)
 
 
 def f_property(getter: typing.Callable[..., Val]) -> FunctionalProperty[Val]:
