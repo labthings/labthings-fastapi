@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+from typing import Iterator
 import pytest
 from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
@@ -211,6 +213,33 @@ class MockFunctionalProperty(MockProperty):
         super().__set_name__(owner, name)
 
 
+@contextmanager
+def raises_or_is_caused_by(
+    exception_cls: type[Exception],
+) -> Iterator[pytest.ExceptionInfo]:
+    r"""Wrap `pytest.raises` to cope with exceptions that are wrapped in another error.
+
+    Some errors raised during class creation are wrapped in a `RuntimeError` on older
+    Python versions. This makes them harder to test for.
+
+    This context manager checks the exception, and if it is not the expected class it
+    will then check the ``__cause__`` attribute. If the ``__cause__`` matches, we
+    replace the exception in the yielded ``excinfo`` object with its ``__cause__``
+    so that the correct exception may be inspected.
+
+    If neither matches, we will fail with an `AssertionError`\ .
+    """
+    with pytest.raises(Exception) as excinfo:
+        yield excinfo
+    if not isinstance(excinfo.value, exception_cls):
+        assert isinstance(excinfo.value.__cause__, exception_cls)
+        assert excinfo._excinfo is not None
+        # If excinfo._excinfo is None, we missed an exception and the code should
+        # already have failed.
+        traceback = excinfo._excinfo[2]
+        excinfo._excinfo = (exception_cls, excinfo.value.__cause__, traceback)
+
+
 def test_decorator_different_names():
     """Check that adding a descriptor to a class twice raises the right error.
 
@@ -222,7 +251,7 @@ def test_decorator_different_names():
     exception is tested in ``test_property.py`` in this folder.
     """
     # First, very obviously double-assign a BaseDescriptor
-    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+    with raises_or_is_caused_by(DescriptorAddedToClassTwiceError) as excinfo:
 
         class ExplicitExample:
             """An example class."""
@@ -252,7 +281,7 @@ def test_decorator_different_names():
     # It should raise an error here, but is a special case in
     # `.FunctionalProperty.__set_name__` so will be OK for `.FunctionalProperty`
     # and `.FunctionalSetting` as a result.
-    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+    with raises_or_is_caused_by(DescriptorAddedToClassTwiceError) as excinfo:
 
         class DecoratorExample:
             """Another example class."""
@@ -274,7 +303,7 @@ def test_decorator_different_names():
     class FirstExampleClass:
         prop = BaseDescriptor()
 
-    with pytest.raises(DescriptorAddedToClassTwiceError) as excinfo:
+    with raises_or_is_caused_by(DescriptorAddedToClassTwiceError) as excinfo:
 
         class SecondExampleClass:
             prop = FirstExampleClass.prop
