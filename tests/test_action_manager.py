@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 import httpx
-from temp_client import poll_task
+from .temp_client import poll_task
 import time
 import labthings_fastapi as lt
 from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH

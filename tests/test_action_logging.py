@@ -4,7 +4,7 @@ This tests the log that is returned in an action invocation
 
 import logging
 from fastapi.testclient import TestClient
-from temp_client import poll_task
+from .temp_client import poll_task
 import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
 

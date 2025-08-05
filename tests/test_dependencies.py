@@ -7,7 +7,7 @@ for actions.
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
 from fastapi.testclient import TestClient
-from module_with_deps import FancyIDDep
+from .module_with_deps import FancyIDDep
 
 
 def test_invocation_id():

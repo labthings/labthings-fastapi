@@ -1,8 +1,8 @@
 from pathlib import Path
 from runpy import run_path
-from test_server_cli import MonitoredProcess
 from fastapi.testclient import TestClient
 from labthings_fastapi import ThingClient
+from .test_server_cli import MonitoredProcess
 
 
 this_file = Path(__file__)

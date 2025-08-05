@@ -4,7 +4,7 @@ This tests the log that is returned in an action invocation
 
 import uuid
 from fastapi.testclient import TestClient
-from temp_client import poll_task, task_href
+from .temp_client import poll_task, task_href
 import labthings_fastapi as lt
 import time
 

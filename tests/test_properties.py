@@ -8,7 +8,7 @@ import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import NotConnectedToServerError
-from temp_client import poll_task
+from .temp_client import poll_task
 
 
 class PropertyTestThing(lt.Thing):
