@@ -270,7 +270,7 @@ def test_decorator_different_names():
     assert "prop1" in str(excinfo.value)
     assert "set_prop1" in str(excinfo.value)
 
-    # For good measure, check re-use across classes is also prevented.
+    # For good measure, check reuse across classes is also prevented.
     class FirstExampleClass:
         prop = BaseDescriptor()
 

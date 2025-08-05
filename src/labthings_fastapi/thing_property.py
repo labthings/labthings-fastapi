@@ -768,7 +768,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         function.
 
         It will cause problems elsewhere in the code if descriptors are assigned
-        to more than one attrubute, and this is checked in
+        to more than one attribute, and this is checked in
         `.BaseDescriptor.__set_name__`\ . We therefore return the setter rather
         than the descriptor if the names don't match. The type hint does not
         reflect this, as it would cause problems when the names do match (the
