@@ -17,6 +17,7 @@ import pydantic
 import pytest
 from labthings_fastapi import thing_property as tp
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
+from .utilities import raises_or_is_caused_by
 
 
 def test_default_factory_from_arguments():
@@ -228,7 +229,7 @@ def test_decorator_exception():
     """
     # The exception should be specific - a simple double assignment is
     # still an error
-    with pytest.raises(DescriptorAddedToClassTwiceError):
+    with raises_or_is_caused_by(DescriptorAddedToClassTwiceError):
 
         class BadExample:
             """A class with a wrongly reused descriptor."""
