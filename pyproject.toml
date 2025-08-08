@@ -33,7 +33,6 @@ dev = [
   "Pillow",
   "flake8",
   "flake8-pyproject",
-  "flake8-docstrings",
   "flake8-rst",
   "flake8-rst-docstrings",
   "pydoclint[flake8]",
@@ -96,6 +95,14 @@ preview = true
 "typing_tests/*" = ["D404", "D401"]
 "docs/*" = ["D", "DOC"]
 
+[tool.ruff.lint.pydocstyle]
+# This lets the D401 checker understand that decorated thing properties and thing
+# settings act like properties so should be documented as such.
+property-decorators = [
+    "labthings_fastapi.property",
+    "labthings_fastapi.setting",
+]
+
 [tool.mypy]
 plugins = ["pydantic.mypy"]
 
@@ -103,7 +110,6 @@ plugins = ["pydantic.mypy"]
 [tool.flake8]
 extend-ignore = [
   "DOC301",  # allow class + __init__ docstrings
-  "D202",  # conflicts with ruff format
   "F401",  # already implemented by ruff, which respects "import x as x"
   "E301",  # leave this to ruff (blank lines)
   "E302",  # leave this to ruff (blank lines)

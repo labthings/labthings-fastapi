@@ -90,9 +90,11 @@ if TYPE_CHECKING:
 # function they overload.
 # D105 is the same as D103, but for __init__ (i.e. magic methods).
 # DOC101 and DOC103 are also a result of overloads not having docstrings
-# DOC201 and D401 are ignored on properties. Because we are overriding the
+# DOC201 is ignored on properties. Because we are overriding the
 # builtin `property`, we are using `@builtins.property` which is not recognised
 # by pydoclint as a property. I've therefore ignored those codes manually.
+# pydocstyle ("D" codes) is run in Ruff and correctly recognises
+# builtins.property as a property decorator.
 
 
 # The following exceptions are raised only when creating/setting up properties.
@@ -342,7 +344,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
 
         :raises MissingTypeError: if the type has not been set.
         :return: the type of the descriptor's value.
-        """  # noqa: D401 # see note at the top of the file
+        """
         if self._type is None:
             raise MissingTypeError("This property does not have a valid type.")
         return self._type
@@ -360,7 +362,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         subclass, this returns it unchanged.
 
         :return: a Pydantic model for the property's type.
-        """  # noqa: D401 # see note at the top of the file
+        """
         if self._model is None:
             self._model = wrap_plain_types_in_rootmodel(self.value_type)
         return self._model
@@ -567,7 +569,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
 
     @builtins.property
     def value_type(self) -> type[Value]:  # noqa: DOC201
-        """The type of the descriptor's value."""  # noqa: D401
+        """The type of the descriptor's value."""
         self.assert_set_name_called()
         return super().value_type
 
@@ -690,12 +692,12 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
     @builtins.property
     def fget(self) -> ValueGetter:  # noqa: DOC201
-        """The getter function."""  # noqa: D401
+        """The getter function."""
         return self._fget
 
     @builtins.property
     def fset(self) -> ValueSetter | None:  # noqa: DOC201
-        """The setter function."""  # noqa: D401
+        """The setter function."""
         return self._fset
 
     def getter(self, fget: ValueGetter) -> Self:
