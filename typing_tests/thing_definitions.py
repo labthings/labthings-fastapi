@@ -3,6 +3,20 @@
 This module checks that code defining a Thing may be type checked using
 mypy.
 
+Note that most of the properties are typed as ``int`` or ``int | None``
+and we do not attempt to cover all possible types. A greater range of types
+should be tested in code that's actually run, in the `tests` folder. For
+this file, what's important is checking that:
+
+1. The type of the default/factory is compatible with the property
+    (though not necessarily identical).
+2. Errors are raised if types don't match.
+3. Class and instance attributes have the expected types.
+
+This requires at least a couple of types, where one is compatible
+with the other, hence ``int`` and ``int | None`` which lets us
+check compatibility, and also check ``None`` is OK as a default.
+
 See README.md for how it's run.
 """
 
@@ -176,7 +190,7 @@ Val = typing.TypeVar("Val")
 
 
 def f_property(getter: typing.Callable[..., Val]) -> FunctionalProperty[Val]:
-    """A function that returns a DataProperty with a getter."""
+    """A function that returns a FunctionalProperty with a getter."""
     return FunctionalProperty(getter)
 
 
@@ -220,12 +234,32 @@ class TestFunctionalProperty(lt.Thing):
 
     @f_property
     def fprop(self) -> int:
-        """A functional property that should not cause mypy errors."""
+        """A functional property that should not cause mypy errors.
+
+        This uses a much simpler function than ``lt.property`` to check
+        the behaviour is the same.
+        """
         return 0
 
-    @strprop.setter
+    @fprop.setter
     def set_fprop(self, value: int) -> None:
-        """Setter for strprop. This should fail type checking."""
+        """Setter for fprop. Type checking should pass."""
+        pass
+
+    @lt.property
+    def strprop(self) -> str:
+        """A property with identically named getter/setter."""
+        return "Hello world!"
+
+    @strprop.setter  # type: ignore[no-redef]
+    def strprop(self, val: str) -> None:
+        """A setter with the same name as the getter.
+
+        This is the convention for `builtins.property` but `mypy` does not
+        allow it for any other property-like decorators.
+
+        This function should raise a ``no-redef`` error.
+        """
         pass
 
 
@@ -233,9 +267,12 @@ assert_type(TestFunctionalProperty.intprop1, FunctionalProperty[int])
 assert_type(TestFunctionalProperty.intprop2, FunctionalProperty[int])
 assert_type(TestFunctionalProperty.intprop3, FunctionalProperty[int])
 assert_type(TestFunctionalProperty.fprop, FunctionalProperty[int])
+# Don't check ``strprop`` because it caused an error and thus will
+# not have the right type, even though the error is ignored.
 
 test_functional_property = TestFunctionalProperty()
 assert_type(test_functional_property.intprop1, int)
 assert_type(test_functional_property.intprop2, int)
 assert_type(test_functional_property.intprop3, int)
 assert_type(test_functional_property.fprop, int)
+# ``strprop`` will be ``Any`` because of the ``[no-redef]`` error.
