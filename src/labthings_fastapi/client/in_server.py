@@ -265,8 +265,17 @@ def direct_thing_client_class(
         This class may be used as a FastAPI dependency: see :ref:`things_from_things`.
     """
 
-    def init_proxy(self, request: Request, **dependencies: Mapping[str, Any]):
-        """Initialise a DirectThingClient (this docstring should be replaced)."""
+    def init_proxy(
+        self: DirectThingClient, request: Request, **dependencies: Mapping[str, Any]
+    ):
+        r"""Initialise a DirectThingClient (this docstring will be replaced).
+
+        :param self: The DirectThingClient instance we're initialising.
+        :param request: a FastAPI Request option (will be supplied by FastAPI).
+        :param \**dependencies: Other keyword arguments will be saved as
+            dependencies. FastAPI will look at the signature (which we will
+            manipulate below) to determine these.
+        """
         # NB this definition isimportant, as we must modify its signature.
         # Inheriting __init__ means we'll accidentally modify the signature
         # of `DirectThingClient` with bad results.
