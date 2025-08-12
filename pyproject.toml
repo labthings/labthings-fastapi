@@ -33,7 +33,6 @@ dev = [
   "Pillow",
   "flake8",
   "flake8-pyproject",
-  "flake8-docstrings",
   "flake8-rst",
   "flake8-rst-docstrings",
   "pydoclint[flake8]",
@@ -76,28 +75,45 @@ target-version = "py310"
 docstring-code-format = true
 
 [tool.ruff.lint]
+external = ["DOC401", "F824", "DOC101", "DOC103"]  # used via flake8/pydoclint
 select = ["E4", "E7", "E9", "F", "D", "DOC"]
 ignore = [
     "D203",  # incompatible with D204
     "D213",  # incompatible with D212
-    "DOC402",  # doesn't work with sphinx-style docstrings, use pydoclint
-    "DOC201",  # doesn't work with sphinx-style docstrings, use pydoclint
-    "DOC501",  # doesn't work with sphinx-style docstrings, use pydoclint
-    "DOC502",  # doesn't work with sphinx-style docstrings, use pydoclint
+    "DOC402",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
+    "DOC201",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
+    "DOC501",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
+    "DOC502",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
 ]
 preview = true
 
 [tool.ruff.lint.per-file-ignores]
+# Tests are currently not fully docstring-ed, we'll ignore this for now.
 "tests/*" = ["D", "DOC"]
+# Typing tests do have docstrings, but it's not helpful to insist on imperative
+# mood etc.
+"typing_tests/*" = ["D404", "D401"]
 "docs/*" = ["D", "DOC"]
 
+[tool.ruff.lint.pydocstyle]
+# This lets the D401 checker understand that decorated thing properties and thing
+# settings act like properties so should be documented as such.
+property-decorators = [
+    "labthings_fastapi.property",
+    "labthings_fastapi.setting",
+]
+
 [tool.mypy]
-plugins = ["pydantic.mypy", "numpy.typing.mypy_plugin"]
+plugins = ["pydantic.mypy"]
+
 
 [tool.flake8]
 extend-ignore = [
   "DOC301",  # allow class + __init__ docstrings
-  "D202",  # conflicts with ruff format
+  "F401",  # already implemented by ruff, which respects "import x as x"
+  "E301",  # leave this to ruff (blank lines)
+  "E302",  # leave this to ruff (blank lines)
+  "E501",  # leave this to ruff (line length), #noqa may exceed max line length.
 ]
 max-line-length = 88
 rst-roles = [

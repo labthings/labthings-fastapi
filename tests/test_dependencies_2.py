@@ -20,7 +20,7 @@ mitigation against something changing in the future.
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
+from .module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
 import labthings_fastapi as lt
 
 

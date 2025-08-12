@@ -4,22 +4,19 @@ This tests the log that is returned in an action invocation
 
 import uuid
 from fastapi.testclient import TestClient
-from temp_client import poll_task, task_href
+from .temp_client import poll_task, task_href
 import labthings_fastapi as lt
 import time
 
 
 class CancellableCountingThing(lt.Thing):
-    counter = lt.ThingProperty(int, 0, observable=False)
-    check = lt.ThingProperty(
-        bool,
-        False,
-        observable=False,
-        description=(
-            "This variable is used to check that the action can detect a cancel event "
-            "and react by performing another task, in this case, setting this variable."
-        ),
-    )
+    counter: int = lt.property(default=0)
+    check: bool = lt.property(default=False)
+    """Whether the count has been cancelled.
+    
+    This variable is used to check that the action can detect a cancel event
+    and react by performing another task, in this case, setting this variable.
+    """
 
     @lt.thing_action
     def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):

@@ -22,9 +22,8 @@ class TestThing(lt.Thing):
             time.sleep(1)
             self.increment_counter()
 
-    counter = lt.ThingProperty(
-        model=int, initial_value=0, readonly=True, description="A pointless counter"
-    )
+    counter: int = lt.property(default=0, readonly=True)
+    "A pointless counter"
 
 
 if __name__ == "__main__":

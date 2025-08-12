@@ -8,24 +8,73 @@ import logging
 from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
+from .temp_client import poll_task
 
 
 class TestThing(lt.Thing):
-    boolsetting = lt.ThingSetting(bool, False, description="A boolean setting")
-    stringsetting = lt.ThingSetting(str, "foo", description="A string setting")
-    dictsetting = lt.ThingSetting(
-        dict, {"a": 1, "b": 2}, description="A dictionary setting"
-    )
+    """A test `.Thing` with some settings and actions."""
 
-    _float = 1.0
+    def __init__(self) -> None:
+        super().__init__()
+        # Initialize functional settings with default values
+        self._floatsetting: float = 1.0
+        self._localonlysetting = "Local-only default."
 
-    @lt.thing_setting
+    boolsetting: bool = lt.setting(default=False)
+    "A boolean setting"
+
+    stringsetting: str = lt.setting(default="foo")
+    "A string setting"
+
+    dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
+    "A dictionary setting"
+
+    @lt.setting
     def floatsetting(self) -> float:
-        return self._float
+        """A float setting."""
+        return self._floatsetting
 
     @floatsetting.setter
     def floatsetting(self, value: float):
-        self._float = value
+        self._floatsetting = value
+
+    @lt.setting
+    def localonlysetting(self) -> str:
+        """A setting that is not writeable from HTTP clients or DirectThingClients.
+
+        This setting has a setter, so may be written to from this Thing, or
+        when settings are loaded. However, it's marked as read-only later, which
+        means HTTP clients or DirectThingClient subclasses can't write to it.
+        """
+        return self._localonlysetting
+
+    @localonlysetting.setter
+    def localonlysetting(self, value: str):
+        self._localonlysetting = value
+
+    localonlysetting.readonly = True
+
+    localonly_boolsetting: bool = lt.setting(default=False, readonly=True)
+
+    @lt.thing_action
+    def write_localonly_setting(self, value: str) -> None:
+        """Change the value of the local-only setting.
+
+        This is allowed - the setting is only read-only for code running
+        over HTTP or via a DirectThingClient. By using this action, we can
+        check it's writeable for local code.
+        """
+        self.localonlysetting = value
+
+    @lt.thing_action
+    def toggle_localonly_boolsetting(self) -> None:
+        """Toggle the local-only bool setting.
+
+        Settings with `readonly=True` are read-only for client code via HTTP
+        or a DirectThingClient. This action checks they are still writeable
+        from within the Thing.
+        """
+        self.localonly_boolsetting = not self.localonly_boolsetting
 
     @lt.thing_action
     def toggle_boolsetting(self):
@@ -37,13 +86,66 @@ class TestThing(lt.Thing):
         t.start()
 
 
+TestThingClientDep = lt.deps.direct_thing_client_dependency(TestThing, "/thing/")
+TestThingDep = lt.deps.raw_thing_dependency(TestThing)
+
+
+class ClientThing(lt.Thing):
+    """This Thing attempts to set read-only settings on TestThing.
+
+    Read-only settings may not be set by DirectThingClient wrappers,
+    which is what this class tests.
+    """
+
+    @lt.thing_action
+    def set_localonlysetting(
+        self,
+        client: TestThingClientDep,
+        val: str,
+    ):
+        """Attempt to set a setting with a DirectThingClient."""
+        client.localonlysetting = val
+
+    @lt.thing_action
+    def set_localonly_boolsetting(
+        self,
+        client: TestThingClientDep,
+        val: bool,
+    ):
+        """Attempt to set a setting with a DirectThingClient."""
+        client.localonly_boolsetting = val
+
+    @lt.thing_action
+    def directly_set_localonlysetting(
+        self,
+        test_thing: TestThingDep,
+        val: str,
+    ):
+        """Attempt to set a setting directly."""
+        test_thing.localonlysetting = val
+
+    @lt.thing_action
+    def directly_set_localonly_boolsetting(
+        self,
+        test_thing: TestThingDep,
+        val: bool,
+    ):
+        """Attempt to set a setting directly."""
+        test_thing.localonly_boolsetting = val
+
+
 def _get_setting_file(server, thingpath):
     path = os.path.join(server.settings_folder, thingpath.lstrip("/"), "settings.json")
     return os.path.normpath(path)
 
 
 def _settings_dict(
-    boolsetting=False, floatsetting=1.0, stringsetting="foo", dictsetting=None
+    boolsetting=False,
+    floatsetting=1.0,
+    stringsetting="foo",
+    dictsetting=None,
+    localonlysetting="Local-only default.",
+    localonly_boolsetting=False,
 ):
     """Return the expected settings dictionary
 
@@ -56,12 +158,19 @@ def _settings_dict(
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
         "dictsetting": dictsetting,
+        "localonlysetting": localonlysetting,
+        "localonly_boolsetting": localonly_boolsetting,
     }
 
 
 @pytest.fixture
 def thing():
     return TestThing()
+
+
+@pytest.fixture
+def client_thing():
+    return ClientThing()
 
 
 @pytest.fixture
@@ -77,23 +186,134 @@ def test_setting_available(thing):
     assert not thing.boolsetting
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
+    assert thing.localonlysetting == "Local-only default."
+    assert thing.dictsetting == {"a": 1, "b": 2}
 
 
-def test_settings_save(thing, server):
-    """Check updated settings are saved to disk"""
+def test_functional_settings_save(thing, server):
+    """Check updated settings are saved to disk
+
+    ``floatsetting`` is a functional setting, we should also test
+    a `.DataSetting` for completeness."""
     setting_file = _get_setting_file(server, "/thing")
     server.add_thing(thing, "/thing")
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app) as client:
+        # We write a new value to the property with a PUT request
         r = client.put("/thing/floatsetting", json=2.0)
+        # A 201 return code means the operation succeeded (i.e.
+        # the property was written to)
         assert r.status_code == 201
+        # We check the value with a GET request
         r = client.get("/thing/floatsetting")
         assert r.json() == 2.0
+        # After successfully writing to the setting, it should
+        # have created a settings file.
         assert os.path.isfile(setting_file)
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
+
+
+def test_data_settings_save(thing, server):
+    """Check updated settings are saved to disk
+
+    This uses ``intsetting`` which is a `.DataSetting` so it tests
+    a different code path to the functional setting above."""
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    # The settings file should not be created yet - it's created the
+    # first time we write to a setting.
+    assert not os.path.isfile(setting_file)
+    with TestClient(server.app) as client:
+        # Change the value using a PUT request
+        r = client.put("/thing/boolsetting", json=True)
+        # Check the value was written successfully (201 response code)
+        assert r.status_code == 201
+        # Check the value is what we expect
+        r = client.get("/thing/boolsetting")
+        assert r.json() is True
+        # After successfully writing to the setting, it should
+        # have created a settings file.
+        assert os.path.isfile(setting_file)
+        with open(setting_file, "r", encoding="utf-8") as file_obj:
+            # Check settings on file match expected dictionary
+            assert json.load(file_obj) == _settings_dict(boolsetting=True)
+
+
+@pytest.mark.parametrize(
+    ("endpoint", "value"),
+    [
+        ("localonlysetting", "Other value"),
+        ("localonly_boolsetting", True),
+    ],
+)
+@pytest.mark.parametrize(
+    "method",
+    ["http", "direct_thing_client", "direct"],
+)
+def test_readonly_setting(thing, client_thing, server, endpoint, value, method):
+    """Check read-only functional settings cannot be set remotely.
+
+    Functional settings must always have a setter, and will be
+    writeable from within the Thing. However, they should not
+    be settable remotely or via a DirectThingClient.
+
+    This test is a bit complicated, but it checks both a
+    `.FunctionalSetting` and a `.DataSetting` via all three
+    methods: HTTP, DirectThingClient, and directly on the Thing.
+    Only the last method should work.
+
+    The test is parametrized so it will run 6 times, trying one
+    block of code inside the ``with`` block each time.
+    """
+    setting_file = _get_setting_file(server, "/thing")
+    server.add_thing(thing, "/thing")
+    server.add_thing(client_thing, "/client_thing")
+    # No setting file created when first added
+    assert not os.path.isfile(setting_file)
+
+    # Access it over "HTTP" with a TestClient
+    # This doesn't actually serve over the network but will use
+    # all the same codepaths.
+    with TestClient(server.app) as client:
+        if method == "http":
+            # Attempt to set read-only setting
+            r = client.put(f"/thing/{endpoint}", json=value)
+            assert r.status_code == 405
+
+        if method == "direct_thing_client":
+            # Attempt to set read-only setting via a DirectThingClient
+            r = client.post(f"/client_thing/set_{endpoint}", json={"val": value})
+            assert r.status_code == 201
+            invocation = poll_task(client, r.json())
+            # The setting is not changed (that's tested later), but the action
+            # does complete. It should fail with an error, but this is expected
+            # behaviour - see #165.
+            assert invocation["status"] == "completed"
+
+        # Check the setting hasn't changed over HTTP
+        r = client.get(f"/thing/{endpoint}")
+        assert r.json() == _settings_dict()[endpoint]
+        assert r.status_code == 200
+
+        if method == "direct":
+            # Actually set read-only setting via raw_thing_dependency
+            r = client.post(
+                f"/client_thing/directly_set_{endpoint}", json={"val": value}
+            )
+            invocation = poll_task(client, r.json())
+            assert invocation["status"] == "completed"
+
+    if method == "direct":
+        # Setting directly should succeed, so the file should exist.
+        with open(setting_file, "r", encoding="utf-8") as file_obj:
+            # Check settings on file match expected dictionary
+            assert json.load(file_obj) == _settings_dict(**{endpoint: value})
+    else:
+        # Other methods fail, so there should be no file here.
+        assert not os.path.isfile(setting_file)  # No file created
 
 
 def test_settings_dict_save(thing, server):

@@ -1,8 +1,8 @@
 from pathlib import Path
 from runpy import run_path
-from test_server_cli import MonitoredProcess
 from fastapi.testclient import TestClient
 from labthings_fastapi import ThingClient
+from .test_server_cli import MonitoredProcess
 
 
 this_file = Path(__file__)
@@ -12,7 +12,10 @@ docs = repo / "docs" / "source"
 
 def run_quickstart_counter():
     # A server is started in the `__name__ == "__main__" block`
-    run_path(docs / "quickstart" / "counter.py")
+    # Running from a WindowsPath confuses the documentation code
+    # in `base_descriptor.get_class_attribute_docstrings` hence
+    # the cast to a `str`
+    run_path(str(docs / "quickstart" / "counter.py"))
 
 
 def test_quickstart_counter():

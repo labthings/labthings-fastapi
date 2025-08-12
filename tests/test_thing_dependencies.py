@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from fastapi import Request
 import pytest
 import labthings_fastapi as lt
-from temp_client import poll_task
+from .temp_client import poll_task
 from labthings_fastapi.client.in_server import direct_thing_client_class
 from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 

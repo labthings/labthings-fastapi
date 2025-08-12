@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 import pytest
 import httpx
-from temp_client import poll_task
+from .temp_client import poll_task
 import time
 import labthings_fastapi as lt
 from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
@@ -13,9 +13,8 @@ class TestThing(lt.Thing):
         """Increment the counter"""
         self.counter += 1
 
-    counter = lt.ThingProperty(
-        model=int, initial_value=0, readonly=True, description="A pointless counter"
-    )
+    counter: int = lt.property(default=0, readonly=True)
+    "A pointless counter"
 
 
 thing = TestThing()

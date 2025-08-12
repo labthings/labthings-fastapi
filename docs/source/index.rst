@@ -15,6 +15,7 @@ Documentation for LabThings-FastAPI
    blobs.rst
    concurrency.rst
    using_things.rst
+   see_also.rst
 
    autoapi/index
 

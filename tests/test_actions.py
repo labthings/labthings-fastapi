@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
-from temp_client import poll_task, get_link
+from .temp_client import poll_task, get_link
 from labthings_fastapi.example_things import MyThing
 import labthings_fastapi as lt
 
