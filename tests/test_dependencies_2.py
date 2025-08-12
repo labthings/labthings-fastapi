@@ -17,6 +17,7 @@ test things from FastAPI that obviously work, but I will leave them in here as
 mitigation against something changing in the future.
 """
 
+from dataclasses import dataclass
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -45,6 +46,8 @@ def test_dep_from_module_with_subdep():
 
     @app.post("/endpoint")
     def endpoint(id: Annotated[ClassDependsOnFancyID, Depends()]) -> bool:
+        # Verify that the dependency is supplied, including its sub-dependency
+        assert id.sub.id == 1234
         return True
 
     with TestClient(app) as client:
@@ -101,25 +104,44 @@ def test_class_dep():
 
 
 def test_class_dep_with_subdep():
-    """Add an endpoint that uses a dependency class with sub-dependency"""
+    """Add an endpoint that uses a dependency class with sub-dependency.
+
+    We do this twice, using a regular class and also a dataclass.
+    """
     app = FastAPI()
 
     class SubDepClass:
         pass
 
-    class DepClass:
+    class DepClass:  # noqa B903
+        """A regular class that has sub-dependencies via __init__.
+
+        Note that this could be a dataclass, but we want to check both
+        dataclasses and normal classes."""
+
         def __init__(self, sub: Annotated[SubDepClass, Depends()]):
             self.sub = sub
 
     @app.post("/dep")
     def endpoint(id: DepClass = Depends()) -> bool:
+        assert isinstance(id.sub, SubDepClass)
+        return True
+
+    @dataclass
+    class DepDataclass:
+        sub: Annotated[SubDepClass, Depends()]
+
+    @app.post("/dep2")
+    def endpoint2(dep: Annotated[DepDataclass, Depends()]):
+        assert isinstance(dep.sub, SubDepClass)
         return True
 
     with TestClient(app) as client:
-        r = client.post("/dep")
-        assert r.status_code == 200
-        invocation = r.json()
-        assert invocation is True
+        for url in ["/dep", "/dep2"]:
+            r = client.post(url)
+            assert r.status_code == 200
+            invocation = r.json()
+            assert invocation is True
 
 
 def test_invocation_id():
