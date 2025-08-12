@@ -84,7 +84,8 @@ ignore = [
     "DOC201",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
     "DOC501",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
     "DOC502",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
-    "B008",  # fails on FastAPI Depends(),
+    "B008",  # This disallows function calls in default values.
+    # FastAPI Depends() breaks this rule, and FastAPI's response is "disable it".
     # see https://github.com/fastapi/fastapi/issues/1522
 ]
 preview = true
