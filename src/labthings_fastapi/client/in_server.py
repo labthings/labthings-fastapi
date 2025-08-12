@@ -21,7 +21,7 @@ from typing import Any, Mapping, Optional, Union
 from pydantic import BaseModel
 from ..descriptors.action import ActionDescriptor
 
-from ..thing_property import BaseProperty
+from ..properties import BaseProperty
 from ..utilities import attributes
 from . import PropertyClientDescriptor
 from ..thing import Thing

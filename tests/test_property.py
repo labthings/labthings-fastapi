@@ -15,7 +15,7 @@ import fastapi
 from fastapi.testclient import TestClient
 import pydantic
 import pytest
-from labthings_fastapi import thing_property as tp
+from labthings_fastapi import properties as tp
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 from .utilities import raises_or_is_caused_by
 

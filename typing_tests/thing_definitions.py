@@ -21,7 +21,7 @@ See README.md for how it's run.
 """
 
 import labthings_fastapi as lt
-from labthings_fastapi.thing_property import FunctionalProperty
+from labthings_fastapi.properties import FunctionalProperty
 
 from typing_extensions import assert_type
 import typing

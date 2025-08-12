@@ -21,7 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .thing_property import DataProperty, BaseSetting
+from .properties import DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes

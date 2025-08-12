@@ -20,7 +20,7 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
-from .thing_property import property, setting, DataProperty, DataSetting
+from .properties import property, setting, DataProperty, DataSetting
 from .decorators import (
     thing_action,
     fastapi_endpoint,

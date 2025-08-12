@@ -8,7 +8,7 @@ import time
 from typing import Any, Optional, Annotated
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.decorators import thing_action
-from labthings_fastapi.thing_property import property as lt_property
+from labthings_fastapi.properties import property as lt_property
 from pydantic import Field
 
 
