@@ -55,10 +55,6 @@ email-validator==2.2.0
     # via
     #   fastapi
     #   pydantic
-exceptiongroup==1.3.0
-    # via
-    #   anyio
-    #   pytest
 fastapi==0.116.1
     # via labthings-fastapi (pyproject.toml)
 fastapi-cli==0.0.8
@@ -170,7 +166,10 @@ pytest==7.4.4
     # via
     #   labthings-fastapi (pyproject.toml)
     #   pytest-cov
+    #   pytest-mock
 pytest-cov==6.2.1
+    # via labthings-fastapi (pyproject.toml)
+pytest-mock==3.14.1
     # via labthings-fastapi (pyproject.toml)
 python-dotenv==1.1.1
     # via
@@ -242,14 +241,6 @@ sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
 starlette==0.47.1
     # via fastapi
-tomli==2.2.1
-    # via
-    #   coverage
-    #   flake8-pyproject
-    #   mypy
-    #   pydoclint
-    #   pytest
-    #   sphinx
 typer==0.16.0
     # via
     #   fastapi-cli
@@ -260,20 +251,16 @@ typing-extensions==4.14.1
     # via
     #   labthings-fastapi (pyproject.toml)
     #   anyio
-    #   astroid
-    #   exceptiongroup
     #   fastapi
     #   mypy
     #   pydantic
     #   pydantic-core
     #   pydantic-extra-types
     #   referencing
-    #   rich
     #   rich-toolkit
     #   starlette
     #   typer
     #   typing-inspection
-    #   uvicorn
 typing-inspection==0.4.1
     # via pydantic-settings
 ujson==5.10.0
