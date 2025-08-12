@@ -112,7 +112,11 @@ class ClientThing(lt.Thing):
         client: TestThingClientDep,
         val: bool,
     ):
-        """Attempt to set a setting with a DirectThingClient."""
+        """Attempt to set a setting with a DirectThingClient.
+
+        This should fail with an error, as it's not writeable from a
+        DirectThingClient.
+        """
         client.localonly_boolsetting = val
 
     @lt.thing_action
@@ -130,7 +134,11 @@ class ClientThing(lt.Thing):
         test_thing: TestThingDep,
         val: bool,
     ):
-        """Attempt to set a setting directly."""
+        """Attempt to set a setting directly.
+
+        This should work, even though the setting is read-only from clients.
+        Using a raw thing dependency bypasses that restriction.
+        """
         test_thing.localonly_boolsetting = val
 
 
@@ -291,7 +299,7 @@ def test_readonly_setting(thing, client_thing, server, endpoint, value, method):
             # The setting is not changed (that's tested later), but the action
             # does complete. It should fail with an error, but this is expected
             # behaviour - see #165.
-            assert invocation["status"] == "completed"
+            assert invocation["status"] == "error"
 
         # Check the setting hasn't changed over HTTP
         r = client.get(f"/thing/{endpoint}")
