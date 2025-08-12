@@ -7,17 +7,25 @@ import labthings_fastapi as lt
 from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
 
 
-class TestThing(lt.Thing):
+class CounterThing(lt.Thing):
     @lt.thing_action(retention_time=0.01)
     def increment_counter(self):
-        """Increment the counter"""
+        """Increment the counter."""
+        self.counter += 1
+
+    @lt.thing_action(retention_time=1)
+    def increment_counter_longlife(self):
+        """Increment the counter.
+
+        This copy of the action won't expire as quickly.
+        """
         self.counter += 1
 
     counter: int = lt.property(default=0, readonly=True)
     "A pointless counter"
 
 
-thing = TestThing()
+thing = CounterThing()
 server = lt.ThingServer()
 server.add_thing(thing, "/thing")
 
@@ -61,7 +69,7 @@ def test_actions_list():
     It's implemented in `ActionManager.list_all_invocations`.
     """
     with TestClient(server.app) as client:
-        r = client.post("/thing/increment_counter")
+        r = client.post("/thing/increment_counter_longlife")
         invocation = poll_task(client, r.json())
         r2 = client.get(ACTION_INVOCATIONS_PATH)
         r2.raise_for_status()
