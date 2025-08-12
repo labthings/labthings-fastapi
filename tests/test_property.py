@@ -157,9 +157,9 @@ def test_baseproperty_type_and_model():
 
     # By default, we have no type so `.type` errors.
     with pytest.raises(tp.MissingTypeError):
-        prop.value_type
+        _ = prop.value_type
     with pytest.raises(tp.MissingTypeError):
-        prop.model
+        _ = prop.model
 
     # Once _type is set, these should both work.
     prop._type = str | None

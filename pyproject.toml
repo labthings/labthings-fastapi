@@ -76,7 +76,7 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 external = ["DOC401", "F824", "DOC101", "DOC103"]  # used via flake8/pydoclint
-select = ["E4", "E7", "E9", "F", "D", "DOC"]
+select = ["B", "E4", "E7", "E9", "F", "D", "DOC"]
 ignore = [
     "D203",  # incompatible with D204
     "D213",  # incompatible with D212
@@ -84,6 +84,9 @@ ignore = [
     "DOC201",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
     "DOC501",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
     "DOC502",  # doesn't work with sphinx-style docstrings, use flake8/pydoclint
+    "B008",  # This disallows function calls in default values.
+    # FastAPI Depends() breaks this rule, and FastAPI's response is "disable it".
+    # see https://github.com/fastapi/fastapi/issues/1522
 ]
 preview = true
 

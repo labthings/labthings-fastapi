@@ -210,7 +210,7 @@ class ThingServer:
                 for thing in self.things.values():
                     await stack.enter_async_context(thing)
                 yield
-            for name, thing in self.things.items():
+            for _name, thing in self.things.items():
                 # Remove the blocking portal - the event loop is about to stop.
                 thing._labthings_blocking_portal = None
 
@@ -284,9 +284,8 @@ def server_from_config(config: dict) -> ThingServer:
         except ImportError as e:
             raise ImportError(
                 f"Could not import {thing['class']}, which was "
-                f"specified as the class for {path}. The error is "
-                f"printed below:\n\n{e}"
-            )
+                f"specified as the class for {path}."
+            ) from e
         instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
         assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"
         server.add_thing(instance, path)

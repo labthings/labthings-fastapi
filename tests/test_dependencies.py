@@ -4,6 +4,7 @@ NB see test_thing_dependencies for tests of the dependency-injection mechanism
 for actions.
 """
 
+from dataclasses import dataclass
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
 from fastapi.testclient import TestClient
@@ -41,9 +42,15 @@ def test_dependency_needing_request():
     """Test a dependency that requires Request object"""
     app = FastAPI()
 
+    @dataclass
     class DepClass:
-        def __init__(self, sub: Request):
-            self.sub = sub
+        r"""A class that has a dependency in its __init__.
+
+        This is a dataclass, so __init__ is generated automatically and
+        will have an argument `sub` with type `Request`\ .
+        """
+
+        sub: Request
 
     @app.post("/dep")
     def endpoint(id: DepClass = Depends()) -> bool:

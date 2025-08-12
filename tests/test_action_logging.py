@@ -31,7 +31,9 @@ def test_invocation_logging(caplog):
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "completed"
         assert len(invocation["log"]) == len(ThingOne.LOG_MESSAGES)
-        for expected, entry in zip(ThingOne.LOG_MESSAGES, invocation["log"]):
+        for expected, entry in zip(
+            ThingOne.LOG_MESSAGES, invocation["log"], strict=True
+        ):
             assert entry["message"] == expected
 
 

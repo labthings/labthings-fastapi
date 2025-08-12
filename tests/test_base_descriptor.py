@@ -161,7 +161,7 @@ def test_basedescriptor_orphaned():
     """Check the right error is raised if we ask for the name outside a class."""
     prop = MockProperty()
     with pytest.raises(DescriptorNotAddedToClassError):
-        prop.name
+        _ = prop.name
 
 
 def test_basedescriptor_fallback():
@@ -185,7 +185,7 @@ def test_basedescriptor_get():
     assert isinstance(Example.my_property, MockProperty)
     with pytest.raises(NotImplementedError):
         # BaseDescriptor requires `instance_get` to be overridden.
-        e.base_descriptor
+        _ = e.base_descriptor
 
 
 class MockFunctionalProperty(MockProperty):
