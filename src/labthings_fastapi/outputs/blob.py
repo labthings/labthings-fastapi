@@ -364,11 +364,11 @@ class Blob(BaseModel):
             url_to_blobdata = url_to_blobdata_ctx.get()
             self._data = url_to_blobdata(self.href)
             self.href = "blob://local"
-        except LookupError:
+        except LookupError as e:
             raise LookupError(
                 "Blobs may only be created from URLs passed in over HTTP."
                 f"The URL in question was {self.href}."
-            )
+            ) from e
         return self
 
     @model_serializer(mode="plain", when_used="always")
@@ -398,11 +398,11 @@ class Blob(BaseModel):
                 blobdata_to_url = blobdata_to_url_ctx.get()
                 # MyPy seems to miss that `self.data` is a property, hence the ignore
                 href = blobdata_to_url(self.data)  # type: ignore[arg-type]
-            except LookupError:
+            except LookupError as e:
                 raise LookupError(
                     "Blobs may only be serialised inside the "
                     "context created by BlobIOContextDep."
-                )
+                ) from e
         else:
             href = self.href
         return {

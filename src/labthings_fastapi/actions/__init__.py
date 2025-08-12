@@ -491,11 +491,11 @@ class ActionManager:
             try:
                 with self._invocations_lock:
                     return self._invocations[id].response(request=request)
-            except KeyError:
+            except KeyError as e:
                 raise HTTPException(
                     status_code=404,
                     detail="No action invocation found with ID {id}",
-                )
+                ) from e
 
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}/output",
@@ -530,11 +530,11 @@ class ActionManager:
             with self._invocations_lock:
                 try:
                     invocation: Any = self._invocations[id]
-                except KeyError:
+                except KeyError as e:
                     raise HTTPException(
                         status_code=404,
                         detail="No action invocation found with ID {id}",
-                    )
+                    ) from e
                 if not invocation.output:
                     raise HTTPException(
                         status_code=503,
@@ -569,11 +569,11 @@ class ActionManager:
             with self._invocations_lock:
                 try:
                     invocation: Any = self._invocations[id]
-                except KeyError:
+                except KeyError as e:
                     raise HTTPException(
                         status_code=404,
                         detail="No action invocation found with ID {id}",
-                    )
+                    ) from e
                 if invocation.status not in [
                     InvocationStatus.RUNNING,
                     InvocationStatus.PENDING,

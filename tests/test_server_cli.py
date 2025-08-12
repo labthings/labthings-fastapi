@@ -14,12 +14,8 @@ def monitored_target(target, conn, *args, **kwargs):
     """Monitor stdout and exceptions from a function"""
     # The lines below copy stdout messages to a pipe
     # which allows us to monitor STDOUT and STDERR
-    for output, name in [(sys.stdout, "stdout"), (sys.stderr, "stderr")]:
-
-        def write_wrapper(message):
-            conn.send((name, message))
-
-        output.write = write_wrapper
+    sys.stdout.write = lambda message: conn.send(("stdout", message))
+    sys.stderr.write = lambda message: conn.send(("stderr", message))
 
     try:
         ret = target(*args, **kwargs)
@@ -44,8 +40,10 @@ class MonitoredProcess(multiprocessing.Process):
             self, target=monitored_target, args=args, **kwargs
         )
 
-    def run_monitored(self, terminate_outputs=[], timeout=10):
+    def run_monitored(self, terminate_outputs=None, timeout=10):
         """Run the process, monitoring stdout and exceptions"""
+        if terminate_outputs is None:
+            terminate_outputs = []
         self.start()
         try:
             while self._pconn.poll(timeout):
@@ -84,8 +82,10 @@ def test_server_from_config():
     assert isinstance(server, ThingServer)
 
 
-def check_serve_from_cli(args: list[str] = []):
+def check_serve_from_cli(args: list[str] | None = None):
     """Check we can create a server from the command line"""
+    if args is None:
+        args = []
     p = MonitoredProcess(target=serve_from_cli, args=(args,))
     p.run_monitored(terminate_outputs=["Application startup complete"])
 

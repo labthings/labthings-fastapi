@@ -49,13 +49,13 @@ def test_thing_with_broken_affordances():
 
 
 def test_thing_that_cannot_instantiate():
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError):
         ThingThatCantInstantiate()
 
 
 def test_thing_that_cannot_start():
     thing = ThingThatCantStart()
     assert isinstance(thing, ThingThatCantStart)
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError):
         with thing:
             pass

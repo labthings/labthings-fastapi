@@ -75,9 +75,8 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
         return resolved
     except KeyError as ke:
         raise KeyError(
-            f"The JSON reference {reference} was not found in the schema "
-            f"(original error {ke})."
-        )
+            f"The JSON reference {reference} was not found in the schema."
+        ) from ke
 
 
 def is_an_object(d: JSONSchema) -> bool:

@@ -20,7 +20,7 @@ class CancellableCountingThing(lt.Thing):
 
     @lt.thing_action
     def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):
-        for i in range(n):
+        for _i in range(n):
             try:
                 cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError as e:
@@ -35,7 +35,7 @@ class CancellableCountingThing(lt.Thing):
         Used to check that cancellation alter task behaviour
         """
         counting_increment = 1
-        for i in range(n):
+        for _i in range(n):
             try:
                 cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError:
@@ -52,7 +52,7 @@ class CancellableCountingThing(lt.Thing):
         """
         cancelled_once = False
         counting_increment = 1
-        for i in range(n):
+        for _i in range(n):
             try:
                 cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError as e:

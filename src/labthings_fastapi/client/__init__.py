@@ -57,8 +57,8 @@ def _get_link(obj: dict, rel: str) -> Mapping:
         raise ObjectHasNoLinksError(f"Can't find any links on {obj}.")
     try:
         return next(link for link in obj["links"] if link["rel"] == rel)
-    except StopIteration:
-        raise KeyError(f"No link was found with rel='{rel}' on {obj}.")
+    except StopIteration as e:
+        raise KeyError(f"No link was found with rel='{rel}' on {obj}.") from e
 
 
 def invocation_href(invocation: dict) -> str:

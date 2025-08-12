@@ -90,7 +90,7 @@ class MyThing(Thing):
         :param increments: how many times to increment.
         :param delay: the wait time between increments.
         """
-        for i in range(increments):
+        for _i in range(increments):
             time.sleep(delay)
             self.increment_counter()
 

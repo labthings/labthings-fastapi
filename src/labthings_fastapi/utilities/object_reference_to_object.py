@@ -26,9 +26,9 @@ def object_reference_to_object(object_reference: str) -> Any:
         for attr in qualname.split("."):
             try:
                 obj = getattr(obj, attr)
-            except AttributeError:
+            except AttributeError as e:
                 raise ImportError(
                     f"Cannot import name {attr} from {obj} "
                     f"when loading '{object_reference}'"
-                )
+                ) from e
     return obj

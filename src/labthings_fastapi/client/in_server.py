@@ -266,11 +266,13 @@ def direct_thing_client_class(
     """
 
     def init_proxy(self, request: Request, **dependencies: Mapping[str, Any]):
-        f"""A client for {thing_class} at {thing_path}"""
+        """Initialise a DirectThingClient (this docstring should be replaced)."""
         # NB this definition isimportant, as we must modify its signature.
         # Inheriting __init__ means we'll accidentally modify the signature
         # of `DirectThingClient` with bad results.
         DirectThingClient.__init__(self, request, **dependencies)
+
+    init_proxy.__doc__ = f"""Initialise a client for {thing_class} at {thing_path}"""
 
     # Using a class definition gets confused by the scope of the function
     # arguments - this is equivalent to a class definition but all the

@@ -96,8 +96,10 @@ def config_from_args(args: Namespace) -> dict:
         try:
             with open(args.config) as f:
                 config = json.load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Could not find configuration file {args.config}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(
+                f"Could not find configuration file {args.config}"
+            ) from e
     else:
         config = {}
     if args.json:

@@ -18,7 +18,7 @@ class TestThing(lt.Thing):
     @lt.thing_action
     def slowly_increase_counter(self) -> None:
         """Increment the counter slowly over a minute"""
-        for i in range(60):
+        for _i in range(60):
             time.sleep(1)
             self.increment_counter()
 
