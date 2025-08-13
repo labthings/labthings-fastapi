@@ -124,12 +124,18 @@ def property_descriptor(
     def __set__(self, obj: DirectThingClient, value: Any):
         setattr(obj._wrapped_thing, self.name, value)
 
+    def set_readonly(self, obj: DirectThingClient, value: Any):
+        raise AttributeError("This property is read-only.")
+
     if readable:
         __get__.__annotations__["return"] = model
         P.__get__ = __get__  # type: ignore[attr-defined]
     if writeable:
         __set__.__annotations__["value"] = model
         P.__set__ = __set__  # type: ignore[attr-defined]
+    else:
+        set_readonly.__annotations__["value"] = model
+        P.__set__ = set_readonly  # type: ignore[attr-defined]
     if description:
         P.__doc__ = description
     return P()
