@@ -297,7 +297,6 @@ class Invocation(Thread):
                 self._status = InvocationStatus.ERROR
                 self._exception = e
                 self.action.emit_changed_event(self.thing, self._status)
-            raise e
         finally:
             with self._status_lock:
                 self._end_time = datetime.datetime.now()
