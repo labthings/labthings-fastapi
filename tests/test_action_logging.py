@@ -9,32 +9,73 @@ import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
 
 
-class ThingOne(lt.Thing):
+class ThingThatLogsAndErrors(lt.Thing):
     LOG_MESSAGES = [
         "message 1",
         "message 2",
     ]
 
     @lt.thing_action
-    def action_one(self, logger: lt.deps.InvocationLogger):
+    def action_that_logs(self, logger: lt.deps.InvocationLogger):
         for m in self.LOG_MESSAGES:
             logger.info(m)
 
+    @lt.thing_action
+    def action_with_unhandled_error(self, logger: lt.deps.InvocationLogger):
+        raise RuntimeError("I was asked to raise this error.")
+
+    @lt.thing_action
+    def action_with_invocation_error(self, logger: lt.deps.InvocationLogger):
+        raise lt.exceptions.InvocationError("This is an error, but I handled it!")
+
 
 def test_invocation_logging(caplog):
-    caplog.set_level(logging.INFO)
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    with TestClient(server.app) as client:
-        r = client.post("/thing_one/action_one")
-        r.raise_for_status()
-        invocation = poll_task(client, r.json())
-        assert invocation["status"] == "completed"
-        assert len(invocation["log"]) == len(ThingOne.LOG_MESSAGES)
-        for expected, entry in zip(
-            ThingOne.LOG_MESSAGES, invocation["log"], strict=True
-        ):
-            assert entry["message"] == expected
+    with caplog.at_level(logging.INFO, logger="labthings.action"):
+        server = lt.ThingServer()
+        server.add_thing(ThingThatLogsAndErrors(), "/log_and_error_thing")
+        with TestClient(server.app) as client:
+            r = client.post("/log_and_error_thing/action_that_logs")
+            r.raise_for_status()
+            invocation = poll_task(client, r.json())
+            assert invocation["status"] == "completed"
+            assert len(invocation["log"]) == len(ThingThatLogsAndErrors.LOG_MESSAGES)
+            assert len(invocation["log"]) == len(caplog.records)
+            for expected, entry in zip(
+                ThingThatLogsAndErrors.LOG_MESSAGES, invocation["log"], strict=True
+            ):
+                assert entry["message"] == expected
+
+
+def test_unhandled_error_logs(caplog):
+    """Check that a log with a traceback is raised if there is an unhandled error."""
+    with caplog.at_level(logging.INFO, logger="labthings.action"):
+        server = lt.ThingServer()
+        server.add_thing(ThingThatLogsAndErrors(), "/log_and_error_thing")
+        with TestClient(server.app) as client:
+            r = client.post("/log_and_error_thing/action_with_unhandled_error")
+            r.raise_for_status()
+            invocation = poll_task(client, r.json())
+            assert invocation["status"] == "error"
+            assert len(invocation["log"]) == len(caplog.records) == 1
+            assert caplog.records[0].levelname == "ERROR"
+            # There is a traceback
+            assert caplog.records[0].exc_info is not None
+
+
+def test_invocation_error_logs(caplog):
+    """Check that a log with a traceback is raised if there is an unhandled error."""
+    with caplog.at_level(logging.INFO, logger="labthings.action"):
+        server = lt.ThingServer()
+        server.add_thing(ThingThatLogsAndErrors(), "/log_and_error_thing")
+        with TestClient(server.app) as client:
+            r = client.post("/log_and_error_thing/action_with_invocation_error")
+            r.raise_for_status()
+            invocation = poll_task(client, r.json())
+            assert invocation["status"] == "error"
+            assert len(invocation["log"]) == len(caplog.records) == 1
+            assert caplog.records[0].levelname == "ERROR"
+            # There is not a traceback
+            assert caplog.records[0].exc_info is None
 
 
 def test_logrecordmodel():
