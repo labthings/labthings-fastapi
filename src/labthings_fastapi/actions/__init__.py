@@ -33,6 +33,7 @@ from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
 from ..dependencies.invocation import (
     CancelHook,
     InvocationCancelledError,
+    InvocationError,
     invocation_logger,
 )
 from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
@@ -247,11 +248,6 @@ class Invocation(Thread):
         stored. The status is then set to ERROR and the thread terminates.
 
         See `.Invocation.status` for status values.
-
-        :raise Exception: any exception raised in the action function will
-            propagate through this method. Usually, this will just cause the
-            thread to terminate after setting ``status`` to ``ERROR`` and
-            saving the exception to ``self._exception``.
         """
         try:
             self.action.emit_changed_event(self.thing, self._status)
@@ -280,17 +276,22 @@ class Invocation(Thread):
                 self._status = InvocationStatus.COMPLETED
                 self.action.emit_changed_event(self.thing, self._status)
         except InvocationCancelledError:
-            logger.error(f"Invocation {self.id} was cancelled.")
+            logger.info(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
                 self.action.emit_changed_event(self.thing, self._status)
         except Exception as e:  # skipcq: PYL-W0703
-            logger.exception(e)
+            # First log
+            if isinstance(e, InvocationError):
+                # Log without traceback
+                logger.error(e)
+            else:
+                logger.exception(e)
+            # Then set status
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
                 self.action.emit_changed_event(self.thing, self._status)
-            raise e
         finally:
             with self._status_lock:
                 self._end_time = datetime.datetime.now()

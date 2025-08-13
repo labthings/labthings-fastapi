@@ -117,6 +117,18 @@ class InvocationCancelledError(BaseException):
     """
 
 
+class InvocationError(RuntimeError):
+    """The invocation ended in an anticipated error state.
+
+    When this error is raised, action execution stops as expected. The exception will be
+    logged at error level without a traceback, and the invocation will return with
+    error status.
+
+    Subclass this error for errors that do not need further traceback information
+    to be provided with the error message in logs.
+    """
+
+
 class CancelEvent(threading.Event):
     """An Event subclass that enables cancellation of actions.
 
