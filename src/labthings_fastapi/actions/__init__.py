@@ -285,14 +285,14 @@ class Invocation(Thread):
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
                 self.action.emit_changed_event(self.thing, self._status)
-        except InvocationError as e:
-            logger.error(e)
-            with self._status_lock:
-                self._status = InvocationStatus.ERROR
-                self._exception = e
-                self.action.emit_changed_event(self.thing, self._status)
         except Exception as e:  # skipcq: PYL-W0703
-            logger.exception(e)
+            # First log
+            if isinstance(e, InvocationError):
+                # Log without traceback
+                logger.error(e)
+            else:
+                logger.exception(e)
+            # Then set status
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
