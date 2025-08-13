@@ -124,10 +124,8 @@ class InvocationError(RuntimeError):
     logged at error level without a traceback, and the invocation will return with
     error status.
 
-    Unlike other types of unhandled error in a LabThings action this will not cause
-    ASGI traceback. The ASGI traceback provides useful debug information to be logged
-    for developers. However, for simple errors with known causes this is information
-    overload for an average user.
+    Subclass this error for errors that do not need further traceback information
+    to be provided with the error message in logs.
     """
 
 
