@@ -248,11 +248,6 @@ class Invocation(Thread):
         stored. The status is then set to ERROR and the thread terminates.
 
         See `.Invocation.status` for status values.
-
-        :raise Exception: any exception raised in the action function will
-            propagate through this method. Usually, this will just cause the
-            thread to terminate after setting ``status`` to ``ERROR`` and
-            saving the exception to ``self._exception``.
         """
         try:
             self.action.emit_changed_event(self.thing, self._status)
