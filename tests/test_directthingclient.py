@@ -7,7 +7,7 @@ and has been added primarily to fix #165.
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
-from lt.deps import DirectThingClient, direct_thing_client_class
+from labthings_fastapi.deps import DirectThingClient, direct_thing_client_class
 from .temp_client import poll_task
 
 
