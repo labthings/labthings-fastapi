@@ -350,7 +350,7 @@ class Thing:
         :raise KeyError: if the requested name is not defined on this Thing.
         :raise PropertyNotObservableError: if the property is not observable.
         """
-        prop = getattr(self.__class__, property_name)
+        prop = getattr(self.__class__, property_name, None)
         if not isinstance(prop, BaseProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         if not isinstance(prop, DataProperty):
@@ -365,7 +365,7 @@ class Thing:
 
         :raise KeyError: if the requested name is not defined on this Thing.
         """
-        action = getattr(self.__class__, action_name)
+        action = getattr(self.__class__, action_name, None)
         if not isinstance(action, ActionDescriptor):
             raise KeyError(f"{action_name} is not an LabThings Action")
         observers = action._observers_set(self)
