@@ -146,7 +146,7 @@ class CancelEvent(threading.Event):
         threading.Event.__init__(self)
         self.invocation_id = id
 
-    def raise_if_set(self):
+    def raise_if_set(self) -> None:
         """Raise an exception if the event is set.
 
         This is intended as a compact alternative to:
@@ -161,7 +161,7 @@ class CancelEvent(threading.Event):
         if self.is_set():
             raise InvocationCancelledError("The action was cancelled.")
 
-    def sleep(self, timeout: float):
+    def sleep(self, timeout: float) -> None:
         r"""Sleep for a given time in seconds, but raise an exception if cancelled.
 
         This function can be used in place of `time.sleep`. It will usually behave
