@@ -122,11 +122,11 @@ class ActionDescriptor:
         self.invocation_model.__name__ = f"{self.name}_invocation"
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> ActionDescriptor:  # noqa: D105
+    def __get__(self, obj: Literal[None], type: type[Thing]) -> ActionDescriptor:  # noqa: D105
         ...
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable:  # noqa: D105
+    def __get__(self, obj: Thing, type: type[Thing] | None = None) -> Callable:  # noqa: D105
         ...
 
     def __get__(
@@ -158,17 +158,17 @@ class ActionDescriptor:
         return partial(self.func, obj)
 
     @property
-    def name(self):
+    def name(self) -> str:
         """The name of the wrapped function."""
         return self.func.__name__
 
     @property
-    def title(self):
+    def title(self) -> str:
         """A human-readable title."""
         return get_summary(self.func) or self.name
 
     @property
-    def description(self):
+    def description(self) -> str | None:
         """A description of the action."""
         return get_docstring(self.func, remove_summary=True)
 
@@ -189,7 +189,7 @@ class ActionDescriptor:
             ld.action_observers[self.name] = WeakSet()
         return ld.action_observers[self.name]
 
-    def emit_changed_event(self, obj: Thing, status: str):
+    def emit_changed_event(self, obj: Thing, status: str) -> None:
         """Notify subscribers that the action status has changed.
 
         This function is run from within the `.Invocation` thread that
@@ -266,12 +266,12 @@ class ActionDescriptor:
             action_manager: ActionManagerContextDep,
             _blob_manager: BlobIOContextDep,
             request: Request,
-            body,
+            body: Any,  # This annotation will be overwritten below.
             id: InvocationID,
             cancel_hook: CancelHook,
             background_tasks: BackgroundTasks,
-            **dependencies,
-        ):
+            **dependencies: Any,
+        ) -> InvocationModel:
             action = action_manager.invoke_action(
                 action=self,
                 thing=thing,
@@ -318,6 +318,7 @@ class ActionDescriptor:
         if hasattr(self.output_model, "media_type"):
             responses[200]["content"][self.output_model.media_type] = {}
         # Now we can add the endpoint to the app.
+        assert thing.path is not None, "Can't add the endpoint without thing.path!"
         app.post(
             thing.path + self.name,
             response_model=self.invocation_model,
@@ -341,7 +342,7 @@ class ActionDescriptor:
         )
         def list_invocations(
             action_manager: ActionManagerContextDep, _blob_manager: BlobIOContextDep
-        ):
+        ) -> list[InvocationModel]:
             return action_manager.list_invocations(self, thing)
 
     def action_affordance(
@@ -359,6 +360,7 @@ class ActionDescriptor:
         :return: An `.ActionAffordance` describing this action.
         """
         path = path or thing.path
+        assert path is not None, "Can't generate forms without a path!"
         forms = [
             Form[ActionOp](href=path + self.name, op=[ActionOp.invokeaction]),
         ]
