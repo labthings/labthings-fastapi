@@ -255,7 +255,7 @@ class Invocation(Thread):
         # which thinks we are calling ActionDescriptor.__get__.
         action: ActionDescriptor = self.action  # type: ignore[call-overload]
         try:
-            action.emit_changed_event(self.thing, str(self._status))
+            action.emit_changed_event(self.thing, self._status.value)
 
             # Capture just this thread's log messages
             handler = DequeLogHandler(dest=self._log)
@@ -269,7 +269,7 @@ class Invocation(Thread):
             with self._status_lock:
                 self._status = InvocationStatus.RUNNING
                 self._start_time = datetime.datetime.now()
-                action.emit_changed_event(self.thing, str(self._status))
+                action.emit_changed_event(self.thing, self._status.value)
 
             # The next line actually runs the action.
             ret = action.__get__(thing)(**kwargs, **self.dependencies)
@@ -277,12 +277,12 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
-                action.emit_changed_event(self.thing, str(self._status))
+                action.emit_changed_event(self.thing, self._status.value)
         except InvocationCancelledError:
             logger.info(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
-                action.emit_changed_event(self.thing, str(self._status))
+                action.emit_changed_event(self.thing, self._status.value)
         except Exception as e:  # skipcq: PYL-W0703
             # First log
             if isinstance(e, InvocationError):
@@ -294,7 +294,7 @@ class Invocation(Thread):
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
-                action.emit_changed_event(self.thing, str(self._status))
+                action.emit_changed_event(self.thing, self._status.value)
         finally:
             with self._status_lock:
                 self._end_time = datetime.datetime.now()
