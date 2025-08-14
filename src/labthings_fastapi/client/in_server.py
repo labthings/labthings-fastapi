@@ -113,18 +113,22 @@ def property_descriptor(
         path = property_path or property_name
 
     def __get__(
-        self,
+        self: PropertyClientDescriptor,
         obj: Optional[DirectThingClient] = None,
         _objtype: Optional[type[DirectThingClient]] = None,
-    ):
+    ) -> Any:
         if obj is None:
             return self
         return getattr(obj._wrapped_thing, self.name)
 
-    def __set__(self, obj: DirectThingClient, value: Any):
+    def __set__(
+        self: PropertyClientDescriptor, obj: DirectThingClient, value: Any
+    ) -> None:
         setattr(obj._wrapped_thing, self.name, value)
 
-    def set_readonly(self, obj: DirectThingClient, value: Any):
+    def set_readonly(
+        self: PropertyClientDescriptor, obj: DirectThingClient, value: Any
+    ) -> None:
         raise AttributeError("This property is read-only.")
 
     if readable:
@@ -198,7 +202,7 @@ def add_action(
     """
 
     @wraps(action.func)
-    def action_method(self, **kwargs):
+    def action_method(self: DirectThingClient, **kwargs: Any) -> Any:
         dependency_kwargs = {
             param.name: self._dependencies[param.name]
             for param in action.dependency_params
