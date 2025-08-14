@@ -32,6 +32,7 @@ def test_websocket_observeproperty(server):
 
 class ThingWithProperties(lt.Thing):
     dataprop: int = lt.property(default=0)
+    non_property: int = 0
 
     @lt.property
     def funcprop(self) -> int:
@@ -40,6 +41,11 @@ class ThingWithProperties(lt.Thing):
     @lt.property
     def set_funcprop(self, val: int) -> None:
         pass
+
+    @lt.thing_action
+    def increment_dataprop(self):
+        """Increment the data property."""
+        self.dataprop += 1
 
 
 def test_observing_dataprop(mocker):
@@ -97,6 +103,26 @@ def test_observing_missing_prop(mocker):
     thing = ThingWithProperties()
     with pytest.raises(AttributeError):
         thing.observe_property("missing_property", mocker.Mock())
+
+
+def test_observing_not_prop(mocker):
+    """Check observing an attribute that's not a property raises an error."""
+    thing = ThingWithProperties()
+    with pytest.raises(KeyError):
+        thing.observe_property("non_property", mocker.Mock())
+
+
+def test_observing_action(mocker):
+    """Check observing an action is successful."""
+    thing = ThingWithProperties()
+    thing.observe_action("increment_dataprop", mocker.Mock())
+
+
+def test_observing_not_action(mocker):
+    """Check observing an attribute that's not an action raises an error."""
+    thing = ThingWithProperties()
+    with pytest.raises(KeyError):
+        thing.observe_action("non_property", mocker.Mock())
 
 
 def test_websocket_observeproperty_counter(server):
