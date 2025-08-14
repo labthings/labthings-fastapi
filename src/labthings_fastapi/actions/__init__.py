@@ -168,7 +168,7 @@ class Invocation(Thread):
             return self._status
 
     @property
-    def action(self):
+    def action(self) -> ActionDescriptor:
         """The `.ActionDescriptor` object running in this thread."""
         action = self.action_ref()
         assert action is not None, "The action for an `Invocation` has been deleted!"
@@ -210,10 +210,12 @@ class Invocation(Thread):
             LinkElement(rel="self", href=href),
             LinkElement(rel="output", href=href + "/output"),
         ]
-        return self.action.invocation_model(
+        # The line below confuses MyPy because self.action **evaluates to** a Descriptor
+        # object (i.e. we don't call __get__ on the descriptor).
+        return self.action.invocation_model(  # type: ignore[call-overload]
             status=self.status,
             id=self.id,
-            action=self.thing.path + self.action.name,
+            action=self.thing.path + self.action.name,  # type: ignore[call-overload]
             href=href,
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
@@ -249,24 +251,25 @@ class Invocation(Thread):
 
         See `.Invocation.status` for status values.
         """
+        # self.action evaluates to an ActionDescriptor. This confuses mypy,
+        # which thinks we are calling ActionDescriptor.__get__.
+        action: ActionDescriptor = self.action  # type: ignore[call-overload]
         try:
-            self.action.emit_changed_event(self.thing, self._status)
+            action.emit_changed_event(self.thing, str(self._status))
 
             # Capture just this thread's log messages
             handler = DequeLogHandler(dest=self._log)
             logger = invocation_logger(self.id)
             logger.addHandler(handler)
 
-            action = self.action
             thing = self.thing
             kwargs = model_to_dict(self.input)
-            assert action is not None
             assert thing is not None
 
             with self._status_lock:
                 self._status = InvocationStatus.RUNNING
                 self._start_time = datetime.datetime.now()
-                self.action.emit_changed_event(self.thing, self._status)
+                action.emit_changed_event(self.thing, str(self._status))
 
             # The next line actually runs the action.
             ret = action.__get__(thing)(**kwargs, **self.dependencies)
@@ -274,12 +277,12 @@ class Invocation(Thread):
             with self._status_lock:
                 self._return_value = ret
                 self._status = InvocationStatus.COMPLETED
-                self.action.emit_changed_event(self.thing, self._status)
+                action.emit_changed_event(self.thing, str(self._status))
         except InvocationCancelledError:
             logger.info(f"Invocation {self.id} was cancelled.")
             with self._status_lock:
                 self._status = InvocationStatus.CANCELLED
-                self.action.emit_changed_event(self.thing, self._status)
+                action.emit_changed_event(self.thing, str(self._status))
         except Exception as e:  # skipcq: PYL-W0703
             # First log
             if isinstance(e, InvocationError):
@@ -291,7 +294,7 @@ class Invocation(Thread):
             with self._status_lock:
                 self._status = InvocationStatus.ERROR
                 self._exception = e
-                self.action.emit_changed_event(self.thing, self._status)
+                action.emit_changed_event(self.thing, str(self._status))
         finally:
             with self._status_lock:
                 self._end_time = datetime.datetime.now()
@@ -341,9 +344,9 @@ class DequeLogHandler(logging.Handler):
 class ActionManager:
     """A class to manage a collection of actions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Set up an `.ActionManager`."""
-        self._invocations = {}
+        self._invocations: dict[uuid.UUID, Invocation] = {}
         self._invocations_lock = Lock()
 
     @property
@@ -443,10 +446,13 @@ class ActionManager:
             i.response(request=request)
             for i in self.invocations
             if thing is None or i.thing == thing
-            if action is None or i.action == action
+            if action is None or i.action == action  # type: ignore[call-overload]
+            # i.action evaluates to an ActionDescriptor, which confuses mypy - it
+            # thinks we are calling ActionDescriptor.__get__ but this isn't ever
+            # called.
         ]
 
-    def expire_invocations(self):
+    def expire_invocations(self) -> None:
         """Delete invocations that have passed their expiry time."""
         to_delete = []
         with self._invocations_lock:
@@ -465,7 +471,9 @@ class ActionManager:
         """
 
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
-        def list_all_invocations(request: Request, _blob_manager: BlobIOContextDep):
+        def list_all_invocations(
+            request: Request, _blob_manager: BlobIOContextDep
+        ) -> list[InvocationModel]:
             return self.list_invocations(request=request)
 
         @app.get(
@@ -512,7 +520,9 @@ class ActionManager:
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_output(id: uuid.UUID, _blob_manager: BlobIOContextDep):
+        def action_invocation_output(
+            id: uuid.UUID, _blob_manager: BlobIOContextDep
+        ) -> Any:
             """Get the output of an action invocation.
 
             This returns just the "output" component of the action invocation. If the
