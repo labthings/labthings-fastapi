@@ -1,13 +1,22 @@
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 from labthings_fastapi.example_things import MyThing
-
-my_thing = MyThing()
-server = lt.ThingServer()
-server.add_thing(my_thing, "/my_thing")
+import pytest
 
 
-def test_websocket_observeproperty():
+@pytest.fixture
+def my_thing():
+    return MyThing()
+
+
+@pytest.fixture
+def server(my_thing):
+    server = lt.ThingServer()
+    server.add_thing(my_thing, "/my_thing")
+    return server
+
+
+def test_websocket_observeproperty(server):
     with TestClient(server.app) as client:
         with client.websocket_connect("/my_thing/ws") as ws:
             ws.send_json(
@@ -20,7 +29,76 @@ def test_websocket_observeproperty():
             ws.close(1000)
 
 
-def test_websocket_observeproperty_counter():
+class ThingWithProperties(lt.Thing):
+    dataprop: int = lt.property(default=0)
+
+    @lt.property
+    def funcprop(self) -> int:
+        return 0
+
+    @lt.property
+    def set_funcprop(self, val: int) -> None:
+        pass
+
+
+def test_observing_dataprop(mocker):
+    """Check `observe_property` is OK on a data property.
+
+    This doesn't check the observation works, because we don't
+    have an event loop. It just checks the call doesn't raise
+    an error.
+    """
+    thing = ThingWithProperties()
+    thing.observe_property("dataprop", mocker.Mock())
+
+
+def test_observing_dataprop_with_ws():
+    """Observe a data property with a websocket, and check it works."""
+    server = lt.ThingServer()
+    server.add_thing(ThingWithProperties(), "/thing")
+    with TestClient(server.app) as client:
+        with client.websocket_connect("/thing/ws") as ws:
+            ws.send_json(
+                {"messageType": "addPropertyObservation", "data": {"dataprop": True}}
+            )
+            client.put("/thing/dataprop", json=1)
+            message = ws.receive_json(mode="text")
+            assert message["data"]["dataprop"] == 1
+            ws.close(1000)
+
+
+def test_observing_funcprop(mocker):
+    """Check errors are raised if we observe an unsuitable property."""
+    thing = ThingWithProperties()
+    with pytest.raises(TypeError):
+        thing.observe_property("funcprop", mocker.Mock())
+
+
+def test_observing_funcprop_with_ws():
+    """Try to observe a functional property with a websocket.
+
+    This should fail: functional properties are not observable.
+    """
+    server = lt.ThingServer()
+    server.add_thing(ThingWithProperties(), "/thing")
+    with TestClient(server.app) as client:
+        with client.websocket_connect("/thing/ws") as ws:
+            ws.send_json(
+                {"messageType": "addPropertyObservation", "data": {"funcprop": True}}
+            )
+            message = ws.receive_json(mode="text")
+            assert message["data"]["dataprop"] == 1
+            ws.close(1000)
+
+
+def test_observing_missing_prop(mocker):
+    """Check observing a non-existent property raises an error."""
+    thing = ThingWithProperties()
+    with pytest.raises(AttributeError):
+        thing.observe_property("missing_property", mocker.Mock())
+
+
+def test_websocket_observeproperty_counter(server):
     with TestClient(server.app) as client:
         with client.websocket_connect("/my_thing/ws") as ws:
             ws.send_json(
@@ -47,7 +125,7 @@ def handle_websocket_messages(message):
     return False
 
 
-def test_websocket_observeaction():
+def test_websocket_observeaction(server, my_thing):
     with TestClient(server.app) as client:
         with client.websocket_connect("/my_thing/ws") as ws:
             ws.send_json(

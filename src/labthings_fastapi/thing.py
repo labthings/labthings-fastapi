@@ -21,7 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .properties import DataProperty, BaseSetting
+from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -349,8 +349,14 @@ class Thing:
         :raise KeyError: if the requested name is not defined on this Thing.
         """
         prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, DataProperty):
+        if not isinstance(prop, BaseProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
+        if not isinstance(prop, DataProperty):
+            raise TypeError(
+                f"{property_name} is not observable. Only data properties are "
+                "observable. This error is often encountered if you try to "
+                "observe a functional property (one with a getter/setter)."
+            )
         prop._observers_set(self).add(stream)
 
     def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
