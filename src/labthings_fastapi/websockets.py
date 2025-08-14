@@ -24,10 +24,55 @@ from anyio.abc import ObjectReceiveStream, ObjectSendStream
 import logging
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+from .exceptions import PropertyNotObservableError
 
 if TYPE_CHECKING:
     from .thing import Thing
+
+
+WEBTHING_ERROR_URL = "https://w3c.github.io/web-thing-protocol/errors"
+
+
+def observation_error_response(
+    name: str, affordance_type: Literal["action", "property"], exception: Exception
+) -> dict[str, str | dict]:
+    r"""Generate a websocket error response for observing an action or property.
+
+    When a websocket client asks to observe a property or action that either
+    doesn't exist or isn't observable, this function makes a dictionary that
+    can be returned to the client indicating an error.
+
+    :param name: The name of the affordance being observed.
+    :param affordance_type: The type of the affordance.
+    :param exception: The error that was raised.
+    :returns: A dictionary that may be returned to the websocket.
+
+    :raises TypeError: if the exception is not a `KeyError`
+        or `.PropertyNotObservableError`\ .
+    """
+    if isinstance(exception, KeyError):
+        error = {
+            "status": "404",
+            "type": f"{WEBTHING_ERROR_URL}#not-found",
+            "title": "Not Found",
+            "detail": f"No {affordance_type} found with the name '{name}'.",
+        }
+    elif isinstance(exception, PropertyNotObservableError):
+        error = {
+            "status": "403",
+            "type": f"{WEBTHING_ERROR_URL}#not-observable",
+            "title": "Not Observable",
+            "detail": f"Property '{name}' is not observable.",
+        }
+    else:
+        raise TypeError(f"Can't generate an error response for {exception}.")
+    return {
+        "messageType": "response",
+        "operation": f"observe{affordance_type}",
+        "name": name,
+        "error": error,
+    }
 
 
 async def relay_notifications_to_websocket(
@@ -66,17 +111,23 @@ async def process_messages_from_websocket(
     while True:
         try:
             data = await websocket.receive_json()
-            if data["messageType"] == "addPropertyObservation":
-                for k in data["data"].keys():
-                    thing.observe_property(k, send_stream)
-            if data["messageType"] == "addActionObservation":
-                for k in data["data"].keys():
-                    thing.observe_action(k, send_stream)
-        except KeyError as e:
-            logging.error(f"Got a bad websocket message: {data}, caused KeyError({e})")
         except WebSocketDisconnect:
             await send_stream.aclose()
             return
+        if data["messageType"] == "addPropertyObservation":
+            try:
+                for k in data["data"].keys():
+                    thing.observe_property(k, send_stream)
+            except (KeyError, PropertyNotObservableError) as e:
+                logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
+                await send_stream.send(observation_error_response(k, "property", e))
+        if data["messageType"] == "addActionObservation":
+            try:
+                for k in data["data"].keys():
+                    thing.observe_action(k, send_stream)
+            except KeyError as e:
+                logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
+                await send_stream.send(observation_error_response(k, "action", e))
 
 
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:

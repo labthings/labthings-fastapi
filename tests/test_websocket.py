@@ -1,7 +1,8 @@
-import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 from labthings_fastapi.example_things import MyThing
 import pytest
+import labthings_fastapi as lt
+from labthings_fastapi.exceptions import PropertyNotObservableError
 
 
 @pytest.fixture
@@ -70,7 +71,7 @@ def test_observing_dataprop_with_ws():
 def test_observing_funcprop(mocker):
     """Check errors are raised if we observe an unsuitable property."""
     thing = ThingWithProperties()
-    with pytest.raises(TypeError):
+    with pytest.raises(PropertyNotObservableError):
         thing.observe_property("funcprop", mocker.Mock())
 
 
@@ -87,7 +88,7 @@ def test_observing_funcprop_with_ws():
                 {"messageType": "addPropertyObservation", "data": {"funcprop": True}}
             )
             message = ws.receive_json(mode="text")
-            assert message["data"]["dataprop"] == 1
+            assert message["error"]["title"] == "Not Observable"
             ws.close(1000)
 
 
