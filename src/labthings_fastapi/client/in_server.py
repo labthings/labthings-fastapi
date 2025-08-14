@@ -277,7 +277,7 @@ def direct_thing_client_class(
 
     def init_proxy(
         self: DirectThingClient, request: Request, **dependencies: Mapping[str, Any]
-    ):
+    ) -> None:
         r"""Initialise a DirectThingClient (this docstring will be replaced).
 
         :param self: The DirectThingClient instance we're initialising.
