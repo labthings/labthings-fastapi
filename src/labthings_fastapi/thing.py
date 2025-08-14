@@ -348,6 +348,7 @@ class Thing:
         :param stream: the stream used to send events.
 
         :raise KeyError: if the requested name is not defined on this Thing.
+        :raise PropertyNotObservableError: if the property is not observable.
         """
         prop = getattr(self.__class__, property_name)
         if not isinstance(prop, BaseProperty):
