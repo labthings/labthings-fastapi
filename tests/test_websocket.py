@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import PropertyNotObservableError
+from labthings_fastapi.exceptions import (
+    PropertyNotObservableError,
+    InvocationCancelledError,
+)
 
 
 class ThingWithProperties(lt.Thing):
@@ -26,6 +29,18 @@ class ThingWithProperties(lt.Thing):
     def increment_dataprop(self):
         """Increment the data property."""
         self.dataprop += 1
+
+    @lt.thing_action
+    def raise_error(self):
+        r"""Raise an exception to test for error status."""
+        self.dataprop += 1
+        raise Exception("A deliberate failure.")
+
+    @lt.thing_action
+    def cancel_myself(self):
+        """Increment the data property, then pretend to be cancelled."""
+        self.dataprop += 1
+        raise InvocationCancelledError()
 
 
 @pytest.fixture
@@ -154,19 +169,27 @@ def test_observing_action_error(thing, mocker):
         thing.observe_action("non_property", mocker.Mock())
 
 
-def test_observing_action_with_ws(client, ws):
+@pytest.mark.parametrize(
+    argnames=["name", "final_status"],
+    argvalues=[
+        ("increment_dataprop", "completed"),
+        ("raise_error", "error"),
+        ("cancel_myself", "cancelled"),
+    ],
+)
+def test_observing_action_with_ws(client, ws, name, final_status):
     """Observe an action with a websocket, checking the status changes correctly."""
     # Observe the property.
     ws.send_json(
         {
             "messageType": "addActionObservation",
-            "data": {"increment_dataprop": True},
+            "data": {name: True},
         }
     )
     # Invoke the action (via HTTP)
-    client.post("/thing/increment_dataprop")
+    client.post(f"/thing/{name}")
     # We should see the status go through the expected sequence
-    for expected_status in ["pending", "running", "completed"]:
+    for expected_status in ["pending", "running", final_status]:
         message = ws.receive_json(mode="text")
         assert message["messageType"] == "actionStatus"
         assert message["data"]["status"] == expected_status
