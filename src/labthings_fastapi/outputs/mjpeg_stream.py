@@ -139,7 +139,7 @@ class MJPEGStream:
         self._ringbuffer: list[RingbufferEntry] = []
         self.reset(ringbuffer_size=ringbuffer_size)
 
-    def reset(self, ringbuffer_size: Optional[int] = None):
+    def reset(self, ringbuffer_size: Optional[int] = None) -> None:
         """Reset the stream and optionally change the ringbuffer size.
 
         Discard all frames from the ringbuffer and reset the frame index.
@@ -361,7 +361,7 @@ class MJPEGStreamDescriptor:
     This descriptor does not currently show up in the :ref:`wot_td`.
     """
 
-    def __init__(self, **kwargs: dict[str, Any]):
+    def __init__(self, **kwargs: Any):
         r"""Initialise an MJPEGStreamDescriptor.
 
         :param \**kwargs: keyword arguments are passed to the initialiser of
@@ -381,10 +381,10 @@ class MJPEGStreamDescriptor:
         self.name = name
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self: ...  # noqa: D105
+    def __get__(self, obj: Literal[None], type: type | None = None) -> Self: ...  # noqa: D105
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> MJPEGStream: ...  # noqa: D105
+    def __get__(self, obj: Thing, type: type | None = None) -> MJPEGStream: ...  # noqa: D105
 
     def __get__(
         self, obj: Optional[Thing], type: type[Thing] | None = None
@@ -452,5 +452,5 @@ class MJPEGStreamDescriptor:
             f"{thing.path}{self.name}/viewer",
             response_class=HTMLResponse,
         )
-        async def viewer_page():
+        async def viewer_page() -> HTMLResponse:
             return await self.viewer_page(f"{thing.path}{self.name}")

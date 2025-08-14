@@ -216,7 +216,7 @@ class ThingServer:
 
         self.blocking_portal = None
 
-    def add_things_view_to_app(self):
+    def add_things_view_to_app(self) -> None:
         """Add an endpoint that shows the list of attached things."""
         thing_server = self
 

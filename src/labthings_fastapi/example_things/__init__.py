@@ -74,7 +74,7 @@ class MyThing(Thing):
         return out
 
     @thing_action
-    def increment_counter(self):
+    def increment_counter(self) -> None:
         """Increment the counter property.
 
         This action doesn't do very much - all it does, in fact,
@@ -84,7 +84,7 @@ class MyThing(Thing):
         self.counter += 1
 
     @thing_action
-    def slowly_increase_counter(self, increments: int = 60, delay: float = 1):
+    def slowly_increase_counter(self, increments: int = 60, delay: float = 1) -> None:
         """Increment the counter slowly over a minute.
 
         :param increments: how many times to increment.
@@ -118,7 +118,7 @@ class ThingWithBrokenAffordances(Thing):
     """A Thing that raises exceptions in actions/properties."""
 
     @thing_action
-    def broken_action(self):
+    def broken_action(self) -> None:
         """Do something that raises an exception.
 
         :raise RuntimeError: every time.
@@ -126,7 +126,7 @@ class ThingWithBrokenAffordances(Thing):
         raise RuntimeError("This is a broken action")
 
     @lt_property
-    def broken_property(self):
+    def broken_property(self) -> None:
         """Raise an exception when the property is accessed.
 
         :raise RuntimeError: every time.
@@ -137,7 +137,7 @@ class ThingWithBrokenAffordances(Thing):
 class ThingThatCantInstantiate(Thing):
     """A Thing that raises an exception in __init__."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Fail to initialise.
 
         :raise RuntimeError: every time.
@@ -148,14 +148,14 @@ class ThingThatCantInstantiate(Thing):
 class ThingThatCantStart(Thing):
     """A Thing that raises an exception in __enter__."""
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         """Fail to start the thing.
 
         :raise RuntimeError: every time.
         """
         raise RuntimeError("This thing can't start")
 
-    def __exit__(self, exc_t: Any, exc_v: Any, exc_tb: Any):
+    def __exit__(self, exc_t: Any, exc_v: Any, exc_tb: Any) -> None:
         """Don't leave the thing as we never entered.
 
         :param exc_t: Exception type.

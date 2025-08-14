@@ -71,7 +71,7 @@ def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
     :param arr: a `numpy.ndarray`.
     :return: a nested list of numbers.
     """
-    return arr.tolist()  # type: ignore[return-value]
+    return arr.tolist()
 
 
 def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
