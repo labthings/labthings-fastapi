@@ -28,6 +28,7 @@ from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
+from .exceptions import PropertyNotObservableError
 
 
 if TYPE_CHECKING:
@@ -352,11 +353,7 @@ class Thing:
         if not isinstance(prop, BaseProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
         if not isinstance(prop, DataProperty):
-            raise TypeError(
-                f"{property_name} is not observable. Only data properties are "
-                "observable. This error is often encountered if you try to "
-                "observe a functional property (one with a getter/setter)."
-            )
+            raise PropertyNotObservableError(f"{property_name} is not observable.")
         prop._observers_set(self).add(stream)
 
     def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
