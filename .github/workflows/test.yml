@@ -74,10 +74,7 @@ jobs:
           path: ./coverage.lcov
       
       - name: Analyse with MyPy
-        run: mypy src
-      
-      - name: Type tests with MyPy
-        run: mypy --warn-unused-ignores typing_tests
+        run: mypy
 
   test-with-unpinned-deps:
     runs-on: ubuntu-latest
@@ -105,7 +102,7 @@ jobs:
       
       - name: Analyse with MyPy
         if: success() || failure()
-        run: mypy src
+        run: mypy
 
       - name: Test with pytest
         if: success() || failure()

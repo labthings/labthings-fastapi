@@ -108,7 +108,12 @@ property-decorators = [
 ]
 
 [tool.mypy]
+files = ["src/", "typing_tests/"]
 plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
 
 
 [tool.flake8]

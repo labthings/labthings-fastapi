@@ -46,6 +46,7 @@ import re
 import shutil
 from typing import (
     Annotated,
+    Any,
     AsyncGenerator,
     Callable,
     Literal,
@@ -215,7 +216,7 @@ class BlobFile:
     id: Optional[uuid.UUID] = None
     """A unique ID to identify the data in a `.BlobManager`."""
 
-    def __init__(self, file_path: str, media_type: str, **kwargs):
+    def __init__(self, file_path: str, media_type: str, **kwargs: Any):
         r"""Create a `.BlobFile` to wrap data stored on disk.
 
         `.BlobFile` objects wrap data stored on disk as files. They

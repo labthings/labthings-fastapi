@@ -220,6 +220,20 @@ def test_baseproperty_add_to_fastapi():
     assert set(entry.keys()) == set(["get", "put"])
 
 
+def test_baseproperty_set_error():
+    """Check `.Baseproperty.__set__` raises an error and is overridden."""
+    assert tp.DataProperty.__get__ is tp.BaseProperty.__get__
+    assert tp.DataProperty.__set__ is not tp.BaseProperty.__set__
+    assert tp.FunctionalProperty.__set__ is not tp.BaseProperty.__set__
+
+    class Example:
+        bp: int = tp.BaseProperty()
+
+    example = Example()
+    with pytest.raises(NotImplementedError):
+        example.bp = 0
+
+
 def test_decorator_exception():
     r"""Check decorators work as expected when the setter has a different name.
 

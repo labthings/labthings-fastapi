@@ -278,7 +278,7 @@ def jsonschema_to_dataschema(
     return output
 
 
-def type_to_dataschema(t: type, **kwargs) -> DataSchema:
+def type_to_dataschema(t: type, **kwargs: Any) -> DataSchema:
     r"""Convert a Python type to a Thing Description DataSchema.
 
     This makes use of pydantic's `schema_of` function to create a
