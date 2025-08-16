@@ -37,7 +37,7 @@ not supported at this time.
 """
 
 from functools import wraps, partial
-from typing import Optional, Callable, overload
+from typing import Any, Optional, Callable, overload
 from ..descriptors import (
     ActionDescriptor,
     EndpointDescriptor,
@@ -45,7 +45,7 @@ from ..descriptors import (
 )
 
 
-def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
+def mark_thing_action(func: Callable, **kwargs: Any) -> ActionDescriptor:
     r"""Mark a method of a Thing as an Action.
 
     We replace the function with a descriptor that's a
@@ -65,12 +65,12 @@ def mark_thing_action(func: Callable, **kwargs) -> ActionDescriptor:
 
 
 @overload
-def thing_action(func: Callable, **kwargs) -> ActionDescriptor: ...
+def thing_action(func: Callable, **kwargs: Any) -> ActionDescriptor: ...
 
 
 @overload
 def thing_action(
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable[
     [
         Callable,
@@ -81,7 +81,7 @@ def thing_action(
 
 @wraps(mark_thing_action)
 def thing_action(
-    func: Optional[Callable] = None, **kwargs
+    func: Optional[Callable] = None, **kwargs: Any
 ) -> (
     ActionDescriptor
     | Callable[
@@ -121,7 +121,7 @@ def thing_action(
 
 
 def fastapi_endpoint(
-    method: HTTPMethod, path: Optional[str] = None, **kwargs
+    method: HTTPMethod, path: Optional[str] = None, **kwargs: Any
 ) -> Callable[[Callable], EndpointDescriptor]:
     r"""Mark a function as a FastAPI endpoint without making it an action.
 

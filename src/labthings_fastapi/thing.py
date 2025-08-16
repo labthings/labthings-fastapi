@@ -152,7 +152,7 @@ class Thing:
             return self.thing_description(base=str(request.base_url))
 
         @server.app.websocket(self.path + "ws")
-        async def websocket(ws: WebSocket):
+        async def websocket(ws: WebSocket) -> None:
             await websocket_endpoint(self, ws)
 
     # A private variable to hold the list of settings so it doesn't need to be
@@ -230,13 +230,14 @@ class Thing:
                 _LOGGER.warning("Error loading settings for %s", thing_name)
         self._setting_storage_path = setting_storage_path
 
-    def save_settings(self):
+    def save_settings(self) -> None:
         """Save settings to JSON.
 
         This is called whenever a setting is updated. All settings are written to
         the settings file every time.
         """
         if self._settings is not None:
+            assert self._setting_storage_path is not None
             setting_dict = {}
             for name in self._settings.keys():
                 value = getattr(self, name)
@@ -352,7 +353,7 @@ class Thing:
             raise KeyError(f"{property_name} is not a LabThings Property")
         prop._observers_set(self).add(stream)
 
-    def observe_action(self, action_name: str, stream: ObjectSendStream):
+    def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
         """Register a stream to receive action status change notifications.
 
         :param action_name: the action to register for.

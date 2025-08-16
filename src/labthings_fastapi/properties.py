@@ -381,7 +381,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         # the function to the decorator.
         if not self.readonly:
 
-            def set_property(body):  # We'll annotate body later
+            def set_property(body: Any) -> None:  # We'll annotate body later
                 if isinstance(body, RootModel):
                     body = body.root
                 return self.__set__(thing, body)
@@ -402,7 +402,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
             summary=self.title,
             description=f"## {self.title}\n\n{self.description or ''}",
         )
-        def get_property():
+        def get_property() -> Any:
             return self.__get__(thing)
 
     def property_affordance(
@@ -443,6 +443,19 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
                 **data_schema.model_dump(exclude_none=True),
                 **pa.model_dump(exclude_none=True),
             }
+        )
+
+    def __set__(self, obj: Thing, value: Any) -> None:
+        """Set the property (stub method).
+
+        This is a stub ``__set__`` method to mark this as a data descriptor.
+
+        :param obj: The Thing on which we are setting the value.
+        :param value: The new value for the Thing.
+        :raises NotImplementedError: as this must be overridden by concrete classes.
+        """
+        raise NotImplementedError(
+            "__set__ must be overridden by property implementations."
         )
 
 
@@ -602,7 +615,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         if emit_changed_event:
             self.emit_changed_event(obj, value)
 
-    def _observers_set(self, obj: Thing):
+    def _observers_set(self, obj: Thing) -> WeakSet:
         """Return the observers of this property.
 
         Each observer in this set will be notified when the property is changed.
@@ -646,7 +659,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             value,
         )
 
-    async def emit_changed_event_async(self, obj: Thing, value: Value):
+    async def emit_changed_event_async(self, obj: Thing, value: Value) -> None:
         """Notify subscribers that the property has changed.
 
         This function may only be run in the `anyio` event loop. See
@@ -793,7 +806,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         """
         return self.fget(obj)
 
-    def __set__(self, obj: Thing, value: Value):
+    def __set__(self, obj: Thing, value: Value) -> None:
         """Set the value of the property.
 
         :param obj: the `.Thing` on which the attribute is accessed.

@@ -81,7 +81,7 @@ ThingContextType = Union[
 ]
 
 
-def uses_thing_context(v: ThingContextType):
+def uses_thing_context(v: ThingContextType) -> None:
     """Check the URLs in the ThingContextType are valid.
 
     This function makes ``assert`` statements, so will fail with an exception

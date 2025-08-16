@@ -30,7 +30,7 @@ import uvicorn
 from . import ThingServer, server_from_config
 
 
-def get_default_parser():
+def get_default_parser() -> ArgumentParser:
     """Return the default CLI parser for LabThings.
 
     This can be used to add more arguments, for custom CLIs that make use of

@@ -19,6 +19,7 @@ from functools import partial, wraps
 from ..utilities.introspection import get_docstring, get_summary
 
 from typing import (
+    Any,
     Callable,
     Literal,
     Mapping,
@@ -45,7 +46,7 @@ class EndpointDescriptor:
         func: Callable,
         http_method: HTTPMethod = "get",
         path: Optional[str] = None,
-        **kwargs: Mapping,
+        **kwargs: Mapping[str, Any],
     ):
         r"""Initialise an EndpointDescriptor.
 
@@ -67,10 +68,10 @@ class EndpointDescriptor:
         self.kwargs = kwargs
 
     @overload
-    def __get__(self, obj: Literal[None], type=None) -> Self: ...  # noqa: D105
+    def __get__(self, obj: Literal[None], type: type[Thing] | None = None) -> Self: ...  # noqa: D105
 
     @overload
-    def __get__(self, obj: Thing, type=None) -> Callable: ...  # noqa: D105
+    def __get__(self, obj: Thing, type: type[Thing] | None = None) -> Callable: ...  # noqa: D105
 
     def __get__(
         self, obj: Optional[Thing], type: type[Thing] | None = None
@@ -96,26 +97,26 @@ class EndpointDescriptor:
         return wraps(self.func)(partial(self.func, obj))
 
     @property
-    def name(self):
+    def name(self) -> str:
         """The name of the wrapped function."""
         return self.func.__name__
 
     @property
-    def path(self):
+    def path(self) -> str:
         """The path of the endpoint (relative to the Thing)."""
         return self._path or self.name
 
     @property
-    def title(self):
+    def title(self) -> str:
         """A human-readable title."""
         return get_summary(self.func) or self.name
 
     @property
-    def description(self):
+    def description(self) -> str | None:
         """A description of the endpoint."""
         return get_docstring(self.func, remove_summary=True)
 
-    def add_to_fastapi(self, app: FastAPI, thing: Thing):
+    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
         """Add an endpoint for this function to a FastAPI app.
 
         We will add an endpoint to the app, bound to a particular `.Thing`.
@@ -126,11 +127,12 @@ class EndpointDescriptor:
         :param app: the `fastapi.FastAPI` application we are adding to.
         :param thing: the `.Thing` we're bound to.
         """
+        assert thing.path is not None
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
         bound_function = partial(self.func, thing)
         # NB the line above can't use self.__get__ as wraps() confuses FastAPI
-        kwargs = {  # Auto-populate description and summary
+        kwargs: dict[str, Any] = {  # Auto-populate description and summary
             "description": f"## {self.title}\n\n {self.description}",
             "summary": self.title,
         }
