@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 import pytest
+import functools
 from .temp_client import poll_task, get_link
 from labthings_fastapi.example_things import MyThing
 import labthings_fastapi as lt
@@ -94,3 +95,61 @@ def test_openapi():
     with TestClient(server.app) as client:
         r = client.get("/openapi.json")
         r.raise_for_status()
+
+
+def example_decorator(func):
+    """Decorate a function using functools.wraps."""
+
+    @functools.wraps(func)
+    def action_wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result
+
+    return action_wrapper
+
+
+def assert_input_models_equivalent(model_a, model_b):
+    """Check two basemodels are equivalent."""
+    keys = list(model_a.model_fields.keys())
+    assert list(model_b.model_fields.keys()) == keys
+
+    for k in keys:
+        field_a = model_a.model_fields[k]
+        field_b = model_b.model_fields[k]
+        assert str(field_a.annotation) == str(field_b.annotation)
+        assert field_a.default == field_b.default
+
+
+def test_wrapped_action():
+    """Check functools.wraps does not confuse schema generation"""
+
+    class Example(lt.Thing):
+        @lt.thing_action
+        def action(
+            self,
+            portal: lt.deps.BlockingPortal,
+            param1: int = 0,
+            param2: str = "string",
+        ) -> float | None:
+            """An example action with type annotations."""
+            return 0.5
+
+        @lt.thing_action
+        @example_decorator
+        def decorated(
+            self,
+            portal: lt.deps.BlockingPortal,
+            param1: int = 0,
+            param2: str = "string",
+        ) -> float | None:
+            """An example decorated action with type annotations."""
+            return 0.5
+
+    assert_input_models_equivalent(
+        Example.action.input_model, Example.decorated.input_model
+    )
+    assert Example.action.output_model == Example.decorated.output_model
+
+    # Check we can make the thing and it has a valid TD
+    example = Example()
+    example.validate_thing_description()
