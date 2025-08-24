@@ -182,6 +182,14 @@ class ThingClient:
         for k in kwargs.keys():
             value = kwargs[k]
             if isinstance(value, ClientBlobOutput):
+                # ClientBlobOutput objects may be used as input to a subsequent
+                # action. When this is done, they should be serialised to a dict
+                # with `href` and `media_type` keys, as done below.
+                # Ideally this should be replaced with `Blob` and the use of
+                # `pydantic` models to serialise action inputs.
+                #
+                # Note that the blob will not be uploaded: we rely on the blob
+                # still existing on the server.
                 kwargs[k] = {"href": value.href, "media_type": value.media_type}
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
