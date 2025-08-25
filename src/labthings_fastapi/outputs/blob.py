@@ -591,7 +591,11 @@ def blob_type(media_type: str) -> type[Blob]:
     return create_model(
         f"{media_type.replace('/', '_')}_blob",
         __base__=Blob,
-        media_type=(eval(f"Literal[r'{media_type}']"), media_type),
+        media_type=(eval(f"Literal[r'{media_type}']"), media_type),  # noqa: S307
+        # This can't be done with `literal_eval` as that does not support subscripts.
+        # Basic sanitisation is done above by removing backslashes and single quotes,
+        # and using a raw string. However, the long term solution is to remove this
+        # function in favour of subclassing Blob, as recommended in the docs.
     )
 
 
