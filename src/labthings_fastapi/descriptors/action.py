@@ -255,6 +255,10 @@ class ActionDescriptor:
         :param thing: The `.Thing` to which the action is attached. Bear in
             mind that the descriptor may be used by more than one `.Thing`,
             so this can't be a property of the descriptor.
+
+        :raises NotConnectedToServerError: if the function is run before the
+            ``thing`` has a ``path`` property. This is assigned when the `.Thing`
+            is added to a server.
         """
 
         # We can't use the decorator in the usual way, because we'd need to
@@ -318,7 +322,10 @@ class ActionDescriptor:
         if hasattr(self.output_model, "media_type"):
             responses[200]["content"][self.output_model.media_type] = {}
         # Now we can add the endpoint to the app.
-        assert thing.path is not None, "Can't add the endpoint without thing.path!"
+        if thing.path is None:
+            raise NotConnectedToServerError(
+                "Can't add the endpoint without thing.path!"
+            )
         app.post(
             thing.path + self.name,
             response_model=self.invocation_model,
@@ -358,9 +365,14 @@ class ActionDescriptor:
             omitted, we use the ``path`` property of the ``thing``.
 
         :return: An `.ActionAffordance` describing this action.
+
+        :raises NotConnectedToServerError: if the function is run before the
+            ``thing`` has a ``path`` property. This is assigned when the `.Thing`
+            is added to a server.
         """
         path = path or thing.path
-        assert path is not None, "Can't generate forms without a path!"
+        if path is None:
+            raise NotConnectedToServerError("Can't generate forms without a path!")
         forms = [
             Form[ActionOp](href=path + self.name, op=[ActionOp.invokeaction]),
         ]

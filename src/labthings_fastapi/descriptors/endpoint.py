@@ -16,8 +16,7 @@ more detail.
 from __future__ import annotations
 from functools import partial, wraps
 
-from labthings_fastapi.exceptions import NotConnectedToServerError
-
+from ..exceptions import NotConnectedToServerError
 from ..utilities.introspection import get_docstring, get_summary
 
 from typing import (
