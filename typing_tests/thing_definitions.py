@@ -59,7 +59,7 @@ assert_type(unbound_prop_2, int)
 
 
 @lt.property
-def strprop(self) -> str:
+def strprop(self: typing.Any) -> str:
     """A functional property that should not cause mypy errors."""
     return "foo"
 
@@ -213,7 +213,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop2.setter
-    def set_intprop2(self, value: int):
+    def set_intprop2(self, value: int) -> None:
         """Setter for intprop2."""
         pass
 

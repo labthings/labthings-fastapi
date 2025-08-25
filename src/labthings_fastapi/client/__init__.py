@@ -148,7 +148,7 @@ class ThingClient:
         r.raise_for_status()
         return r.json()
 
-    def set_property(self, path: str, value: Any):
+    def set_property(self, path: str, value: Any) -> None:
         """Make a PUT request to set the value of a property.
 
         :param path: the URI of the ``getproperty`` endpoint, relative
@@ -159,7 +159,7 @@ class ThingClient:
         r = self.client.put(urljoin(self.path, path), json=value)
         r.raise_for_status()
 
-    def invoke_action(self, path: str, **kwargs):
+    def invoke_action(self, path: str, **kwargs: Any) -> Any:
         r"""Invoke an action on the Thing.
 
         This method will make the initial POST request to invoke an action,
@@ -180,8 +180,17 @@ class ThingClient:
         :raise RuntimeError: is raised if the action does not complete successfully.
         """
         for k in kwargs.keys():
-            if isinstance(kwargs[k], ClientBlobOutput):
-                kwargs[k] = {"href": kwargs[k].href, "media_type": kwargs[k].media_type}
+            value = kwargs[k]
+            if isinstance(value, ClientBlobOutput):
+                # ClientBlobOutput objects may be used as input to a subsequent
+                # action. When this is done, they should be serialised to a dict
+                # with `href` and `media_type` keys, as done below.
+                # Ideally this should be replaced with `Blob` and the use of
+                # `pydantic` models to serialise action inputs.
+                #
+                # Note that the blob will not be uploaded: we rely on the blob
+                # still existing on the server.
+                kwargs[k] = {"href": value.href, "media_type": value.media_type}
         r = self.client.post(urljoin(self.path, path), json=kwargs)
         r.raise_for_status()
         invocation = poll_invocation(self.client, r.json())
@@ -270,7 +279,9 @@ class ThingClient:
 class PropertyClientDescriptor:
     """A base class for properties on `.ThingClient` objects."""
 
-    pass
+    name: str
+    type: type | BaseModel
+    path: str
 
 
 def property_descriptor(
@@ -312,10 +323,10 @@ def property_descriptor(
     if readable:
 
         def __get__(
-            self,
+            self: PropertyClientDescriptor,
             obj: Optional[ThingClient] = None,
             _objtype: Optional[type[ThingClient]] = None,
-        ):
+        ) -> Any:
             if obj is None:
                 return self
             return obj.get_property(self.name)
@@ -324,7 +335,9 @@ def property_descriptor(
         P.__get__ = __get__  # type: ignore[attr-defined]
     if writeable:
 
-        def __set__(self, obj: ThingClient, value: Any):
+        def __set__(
+            self: PropertyClientDescriptor, obj: ThingClient, value: Any
+        ) -> None:
             obj.set_property(self.name, value)
 
         __set__.__annotations__["value"] = model
@@ -349,7 +362,7 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
         format.
     """
 
-    def action_method(self, **kwargs):
+    def action_method(self: ThingClient, **kwargs: Any) -> Any:
         return self.invoke_action(action_name, **kwargs)
 
     if "output" in action and "type" in action["output"]:
@@ -359,7 +372,7 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
     setattr(cls, action_name, action_method)
 
 
-def add_property(cls: type[ThingClient], property_name: str, property: dict):
+def add_property(cls: type[ThingClient], property_name: str, property: dict) -> None:
     """Add a property to a ThingClient subclass.
 
     A descriptor will be added to the provided class that makes the
