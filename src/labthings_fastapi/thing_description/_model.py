@@ -92,6 +92,8 @@ def uses_thing_context(v: ThingContextType) -> None:
     This refers to the ``@context`` property.
 
     :param v: the ThingContextType object.
+
+    :raises ValueError: if the URL is not correct.
     """
     if not isinstance(v, list):
         if v is not THING_CONTEXT_URL:

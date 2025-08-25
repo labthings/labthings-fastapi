@@ -192,6 +192,10 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
+
+        :raises RuntimeError: if a `.Thing` already has a blocking portal attached.
+            This should never happen, and suggests the server is being used to
+            serve a `.Thing` that is already being served elsewhere.
         """
         async with BlockingPortal() as portal:
             self.blocking_portal = portal

@@ -184,7 +184,10 @@ class Invocation(Thread):
 
     @property
     def thing(self) -> Thing:
-        """The `.Thing` to which the action is bound, i.e. this is ``self``."""
+        """The `.Thing` to which the action is bound, i.e. this is ``self``.
+
+        :raises RuntimeError: if the Thing no longer exists.
+        """
         thing = self.thing_ref()
         if thing is None:  # pragma: no cover
             # this error block is primarily for mypy: the Thing will exist as
@@ -261,6 +264,8 @@ class Invocation(Thread):
         stored. The status is then set to ERROR and the thread terminates.
 
         See `.Invocation.status` for status values.
+
+        :raises RuntimeError: if there is no Thing associated with the invocation.
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
