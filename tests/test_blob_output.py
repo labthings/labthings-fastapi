@@ -77,23 +77,27 @@ def test_blob_type():
 def test_blob_creation():
     """Check that blobs can be created in three ways"""
     TEXT = b"Test input"
+    # Create a blob from a file in a temporary directory
     td = TemporaryDirectory()
     with open(os.path.join(td.name, "test_input"), "wb") as f:
         f.write(TEXT)
+    # This creates the blob from only a file. It won't preserve
+    # the temporary directory.
     blob = TextBlob.from_file(os.path.join(td.name, "test_input"))
     assert blob.content == TEXT
+    # This will preserve the temporary directory, as it's
+    # saved in the underlying BlobData object (asserted below).
     blob = TextBlob.from_temporary_directory(td, "test_input")
     assert blob.content == TEXT
     assert blob.data._temporary_directory is td
+
+    # Finally, check we can make a blob from a bytes object, no file.
     blob = TextBlob.from_bytes(TEXT)
     assert blob.content == TEXT
 
 
 def test_blob_output_client():
-    """Test that a Thing can depend on another Thing
-
-    This uses the internal thing client mechanism.
-    """
+    """Test that blob outputs work as expected when used over HTTP."""
     server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     with TestClient(server.app) as client:
@@ -102,13 +106,13 @@ def test_blob_output_client():
 
 
 def test_blob_output_direct():
-    """This should mirror `test_blob_output_inserver` but with helpful errors"""
+    """Check blob outputs work correctly when we use a Thing directly in Python."""
     thing = ThingOne()
     check_actions(thing)
 
 
 def test_blob_output_inserver():
-    """Test that the blob output works the same when used directly"""
+    """Test that the blob output works the same when used via a DirectThingClient."""
     server = lt.ThingServer()
     server.add_thing(ThingOne(), "/thing_one")
     server.add_thing(ThingTwo(), "/thing_two")
@@ -131,7 +135,11 @@ def check_blob(output, expected_content: bytes):
 
 
 def check_actions(thing):
-    """Check that both action_one and action_two work"""
+    """Check that both action_one and action_two work.
+
+    This should work if called on a ThingOne directly, or a DirectThingClient,
+    or an HTTP ThingClient.
+    """
     for action in (thing.action_one, thing.action_two, thing.action_three):
         output = action()
         check_blob(output, ThingOne.ACTION_ONE_RESULT)
@@ -157,6 +165,3 @@ def test_blob_input():
         # Check that the same thing works on the server side
         tc2 = lt.ThingClient.from_url("/thing_two/", client=client)
         assert tc2.check_passthrough() is True
-
-
-# TODO: check that the stub serialiser isn't being used

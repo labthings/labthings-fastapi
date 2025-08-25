@@ -17,6 +17,7 @@ import pydantic
 import pytest
 from labthings_fastapi import properties as tp
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
+from labthings_fastapi.exceptions import NotConnectedToServerError
 from .utilities import raises_or_is_caused_by
 
 
@@ -217,7 +218,7 @@ def test_baseproperty_add_to_fastapi():
     # Check the property appears at the expected place
     entry = openapi["paths"]["/example/prop"]
     # Check it declares the right methods
-    assert set(entry.keys()) == set(["get", "put"])
+    assert set(entry.keys()) == {"get", "put"}
 
 
 def test_baseproperty_set_error():
@@ -266,3 +267,22 @@ def test_decorator_exception():
     assert Example.prop.name == "prop"
     assert not isinstance(Example.set_prop, tp.FunctionalProperty)
     assert callable(Example.set_prop)
+
+
+def test_premature_api_and_affordance(mocker):
+    """Check the right error is raised if we add to API without a path."""
+
+    class Example:
+        path = None  # this is supplied by `lt.Thing` but we're not subclassing.
+
+        @tp.property
+        def prop(self) -> bool:
+            """An example getter."""
+            return True
+
+    example = Example()
+
+    with pytest.raises(NotConnectedToServerError):
+        Example.prop.add_to_fastapi(mocker.Mock(), example)
+    with pytest.raises(NotConnectedToServerError):
+        Example.prop.property_affordance(example, None)

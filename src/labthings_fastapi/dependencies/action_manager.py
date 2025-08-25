@@ -27,19 +27,17 @@ from ..actions import ActionManager
 
 
 def action_manager_from_thing_server(request: Request) -> ActionManager:
-    """Retrieve the Action Manager from the Thing Server.
+    r"""Retrieve the Action Manager from the Thing Server.
 
     This is for use as a FastAPI dependency. We use the ``request`` to
-    access the `.ThingServer` and thus access the `.ActionManager`.
+    access the `.ThingServer` and thus access the `.ActionManager`\ .
 
     :param request: the FastAPI request object. This will be supplied by
         FastAPI when this function is used as a dependency.
 
-    :return: the `.ActionManager` object associated with our `.ThingServer`.
+    :return: the `.ActionManager` object associated with our `.ThingServer`\ .
     """
-    action_manager = find_thing_server(request.app).action_manager
-    assert action_manager is not None
-    return action_manager
+    return find_thing_server(request.app).action_manager
 
 
 ActionManagerDep = Annotated[ActionManager, Depends(action_manager_from_thing_server)]

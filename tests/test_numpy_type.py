@@ -70,6 +70,8 @@ class MyNumpyThing(lt.Thing):
 
 def test_thing_description():
     thing = MyNumpyThing()
+    # We must mock a path, or it can't generate a Thing Description.
+    thing.path = "/mynumpything"
     assert thing.validate_thing_description() is None
 
 

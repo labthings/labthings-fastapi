@@ -114,10 +114,11 @@ def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
     :return: A `pydantic` model, wrapping Python types in a ``RootModel`` if needed.
     """
     try:  # This needs to be a `try` as basic types are not classes
-        assert issubclass(model, BaseModel)
-        return model
-    except (TypeError, AssertionError):
-        return create_model(f"{model!r}", root=(model, ...), __base__=RootModel)
+        if issubclass(model, BaseModel):
+            return model
+    except TypeError:
+        pass  # some plain types aren't classes and that's OK - they still get wrapped.
+    return create_model(f"{model!r}", root=(model, ...), __base__=RootModel)
 
 
 def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:

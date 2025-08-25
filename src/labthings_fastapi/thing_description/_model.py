@@ -92,15 +92,24 @@ def uses_thing_context(v: ThingContextType) -> None:
     This refers to the ``@context`` property.
 
     :param v: the ThingContextType object.
+
+    :raises ValueError: if the URL is not correct.
     """
     if not isinstance(v, list):
-        assert v is THING_CONTEXT_URL
+        if v is not THING_CONTEXT_URL:
+            raise ValueError(f"{v} must be {THING_CONTEXT_URL}")  # pragma: no cover
+            # excluded from coverage as this is hardcoded, so we shouldn't ever
+            # see the error.
     else:
-        assert (
+        if not (
             v[0] == THING_CONTEXT_URL
             or v[1] == THING_CONTEXT_URL
             and v[0] == THING_CONTEXT_URL_v1
-        )
+        ):
+            raise ValueError(
+                f"{v} must contain {THING_CONTEXT_URL}"
+            )  # pragma: no cover
+            # This is hard-coded, so is not an error we ever expect to see.
 
 
 ThingContext = Annotated[

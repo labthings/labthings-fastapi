@@ -154,7 +154,7 @@ class BlobBytes:
     id: Optional[uuid.UUID] = None
     """A unique ID to identify the data in a `.BlobManager`."""
 
-    def __init__(self, data: bytes, media_type: str):
+    def __init__(self, data: bytes, media_type: str) -> None:
         """Create a `.BlobBytes` object.
 
         `.BlobBytes` objects wrap data stored in memory as `bytes`. They
@@ -216,7 +216,7 @@ class BlobFile:
     id: Optional[uuid.UUID] = None
     """A unique ID to identify the data in a `.BlobManager`."""
 
-    def __init__(self, file_path: str, media_type: str, **kwargs: Any):
+    def __init__(self, file_path: str, media_type: str, **kwargs: Any) -> None:
         r"""Create a `.BlobFile` to wrap data stored on disk.
 
         `.BlobFile` objects wrap data stored on disk as files. They
@@ -591,7 +591,11 @@ def blob_type(media_type: str) -> type[Blob]:
     return create_model(
         f"{media_type.replace('/', '_')}_blob",
         __base__=Blob,
-        media_type=(eval(f"Literal[r'{media_type}']"), media_type),
+        media_type=(eval(f"Literal[r'{media_type}']"), media_type),  # noqa: S307
+        # This can't be done with `literal_eval` as that does not support subscripts.
+        # Basic sanitisation is done above by removing backslashes and single quotes,
+        # and using a raw string. However, the long term solution is to remove this
+        # function in favour of subclassing Blob, as recommended in the docs.
     )
 
 
