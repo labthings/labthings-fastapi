@@ -260,7 +260,7 @@ class ThingServer:
 
 
 def server_from_config(config: dict) -> ThingServer:
-    """Create a ThingServer from a configuration dictionary.
+    r"""Create a ThingServer from a configuration dictionary.
 
     This function creates a `.ThingServer` and adds a number of `.Thing`
     instances from a configuration dictionary.
@@ -273,6 +273,7 @@ def server_from_config(config: dict) -> ThingServer:
 
     :raise ImportError: if a Thing could not be loaded from the specified
         object reference.
+    :raise TypeError: if a class is specified that does not subclass `.Thing`\ .
     """
     server = ThingServer(config.get("settings_folder", None))
     for path, thing in config.get("things", {}).items():
