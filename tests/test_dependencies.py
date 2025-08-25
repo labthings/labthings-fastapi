@@ -5,6 +5,7 @@ for actions.
 """
 
 from dataclasses import dataclass
+from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
 from fastapi.testclient import TestClient

@@ -154,7 +154,7 @@ class BlobBytes:
     id: Optional[uuid.UUID] = None
     """A unique ID to identify the data in a `.BlobManager`."""
 
-    def __init__(self, data: bytes, media_type: str):
+    def __init__(self, data: bytes, media_type: str) -> None:
         """Create a `.BlobBytes` object.
 
         `.BlobBytes` objects wrap data stored in memory as `bytes`. They
@@ -216,7 +216,7 @@ class BlobFile:
     id: Optional[uuid.UUID] = None
     """A unique ID to identify the data in a `.BlobManager`."""
 
-    def __init__(self, file_path: str, media_type: str, **kwargs: Any):
+    def __init__(self, file_path: str, media_type: str, **kwargs: Any) -> None:
         r"""Create a `.BlobFile` to wrap data stored on disk.
 
         `.BlobFile` objects wrap data stored on disk as files. They

@@ -78,7 +78,7 @@ class Invocation(Thread):
         dependencies: Optional[dict[str, Any]] = None,
         log_len: int = 1000,
         cancel_hook: Optional[CancelHook] = None,
-    ):
+    ) -> None:
         """Create a thread to run an action and track its outputs.
 
         :param action: provides the function that we run, as well as metadata
@@ -312,7 +312,7 @@ class DequeLogHandler(logging.Handler):
         self,
         dest: MutableSequence,
         level: int = logging.INFO,
-    ):
+    ) -> None:
         """Set up a log handler that appends messages to a deque.
 
         .. warning::

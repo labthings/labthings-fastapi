@@ -54,7 +54,7 @@ class DirectThingClient:
     thing_path: str
     """The path to the Thing on the server. Relative to the server's base URL."""
 
-    def __init__(self, request: Request, **dependencies: Mapping[str, Any]):
+    def __init__(self, request: Request, **dependencies: Mapping[str, Any]) -> None:
         r"""Wrap a `.Thing` so it works like a `.ThingClient`.
 
         This class is designed to be used as a FastAPI dependency, and will
@@ -157,7 +157,7 @@ class DependencyNameClashError(KeyError):
     exception is raised.
     """
 
-    def __init__(self, name: str, existing: type, new: type):
+    def __init__(self, name: str, existing: type, new: type) -> None:
         """Create a DependencyNameClashError.
 
         See class docstring for an explanation of the error.

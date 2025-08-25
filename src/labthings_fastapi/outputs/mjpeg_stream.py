@@ -61,7 +61,9 @@ class MJPEGStreamResponse(StreamingResponse):
     media_type = "multipart/x-mixed-replace; boundary=frame"
     """The media_type used to describe the endpoint in FastAPI."""
 
-    def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
+    def __init__(
+        self, gen: AsyncGenerator[bytes, None], status_code: int = 200
+    ) -> None:
         """Set up StreamingResponse that streams an MJPEG stream.
 
         This response is initialised with an async generator that yields `bytes`
@@ -124,7 +126,7 @@ class MJPEGStream:
     of new frames, and then retrieving the frame (shortly) afterwards.
     """
 
-    def __init__(self, ringbuffer_size: int = 10):
+    def __init__(self, ringbuffer_size: int = 10) -> None:
         """Initialise an MJPEG stream.
 
         See the class docstring for `.MJPEGStream`. Note that it will
@@ -361,7 +363,7 @@ class MJPEGStreamDescriptor:
     This descriptor does not currently show up in the :ref:`wot_td`.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         r"""Initialise an MJPEGStreamDescriptor.
 
         :param \**kwargs: keyword arguments are passed to the initialiser of

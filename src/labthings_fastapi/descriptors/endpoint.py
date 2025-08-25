@@ -49,7 +49,7 @@ class EndpointDescriptor:
         http_method: HTTPMethod = "get",
         path: Optional[str] = None,
         **kwargs: Mapping[str, Any],
-    ):
+    ) -> None:
         r"""Initialise an EndpointDescriptor.
 
         See `.fastapi_endpoint`, which is the usual way of instantiating this

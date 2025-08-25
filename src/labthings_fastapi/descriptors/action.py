@@ -84,7 +84,7 @@ class ActionDescriptor:
         func: Callable,
         response_timeout: float = 1,
         retention_time: float = 300,
-    ):
+    ) -> None:
         """Create a new action descriptor.
 
         The action descriptor wraps a method of a `.Thing`. It may still be
