@@ -17,6 +17,14 @@ class ThingWithProperties(lt.Thing):
     dataprop: int = lt.property(default=0)
     non_property: int = 0
 
+    def undecorated(self) -> int:
+        """An undecorated function that returns an int."""
+        return 0
+
+    def python_property(self) -> int:
+        """A property that isn't a LabThings property."""
+        return 0
+
     @lt.property
     def funcprop(self) -> int:
         return 0
@@ -97,6 +105,8 @@ def test_observing_dataprop(thing, mocker):
     argvalues=[
         ("funcprop", PropertyNotObservableError),
         ("non_property", KeyError),
+        ("python_property", KeyError),
+        ("undecorated", KeyError),
         ("increment_dataprop", KeyError),
         ("missing", KeyError),
     ],
@@ -139,6 +149,8 @@ def test_observing_dataprop_with_ws(client, ws):
     argvalues=[
         ("funcprop", "Not Observable", "403"),
         ("non_property", "Not Found", "404"),
+        ("python_property", "Not Found", "404"),
+        ("undecorated", "Not Found", "404"),
         ("increment_dataprop", "Not Found", "404"),
         ("missing", "Not Found", "404"),
     ],
@@ -173,10 +185,13 @@ def test_observing_action(thing, mocker):
     assert fake_observer in observers_set
 
 
-def test_observing_action_error(thing, mocker):
+@pytest.mark.parametrize(
+    "name", ["non_property", "python_property", "undecorated", "dataprop"]
+)
+def test_observing_action_error(thing, mocker, name):
     """Check observing an attribute that's not an action raises an error."""
     with pytest.raises(KeyError):
-        thing.observe_action("non_property", mocker.Mock())
+        thing.observe_action(name, mocker.Mock())
 
 
 @pytest.mark.parametrize(
@@ -205,7 +220,10 @@ def test_observing_action_with_ws(client, ws, name, final_status):
         assert message["data"]["status"] == expected_status
 
 
-def test_observing_action_error_with_ws(ws):
+@pytest.mark.parametrize(
+    "name", ["non_property", "python_property", "undecorated", "dataprop"]
+)
+def test_observing_action_error_with_ws(ws, name):
     """Try to observe something that's not an action, as an action.
 
     This should fail: observeAction should only work on actions.
@@ -214,7 +232,7 @@ def test_observing_action_error_with_ws(ws):
     ws.send_json(
         {
             "messageType": "addActionObservation",
-            "data": {"non_property": True},
+            "data": {name: True},
         }
     )
     # Receive the message and check for the error.
