@@ -288,8 +288,11 @@ class MJPEGStream:
                     yield frame
             except StopAsyncIteration:
                 break
-            except Exception as e:
-                logging.error(f"Error in stream: {e}, stream stopped")
+            except Exception as e:  # noqa: BLE001
+                # It's important that errors in the stream don't crash the server.
+                # This may be something we can remove in the future, now streams stop
+                # more elegantly. However, it will require careful testing.f
+                logging.exception(f"Error in stream: {e}, stream stopped")
                 return
 
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:

@@ -20,7 +20,10 @@ def monitored_target(target, conn, *args, **kwargs):
     try:
         ret = target(*args, **kwargs)
         conn.send(("success", ret))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
+        # this is test code, and any exceptions should be inspected
+        # by the calling function. Catching Exception is therefore
+        # OK in this case.
         conn.send(("exception", e))
     except SystemExit as e:
         conn.send(("exit", e))

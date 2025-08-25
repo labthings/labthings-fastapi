@@ -204,23 +204,19 @@ class ActionDescriptor:
         :raise NotConnectedToServerError: if the Thing calling the action is not
             connected to a server with a running event loop.
         """
-        try:
-            runner = get_blocking_portal(obj)
-            if not runner:
-                thing_name = obj.__class__.__name__
-                msg = (
-                    f"Cannot emit action changed event. Is {thing_name} connected to "
-                    "a running server?"
-                )
-                raise NotConnectedToServerError(msg)
-            runner.start_task_soon(
-                self.emit_changed_event_async,
-                obj,
-                status,
+        runner = get_blocking_portal(obj)
+        if not runner:
+            thing_name = obj.__class__.__name__
+            msg = (
+                f"Cannot emit action changed event. Is {thing_name} connected to "
+                "a running server?"
             )
-        except Exception:
-            # TODO: in the unit test, the get_blocking_portal throws exception
-            ...
+            raise NotConnectedToServerError(msg)
+        runner.start_task_soon(
+            self.emit_changed_event_async,
+            obj,
+            status,
+        )
 
     async def emit_changed_event_async(self, obj: Thing, value: Any) -> None:
         """Notify subscribers that the action status has changed.
