@@ -82,11 +82,14 @@ def ws(client):
 def test_observing_dataprop(thing, mocker):
     """Check `observe_property` is OK on a data property.
 
-    This doesn't check the observation works, because we don't
-    have an event loop. It just checks the call doesn't raise
-    an error.
+    This checks that something is added to the set of observers.
+    We don't check for events, as there's no event loop: this is
+    tested in `test_observing_dataprop_with_ws` below.
     """
-    thing.observe_property("dataprop", mocker.Mock())
+    observers_set = ThingWithProperties.dataprop._observers_set(thing)
+    fake_observer = mocker.Mock()
+    thing.observe_property("dataprop", fake_observer)
+    assert fake_observer in observers_set
 
 
 @pytest.mark.parametrize(
