@@ -28,6 +28,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from anyio.from_thread import BlockingPortal as RealBlockingPortal
 from .thing_server import find_thing_server
+from ..exceptions import ServerNotRunningError
 
 
 def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
@@ -41,12 +42,19 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
 
     :return: the `anyio.from_thread.BlockingPortal` allowing access to the
         `.ThingServer`\ 's event loop.
+    
+    :raises ServerNotRunningError: if the server does not have an available
+        blocking portal. This should not normally happen, as dependencies
+        are only evaluated while the server is running.
     """
     portal = find_thing_server(request.app).blocking_portal
-    assert portal is not None, RuntimeError(
+    if portal is None:  # pragma: no cover
+        raise ServerNotRunningError(
         "Could not get the blocking portal from the server."
         # This should never happen, as the blocking portal is added
         # and removed in `.ThingServer.lifecycle`.
+        # As dependencies are only evaluated while the server is running,
+        # this error should never be raised.
     )
     return portal
 
