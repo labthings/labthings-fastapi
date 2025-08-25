@@ -198,9 +198,8 @@ class ThingServer:
             # We attach a blocking portal to each thing, so that threaded code can
             # make callbacks to async code (needed for events etc.)
             for thing in self.things.values():
-                assert thing._labthings_blocking_portal is None, (
-                    "Things may only ever have one blocking portal"
-                )
+                if thing._labthings_blocking_portal is not None:
+                    raise RuntimeError("Things may only ever have one blocking portal")
                 thing._labthings_blocking_portal = portal
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
@@ -287,6 +286,7 @@ def server_from_config(config: dict) -> ThingServer:
                 f"specified as the class for {path}."
             ) from e
         instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
-        assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"
+        if not isinstance(instance, Thing):
+            raise TypeError(f"{thing['class']} is not a Thing")
         server.add_thing(instance, path)
     return server
