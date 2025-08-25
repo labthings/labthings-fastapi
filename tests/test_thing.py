@@ -6,6 +6,7 @@ from labthings_fastapi import ThingServer
 def test_td_validates():
     """This will raise an exception if it doesn't validate OK"""
     thing = MyThing()
+    thing.path = "/mything"  # can't generate a TD without a path
     assert thing.validate_thing_description() is None
 
 
