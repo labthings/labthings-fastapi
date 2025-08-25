@@ -162,8 +162,15 @@ def test_observing_dataprop_error_with_ws(ws, name, title, status):
 
 
 def test_observing_action(thing, mocker):
-    """Check observing an action is successful."""
-    thing.observe_action("increment_dataprop", mocker.Mock())
+    """Check observing an action is successful.
+
+    This verifies we've added an observer to the set, but doesn't test for
+    notifications: that would require an event loop.
+    """
+    observers_set = ThingWithProperties.increment_dataprop._observers_set(thing)
+    fake_observer = mocker.Mock()
+    thing.observe_action("increment_dataprop", fake_observer)
+    assert fake_observer in observers_set
 
 
 def test_observing_action_error(thing, mocker):
