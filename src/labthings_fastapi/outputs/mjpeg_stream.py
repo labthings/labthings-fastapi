@@ -346,8 +346,17 @@ class MJPEGStream:
             self.condition.notify_all()
 
     async def notify_stream_stopped(self) -> None:
-        """Raise an exception in any waiting tasks to signal the stream has stopped."""
-        assert self._streaming is False
+        """Raise an exception in any waiting tasks to signal the stream has stopped.
+
+        This should be run only when streaming has stopped, i.e. ``self._streaming``
+        is ``False`` and an error will be raised if this isn't the case.
+
+        :raises RuntimeError: if the stream is still streaming.
+        """
+        if self._streaming is True:
+            raise RuntimeError(
+                "This function should only be called when the stream is stopped."
+            )
         async with self.condition:
             self.condition.notify_all()
 
