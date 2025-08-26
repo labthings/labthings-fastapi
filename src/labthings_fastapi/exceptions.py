@@ -26,3 +26,13 @@ class ReadOnlyPropertyError(AttributeError):
     No setter has been defined for this `.FunctionalProperty`, so
     it may not be written to.
     """
+
+
+class PropertyNotObservableError(RuntimeError):
+    """The property is not observable.
+
+    This exception is raised when `.Thing.observe_property` is called with a
+    property that is not observable. Currently, only data properties are
+    observable: functional properties (using a getter/setter) may not be
+    observed.
+    """

@@ -21,13 +21,14 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .properties import DataProperty, BaseSetting
+from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
+from .exceptions import PropertyNotObservableError
 
 
 if TYPE_CHECKING:
@@ -347,10 +348,13 @@ class Thing:
         :param stream: the stream used to send events.
 
         :raise KeyError: if the requested name is not defined on this Thing.
+        :raise PropertyNotObservableError: if the property is not observable.
         """
-        prop = getattr(self.__class__, property_name)
-        if not isinstance(prop, DataProperty):
+        prop = getattr(self.__class__, property_name, None)
+        if not isinstance(prop, BaseProperty):
             raise KeyError(f"{property_name} is not a LabThings Property")
+        if not isinstance(prop, DataProperty):
+            raise PropertyNotObservableError(f"{property_name} is not observable.")
         prop._observers_set(self).add(stream)
 
     def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
@@ -361,7 +365,7 @@ class Thing:
 
         :raise KeyError: if the requested name is not defined on this Thing.
         """
-        action = getattr(self.__class__, action_name)
+        action = getattr(self.__class__, action_name, None)
         if not isinstance(action, ActionDescriptor):
             raise KeyError(f"{action_name} is not an LabThings Action")
         observers = action._observers_set(self)
