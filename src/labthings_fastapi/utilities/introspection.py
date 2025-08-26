@@ -117,7 +117,7 @@ def input_model_from_signature(
         fields[name] = (p_type, default)
     model = create_model(  # type: ignore[call-overload]
         f"{func.__name__}_input",
-        model_config=ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
+        __config__=ConfigDict(extra="allow" if takes_v_kwargs else "forbid"),
         **fields,
     )
     # If there are no fields, we use a RootModel to allow none as well as {}
