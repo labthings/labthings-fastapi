@@ -41,3 +41,34 @@ class ReadOnlyPropertyError(AttributeError):
     No setter has been defined for this `.FunctionalProperty`, so
     it may not be written to.
     """
+
+
+class InconsistentTypeError(TypeError):
+    """Different type hints have been given for a descriptor.
+
+    Some descriptors in LabThings, particularly `.DataProperty` and `.ThingConnection`
+    may have their type specified in different ways. If multiple type hints are
+    provided, they must match. See `.property` for more details.
+    """
+
+
+class MissingTypeError(TypeError):
+    """No type hints have been given for a descriptor that requires a type.
+
+    Every property and thing connection should have a type hint,
+    There are different ways of providing these type hints.
+    This error indicates that no type hint was found.
+
+    See documentation for `.property` and `.thing_connection` for more details.
+    """
+
+
+class ThingNotConnectedError(RuntimeError):
+    """ThingConnections have not yet been set up.
+
+    This error is raised if a ThingConnection is accessed before the `.Thing` has
+    been supplied by the LabThings server. This usually happens because either
+    the `.Thing` is being used without a server (in which case the attribute
+    should be mocked), or because it has been accessed before ``__enter__``
+    has been called.
+    """

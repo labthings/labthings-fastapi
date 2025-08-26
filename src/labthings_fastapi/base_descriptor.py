@@ -7,15 +7,18 @@ the code that implements it.
 
 from __future__ import annotations
 import ast
+import builtins
 import inspect
 from itertools import pairwise
 import textwrap
 from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
 from types import MappingProxyType
+import typing
 from weakref import WeakKeyDictionary
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
+from .exceptions import MissingTypeError, InconsistentTypeError
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -169,6 +172,7 @@ class BaseDescriptor(Generic[Value]):
 
     def __init__(self) -> None:
         """Initialise a BaseDescriptor."""
+        super().__init__()
         self._name: str | None = None
         self._title: str | None = None
         self._description: str | None = None
@@ -351,6 +355,91 @@ class BaseDescriptor(Generic[Value]):
             "__instance_get__ must be defined on BaseDescriptor subclasses. \n\n"
             "See BaseDescriptor.__instance_get__ for details."
         )
+
+
+class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
+    """A BaseDescriptor that determines its type like a dataclass field."""
+
+    def __init__(self) -> None:
+        """Initialise the FieldTypedBaseDescriptor."""
+        self._type: type | None = None  # Will be set in __set_name__
+
+    def __set_name__(self, owner: type[Thing], name: str) -> None:
+        """Take note of the name and type.
+
+        This function is where we determine the type of the property. It may
+        be specified in two ways: either by subscripting the descriptor
+        or by annotating the attribute. This example is for ``DataProperty``
+        as this class is not intended to be used directly.
+
+        .. code-block:: python
+
+            class MyThing(Thing):
+                subscripted_property = DataProperty[int](0)
+                annotated_property: int = DataProperty(0)
+
+        The second form often works better with autocompletion, though it
+        is usually called via a function to avoid type checking errors.
+
+        Neither form allows us to access the type during ``__init__``, which
+        is why we find the type here. If there is a problem, exceptions raised
+        will appear to come from the class definition, so it's important to
+        include the name of the attribute.
+
+        See :ref:`descriptors` for links to the Python docs about when
+        this function is called.
+
+        :param owner: the `.Thing` subclass to which we are being attached.
+        :param name: the name to which we have been assigned.
+
+        :raises InconsistentTypeError: if the type is specified twice and
+            the two types are not identical.
+        :raises MissingTypeError: if no type hints have been given.
+        """
+        # Call BaseDescriptor so we remember the name
+        super().__set_name__(owner, name)
+
+        # Check for type subscripts
+        if hasattr(self, "__orig_class__"):
+            # We have been instantiated with a subscript, e.g. BaseProperty[int].
+            #
+            # __orig_class__ is set on generic classes when they are instantiated
+            # with a subscripted type.
+            self._type = typing.get_args(self.__orig_class__)[0]
+
+        # Check for annotations on the parent class
+        annotations = typing.get_type_hints(owner, include_extras=True)
+        field_annotation = annotations.get(name, None)
+        if field_annotation is not None:
+            # We have been assigned to an annotated class attribute, e.g.
+            # myprop: int = BaseProperty(0)
+            if self._type is not None and self._type != field_annotation:
+                raise InconsistentTypeError(
+                    f"Property {name} on {owner} has conflicting types.\n\n"
+                    f"The field annotation of {field_annotation} conflicts "
+                    f"with the inferred type of {self._type}."
+                )
+            self._type = field_annotation
+        if self._type is None:
+            raise MissingTypeError(
+                f"No type hint was found for property {name} on {owner}."
+            )
+
+    @builtins.property
+    def value_type(self) -> type[Value]:
+        """The type of this descriptor's value.
+
+        This is only available after ``__set_name__`` has been called, which happens
+        at the end of the class definition. If it is called too early, a
+        `.DescriptorNotAddedToClassError` will be raised.
+
+        :return: the type of the descriptor's value.
+        :raises MissingTypeError: if the type is None or not specified.
+        """
+        self.assert_set_name_called()
+        if self._type is None:
+            raise MissingTypeError(f"No type hint was found for property {self.name}. ")
+        return self._type
 
 
 # get_class_attribute_docstrings is a relatively expensive function that
