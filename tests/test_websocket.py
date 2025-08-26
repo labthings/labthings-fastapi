@@ -84,7 +84,6 @@ def ws(client):
             yield ws
         finally:
             ws.close(1000)
-            pass
 
 
 def test_observing_dataprop(thing, mocker):
