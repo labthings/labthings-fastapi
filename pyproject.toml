@@ -108,7 +108,7 @@ preview = true
 # Typing tests do have docstrings, but it's not helpful to insist on imperative
 # mood etc.
 "typing_tests/*" = ["D404", "D401"]
-"docs/*" = ["D", "DOC"]
+"docs/source/conf.py" = ["D", "DOC", "ANN"]
 
 [tool.ruff.lint.pydocstyle]
 # This lets the D401 checker understand that decorated thing properties and thing
