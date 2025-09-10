@@ -77,7 +77,16 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 external = ["DOC401", "F824", "DOC101", "DOC103"]  # used via flake8/pydoclint
-select = ["B", "E4", "E7", "E9", "F", "D", "DOC"]
+select = [
+  "ANN",   # type annotations (ensuring they are present, complements mypy)
+  "B",     # flake8-bugbear
+  "E",     # flake8
+  "F",     # flake8
+  "FAST",  # FastAPI rules (mostly around dependencies)
+  "D",     # pydoclint (recommended by the developers over flake8 plugin)
+  "DOC",   # pydocstyle (limited support for sphinx style: see ignores)
+  "FAST"   # FastAPI rules
+]
 ignore = [
     "D203",  # incompatible with D204
     "D213",  # incompatible with D212
@@ -88,12 +97,14 @@ ignore = [
     "B008",  # This disallows function calls in default values.
     # FastAPI Depends() breaks this rule, and FastAPI's response is "disable it".
     # see https://github.com/fastapi/fastapi/issues/1522
+    "ANN401",  # ANN401 disallows Any. There are quite a few places where Any is
+    # needed for dynamically typed code.
 ]
 preview = true
 
 [tool.ruff.lint.per-file-ignores]
 # Tests are currently not fully docstring-ed, we'll ignore this for now.
-"tests/*" = ["D", "DOC"]
+"tests/*" = ["D", "DOC", "ANN"]
 # Typing tests do have docstrings, but it's not helpful to insist on imperative
 # mood etc.
 "typing_tests/*" = ["D404", "D401"]
