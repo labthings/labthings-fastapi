@@ -1,3 +1,4 @@
+import uuid
 from fastapi.testclient import TestClient
 import pytest
 import functools
@@ -82,14 +83,42 @@ def test_varargs():
 
 
 def test_action_output():
+    """Test that an action's output may be retrieved directly.
+
+    This tests the /action_invocation/{id}/output endpoint, including
+    some error conditions (not found/output not available).
+    """
     with TestClient(server.app) as client:
+        # Start an action and wait for it to complete
         r = client.post("/thing/make_a_dict", json={})
         r.raise_for_status()
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "completed"
         assert invocation["output"] == {"key": "value"}
+        # Retrieve the output directly and check it matches
         r = client.get(get_link(invocation, "output")["href"])
         assert r.json() == {"key": "value"}
+
+        # Test an action that doesn't have an output
+        r = client.post("/thing/action_without_arguments", json={})
+        r.raise_for_status()
+        invocation = poll_task(client, r.json())
+        assert invocation["status"] == "completed"
+        assert invocation["output"] is None
+
+        # If the output is None, retrieving it directly should fail
+        r = client.get(get_link(invocation, "output")["href"])
+        assert r.status_code == 503
+
+        # Repeat the last check, using a manually generated URL
+        # (mostly to check the manually generated URL is valid,
+        # so the next test can be trusted).
+        r = client.get(f"/action_invocation/{invocation['id']}/output")
+        assert r.status_code == 404
+
+        # Test an output on a non-existent invocation
+        r = client.get(f"/action_invocation/{uuid.uuid4()}/output")
+        assert r.status_code == 404
 
 
 def test_openapi():
