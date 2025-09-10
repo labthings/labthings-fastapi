@@ -237,6 +237,11 @@ class Thing:
 
         This is called whenever a setting is updated. All settings are written to
         the settings file every time.
+
+        :raises NotConnectedToServerError: if there is no settings file path set.
+            This is set when the `.Thing` is connected to a `.ThingServer` so
+            most likely we are trying to save settings before we are attached
+            to a server.
         """
         if self._settings is not None:
             if self._setting_storage_path is None:
