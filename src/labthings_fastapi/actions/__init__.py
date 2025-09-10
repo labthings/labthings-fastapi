@@ -169,9 +169,17 @@ class Invocation(Thread):
 
     @property
     def action(self) -> ActionDescriptor:
-        """The `.ActionDescriptor` object running in this thread."""
+        """The `.ActionDescriptor` object running in this thread.
+        
+        :raises RuntimeError: if the action descriptor has been deleted.
+            This should never happen, as the descriptor is a property of
+            a class, which won't be deleted.
+        """
         action = self.action_ref()
-        assert action is not None, "The action for an `Invocation` has been deleted!"
+        if action is None:  # pragma: no cover
+            # Action descriptors should only be deleted after the server has
+            # stopped, so this error should never occur.
+            raise RuntimeError("The action for an `Invocation` has been deleted!")
         return action
 
     @property
@@ -264,7 +272,11 @@ class Invocation(Thread):
 
             thing = self.thing
             kwargs = model_to_dict(self.input)
-            assert thing is not None
+            if thing is None:  # pragma: no cover
+                # The Thing is stored as a weakref, but it will always exist
+                # while the server is running - this error should never
+                # occur.
+                raise RuntimeError("Cannot start an invocation without a Thing.")
 
             with self._status_lock:
                 self._status = InvocationStatus.RUNNING
