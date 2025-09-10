@@ -23,7 +23,7 @@ def test_thing_with_blocking_portal_error(mocker):
     server = lt.ThingServer()
     server.add_thing(Example(), "/example")
     with pytest.raises(RuntimeError):
-        with TestClient(server.app) as client:
+        with TestClient(server.app):
             pass
 
 
