@@ -53,7 +53,7 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
-    def __init__(self, settings_folder: Optional[str] = None):
+    def __init__(self, settings_folder: Optional[str] = None) -> None:
         """Initialise a LabThings server.
 
         Setting up the `.ThingServer` involves creating the underlying

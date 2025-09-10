@@ -687,7 +687,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
     def __init__(
         self,
         fget: ValueGetter,
-    ):
+    ) -> None:
         """Set up a FunctionalProperty.
 
         Create a descriptor for a property that uses a getter function.
