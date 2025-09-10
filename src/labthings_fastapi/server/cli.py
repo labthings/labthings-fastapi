@@ -144,7 +144,6 @@ def serve_from_cli(
         config, server = None, None
         config = config_from_args(args)
         server = server_from_config(config)
-        assert isinstance(server, ThingServer)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)
