@@ -15,14 +15,20 @@ class NotConnectedToServerError(RuntimeError):
 
     This exception is called if an Action is called or
     a `.DataProperty` is updated on a Thing that is not
-    connected to a ThingServer. A server connection is needed
-    to manage asynchronous behaviour.
+    connected to a ThingServer.
+
+    A server connection is needed to manage asynchronous behaviour.
+
+    `.Thing` instances are also only assigned a ``path`` when they
+    are added to a server, so this error may be raised by functions
+    that implement the HTTP API if an attempt is made to construct
+    the API before the `.Thing` has been assigned a path.
     """
 
 
 class ServerNotRunningError(RuntimeError):
     """The ThingServer is not running.
-    
+
     This exception is called when a function assumes the ThingServer is
     running, and it is not. This might be because the function needs to call
     code in the async event loop.
