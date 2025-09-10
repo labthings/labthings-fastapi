@@ -79,13 +79,15 @@ docstring-code-format = true
 external = ["DOC401", "F824", "DOC101", "DOC103"]  # used via flake8/pydoclint
 select = [
   "ANN",   # type annotations (ensuring they are present, complements mypy)
+  "ASYNC", # flake8 async rules
   "B",     # flake8-bugbear
   "E",     # flake8
   "F",     # flake8
   "FAST",  # FastAPI rules (mostly around dependencies)
   "D",     # pydoclint (recommended by the developers over flake8 plugin)
   "DOC",   # pydocstyle (limited support for sphinx style: see ignores)
-  "FAST"   # FastAPI rules
+  "FAST",  # FastAPI rules
+  "S",     # flake8-bandit - notably, this disallows `assert`
 ]
 ignore = [
     "D203",  # incompatible with D204
@@ -104,10 +106,16 @@ preview = true
 
 [tool.ruff.lint.per-file-ignores]
 # Tests are currently not fully docstring-ed, we'll ignore this for now.
-"tests/*" = ["D", "DOC", "ANN"]
+"tests/*" = [
+    "D",      # Tests are not yet fully covered by docstrings
+    "DOC",    # Tests are not yet fully covered by docstrings
+    "ANN",    # We don't require type hints in test code.
+    "S101",   # S101 disallows assert. That's not appropriate for tests.
+]
 # Typing tests do have docstrings, but it's not helpful to insist on imperative
 # mood etc.
 "typing_tests/*" = ["D404", "D401"]
+# The docs config file is a python file, but doesn't conform to the usual rules.
 "docs/source/conf.py" = ["D", "DOC", "ANN"]
 
 [tool.ruff.lint.pydocstyle]
