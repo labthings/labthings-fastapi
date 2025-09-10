@@ -273,6 +273,8 @@ def test_premature_api_and_affordance(mocker):
     """Check the right error is raised if we add to API without a path."""
 
     class Example:
+        path = None  # this is supplied by `lt.Thing` but we're not subclassing.
+
         @tp.property
         def prop(self) -> bool:
             """An example getter."""
