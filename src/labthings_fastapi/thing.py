@@ -78,7 +78,7 @@ class Thing:
     """A human-readable description of the Thing"""
     _labthings_blocking_portal: Optional[BlockingPortal] = None
     """See :ref:`concurrency` for why blocking portal is needed."""
-    path: Optional[str]
+    path: Optional[str] = None
     """The path at which the `.Thing` is exposed over HTTP."""
 
     async def __aenter__(self) -> Self:
