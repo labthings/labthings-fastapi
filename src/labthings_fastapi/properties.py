@@ -372,8 +372,14 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
 
         :param app: The FastAPI application we are adding endpoints to.
         :param thing: The `.Thing` we are adding the endpoints for.
+
+        :raises NotConnectedToServerError: if the `.Thing` does not have
+            a ``path`` set.
         """
-        assert thing.path is not None
+        if thing.path is None:
+            raise NotConnectedToServerError(
+                "Can't add the endpoint without thing.path!"
+            )
         # We can't use the decorator in the usual way, because we'd need to
         # annotate the type of `body` with `self.model` which is only defined
         # at runtime.
@@ -415,9 +421,14 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
             the ``path`` from ``thing``.
 
         :return: A description of the property in :ref:`wot_td` format.
+        :raises NotConnectedToServerError: if the `.Thing` does not have
+            a ``path`` set.
         """
         path = path or thing.path
-        assert path is not None, "Cannot create a property affordance without a path"
+        if path is None:
+            raise NotConnectedToServerError(
+                "Can't create an affordance without thing.path!"
+            )
         ops = [PropertyOp.readproperty]
         if not self.readonly:
             ops.append(PropertyOp.writeproperty)
