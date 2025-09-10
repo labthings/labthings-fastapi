@@ -128,12 +128,16 @@ class EndpointDescriptor:
 
         :param app: the `fastapi.FastAPI` application we are adding to.
         :param thing: the `.Thing` we're bound to.
+
+        :raises NotConnectedToServerError: if there is no ``path`` attribute
+            of the host `.Thing` (which usually means it is not yet connected
+            to a server).
         """
         if thing.path is None:
             raise NotConnectedToServerError(
-                "Endpoints may only be added to Things that have a path. "
-                "This error indicates `add_to_fastapi` is being called before "
-                "the Thing has been assigned a path, which should not happen."
+                "Attempted to add an endpoint to the API, but there is no "
+                "path set on the Thing. This usually means it is not connected "
+                "to a ThingServer."
             )
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
