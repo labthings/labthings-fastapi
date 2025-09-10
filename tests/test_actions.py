@@ -183,6 +183,7 @@ def test_wrapped_action():
 
     # Check we can make the thing and it has a valid TD
     example = Example()
+    example.path = "/example"
     example.validate_thing_description()
 
 
