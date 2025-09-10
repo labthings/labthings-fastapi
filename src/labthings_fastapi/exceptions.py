@@ -20,6 +20,15 @@ class NotConnectedToServerError(RuntimeError):
     """
 
 
+class ServerNotRunningError(RuntimeError):
+    """The ThingServer is not running.
+    
+    This exception is called when a function assumes the ThingServer is
+    running, and it is not. This might be because the function needs to call
+    code in the async event loop.
+    """
+
+
 class ReadOnlyPropertyError(AttributeError):
     """A property is read-only.
 
