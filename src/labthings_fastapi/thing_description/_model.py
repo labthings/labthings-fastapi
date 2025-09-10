@@ -84,32 +84,37 @@ ThingContextType = Union[
 def uses_thing_context(v: ThingContextType) -> None:
     """Check the URLs in the ThingContextType are valid.
 
-    This function makes ``assert`` statements, so will fail with an exception
-    if it is not valid. This module is hard coded to use valid URLs, so it is
-    not an expected error.
+    This function checks a valid context URL is provided. See the
+    JSONSchema for Thing Description (`td-json-schema-validation.json`)
+    for more details.
 
     See https://www.w3.org/TR/wot-thing-description11/#thing
-    This refers to the ``@context`` property.
+    Specifically, the ``@context`` property is what this function
+    validates.
 
     :param v: the ThingContextType object.
 
     :raises ValueError: if the URL is not correct.
     """
     if not isinstance(v, list):
-        if v is not THING_CONTEXT_URL:
-            raise ValueError(f"{v} must be {THING_CONTEXT_URL}")  # pragma: no cover
-            # excluded from coverage as this is hardcoded, so we shouldn't ever
-            # see the error.
+        if v != THING_CONTEXT_URL:
+            raise ValueError(f"{v} must be {THING_CONTEXT_URL}")
     else:
-        if not (
-            v[0] == THING_CONTEXT_URL
-            or v[1] == THING_CONTEXT_URL
-            and v[0] == THING_CONTEXT_URL_v1
-        ):
-            raise ValueError(
-                f"{v} must contain {THING_CONTEXT_URL}"
-            )  # pragma: no cover
-            # This is hard-coded, so is not an error we ever expect to see.
+        if len(v) == 0:
+            raise ValueError("The context can't be an empty list.")
+        if v[0] == THING_CONTEXT_URL:
+            if THING_CONTEXT_URL_v1 in v[1:]:
+                raise ValueError("An old context is given after the current one.")
+            return  # If the old URL isn't in the list, it's OK.
+        if v[0] == THING_CONTEXT_URL_v1:
+            # It's OK to start with the old URL, provided the new URL follows.
+            if len(v) > 1 and v[1] == THING_CONTEXT_URL:
+                return  # Old URL followed by new URL is OK.
+            else:
+                raise ValueError("The thing context URL is outdated, should be v1.1.")
+        raise ValueError(
+            f"{v} must contain {THING_CONTEXT_URL} before {THING_CONTEXT_URL_v1}."
+        )
 
 
 ThingContext = Annotated[
