@@ -170,7 +170,7 @@ class Invocation(Thread):
     @property
     def action(self) -> ActionDescriptor:
         """The `.ActionDescriptor` object running in this thread.
-        
+
         :raises RuntimeError: if the action descriptor has been deleted.
             This should never happen, as the descriptor is a property of
             a class, which won't be deleted.
@@ -186,7 +186,10 @@ class Invocation(Thread):
     def thing(self) -> Thing:
         """The `.Thing` to which the action is bound, i.e. this is ``self``."""
         thing = self.thing_ref()
-        assert thing is not None, "The `Thing` on which an action was run is missing!"
+        if thing is None:  # pragma: no cover
+            # this error block is primarily for mypy: the Thing will exist as
+            # long as the server is running, so we should never hit this error.
+            raise RuntimeError("The `Thing` on which an action was run is missing!")
         return thing
 
     def cancel(self) -> None:
