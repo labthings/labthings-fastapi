@@ -75,7 +75,7 @@ def test_fancy_id_default():
     app = FastAPI()
 
     @app.post("/invoke_fancy")
-    def invoke_fancy(id: FancyID = Depends()) -> dict:
+    def invoke_fancy(id: Annotated[FancyID, Depends()]) -> dict:
         return {"id": "me"}
 
     with TestClient(app) as client:
@@ -93,7 +93,7 @@ def test_class_dep():
         pass
 
     @app.post("/dep")
-    def endpoint(id: DepClass = Depends()) -> bool:
+    def endpoint(id: Annotated[DepClass, Depends()]) -> bool:
         return True
 
     with TestClient(app) as client:
@@ -123,7 +123,7 @@ def test_class_dep_with_subdep():
             self.sub = sub
 
     @app.post("/dep")
-    def endpoint(id: DepClass = Depends()) -> bool:
+    def endpoint(id: Annotated[DepClass, Depends()]) -> bool:
         assert isinstance(id.sub, SubDepClass)
         return True
 

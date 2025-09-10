@@ -139,7 +139,7 @@ class TestExplicitDescriptor(lt.Thing):
     """A DataProperty that should not cause mypy errors."""
 
     intprop2 = lt.DataProperty[int](default_factory=int_factory)
-    """This property should not cause mypy errors, as the factory matches the type hint."""
+    """The factory matches the type hint, so this should be OK."""
 
     intprop3 = lt.DataProperty[int](default_factory=optional_int_factory)
     """Uses a factory function that doesn't match the type hint.
@@ -151,7 +151,7 @@ class TestExplicitDescriptor(lt.Thing):
     """
 
     intprop4 = lt.DataProperty[int](default="foo")  # type: ignore[call-overload]
-    """This property should cause mypy to throw an error, as the default is a string."""
+    """This property should cause an error, as the default is a string."""
 
     intprop5 = lt.DataProperty[int]()  # type: ignore[call-overload]
     """This property should cause mypy to throw an error, as it has no default."""
@@ -160,7 +160,7 @@ class TestExplicitDescriptor(lt.Thing):
     """A DataProperty that should not cause mypy errors."""
 
     optionalintprop2 = lt.DataProperty[int | None](default_factory=optional_int_factory)
-    """This property should not cause mypy errors, as the factory matches the type hint."""
+    """This property should not cause mypy errors: the factory matches the type hint."""
 
     optionalintprop3 = lt.DataProperty[int | None](default_factory=int_factory)
     """Uses a factory function that is a subset of the type hint."""
