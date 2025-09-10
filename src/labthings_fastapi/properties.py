@@ -386,11 +386,13 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         if not self.readonly:
-
-            def set_property(body: Any) -> None:  # We'll annotate body later
+            # The function is initially defined with a ``body`` argument of type
+            # ``Any`` but this will be replaced with the correct annotation a
+            # few lines below.
+            def set_property(body: Any) -> None:
                 if isinstance(body, RootModel):
                     body = body.root
-                return self.__set__(thing, body)
+                self.__set__(thing, body)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.put(
