@@ -21,6 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
+from .exceptions import NotConnectedToServerError
 from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
@@ -238,7 +239,10 @@ class Thing:
         the settings file every time.
         """
         if self._settings is not None:
-            assert self._setting_storage_path is not None
+            if self._setting_storage_path is None:
+                raise NotConnectedToServerError(
+                    "The path to the settings file is not defined yet."
+                )
             setting_dict = {}
             for name in self._settings.keys():
                 value = getattr(self, name)
