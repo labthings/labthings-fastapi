@@ -302,10 +302,10 @@ class BaseDescriptor(Generic[Value]):
     # I have ignored D105 (missing docstrings) on the overloads - these should not
     # exist on @overload definitions.
     @overload
-    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...  # noqa: D105
+    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...
 
     @overload
-    def __get__(self, obj: None, type: type) -> Self: ...  # noqa: D105
+    def __get__(self, obj: None, type: type) -> Self: ...
 
     def __get__(self, obj: Thing | None, type: type | None = None) -> Value | Self:
         """Return the value or the descriptor, as per `property`.
