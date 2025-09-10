@@ -218,7 +218,7 @@ def test_baseproperty_add_to_fastapi():
     # Check the property appears at the expected place
     entry = openapi["paths"]["/example/prop"]
     # Check it declares the right methods
-    assert set(entry.keys()) == set(["get", "put"])
+    assert set(entry.keys()) == {"get", "put"}
 
 
 def test_baseproperty_set_error():

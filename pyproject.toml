@@ -82,6 +82,7 @@ select = [
   "ASYNC", # flake8 async rules
   "B",     # flake8-bugbear
   "BLE",   # don't catch Exception
+  "C4",    # flake8-comprehension rules
   "E",     # flake8
   "F",     # flake8
   "FAST",  # FastAPI rules (mostly around dependencies)
