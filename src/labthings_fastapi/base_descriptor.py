@@ -244,7 +244,7 @@ class BaseDescriptor(Generic[Value]):
 
         The ``name`` of :ref:`wot_affordances` is used in their URL and in
         the :ref:`gen_docs` served by LabThings.
-        
+
         :raises DescriptorNotAddedToClassError: if ``__set_name__`` has not yet
             been called.
         """
