@@ -197,7 +197,14 @@ class ThingServer:
             kwargs = {}
         interface = ThingServerInterface(name=name, server=self)
         # This is where we instantiate the Thing
-        thing = thing_subclass(*args, **kwargs, thing_server_interface=interface)
+        # I've had to ignore this line because the *args causes an error.
+        # Given that *args and **kwargs are very loosely typed anyway, this
+        # doesn't lose us much.
+        thing = thing_subclass(
+            *args,
+            **kwargs,
+            thing_server_interface=interface,
+        )  # type: ignore[misc]
         self._things[name] = thing
         settings_folder = os.path.join(self.settings_folder, name)
         os.makedirs(settings_folder, exist_ok=True)

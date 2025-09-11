@@ -1,9 +1,10 @@
 r"""Interface between `.Thing` subclasses and the `.ThingServer`\ ."""
 
 from __future__ import annotations
+from concurrent.futures import Future
 import os
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Awaitable, Mapping, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping, ParamSpec, TypeVar
 from weakref import ref, ReferenceType
 
 from .exceptions import ServerNotRunningError
@@ -11,6 +12,10 @@ from .exceptions import ServerNotRunningError
 if TYPE_CHECKING:
     from .server import ThingServer
     from .thing import Thing
+
+
+Params = ParamSpec("Params")
+ReturnType = TypeVar("ReturnType")
 
 
 class ThingServerMissingError(RuntimeError):
@@ -68,23 +73,28 @@ class ThingServerInterface:
             raise ThingServerMissingError()
         return server
 
-    def start_async_task_soon(self, async_function: Awaitable, *args: Any) -> None:
+    def start_async_task_soon(
+        self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
+    ) -> Future[ReturnType]:
         """Run an asynchronous task in the server's event loop.
 
         This function wraps `anyio.from_thread.BlockingPortal.start_task_soon` to
         provide a way of calling asynchronous code from threaded code. It will
         call the provided async function in the server's event loop, without any
         guarantee of exactly when it will happen. This means we will return
-        immediately, and the return value from ``async_function`` will not be
-        available.
+        immediately, and the return value of this function will be a
+        `concurrent.futures.Future` object that may resolve to the async function's
+        return value.
 
         :param async_function: the asynchronous function to call.
         :param *args: positional arguments to be provided to the function.
+
+        :returns: an `asyncio.Future` object wrapping the return value.
         """
         portal = self._get_server().blocking_portal
         if portal is None:
             raise ServerNotRunningError("Can't run async code without an event loop.")
-        portal.start_task_soon(async_function, *args)
+        return portal.start_task_soon(async_function, *args)
 
     @property
     def settings_folder(self) -> str:
@@ -137,13 +147,27 @@ class MockThingServerInterface(ThingServerInterface):
         self._name: str = name
         self._settings_tempdir: TemporaryDirectory | None = None
 
-    def start_async_task_soon(self, async_function: Awaitable, *args: Any) -> None:
+    def start_async_task_soon(
+        self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
+    ) -> Future[ReturnType]:
         """Do nothing, as there's no event loop to use.
+
+        This returns a `concurrent.futures.Future` object that is already cancelled,
+        in order to avoid accidental hangs in test code that attempts to wait for
+        the future object to resolve. Cancelling it may cause errors if you need
+        the return value.
+
+        If you need the async code to run, it's best to add the `.Thing` to a
+        `lt.ThingServer` instead. Using a test client will start an event loop
+        in a background thread, and allow you to use a real `.ThingServerInterface`
+        without the overhead of actually starting an HTTP server.
 
         :param async_function: the asynchronous function to call.
         :param *args: positional arguments to be provided to the function.
         """
-        pass
+        f: Future[ReturnType] = Future()
+        f.cancel()
+        return f
 
     @property
     def settings_folder(self) -> str:
@@ -179,6 +203,15 @@ def create_thing_without_server(
         so that it will function without a server.
     """
     name = cls.__name__.lower()
+    if "thing_server_interface" in kwargs:
+        msg = "You may not supply a keyword argument called 'thing_server_interface'."
+        raise ValueError(msg)
     return cls(
         *args, **kwargs, thing_server_interface=MockThingServerInterface(name=name)
-    )
+    )  # type: ignore[misc]
+    # Note: we must ignore misc typing errors above because mypy flags an error
+    # that `thing_server_interface` is multiply specified.
+    # This is a conflict with *args, if we had only **kwargs it would not flag
+    # any error.
+    # Given that args and kwargs are dynamically typed anyway, this does not
+    # lose us much.
