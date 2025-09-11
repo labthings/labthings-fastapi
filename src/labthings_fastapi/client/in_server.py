@@ -51,8 +51,8 @@ class DirectThingClient:
     __globals__ = globals()  # "bake in" globals so dependency injection works
     thing_class: type[Thing]
     """The class of the underlying `.Thing` we are wrapping."""
-    thing_path: str
-    """The path to the Thing on the server. Relative to the server's base URL."""
+    thing_name: str
+    """The name of the Thing on the server."""
 
     def __init__(self, request: Request, **dependencies: Mapping[str, Any]) -> None:
         r"""Wrap a `.Thing` so it works like a `.ThingClient`.
@@ -70,7 +70,7 @@ class DirectThingClient:
             such as access to other `.Things`.
         """
         server = find_thing_server(request.app)
-        self._wrapped_thing = server.things[self.thing_path]
+        self._wrapped_thing = server.things[self.thing_name]
         self._request = request
         self._dependencies = dependencies
 
@@ -254,7 +254,7 @@ def add_property(
 
 def direct_thing_client_class(
     thing_class: type[Thing],
-    thing_path: str,
+    thing_name: str,
     actions: Optional[list[str]] = None,
 ) -> type[DirectThingClient]:
     r"""Create a DirectThingClient from a Thing class and a path.
@@ -262,7 +262,7 @@ def direct_thing_client_class(
     This is a class, not an instance: it's designed to be a FastAPI dependency.
 
     :param thing_class: The `.Thing` subclass that will be wrapped.
-    :param thing_path: The path where the `.Thing` is found on the server.
+    :param thing_name: The name of the `.Thing` on the server.
     :param actions: An optional list giving a subset of actions that will be
         accessed. If this is specified, it may reduce the number of FastAPI
         dependencies we need.
@@ -291,15 +291,15 @@ def direct_thing_client_class(
         # of `DirectThingClient` with bad results.
         DirectThingClient.__init__(self, request, **dependencies)
 
-    init_proxy.__doc__ = f"""Initialise a client for {thing_class} at {thing_path}"""
+    init_proxy.__doc__ = f"""Initialise a client for {thing_class}"""
 
     # Using a class definition gets confused by the scope of the function
     # arguments - this is equivalent to a class definition but all the
     # arguments are evaluated in the right scope.
     client_attrs = {
         "thing_class": thing_class,
-        "thing_path": thing_path,
-        "__doc__": f"A client for {thing_class} at {thing_path}",
+        "thing_name": thing_name,
+        "__doc__": f"A client for {thing_class} named {thing_name}",
         "__init__": init_proxy,
     }
     dependencies: list[inspect.Parameter] = []
