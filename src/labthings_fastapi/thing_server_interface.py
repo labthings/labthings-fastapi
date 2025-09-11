@@ -76,7 +76,7 @@ class ThingServerInterface:
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
     ) -> Future[ReturnType]:
-        """Run an asynchronous task in the server's event loop.
+        r"""Run an asynchronous task in the server's event loop.
 
         This function wraps `anyio.from_thread.BlockingPortal.start_task_soon` to
         provide a way of calling asynchronous code from threaded code. It will
@@ -87,9 +87,12 @@ class ThingServerInterface:
         return value.
 
         :param async_function: the asynchronous function to call.
-        :param *args: positional arguments to be provided to the function.
+        :param \*args: positional arguments to be provided to the function.
 
         :returns: an `asyncio.Future` object wrapping the return value.
+
+        :raises ServerNotRunningError: if the server is not running
+            (i.e. there is no event loop).
         """
         portal = self._get_server().blocking_portal
         if portal is None:
@@ -150,7 +153,7 @@ class MockThingServerInterface(ThingServerInterface):
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
     ) -> Future[ReturnType]:
-        """Do nothing, as there's no event loop to use.
+        r"""Do nothing, as there's no event loop to use.
 
         This returns a `concurrent.futures.Future` object that is already cancelled,
         in order to avoid accidental hangs in test code that attempts to wait for
@@ -163,7 +166,9 @@ class MockThingServerInterface(ThingServerInterface):
         without the overhead of actually starting an HTTP server.
 
         :param async_function: the asynchronous function to call.
-        :param *args: positional arguments to be provided to the function.
+        :param \*args: positional arguments to be provided to the function.
+
+        :returns: a `concurrent.futures.Future` object that has been cancelled.
         """
         f: Future[ReturnType] = Future()
         f.cancel()
@@ -171,13 +176,22 @@ class MockThingServerInterface(ThingServerInterface):
 
     @property
     def settings_folder(self) -> str:
-        """The path to a folder where persistent files may be saved."""
+        """The path to a folder where persistent files may be saved.
+
+        This will create a temporary folder the first time it is called,
+        and return the same folder on subsequent calls.
+
+        :returns: the path to a temporary folder.
+        """
         if not self._settings_tempdir:
             self._settings_tempdir = TemporaryDirectory()
         return self._settings_tempdir.name
 
     def get_thing_states(self) -> Mapping[str, Any]:
-        """Return an empty dictionary to mock the metadata dictionary."""
+        """Return an empty dictionary to mock the metadata dictionary.
+
+        :returns: an empty dictionary.
+        """
         return {}
 
 
@@ -196,11 +210,14 @@ def create_thing_without_server(
     The name of the Thing will be taken from the class name, lowercased.
 
     :param cls: The `.Thing` subclass to instantiate.
-    :param *args: positional arguments to ``__init__``.
-    :param **kwargs: keyword arguments to ``__init__``.
+    :param \*args: positional arguments to ``__init__``.
+    :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
         so that it will function without a server.
+
+    :raises ValueError: if a keyword argument called 'thing_server_interface'
+        is supplied, as this would conflict with the mock interface.
     """
     name = cls.__name__.lower()
     if "thing_server_interface" in kwargs:

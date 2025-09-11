@@ -138,7 +138,9 @@ class ThingThatCantInstantiate(Thing):
     """A Thing that raises an exception in __init__."""
 
     def __init__(self, **kwargs: Any) -> None:
-        """Fail to initialise.
+        r"""Fail to initialise.
+
+        :param \**kwargs: keyword arguments passed to Thing.__init__
 
         :raise RuntimeError: every time.
         """

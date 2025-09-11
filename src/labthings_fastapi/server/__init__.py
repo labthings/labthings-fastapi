@@ -247,10 +247,6 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
-
-        :raises RuntimeError: if a `.Thing` already has a blocking portal attached.
-            This should never happen, and suggests the server is being used to
-            serve a `.Thing` that is already being served elsewhere.
         """
         async with BlockingPortal() as portal:
             # We create a blocking portal to allow threaded code to call async code
@@ -325,7 +321,6 @@ def server_from_config(config: dict) -> ThingServer:
 
     :raise ImportError: if a Thing could not be loaded from the specified
         object reference.
-    :raise TypeError: if a class is specified that does not subclass `.Thing`\ .
     """
     server = ThingServer(config.get("settings_folder", None))
     for name, thing in config.get("things", {}).items():

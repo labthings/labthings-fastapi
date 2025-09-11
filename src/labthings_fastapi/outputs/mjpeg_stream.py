@@ -321,10 +321,6 @@ class MJPEGStream:
         are handled.
 
         :param frame: The frame to add
-        :param portal: The blocking portal to use for scheduling tasks.
-            This is necessary because tasks are handled asynchronously.
-            The blocking portal may be obtained with a dependency, in
-            `labthings_fastapi.dependencies.blocking_portal.BlockingPortal`.
 
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.

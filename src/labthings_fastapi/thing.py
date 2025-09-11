@@ -83,7 +83,16 @@ class Thing:
         """Initialise a Thing.
 
         The most important function of ``__init__`` is attaching the
-        thing_server_interface, and setting the path.
+        thing_server_interface, and setting the path. Note that `.Thing`
+        instances are usually created by a `.ThingServer` and not instantiated
+        directly: if you do make a `.Thing` directly, you will need to supply
+        a `.ThingServerInterface` that is connected to a `.ThingServer` or a
+        suitable mock object.
+
+        :param thing_server_interface: The interface to the server that
+            is hosting this Thing. It will be supplied when the `.Thing` is
+            instantiated by the `.ThingServer` or by
+            `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
 
