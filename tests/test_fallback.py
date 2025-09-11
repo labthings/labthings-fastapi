@@ -49,8 +49,8 @@ def test_fallback_with_server():
         html = response.text
         assert "Something went wrong" in html
         assert "No logging info available" in html
-        assert "thing1/" in html
-        assert "thing2/" in html
+        assert "thing1" in html
+        assert "thing2" in html
 
 
 def test_fallback_with_log():

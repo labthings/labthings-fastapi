@@ -16,14 +16,14 @@ class TestThing(lt.Thing):
         self.alive = False
 
 
-thing = TestThing()
 server = lt.ThingServer()
-server.add_thing(thing, "/thing")
+thing = server.add_thing("thing", TestThing)
 
 
 def test_thing_alive():
     assert thing.alive is False
     with TestClient(server.app) as client:
+        assert thing.alive is True
         r = client.get("/thing/alive")
         assert r.json() is True
     assert thing.alive is False

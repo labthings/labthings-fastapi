@@ -52,16 +52,10 @@ class ThingWithProperties(lt.Thing):
 
 
 @pytest.fixture
-def thing():
-    """Instantiate and return a test Thing."""
-    return ThingWithProperties()
-
-
-@pytest.fixture
-def server(thing):
+def server():
     """Create a server, and add a MyThing test Thing to it."""
     server = lt.ThingServer()
-    server.add_thing(thing, "/thing")
+    server.add_thing("thing", ThingWithProperties)
     return server
 
 
@@ -84,6 +78,12 @@ def ws(client):
             yield ws
         finally:
             ws.close(1000)
+
+
+@pytest.fixture
+def thing():
+    """Create a ThingWithProperties, not connected to a server."""
+    return ThingWithProperties()
 
 
 def test_observing_dataprop(thing, mocker):

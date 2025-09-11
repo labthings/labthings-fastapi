@@ -8,9 +8,14 @@ from .temp_client import poll_task, get_link
 from labthings_fastapi.example_things import MyThing
 import labthings_fastapi as lt
 
-thing = MyThing()
-server = lt.ThingServer()
-server.add_thing(thing, "/thing")
+
+@pytest.fixture
+def client():
+    """Yield a client connected to a ThingServer"""
+    server = lt.ThingServer()
+    server.add_thing("thing", MyThing)
+    with TestClient(server.app) as client:
+        yield client
 
 
 def action_partial(client: TestClient, url: str):
@@ -22,54 +27,67 @@ def action_partial(client: TestClient, url: str):
     return run
 
 
-def test_get_action_invocations():
+def test_get_action_invocations(client):
     """Test that running "get" on an action returns a list of invocations."""
-    with TestClient(server.app) as client:
-        # When we start the action has no invocations
-        invocations_before = client.get("/thing/increment_counter").json()
-        assert invocations_before == []
-        # Start the action
-        r = client.post("/thing/increment_counter")
-        assert r.status_code in (200, 201)
-        # Now it is started, there is a list of 1 dictionary containing the
-        # invocation information.
-        invocations_after = client.get("/thing/increment_counter").json()
-        assert len(invocations_after) == 1
-        assert isinstance(invocations_after, list)
-        assert isinstance(invocations_after[0], dict)
-        assert "status" in invocations_after[0]
-        assert "id" in invocations_after[0]
-        assert "action" in invocations_after[0]
-        assert "href" in invocations_after[0]
-        assert "timeStarted" in invocations_after[0]
-        # Let the task finish before ending the test
-        poll_task(client, r.json())
+    # When we start the action has no invocations
+    invocations_before = client.get("/thing/increment_counter").json()
+    assert invocations_before == []
+    # Start the action
+    r = client.post("/thing/increment_counter")
+    assert r.status_code in (200, 201)
+    # Now it is started, there is a list of 1 dictionary containing the
+    # invocation information.
+    invocations_after = client.get("/thing/increment_counter").json()
+    assert len(invocations_after) == 1
+    assert isinstance(invocations_after, list)
+    assert isinstance(invocations_after[0], dict)
+    assert "status" in invocations_after[0]
+    assert "id" in invocations_after[0]
+    assert "action" in invocations_after[0]
+    assert "href" in invocations_after[0]
+    assert "timeStarted" in invocations_after[0]
+    # Let the task finish before ending the test
+    poll_task(client, r.json())
 
 
-def test_counter():
-    with TestClient(server.app) as client:
-        before_value = client.get("/thing/counter").json()
-        r = client.post("/thing/increment_counter")
-        assert r.status_code in (200, 201)
-        poll_task(client, r.json())
-        after_value = client.get("/thing/counter").json()
-        assert after_value == before_value + 1
+def test_counter(client):
+    """Test that the increment_counter action increments the property."""
+    before_value = client.get("/thing/counter").json()
+    r = client.post("/thing/increment_counter")
+    assert r.status_code in (200, 201)
+    poll_task(client, r.json())
+    after_value = client.get("/thing/counter").json()
+    assert after_value == before_value + 1
 
 
-def test_no_args():
-    with TestClient(server.app) as client:
-        run = action_partial(client, "/thing/action_without_arguments")
-        run({})  # an empty dict should be OK
-        run(None)  # it should also be OK to call it with None
-        # Calling with no payload is equivalent to None
+def test_no_args(client):
+    """Test None and {} are both accepted as input.
+
+    Actions that take no arguments will accept either an empty
+    dictionary or None as their input.
+
+    Note that there is an assertion in `action_partial` so we
+    do check that the action runs.
+    """
+    run = action_partial(client, "/thing/action_without_arguments")
+    run({})  # an empty dict should be OK
+    run(None)  # it should also be OK to call it with None
+    # Calling with no payload is equivalent to None
 
 
-def test_only_kwargs():
-    with TestClient(server.app) as client:
-        run = action_partial(client, "/thing/action_with_only_kwargs")
-        run({})  # an empty dict should be OK
-        run(None)  # it should also be OK to call it with None
-        run({"foo": "bar"})  # it should be OK to call it with a payload
+def test_only_kwargs(client):
+    """Test an action that only has **kwargs works as expected.
+
+    It should be allowable to invoke such an action with no
+    input (see test above) or with arbitrary keyword arguments.
+
+    Note that there is an assertion in `action_partial` so we
+    do check that the action runs.
+    """
+    run = action_partial(client, "/thing/action_with_only_kwargs")
+    run({})  # an empty dict should be OK
+    run(None)  # it should also be OK to call it with None
+    run({"foo": "bar"})  # it should be OK to call it with a payload
 
 
 def test_varargs():
@@ -82,50 +100,48 @@ def test_varargs():
             pass
 
 
-def test_action_output():
+def test_action_output(client):
     """Test that an action's output may be retrieved directly.
 
     This tests the /action_invocation/{id}/output endpoint, including
     some error conditions (not found/output not available).
     """
-    with TestClient(server.app) as client:
-        # Start an action and wait for it to complete
-        r = client.post("/thing/make_a_dict", json={})
-        r.raise_for_status()
-        invocation = poll_task(client, r.json())
-        assert invocation["status"] == "completed"
-        assert invocation["output"] == {"key": "value"}
-        # Retrieve the output directly and check it matches
-        r = client.get(get_link(invocation, "output")["href"])
-        assert r.json() == {"key": "value"}
+    # Start an action and wait for it to complete
+    r = client.post("/thing/make_a_dict", json={})
+    r.raise_for_status()
+    invocation = poll_task(client, r.json())
+    assert invocation["status"] == "completed"
+    assert invocation["output"] == {"key": "value"}
+    # Retrieve the output directly and check it matches
+    r = client.get(get_link(invocation, "output")["href"])
+    assert r.json() == {"key": "value"}
 
-        # Test an action that doesn't have an output
-        r = client.post("/thing/action_without_arguments", json={})
-        r.raise_for_status()
-        invocation = poll_task(client, r.json())
-        assert invocation["status"] == "completed"
-        assert invocation["output"] is None
+    # Test an action that doesn't have an output
+    r = client.post("/thing/action_without_arguments", json={})
+    r.raise_for_status()
+    invocation = poll_task(client, r.json())
+    assert invocation["status"] == "completed"
+    assert invocation["output"] is None
 
-        # If the output is None, retrieving it directly should fail
-        r = client.get(get_link(invocation, "output")["href"])
-        assert r.status_code == 503
+    # If the output is None, retrieving it directly should fail
+    r = client.get(get_link(invocation, "output")["href"])
+    assert r.status_code == 503
 
-        # Repeat the last check, using a manually generated URL
-        # (mostly to check the manually generated URL is valid,
-        # so the next test can be trusted).
-        r = client.get(f"/action_invocation/{invocation['id']}/output")
-        assert r.status_code == 404
+    # Repeat the last check, using a manually generated URL
+    # (mostly to check the manually generated URL is valid,
+    # so the next test can be trusted).
+    r = client.get(f"/action_invocation/{invocation['id']}/output")
+    assert r.status_code == 404
 
-        # Test an output on a non-existent invocation
-        r = client.get(f"/action_invocation/{uuid.uuid4()}/output")
-        assert r.status_code == 404
+    # Test an output on a non-existent invocation
+    r = client.get(f"/action_invocation/{uuid.uuid4()}/output")
+    assert r.status_code == 404
 
 
-def test_openapi():
+def test_openapi(client):
     """Check the OpenAPI docs are generated OK"""
-    with TestClient(server.app) as client:
-        r = client.get("/openapi.json")
-        r.raise_for_status()
+    r = client.get("/openapi.json")
+    r.raise_for_status()
 
 
 def example_decorator(func):

@@ -53,9 +53,8 @@ class PropertyTestThing(lt.Thing):
 
 @pytest.fixture
 def server():
-    thing = PropertyTestThing()
     server = lt.ThingServer()
-    server.add_thing(thing, "/thing")
+    server.add_thing("thing", PropertyTestThing)
     return server
 
 

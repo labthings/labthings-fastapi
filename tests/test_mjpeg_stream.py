@@ -3,6 +3,7 @@ import threading
 import time
 from PIL import Image
 from fastapi.testclient import TestClient
+import pytest
 import labthings_fastapi as lt
 
 
@@ -44,7 +45,16 @@ class Telly(lt.Thing):
         self._streaming = False
 
 
-def test_mjpeg_stream():
+@pytest.fixture
+def client():
+    """Yield a test client connected to a ThingServer"""
+    server = lt.ThingServer()
+    server.add_thing("telly", Telly)
+    with TestClient(server.app) as client:
+        yield client
+
+
+def test_mjpeg_stream(client):
     """Verify the MJPEG stream contains at least one frame marker.
 
     A limitation of the TestClient is that it can't actually stream.
@@ -55,24 +65,19 @@ def test_mjpeg_stream():
     but it might be possible in the future to check there are three
     images there.
     """
-    server = lt.ThingServer()
-    telly = Telly()
-    server.add_thing(telly, "telly")
-    with TestClient(server.app) as client:
-        with client.stream("GET", "/telly/stream") as stream:
-            stream.raise_for_status()
-            received = 0
-            for b in stream.iter_bytes():
-                received += 1
-                assert b.startswith(b"--frame")
+    with client.stream("GET", "/telly/stream") as stream:
+        stream.raise_for_status()
+        received = 0
+        for b in stream.iter_bytes():
+            received += 1
+            assert b.startswith(b"--frame")
 
 
 if __name__ == "__main__":
     import uvicorn
 
     server = lt.ThingServer()
-    telly = Telly()
+    telly = server.add_thing("telly", Telly)
     telly.framerate = 6
     telly.frame_limit = -1
-    server.add_thing(telly, "telly")
     uvicorn.run(server.app, port=5000)

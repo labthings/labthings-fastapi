@@ -88,7 +88,7 @@ class ThingWithSettings(lt.Thing):
 
 
 ThingWithSettingsClientDep = lt.deps.direct_thing_client_dependency(
-    ThingWithSettings, "/thing/"
+    ThingWithSettings, "thing"
 )
 ThingWithSettingsDep = lt.deps.raw_thing_dependency(ThingWithSettings)
 
@@ -175,16 +175,6 @@ def _settings_dict(
 
 
 @pytest.fixture
-def thing():
-    return ThingWithSettings()
-
-
-@pytest.fixture
-def client_thing():
-    return ClientThing()
-
-
-@pytest.fixture
 def server():
     with tempfile.TemporaryDirectory() as tempdir:
         # Yield server rather than return so that the temp directory isn't cleaned up
@@ -192,8 +182,9 @@ def server():
         yield lt.ThingServer(settings_folder=tempdir)
 
 
-def test_setting_available(thing):
+def test_setting_available():
     """Check default settings are available before connecting to server"""
+    thing = ThingWithSettings()
     assert not thing.boolsetting
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
@@ -201,13 +192,13 @@ def test_setting_available(thing):
     assert thing.dictsetting == {"a": 1, "b": 2}
 
 
-def test_functional_settings_save(thing, server):
+def test_functional_settings_save(server):
     """Check updated settings are saved to disk
 
     ``floatsetting`` is a functional setting, we should also test
     a `.DataSetting` for completeness."""
     setting_file = _get_setting_file(server, "/thing")
-    server.add_thing(thing, "/thing")
+    server.add_thing("thing", ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app) as client:
@@ -227,13 +218,13 @@ def test_functional_settings_save(thing, server):
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
 
 
-def test_data_settings_save(thing, server):
+def test_data_settings_save(server):
     """Check updated settings are saved to disk
 
     This uses ``intsetting`` which is a `.DataSetting` so it tests
     a different code path to the functional setting above."""
     setting_file = _get_setting_file(server, "/thing")
-    server.add_thing(thing, "/thing")
+    server.add_thing("thing", ThingWithSettings)
     # The settings file should not be created yet - it's created the
     # first time we write to a setting.
     assert not os.path.isfile(setting_file)
@@ -264,7 +255,7 @@ def test_data_settings_save(thing, server):
     "method",
     ["http", "direct_thing_client", "direct"],
 )
-def test_readonly_setting(thing, client_thing, server, endpoint, value, method):
+def test_readonly_setting(server, endpoint, value, method):
     """Check read-only functional settings cannot be set remotely.
 
     Functional settings must always have a setter, and will be
@@ -280,8 +271,8 @@ def test_readonly_setting(thing, client_thing, server, endpoint, value, method):
     block of code inside the ``with`` block each time.
     """
     setting_file = _get_setting_file(server, "/thing")
-    server.add_thing(thing, "/thing")
-    server.add_thing(client_thing, "/client_thing")
+    server.add_thing("thing", ThingWithSettings)
+    server.add_thing("client_thing", ClientThing)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
 
@@ -327,10 +318,10 @@ def test_readonly_setting(thing, client_thing, server, endpoint, value, method):
         assert not os.path.isfile(setting_file)  # No file created
 
 
-def test_settings_dict_save(thing, server):
+def test_settings_dict_save(server):
     """Check settings are saved if the dict is updated in full"""
     setting_file = _get_setting_file(server, "/thing")
-    server.add_thing(thing, "/thing")
+    thing = server.add_thing("thing", ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app):
@@ -341,24 +332,25 @@ def test_settings_dict_save(thing, server):
             assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
 
 
-def test_premature_Settings_save(thing):
+def test_premature_Settings_save():
     """Check a helpful error is raised if the settings path is missing.
 
     The settings path is only set when a thing is connected to a server,
-    so if we use an unconnected thing, we should see the error.
+    so if we use an unconnected we should see the error.
     """
+    thing = ThingWithSettings()
     with pytest.raises(NotConnectedToServerError):
         thing.save_settings()
 
 
-def test_settings_dict_internal_update(thing, server):
+def test_settings_dict_internal_update(server):
     """Confirm settings are not saved if the internal value of a dictionary is updated
 
     This behaviour is not ideal, but it is documented. If the behaviour is updated
     then the documentation should be updated and this test removed
     """
     setting_file = _get_setting_file(server, "/thing")
-    server.add_thing(thing, "/thing")
+    thing = server.add_thing("thing", ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app):
@@ -368,7 +360,7 @@ def test_settings_dict_internal_update(thing, server):
         assert not os.path.isfile(setting_file)
 
 
-def test_settings_load(thing, server):
+def test_settings_load(server):
     """Check settings can be loaded from disk when added to server"""
     setting_file = _get_setting_file(server, "/thing")
     setting_json = json.dumps(_settings_dict(floatsetting=3.0, stringsetting="bar"))
@@ -377,13 +369,13 @@ def test_settings_load(thing, server):
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
     # Add thing to server and check new settings are loaded
-    server.add_thing(thing, "/thing")
+    thing = server.add_thing("thing", ThingWithSettings)
     assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
 
 
-def test_load_extra_settings(thing, server, caplog):
+def test_load_extra_settings(server, caplog):
     """Load from setting file. Extra setting in file should create a warning."""
     setting_file = _get_setting_file(server, "/thing")
     setting_dict = _settings_dict(floatsetting=3.0, stringsetting="bar")
@@ -396,7 +388,7 @@ def test_load_extra_settings(thing, server, caplog):
 
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        server.add_thing(thing, "/thing")
+        thing = server.add_thing("thing", ThingWithSettings)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.thing"
@@ -407,7 +399,7 @@ def test_load_extra_settings(thing, server, caplog):
     assert thing.floatsetting == 3.0
 
 
-def test_try_loading_corrupt_settings(thing, server, caplog):
+def test_try_loading_corrupt_settings(server, caplog):
     """Load from setting file. Extra setting in file should create a warning."""
     setting_file = _get_setting_file(server, "/thing")
     setting_dict = _settings_dict(floatsetting=3.0, stringsetting="bar")
@@ -421,7 +413,7 @@ def test_try_loading_corrupt_settings(thing, server, caplog):
 
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        server.add_thing(thing, "/thing")
+        thing = server.add_thing("thing", ThingWithSettings)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.thing"

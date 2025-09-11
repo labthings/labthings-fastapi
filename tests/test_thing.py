@@ -1,4 +1,3 @@
-import pytest
 from labthings_fastapi.example_things import MyThing
 from labthings_fastapi import ThingServer
 
@@ -12,15 +11,6 @@ def test_td_validates():
 
 def test_add_thing():
     """Check that thing can be added to the server"""
-    thing = MyThing()
     server = ThingServer()
-    server.add_thing(thing, "/thing")
-
-
-def test_add_naughty_thing():
-    """Check that a thing trying to access server resources
-    using .. is not allowed"""
-    thing = MyThing()
-    server = ThingServer()
-    with pytest.raises(ValueError):
-        server.add_thing(thing, "/../../../../bin")
+    server.add_thing("thing", MyThing)
+    assert isinstance(server.things["thing"], MyThing)

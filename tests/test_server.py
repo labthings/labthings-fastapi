@@ -33,7 +33,7 @@ def test_thing_with_blocking_portal_error(mocker):
             self._labthings_blocking_portal = mocker.Mock()
 
     server = lt.ThingServer()
-    server.add_thing(Example(), "/example")
+    server.add_thing("example", Example)
     with pytest.RaisesGroup(pytest.RaisesExc(RuntimeError, match="blocking portal")):
         with TestClient(server.app):
             pass

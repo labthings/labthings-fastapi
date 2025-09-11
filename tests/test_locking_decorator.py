@@ -115,8 +115,8 @@ def echo_via_client(client):
 def test_locking_in_server():
     """Check the lock works within LabThings."""
     server = lt.ThingServer()
-    thing = LockedExample()
-    server.add_thing(thing, "/thing")
+    server.add_thing("thing", LockedExample)
+    thing = server.things["thing"]
     with TestClient(server.app) as client:
         # Start a long task
         r1 = client.post("/thing/wait_wrapper", json={})

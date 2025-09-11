@@ -54,7 +54,7 @@ def counter_client(mocker) -> DirectThingClient:
     return StandaloneCounterClient(counter)
 
 
-CounterDep = lt.deps.direct_thing_client_dependency(Counter, "/counter/")
+CounterDep = lt.deps.direct_thing_client_dependency(Counter, "counter")
 RawCounterDep = lt.deps.raw_thing_dependency(Counter)
 
 
@@ -145,8 +145,8 @@ def test_directthingclient_in_server(action):
     This uses the internal thing client mechanism.
     """
     server = lt.ThingServer()
-    server.add_thing(Counter(), "/counter")
-    server.add_thing(Controller(), "/controller")
+    server.add_thing("counter", Counter)
+    server.add_thing("controller", Controller)
     with TestClient(server.app) as client:
         r = client.post(f"/controller/{action}")
         invocation = poll_task(client, r.json())

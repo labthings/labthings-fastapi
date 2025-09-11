@@ -47,7 +47,7 @@ class ThingOne(lt.Thing):
         return blob
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):
@@ -64,6 +64,16 @@ class ThingTwo(lt.Thing):
         passthrough = thing_one.passthrough_blob(blob=output)
         assert passthrough.content == ThingOne.ACTION_ONE_RESULT
         return True
+
+
+@pytest.fixture
+def client():
+    """Yield a test client connected to a ThingServer."""
+    server = lt.ThingServer()
+    server.add_thing("thing_one", ThingOne)
+    server.add_thing("thing_two", ThingTwo)
+    with TestClient(server.app) as client:
+        yield client
 
 
 def test_blob_type():
@@ -96,13 +106,10 @@ def test_blob_creation():
     assert blob.content == TEXT
 
 
-def test_blob_output_client():
+def test_blob_output_client(client):
     """Test that blob outputs work as expected when used over HTTP."""
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    with TestClient(server.app) as client:
-        tc = lt.ThingClient.from_url("/thing_one/", client=client)
-        check_actions(tc)
+    tc = lt.ThingClient.from_url("/thing_one/", client=client)
+    check_actions(tc)
 
 
 def test_blob_output_direct():
@@ -111,15 +118,11 @@ def test_blob_output_direct():
     check_actions(thing)
 
 
-def test_blob_output_inserver():
+def test_blob_output_inserver(client):
     """Test that the blob output works the same when used via a DirectThingClient."""
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    server.add_thing(ThingTwo(), "/thing_two")
-    with TestClient(server.app) as client:
-        tc = lt.ThingClient.from_url("/thing_two/", client=client)
-        output = tc.check_both()
-        assert output is True
+    tc = lt.ThingClient.from_url("/thing_two/", client=client)
+    output = tc.check_both()
+    assert output is True
 
 
 def check_blob(output, expected_content: bytes):
@@ -145,23 +148,19 @@ def check_actions(thing):
         check_blob(output, ThingOne.ACTION_ONE_RESULT)
 
 
-def test_blob_input():
+def test_blob_input(client):
     """Check that blobs can be used as input."""
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    server.add_thing(ThingTwo(), "/thing_two")
-    with TestClient(server.app) as client:
-        tc = lt.ThingClient.from_url("/thing_one/", client=client)
-        output = tc.action_one()
-        print(f"Output is {output}")
-        assert output is not None
+    tc = lt.ThingClient.from_url("/thing_one/", client=client)
+    output = tc.action_one()
+    print(f"Output is {output}")
+    assert output is not None
 
-        # Check that the blob can be passed from one action to another,
-        # via the client
-        passthrough = tc.passthrough_blob(blob=output)
-        print(f"Output is {passthrough}")
-        assert passthrough.content == ThingOne.ACTION_ONE_RESULT
+    # Check that the blob can be passed from one action to another,
+    # via the client
+    passthrough = tc.passthrough_blob(blob=output)
+    print(f"Output is {passthrough}")
+    assert passthrough.content == ThingOne.ACTION_ONE_RESULT
 
-        # Check that the same thing works on the server side
-        tc2 = lt.ThingClient.from_url("/thing_two/", client=client)
-        assert tc2.check_passthrough() is True
+    # Check that the same thing works on the server side
+    tc2 = lt.ThingClient.from_url("/thing_two/", client=client)
+    assert tc2.check_passthrough() is True

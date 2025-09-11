@@ -4,6 +4,7 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 
 from typing import Any, Mapping
 from fastapi.testclient import TestClient
+import pytest
 from .temp_client import poll_task
 import labthings_fastapi as lt
 
@@ -26,7 +27,7 @@ class ThingOne(lt.Thing):
         return {"a": self.a}
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):
@@ -47,15 +48,22 @@ class ThingTwo(lt.Thing):
         return metadata
 
 
-def test_fresh_metadata():
+@pytest.fixture
+def client():
+    """Yield a test client connected to a ThingServer."""
     server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one/")
-    server.add_thing(ThingTwo(), "/thing_two/")
+    server.add_thing("thing_one", ThingOne)
+    server.add_thing("thing_two", ThingTwo)
     with TestClient(server.app) as client:
-        r = client.post("/thing_two/count_and_watch")
-        invocation = poll_task(client, r.json())
-        assert invocation["status"] == "completed"
-        out = invocation["output"]
-        for a in ThingTwo.A_VALUES:
-            assert out[f"a_{a}"]["/thing_one/"]["a"] == a
-            assert out[f"a_{a}"]["/thing_two/"]["a"] == 1
+        yield client
+
+
+def test_fresh_metadata(client):
+    """"""
+    r = client.post("/thing_two/count_and_watch")
+    invocation = poll_task(client, r.json())
+    assert invocation["status"] == "completed"
+    out = invocation["output"]
+    for a in ThingTwo.A_VALUES:
+        assert out[f"a_{a}"]["thing_one"]["a"] == a
+        assert out[f"a_{a}"]["thing_two"]["a"] == 1
