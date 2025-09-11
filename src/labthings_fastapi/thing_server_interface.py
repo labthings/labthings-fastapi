@@ -152,6 +152,10 @@ class MockThingServerInterface(ThingServerInterface):
             self._settings_tempdir = TemporaryDirectory()
         return self._settings_tempdir.name
 
+    def get_thing_states(self) -> Mapping[str, Any]:
+        """Return an empty dictionary to mock the metadata dictionary."""
+        return {}
+
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
