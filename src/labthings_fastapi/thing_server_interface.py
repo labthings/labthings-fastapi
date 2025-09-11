@@ -122,7 +122,7 @@ class ThingServerInterface:
         A ThingServerInterface is specific to one Thing, so this path points
         to the base URL of the Thing, i.e. the Thing Description's endpoint.
         """
-        return f"/{self.name}/"
+        return self._get_server().path_for_thing(self.name)
 
     def get_thing_states(self) -> Mapping[str, Any]:
         """Retrieve metadata from all Things on the server.
@@ -186,6 +186,15 @@ class MockThingServerInterface(ThingServerInterface):
         if not self._settings_tempdir:
             self._settings_tempdir = TemporaryDirectory()
         return self._settings_tempdir.name
+
+    @property
+    def path(self) -> str:
+        """The path, relative to the server's base URL, of the Thing.
+
+        A ThingServerInterface is specific to one Thing, so this path points
+        to the base URL of the Thing, i.e. the Thing Description's endpoint.
+        """
+        return f"/{self.name}/"
 
     def get_thing_states(self) -> Mapping[str, Any]:
         """Return an empty dictionary to mock the metadata dictionary.

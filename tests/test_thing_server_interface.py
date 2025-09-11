@@ -108,7 +108,16 @@ def test_name(server, interface):
 
 def test_path(interface, server):
     """Check the thing's path is generated predictably."""
+    with pytest.raises(KeyError):
+        # `interface` is for a thing called NAME, which isn't
+        # added to the server, so when we try to get its path
+        # it should raise an error.
+        _ = interface.path
+    # If we put something in the dictionary of things, it should work.
+    server._things[NAME] = None
     assert interface.path == f"/{NAME}/"
+    # We can also check the example thing, which is actually added to the server.
+    # This doesn't need any mocking.
     assert server.things["example"].path == "/example/"
 
 
@@ -139,6 +148,11 @@ def test_mock_settings_folder(mockinterface):
     f = mockinterface.settings_folder
     assert f == mockinterface._settings_tempdir.name
     assert mockinterface.settings_file_path == os.path.join(f, "settings.json")
+
+
+def test_mock_path(mockinterface):
+    """Check the path is generated predictably."""
+    assert mockinterface.path == f"/{NAME}/"
 
 
 def test_mock_get_thing_states(mockinterface):
