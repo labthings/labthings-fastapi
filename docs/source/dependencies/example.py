@@ -5,7 +5,7 @@ from fastapi import Depends
 import labthings_fastapi as lt
 from labthings_fastapi.example_things import MyThing
 
-MyThingClient = lt.deps.direct_thing_client_class(MyThing, "/mything/")
+MyThingClient = lt.deps.direct_thing_client_class(MyThing, "mything")
 MyThingDep = Annotated[MyThingClient, Depends()]
 
 
@@ -19,8 +19,8 @@ class TestThing(lt.Thing):
 
 
 server = lt.ThingServer()
-server.add_thing(MyThing(), "/mything/")
-server.add_thing(TestThing(), "/testthing/")
+server.add_thing("mything", MyThing)
+server.add_thing("testthing", TestThing)
 
 if __name__ == "__main__":
     import uvicorn
