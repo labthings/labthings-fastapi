@@ -270,13 +270,13 @@ class Invocation(Thread):
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
         action: ActionDescriptor = self.action  # type: ignore[call-overload]
+        # Create a logger just for this invocation, keyed to the invocation id
+        # Logs that go to this logger will be copied into `self._log`
+        handler = DequeLogHandler(dest=self._log)
+        logger = invocation_logger(self.id)
+        logger.addHandler(handler)
         try:
             action.emit_changed_event(self.thing, self._status.value)
-
-            # Capture just this thread's log messages
-            handler = DequeLogHandler(dest=self._log)
-            logger = invocation_logger(self.id)
-            logger.addHandler(handler)
 
             thing = self.thing
             kwargs = model_to_dict(self.input)
