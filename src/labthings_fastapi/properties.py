@@ -85,14 +85,15 @@ if TYPE_CHECKING:
 
 # Note on ignored linter codes:
 #
-# D103 refers to missing docstrings. I have ignored this on @overload definitions
-# because they shouldn't have docstrings - the docstring belongs only on the
-# function they overload.
-# D105 is the same as D103, but for __init__ (i.e. magic methods).
-# DOC101 and DOC103 are also a result of overloads not having docstrings
-# DOC201 is ignored on properties. Because we are overriding the
-# builtin `property`, we are using `@builtins.property` which is not recognised
-# by pydoclint as a property. I've therefore ignored those codes manually.
+# DOC101 and DOC103 are a result of overloads not having docstrings. While
+#     the related D codes (checked by Ruff) don't flag overloads, pydoclint
+#     doesn't ignore overloads. This is most likely a pydoclint bug that
+#     we are working around.
+# DOC201 is ignored on properties.
+#     Because we are overriding the
+#     builtin `property`, we are using `@builtins.property` which is not
+#     recognised by pydoclint as a property. I've therefore ignored those
+#     codes manually.
 # pydocstyle ("D" codes) is run in Ruff and correctly recognises
 # builtins.property as a property decorator.
 
@@ -207,19 +208,17 @@ def default_factory_from_arguments(
 
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
-def property(  # noqa: D103
+def property(
     getter: Callable[[Any], Value],
 ) -> FunctionalProperty[Value]: ...
 
 
 @overload  # use as `field: int = property(default=0)`
-def property(  # noqa: D103
-    *, default: Value, readonly: bool = False
-) -> Value: ...
+def property(*, default: Value, readonly: bool = False) -> Value: ...
 
 
 @overload  # use as `field: int = property(default_factory=lambda: 0)`
-def property(  # noqa: D103
+def property(
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 
@@ -480,12 +479,12 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     """
 
     @overload
-    def __init__(  # noqa: D105,D107,DOC101,DOC103
+    def __init__(  # noqa: DOC101,DOC103
         self, default: Value, *, readonly: bool = False
     ) -> None: ...
 
     @overload
-    def __init__(  # noqa: D105,D107,DOC101,DOC103
+    def __init__(  # noqa: DOC101,DOC103
         self, *, default_factory: ValueFactory, readonly: bool = False
     ) -> None: ...
 
@@ -833,19 +832,17 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
 
 @overload  # use as a decorator  @setting
-def setting(  # noqa: D103
+def setting(
     getter: Callable[[Any], Value],
 ) -> FunctionalSetting[Value]: ...
 
 
 @overload  # use as `field: int = setting(default=0)``
-def setting(  # noqa: D103
-    *, default: Value, readonly: bool = False
-) -> Value: ...
+def setting(*, default: Value, readonly: bool = False) -> Value: ...
 
 
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`
-def setting(  # noqa: D103
+def setting(
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 
