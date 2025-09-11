@@ -153,17 +153,27 @@ class ThingServer:
         args: Sequence[Any] | None = None,
         kwargs: Mapping[str, Any] | None = None,
     ) -> ThingSubclass:
-        """Add a thing to the server.
+        r"""Add a thing to the server.
+
+        This function will create an instance of ``thing_subclass`` and supply
+        the ``args`` and ``kwargs`` arguments to its ``__init__`` method. That
+        instance will then be added to the server with the given name.
 
         :param name: The name to use for the thing. This will be part of the URL
             used to access the thing, and must only contain alphanumeric characters,
             hyphens and underscores.
         :param thing_subclass: The `.Thing` subclass to add to the server.
+        :param args: positional arguments to pass to the constructor of
+            ``thing_subclass``\ .
         :param kwargs: keyword arguments to pass to the constructor of
-            ``thing_subclass``.
+            ``thing_subclass``\ .
+
+        :returns: the instance of ``thing_subclass`` that was created and added
+            to the server. There is no need to retain a reference to this, as it
+            is stored in the server's dictionary of `.Thing` instances.
 
         :raise ValueError: if ``path`` contains invalid characters.
-        :raise KeyError: if a `.Thing` has already been added at ``path``.
+        :raise KeyError: if a `.Thing` has already been added at ``path``\ .
         :raise TypeError: if ``thing_subclass`` is not a subclass of `.Thing`
             or if ``name`` is not string-like. This usually means arguments
             are being passed the wrong way round.
