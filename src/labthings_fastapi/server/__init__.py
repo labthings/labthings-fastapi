@@ -23,6 +23,7 @@ from ..utilities.object_reference_to_object import (
 )
 from ..actions import ActionManager
 from ..thing import Thing
+from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers  # noqa: F401
 
@@ -194,8 +195,9 @@ class ThingServer:
             args = []
         if kwargs is None:
             kwargs = {}
+        interface = ThingServerInterface(name=name, server=self)
         # This is where we instantiate the Thing
-        thing = thing_subclass(*args, **kwargs)
+        thing = thing_subclass(*args, **kwargs, thing_server_interface=interface)
         self._things[name] = thing
         settings_folder = os.path.join(self.settings_folder, name)
         os.makedirs(settings_folder, exist_ok=True)
@@ -244,13 +246,9 @@ class ThingServer:
             serve a `.Thing` that is already being served elsewhere.
         """
         async with BlockingPortal() as portal:
+            # We create a blocking portal to allow threaded code to call async code
+            # in the event loop.
             self.blocking_portal = portal
-            # We attach a blocking portal to each thing, so that threaded code can
-            # make callbacks to async code (needed for events etc.)
-            for thing in self.things.values():
-                if thing._labthings_blocking_portal is not None:
-                    raise RuntimeError("Things may only ever have one blocking portal")
-                thing._labthings_blocking_portal = portal
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
             # and shut down the hardware. NB we must make sure the blocking portal
@@ -259,9 +257,6 @@ class ThingServer:
                 for thing in self.things.values():
                     await stack.enter_async_context(thing)
                 yield
-            for _name, thing in self.things.items():
-                # Remove the blocking portal - the event loop is about to stop.
-                thing._labthings_blocking_portal = None
 
         self.blocking_portal = None
 
@@ -336,9 +331,6 @@ def server_from_config(config: dict) -> ThingServer:
                 f"Could not import {thing['class']}, which was "
                 f"specified as the class for {name}."
             ) from e
-        instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
-        if not isinstance(instance, Thing):
-            raise TypeError(f"{thing['class']} is not a Thing")
         server.add_thing(
             name=name,
             thing_subclass=cls,

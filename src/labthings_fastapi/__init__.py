@@ -20,6 +20,7 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
+from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
 from .decorators import (
     thing_action,
@@ -30,7 +31,6 @@ from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
 from .client import ThingClient
-from .utilities import get_blocking_portal
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.
@@ -40,6 +40,7 @@ from .utilities import get_blocking_portal
 # re-export style, we may switch in the future.
 __all__ = [
     "Thing",
+    "ThingServerInterface",
     "property",
     "setting",
     "DataProperty",
@@ -52,5 +53,4 @@ __all__ = [
     "ThingServer",
     "cli",
     "ThingClient",
-    "get_blocking_portal",
 ]

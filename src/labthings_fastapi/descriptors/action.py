@@ -33,7 +33,7 @@ from ..utilities.introspection import (
 from ..outputs.blob import BlobIOContextDep
 from ..thing_description import type_to_dataschema
 from ..thing_description._model import ActionAffordance, ActionOp, Form
-from ..utilities import labthings_data, get_blocking_portal
+from ..utilities import labthings_data
 from ..exceptions import NotConnectedToServerError
 
 if TYPE_CHECKING:
@@ -200,19 +200,8 @@ class ActionDescriptor:
 
         :param obj: The `.Thing` on which the action is being observed.
         :param status: The status of the action, to be sent to observers.
-
-        :raise NotConnectedToServerError: if the Thing calling the action is not
-            connected to a server with a running event loop.
         """
-        runner = get_blocking_portal(obj)
-        if not runner:
-            thing_name = obj.__class__.__name__
-            msg = (
-                f"Cannot emit action changed event. Is {thing_name} connected to "
-                "a running server?"
-            )
-            raise NotConnectedToServerError(msg)
-        runner.start_task_soon(
+        obj._thing_server_interface.start_async_task_soon(
             self.emit_changed_event_async,
             obj,
             status,

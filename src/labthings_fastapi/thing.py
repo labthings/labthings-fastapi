@@ -16,7 +16,6 @@ from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
-from anyio.from_thread import BlockingPortal
 from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
@@ -35,6 +34,7 @@ from .exceptions import PropertyNotObservableError
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
+    from .thing_server_interface import ThingServerInterface
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,8 @@ class Thing:
 
     * ``__init__``: You should accept any arguments you need to configure the Thing
         in ``__init__``. Don't initialise any hardware at this time, as your Thing may
-        be instantiated quite early, or even at import time.
+        be instantiated quite early, or even at import time. You must make sure to
+        call ``super().__init__(thing_server_interface)``\ .
     * ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
         should start and stop communications with the hardware. This is Python's
         "context manager" protocol. The arguments of ``__exit__`` will be ``None``
@@ -70,17 +71,26 @@ class Thing:
         so it makes sense to set this in a subclass.
 
     There are various LabThings methods that you should avoid overriding unless you
-    know what you are doing: anything not mentioned above that's defined in `Thing` is
+    know what you are doing: anything not mentioned above that's defined in `.Thing` is
     probably best left alone. They may in time be collected together into a single
     object to avoid namespace clashes.
     """
 
     title: str
     """A human-readable description of the Thing"""
-    _labthings_blocking_portal: Optional[BlockingPortal] = None
-    """See :ref:`concurrency` for why blocking portal is needed."""
-    path: Optional[str] = None
-    """The path at which the `.Thing` is exposed over HTTP."""
+
+    def __init__(self, thing_server_interface: ThingServerInterface) -> None:
+        """Initialise a Thing.
+
+        The most important function of ``__init__`` is attaching the
+        thing_server_interface, and setting the path.
+        """
+        self._thing_server_interface = thing_server_interface
+
+    @property
+    def path(self) -> str:
+        """The path at which the `.Thing` is exposed over HTTP."""
+        return self._thing_server_interface.path
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.
@@ -130,7 +140,6 @@ class Thing:
         We create HTTP endpoints for all :ref:`wot_affordances` on the `.Thing`, as well
         as any `.EndpointDescriptor` descriptors.
         """
-        self.path = path
         self.action_manager: ActionManager = server.action_manager
         self.load_settings(setting_storage_path)
 

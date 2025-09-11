@@ -653,19 +653,8 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
 
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
-
-        :raise NotConnectedToServerError: if the Thing that is calling the property
-            update is not connected to a server with a running event loop.
         """
-        runner = obj._labthings_blocking_portal
-        if not runner:
-            thing_name = obj.__class__.__name__
-            msg = (
-                f"Cannot emit property updated changed event. Is {thing_name} "
-                "connected to a running server?"
-            )
-            raise NotConnectedToServerError(msg)
-        runner.start_task_soon(
+        obj._thing_server_interface.start_async_task_soon(
             self.emit_changed_event_async,
             obj,
             value,
@@ -751,7 +740,8 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         .. code-block:: python
 
             class MyThing(lt.Thing):
-                def __init__(self):
+                def __init__(self, thing_server_interface):
+                    super().__init__(thing_server_interface=thing_server_interface)
                     self._myprop: int = 0
 
                 @lt.property
