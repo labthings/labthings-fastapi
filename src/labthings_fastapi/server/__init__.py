@@ -32,7 +32,7 @@ from ..outputs.blob import BlobDataManager
 # A path should be made up of names separated by / as a path separator.
 # Each name should be made of alphanumeric characters, hyphen, or underscore.
 # This regex enforces a trailing /
-PATH_REGEX = re.compile(r"^/([a-zA-Z0-9\-_]+\/)+$")
+PATH_REGEX = re.compile(r"^([a-zA-Z0-9\-_]+)$")
 
 
 class ThingServer:
@@ -161,8 +161,12 @@ class ThingServer:
 
         :raise ValueError: if ``path`` contains invalid characters.
         :raise KeyError: if a `.Thing` has already been added at ``path``.
-        :raise TypeError: if ``thing_subclass`` is not a subclass of `.Thing`.
+        :raise TypeError: if ``thing_subclass`` is not a subclass of `.Thing`
+            or if ``name`` is not string-like. This usually means arguments
+            are being passed the wrong way round.
         """
+        if not isinstance(name, str):
+            raise TypeError("Thing names must be strings.")
         if PATH_REGEX.match(name) is None:
             msg = (
                 f"'{name}' contains unsafe characters. Use only alphanumeric "
