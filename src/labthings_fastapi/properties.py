@@ -372,19 +372,27 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
 
         :param app: The FastAPI application we are adding endpoints to.
         :param thing: The `.Thing` we are adding the endpoints for.
+
+        :raises NotConnectedToServerError: if the `.Thing` does not have
+            a ``path`` set.
         """
-        assert thing.path is not None
+        if thing.path is None:
+            raise NotConnectedToServerError(
+                "Can't add the endpoint without thing.path!"
+            )
         # We can't use the decorator in the usual way, because we'd need to
         # annotate the type of `body` with `self.model` which is only defined
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         if not self.readonly:
-
-            def set_property(body: Any) -> None:  # We'll annotate body later
+            # The function is initially defined with a ``body`` argument of type
+            # ``Any`` but this will be replaced with the correct annotation a
+            # few lines below.
+            def set_property(body: Any) -> None:
                 if isinstance(body, RootModel):
                     body = body.root
-                return self.__set__(thing, body)
+                self.__set__(thing, body)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.put(
@@ -415,9 +423,14 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
             the ``path`` from ``thing``.
 
         :return: A description of the property in :ref:`wot_td` format.
+        :raises NotConnectedToServerError: if the `.Thing` does not have
+            a ``path`` set.
         """
         path = path or thing.path
-        assert path is not None, "Cannot create a property affordance without a path"
+        if path is None:
+            raise NotConnectedToServerError(
+                "Can't create an affordance without thing.path!"
+            )
         ops = [PropertyOp.readproperty]
         if not self.readonly:
             ops.append(PropertyOp.writeproperty)
@@ -687,7 +700,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
     def __init__(
         self,
         fget: ValueGetter,
-    ):
+    ) -> None:
         """Set up a FunctionalProperty.
 
         Create a descriptor for a property that uses a getter function.

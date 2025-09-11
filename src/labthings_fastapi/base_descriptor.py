@@ -244,11 +244,16 @@ class BaseDescriptor(Generic[Value]):
 
         The ``name`` of :ref:`wot_affordances` is used in their URL and in
         the :ref:`gen_docs` served by LabThings.
+
+        :raises DescriptorNotAddedToClassError: if ``__set_name__`` has not yet
+            been called.
         """
         self.assert_set_name_called()
-        assert self._name is not None
-        # The assert statement is mostly for typing: if assert_set_name_called
-        # doesn't raise an error, self._name has been set.
+        if self._name is None:  # pragma: no cover
+            raise DescriptorNotAddedToClassError("`_name` is not set.")
+        # The exception is mostly for typing: if `assert_set_name_called``
+        # doesn't raise an error, `BaseDescriptor.__set_name__` has been
+        # called and thus `self._name`` has been set.
         return self._name
 
     @property
@@ -297,10 +302,10 @@ class BaseDescriptor(Generic[Value]):
     # I have ignored D105 (missing docstrings) on the overloads - these should not
     # exist on @overload definitions.
     @overload
-    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...  # noqa: D105
+    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...
 
     @overload
-    def __get__(self, obj: None, type: type) -> Self: ...  # noqa: D105
+    def __get__(self, obj: None, type: type) -> Self: ...
 
     def __get__(self, obj: Thing | None, type: type | None = None) -> Value | Self:
         """Return the value or the descriptor, as per `property`.
@@ -429,7 +434,6 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
         return {}
     # The line below parses the class to get a syntax tree.
     module_ast = ast.parse(textwrap.dedent(src))
-    assert isinstance(module_ast, ast.Module)
     class_def = module_ast.body[0]
     if not isinstance(class_def, ast.ClassDef):
         raise TypeError("The object supplied was not a class.")

@@ -21,6 +21,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
+from .exceptions import NotConnectedToServerError
 from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
@@ -78,7 +79,7 @@ class Thing:
     """A human-readable description of the Thing"""
     _labthings_blocking_portal: Optional[BlockingPortal] = None
     """See :ref:`concurrency` for why blocking portal is needed."""
-    path: Optional[str]
+    path: Optional[str] = None
     """The path at which the `.Thing` is exposed over HTTP."""
 
     async def __aenter__(self) -> Self:
@@ -236,9 +237,17 @@ class Thing:
 
         This is called whenever a setting is updated. All settings are written to
         the settings file every time.
+
+        :raises NotConnectedToServerError: if there is no settings file path set.
+            This is set when the `.Thing` is connected to a `.ThingServer` so
+            most likely we are trying to save settings before we are attached
+            to a server.
         """
         if self._settings is not None:
-            assert self._setting_storage_path is not None
+            if self._setting_storage_path is None:
+                raise NotConnectedToServerError(
+                    "The path to the settings file is not defined yet."
+                )
             setting_dict = {}
             for name in self._settings.keys():
                 value = getattr(self, name)

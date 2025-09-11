@@ -137,7 +137,7 @@ class CancelEvent(threading.Event):
     usually by a ``DELETE`` request to the invocation's URL.
     """
 
-    def __init__(self, id: InvocationID):
+    def __init__(self, id: InvocationID) -> None:
         """Initialise the cancellation event.
 
         :param id: The invocation ID, annotated as a dependency so it is

@@ -61,7 +61,9 @@ class MJPEGStreamResponse(StreamingResponse):
     media_type = "multipart/x-mixed-replace; boundary=frame"
     """The media_type used to describe the endpoint in FastAPI."""
 
-    def __init__(self, gen: AsyncGenerator[bytes, None], status_code: int = 200):
+    def __init__(
+        self, gen: AsyncGenerator[bytes, None], status_code: int = 200
+    ) -> None:
         """Set up StreamingResponse that streams an MJPEG stream.
 
         This response is initialised with an async generator that yields `bytes`
@@ -124,7 +126,7 @@ class MJPEGStream:
     of new frames, and then retrieving the frame (shortly) afterwards.
     """
 
-    def __init__(self, ringbuffer_size: int = 10):
+    def __init__(self, ringbuffer_size: int = 10) -> None:
         """Initialise an MJPEG stream.
 
         See the class docstring for `.MJPEGStream`. Note that it will
@@ -286,8 +288,11 @@ class MJPEGStream:
                     yield frame
             except StopAsyncIteration:
                 break
-            except Exception as e:
-                logging.error(f"Error in stream: {e}, stream stopped")
+            except Exception as e:  # noqa: BLE001
+                # It's important that errors in the stream don't crash the server.
+                # This may be something we can remove in the future, now streams stop
+                # more elegantly. However, it will require careful testing.f
+                logging.exception(f"Error in stream: {e}, stream stopped")
                 return
 
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
@@ -344,8 +349,17 @@ class MJPEGStream:
             self.condition.notify_all()
 
     async def notify_stream_stopped(self) -> None:
-        """Raise an exception in any waiting tasks to signal the stream has stopped."""
-        assert self._streaming is False
+        """Raise an exception in any waiting tasks to signal the stream has stopped.
+
+        This should be run only when streaming has stopped, i.e. ``self._streaming``
+        is ``False`` and an error will be raised if this isn't the case.
+
+        :raises RuntimeError: if the stream is still streaming.
+        """
+        if self._streaming is True:
+            raise RuntimeError(
+                "This function should only be called when the stream is stopped."
+            )
         async with self.condition:
             self.condition.notify_all()
 
@@ -361,7 +375,7 @@ class MJPEGStreamDescriptor:
     This descriptor does not currently show up in the :ref:`wot_td`.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         r"""Initialise an MJPEGStreamDescriptor.
 
         :param \**kwargs: keyword arguments are passed to the initialiser of

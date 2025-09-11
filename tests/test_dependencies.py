@@ -5,6 +5,7 @@ for actions.
 """
 
 from dataclasses import dataclass
+from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
 from fastapi.testclient import TestClient
@@ -53,7 +54,7 @@ def test_dependency_needing_request():
         sub: Request
 
     @app.post("/dep")
-    def endpoint(id: DepClass = Depends()) -> bool:
+    def endpoint(id: Annotated[DepClass, Depends()]) -> bool:
         return True
 
     with TestClient(app) as client:

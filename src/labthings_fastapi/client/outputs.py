@@ -35,7 +35,7 @@ class ClientBlobOutput:
 
     def __init__(
         self, media_type: str, href: str, client: Optional[httpx.Client] = None
-    ):
+    ) -> None:
         """Create a ClientBlobOutput to wrap a link to a downloadable file.
 
         :param media_type: the MIME type of the remote file.

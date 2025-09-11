@@ -16,6 +16,7 @@ more detail.
 from __future__ import annotations
 from functools import partial, wraps
 
+from ..exceptions import NotConnectedToServerError
 from ..utilities.introspection import get_docstring, get_summary
 
 from typing import (
@@ -47,7 +48,7 @@ class EndpointDescriptor:
         http_method: HTTPMethod = "get",
         path: Optional[str] = None,
         **kwargs: Mapping[str, Any],
-    ):
+    ) -> None:
         r"""Initialise an EndpointDescriptor.
 
         See `.fastapi_endpoint`, which is the usual way of instantiating this
@@ -126,8 +127,17 @@ class EndpointDescriptor:
 
         :param app: the `fastapi.FastAPI` application we are adding to.
         :param thing: the `.Thing` we're bound to.
+
+        :raises NotConnectedToServerError: if there is no ``path`` attribute
+            of the host `.Thing` (which usually means it is not yet connected
+            to a server).
         """
-        assert thing.path is not None
+        if thing.path is None:
+            raise NotConnectedToServerError(
+                "Attempted to add an endpoint to the API, but there is no "
+                "path set on the Thing. This usually means it is not connected "
+                "to a ThingServer."
+            )
         # fastapi_endpoint is equivalent to app.get/app.post/whatever
         fastapi_endpoint = getattr(app, self.http_method)
         bound_function = partial(self.func, thing)

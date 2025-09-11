@@ -121,7 +121,7 @@ class ThingClient:
         creates a subclass with the right attributes.
     """
 
-    def __init__(self, base_url: str, client: Optional[httpx.Client] = None):
+    def __init__(self, base_url: str, client: Optional[httpx.Client] = None) -> None:
         """Create a ThingClient connected to a remote Thing.
 
         :param base_url: the base URL of the Thing. This should be the URL

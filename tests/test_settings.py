@@ -8,10 +8,11 @@ import logging
 from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
+from labthings_fastapi.exceptions import NotConnectedToServerError
 from .temp_client import poll_task
 
 
-class TestThing(lt.Thing):
+class ThingWithSettings(lt.Thing):
     """A test `.Thing` with some settings and actions."""
 
     def __init__(self) -> None:
@@ -86,12 +87,14 @@ class TestThing(lt.Thing):
         t.start()
 
 
-TestThingClientDep = lt.deps.direct_thing_client_dependency(TestThing, "/thing/")
-TestThingDep = lt.deps.raw_thing_dependency(TestThing)
+ThingWithSettingsClientDep = lt.deps.direct_thing_client_dependency(
+    ThingWithSettings, "/thing/"
+)
+ThingWithSettingsDep = lt.deps.raw_thing_dependency(ThingWithSettings)
 
 
 class ClientThing(lt.Thing):
-    """This Thing attempts to set read-only settings on TestThing.
+    """This Thing attempts to set read-only settings on ThingWithSettings.
 
     Read-only settings may not be set by DirectThingClient wrappers,
     which is what this class tests.
@@ -100,7 +103,7 @@ class ClientThing(lt.Thing):
     @lt.thing_action
     def set_localonlysetting(
         self,
-        client: TestThingClientDep,
+        client: ThingWithSettingsClientDep,
         val: str,
     ):
         """Attempt to set a setting with a DirectThingClient."""
@@ -109,7 +112,7 @@ class ClientThing(lt.Thing):
     @lt.thing_action
     def set_localonly_boolsetting(
         self,
-        client: TestThingClientDep,
+        client: ThingWithSettingsClientDep,
         val: bool,
     ):
         """Attempt to set a setting with a DirectThingClient.
@@ -122,7 +125,7 @@ class ClientThing(lt.Thing):
     @lt.thing_action
     def directly_set_localonlysetting(
         self,
-        test_thing: TestThingDep,
+        test_thing: ThingWithSettingsDep,
         val: str,
     ):
         """Attempt to set a setting directly."""
@@ -131,7 +134,7 @@ class ClientThing(lt.Thing):
     @lt.thing_action
     def directly_set_localonly_boolsetting(
         self,
-        test_thing: TestThingDep,
+        test_thing: ThingWithSettingsDep,
         val: bool,
     ):
         """Attempt to set a setting directly.
@@ -173,7 +176,7 @@ def _settings_dict(
 
 @pytest.fixture
 def thing():
-    return TestThing()
+    return ThingWithSettings()
 
 
 @pytest.fixture
@@ -336,6 +339,16 @@ def test_settings_dict_save(thing, server):
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
+
+
+def test_premature_Settings_save(thing):
+    """Check a helpful error is raised if the settings path is missing.
+
+    The settings path is only set when a thing is connected to a server,
+    so if we use an unconnected thing, we should see the error.
+    """
+    with pytest.raises(NotConnectedToServerError):
+        thing.save_settings()
 
 
 def test_settings_dict_internal_update(thing, server):

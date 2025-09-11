@@ -53,7 +53,7 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
-    def __init__(self, settings_folder: Optional[str] = None):
+    def __init__(self, settings_folder: Optional[str] = None) -> None:
         """Initialise a LabThings server.
 
         Setting up the `.ThingServer` involves creating the underlying
@@ -192,15 +192,18 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
+
+        :raises RuntimeError: if a `.Thing` already has a blocking portal attached.
+            This should never happen, and suggests the server is being used to
+            serve a `.Thing` that is already being served elsewhere.
         """
         async with BlockingPortal() as portal:
             self.blocking_portal = portal
             # We attach a blocking portal to each thing, so that threaded code can
             # make callbacks to async code (needed for events etc.)
             for thing in self.things.values():
-                assert thing._labthings_blocking_portal is None, (
-                    "Things may only ever have one blocking portal"
-                )
+                if thing._labthings_blocking_portal is not None:
+                    raise RuntimeError("Things may only ever have one blocking portal")
                 thing._labthings_blocking_portal = portal
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
@@ -261,7 +264,7 @@ class ThingServer:
 
 
 def server_from_config(config: dict) -> ThingServer:
-    """Create a ThingServer from a configuration dictionary.
+    r"""Create a ThingServer from a configuration dictionary.
 
     This function creates a `.ThingServer` and adds a number of `.Thing`
     instances from a configuration dictionary.
@@ -274,6 +277,7 @@ def server_from_config(config: dict) -> ThingServer:
 
     :raise ImportError: if a Thing could not be loaded from the specified
         object reference.
+    :raise TypeError: if a class is specified that does not subclass `.Thing`\ .
     """
     server = ThingServer(config.get("settings_folder", None))
     for path, thing in config.get("things", {}).items():
@@ -287,6 +291,7 @@ def server_from_config(config: dict) -> ThingServer:
                 f"specified as the class for {path}."
             ) from e
         instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
-        assert isinstance(instance, Thing), f"{thing['class']} is not a Thing"
+        if not isinstance(instance, Thing):
+            raise TypeError(f"{thing['class']} is not a Thing")
         server.add_thing(instance, path)
     return server
