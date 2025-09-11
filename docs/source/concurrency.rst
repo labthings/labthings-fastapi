@@ -11,7 +11,7 @@ In the case of properties, the HTTP response is only returned once the `.Thing` 
 
 Many of the functions that handle HTTP requests are asynchronous, running in an :mod:`anyio` event loop. This enables many HTTP connections to be handled at once with good efficiency. The `anyio documentation`_ describes the functions that link between async and threaded code. When the LabThings server is started, we create an :class:`anyio.from_thread.BlockingPortal`, which allows threaded code to run code asynchronously in the event loop.
 
-An action can obtain the blocking portal using the `~labthings_fastapi.dependencies.blocking_portal.BlockingPortal` dependency, i.e. by declaring an argument of that type. This avoids referring to the blocking portal through a global variable, which could lead to confusion if there are multiple event loops, e.g. during testing.
+An action can run async code using its server interface. See `.ThingServerInterface.start_async_task_soon` for details.
 
 There are relatively few occasions when `.Thing` code will need to consider this explicitly: more usually the blocking portal will be obtained by a LabThings function, for example the `.MJPEGStream` class.
 
