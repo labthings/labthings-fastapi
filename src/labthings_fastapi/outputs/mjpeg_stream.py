@@ -24,7 +24,6 @@ from copy import copy
 from contextlib import asynccontextmanager
 import threading
 import anyio
-from anyio.from_thread import BlockingPortal
 import logging
 
 if TYPE_CHECKING:

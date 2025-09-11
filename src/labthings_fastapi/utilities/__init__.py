@@ -5,7 +5,6 @@ from typing import Any, Dict, Iterable, TYPE_CHECKING, Optional
 from weakref import WeakSet
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
-from anyio.from_thread import BlockingPortal
 from .introspection import EmptyObject
 
 if TYPE_CHECKING:
@@ -80,25 +79,6 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
     if LABTHINGS_DICT_KEY not in obj.__dict__:
         obj.__dict__[LABTHINGS_DICT_KEY] = LabThingsObjectData()
     return obj.__dict__[LABTHINGS_DICT_KEY]
-
-
-def get_blocking_portal(obj: Thing) -> Optional[BlockingPortal]:
-    """Retrieve a blocking portal from a Thing.
-
-    See :ref:`concurrency` for more details.
-
-    When a `.Thing` is attached to a `.ThingServer` and the `.ThingServer`
-    is started, it sets an attribute on each `.Thing` to allow it to
-    access an `anyio.from_thread.BlockingPortal`. This allows threaded
-    code to call async code.
-
-    This function retrieves the blocking portal from a `.Thing`.
-
-    :param obj: the `.Thing` on which we are looking for the portal.
-
-    :return: the blocking portal.
-    """
-    return obj._labthings_blocking_portal
 
 
 def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
