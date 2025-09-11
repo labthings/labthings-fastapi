@@ -68,6 +68,9 @@ addopts = [
     "--cov-report=html:htmlcov",
     "--cov-report=lcov",
 ]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.ruff]
 target-version = "py310"

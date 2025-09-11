@@ -1,6 +1,7 @@
 from pathlib import Path
 from runpy import run_path
 from fastapi.testclient import TestClient
+import pytest
 from labthings_fastapi import ThingClient
 from .test_server_cli import MonitoredProcess
 
@@ -18,6 +19,7 @@ def run_quickstart_counter():
     run_path(str(docs / "quickstart" / "counter.py"))
 
 
+@pytest.mark.slow
 def test_quickstart_counter():
     """Check we can create a server from the command line"""
     p = MonitoredProcess(target=run_quickstart_counter)

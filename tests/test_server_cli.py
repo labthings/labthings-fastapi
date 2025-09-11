@@ -4,6 +4,7 @@ import sys
 import tempfile
 
 from pytest import raises
+import pytest
 
 from labthings_fastapi import ThingServer
 from labthings_fastapi.server import server_from_config
@@ -93,12 +94,14 @@ def check_serve_from_cli(args: list[str] | None = None):
     p.run_monitored(terminate_outputs=["Application startup complete"])
 
 
+@pytest.mark.slow
 def test_serve_from_cli_with_config_json():
     """Check we can create a server from the command line, using JSON"""
     config_json = json.dumps(CONFIG)
     check_serve_from_cli(["-j", config_json])
 
 
+@pytest.mark.slow
 def test_serve_from_cli_with_config_file():
     """Check we can create a server from the command line, using a file"""
     config_json = json.dumps(CONFIG)
@@ -109,11 +112,13 @@ def test_serve_from_cli_with_config_file():
         check_serve_from_cli(["-c", temp.name])
 
 
+@pytest.mark.slow
 def test_serve_with_no_config_without_multiprocessing():
     with raises(RuntimeError):
         serve_from_cli([], dry_run=True)
 
 
+@pytest.mark.slow
 def test_serve_with_no_config():
     """Check an empty config fails, using multiprocessing.
     This is important, because if it passes it means our tests above
@@ -123,6 +128,7 @@ def test_serve_with_no_config():
         check_serve_from_cli([])
 
 
+@pytest.mark.slow
 def test_invalid_thing():
     """Check it fails for invalid things"""
     config_json = json.dumps(
@@ -136,6 +142,7 @@ def test_invalid_thing():
         check_serve_from_cli(["-j", config_json])
 
 
+@pytest.mark.slow
 def test_fallback():
     """test the fallback option
 
@@ -152,12 +159,14 @@ def test_fallback():
     check_serve_from_cli(["-j", config_json, "--fallback"])
 
 
+@pytest.mark.slow
 def test_invalid_config():
     """Check it fails for invalid config"""
     with raises(FileNotFoundError):
         check_serve_from_cli(["-c", "non_existent_file.json"])
 
 
+@pytest.mark.slow
 def test_thing_that_cannot_start():
     """Check it fails for a thing that can't start"""
     config_json = json.dumps(
@@ -169,7 +178,3 @@ def test_thing_that_cannot_start():
     )
     with raises(SystemExit):
         check_serve_from_cli(["-j", config_json])
-
-
-if __name__ == "__main__":
-    test_serve_from_cli_with_config_json()
