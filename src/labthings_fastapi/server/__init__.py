@@ -196,6 +196,7 @@ class ThingServer:
         if kwargs is None:
             kwargs = {}
         interface = ThingServerInterface(name=name, server=self)
+        os.makedirs(interface.settings_folder, exist_ok=True)
         # This is where we instantiate the Thing
         # I've had to ignore this line because the *args causes an error.
         # Given that *args and **kwargs are very loosely typed anyway, this
@@ -206,12 +207,8 @@ class ThingServer:
             thing_server_interface=interface,
         )  # type: ignore[misc]
         self._things[name] = thing
-        settings_folder = os.path.join(self.settings_folder, name)
-        os.makedirs(settings_folder, exist_ok=True)
         thing.attach_to_server(
             server=self,
-            path=self.path_for_thing(name),
-            setting_storage_path=os.path.join(settings_folder, "settings.json"),
         )
         return thing
 

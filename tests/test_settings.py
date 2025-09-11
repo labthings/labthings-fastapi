@@ -9,7 +9,6 @@ import logging
 from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import NotConnectedToServerError
 from labthings_fastapi.thing_server_interface import create_thing_without_server
 from .temp_client import poll_task
 
@@ -332,17 +331,6 @@ def test_settings_dict_save(server):
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
-
-
-def test_premature_Settings_save():
-    """Check a helpful error is raised if the settings path is missing.
-
-    The settings path is only set when a thing is connected to a server,
-    so if we use an unconnected we should see the error.
-    """
-    thing = create_thing_without_server(ThingWithSettings)
-    with pytest.raises(NotConnectedToServerError):
-        thing.save_settings()
 
 
 def test_settings_dict_internal_update(server):

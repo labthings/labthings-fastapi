@@ -20,7 +20,6 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
-from .exceptions import NotConnectedToServerError
 from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
@@ -95,6 +94,7 @@ class Thing:
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
+        self._disable_saving_settings: bool = False
 
     @property
     def path(self) -> str:
@@ -129,18 +129,12 @@ class Thing:
         if hasattr(self, "__exit__"):
             await run_sync(self.__exit__, exc_t, exc_v, exc_tb)
 
-    def attach_to_server(
-        self, server: ThingServer, path: str, setting_storage_path: str
-    ) -> None:
+    def attach_to_server(self, server: ThingServer) -> None:
         """Attach this thing to the server.
 
         Things need to be attached to a server before use to function correctly.
 
         :param server: The server to attach this Thing to.
-        :param path: The root URL for the Thing.
-        :param setting_storage_path: The path on disk to save the any Thing Settings
-            to. This should be the path to a json file. If it does not exist it will be
-            created.
 
         Attaching the `.Thing` to a `.ThingServer` allows the `.Thing` to start
         actions, load its settings from the correct place, and create HTTP endpoints
@@ -150,7 +144,7 @@ class Thing:
         as any `.EndpointDescriptor` descriptors.
         """
         self.action_manager: ActionManager = server.action_manager
-        self.load_settings(setting_storage_path)
+        self.load_settings()
 
         for _name, item in class_attributes(self):
             try:
@@ -197,21 +191,7 @@ class Thing:
                 self._settings_store[name] = attr
         return self._settings_store
 
-    _setting_storage_path: Optional[str] = None
-
-    @property
-    def setting_storage_path(self) -> Optional[str]:
-        """The storage path for settings.
-
-        .. note::
-
-            This is set in `.Thing.attach_to_server`. It is ``None`` during the
-            ``__init__`` method, so it is best to avoid using settings until the
-            `.Thing` is set up in ``__enter__``.
-        """
-        return self._setting_storage_path
-
-    def load_settings(self, setting_storage_path: str) -> None:
+    def load_settings(self) -> None:
         """Load settings from json.
 
         Read the JSON file and use it to populate settings.
@@ -223,14 +203,11 @@ class Thing:
             Note that no notifications will be triggered when the settings are set,
             so if action is needed (e.g. updating hardware with the loaded settings)
             it should be taken in ``__enter__``.
-
-        :param setting_storage_path: The path where the settings should be stored.
         """
-        # Ensure that the settings path isn't set during loading or saving will be
-        # triggered
-        self._setting_storage_path = None
+        setting_storage_path = self._thing_server_interface.settings_file_path
         thing_name = type(self).__name__
         if os.path.exists(setting_storage_path):
+            self._disable_saving_settings = True
             try:
                 with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
                     setting_dict = json.load(file_obj)
@@ -248,24 +225,18 @@ class Thing:
                         )
             except (FileNotFoundError, JSONDecodeError, PermissionError):
                 _LOGGER.warning("Error loading settings for %s", thing_name)
-        self._setting_storage_path = setting_storage_path
+            finally:
+                self._disable_saving_settings = False
 
     def save_settings(self) -> None:
         """Save settings to JSON.
 
         This is called whenever a setting is updated. All settings are written to
         the settings file every time.
-
-        :raises NotConnectedToServerError: if there is no settings file path set.
-            This is set when the `.Thing` is connected to a `.ThingServer` so
-            most likely we are trying to save settings before we are attached
-            to a server.
         """
+        if self._disable_saving_settings:
+            return
         if self._settings is not None:
-            if self._setting_storage_path is None:
-                raise NotConnectedToServerError(
-                    "The path to the settings file is not defined yet."
-                )
             setting_dict = {}
             for name in self._settings.keys():
                 value = getattr(self, name)
@@ -274,7 +245,8 @@ class Thing:
                 setting_dict[name] = value
             # Dumpy to string before writing so if this fails the file isn't overwritten
             setting_json = json.dumps(setting_dict, indent=4)
-            with open(self._setting_storage_path, "w", encoding="utf-8") as file_obj:
+            path = self._thing_server_interface.settings_file_path
+            with open(path, "w", encoding="utf-8") as file_obj:
                 file_obj.write(setting_json)
 
     _labthings_thing_state: Optional[dict] = None
