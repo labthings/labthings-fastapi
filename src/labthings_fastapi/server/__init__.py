@@ -7,7 +7,7 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations
-from typing import AsyncGenerator, Optional, Sequence, TypeVar
+from typing import Any, AsyncGenerator, Optional, Sequence, TypeVar
 import os.path
 import re
 
@@ -143,35 +143,63 @@ class ThingServer:
             f"There are {len(instances)} Things of class {cls}, expected 1."
         )
 
-    def add_thing(self, thing: Thing, path: str) -> None:
+    def add_thing(
+        self,
+        name: str,
+        thing_subclass: type[Thing],
+        args: Sequence[Any] | None = None,
+        kwargs: Mapping[str, Any] | None = None,
+    ) -> None:
         """Add a thing to the server.
 
-        :param thing: The `.Thing` instance to add to the server.
-        :param path: the relative path to access the thing on the server. Must only
-            contain alphanumeric characters, hyphens, or underscores.
+        :param name: The name to use for the thing. This will be part of the URL
+            used to access the thing, and must only contain alphanumeric characters,
+            hyphens and underscores.
+        :param thing_subclass: The `.Thing` subclass to add to the server.
+        :param kwargs: keyword arguments to pass to the constructor of
+            ``thing_subclass``.
 
         :raise ValueError: if ``path`` contains invalid characters.
         :raise KeyError: if a `.Thing` has already been added at ``path``.
+        :raise TypeError: if ``thing_subclass`` is not a subclass of `.Thing`.
         """
-        # Ensure leading and trailing /
-        if not path.endswith("/"):
-            path += "/"
-        if not path.startswith("/"):
-            path = "/" + path
-        if PATH_REGEX.match(path) is None:
+        if PATH_REGEX.match(name) is None:
             msg = (
-                f"{path} contains unsafe characters. Use only alphanumeric "
+                f"'{name}' contains unsafe characters. Use only alphanumeric "
                 "characters, hyphens and underscores"
             )
             raise ValueError(msg)
-        if path in self._things:
-            raise KeyError(f"{path} has already been added to this thing server.")
-        self._things[path] = thing
-        settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
+        if name in self._things:
+            raise KeyError(f"{name} has already been added to this thing server.")
+        if not issubclass(thing_subclass, Thing):
+            raise TypeError(f"{thing_subclass} is not a Thing subclass.")
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
+        # This is where we instantiate the Thing
+        thing = thing_subclass(*args, **kwargs)
+        self._things[name] = thing
+        settings_folder = os.path.join(self.settings_folder, name)
         os.makedirs(settings_folder, exist_ok=True)
         thing.attach_to_server(
-            self, path, os.path.join(settings_folder, "settings.json")
+            server=self,
+            path=self.path_for_thing(name),
+            setting_storage_path=os.path.join(settings_folder, "settings.json"),
         )
+
+    def path_for_thing(self, name: str) -> str:
+        """Return the path for a thing with the given name.
+
+        :param name: The name of the thing, as passed to `.add_thing`.
+
+        :return: The path at which the thing is served.
+
+        :raise KeyError: if no thing with the given name has been added.
+        """
+        if name not in self._things:
+            raise KeyError(f"No thing named {name} has been added to this server.")
+        return f"/{name}/"
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
@@ -280,7 +308,7 @@ def server_from_config(config: dict) -> ThingServer:
     :raise TypeError: if a class is specified that does not subclass `.Thing`\ .
     """
     server = ThingServer(config.get("settings_folder", None))
-    for path, thing in config.get("things", {}).items():
+    for name, thing in config.get("things", {}).items():
         if isinstance(thing, str):
             thing = {"class": thing}
         try:
@@ -288,10 +316,15 @@ def server_from_config(config: dict) -> ThingServer:
         except ImportError as e:
             raise ImportError(
                 f"Could not import {thing['class']}, which was "
-                f"specified as the class for {path}."
+                f"specified as the class for {name}."
             ) from e
         instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
         if not isinstance(instance, Thing):
             raise TypeError(f"{thing['class']} is not a Thing")
-        server.add_thing(instance, path)
+        server.add_thing(
+            name=name,
+            thing_subclass=cls,
+            args=thing.get("args", ()),
+            kwargs=thing.get("kwargs", {}),
+        )
     return server
