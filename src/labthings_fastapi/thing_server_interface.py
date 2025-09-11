@@ -3,7 +3,7 @@ r"""Interface between `.Thing` subclasses and the `.ThingServer`\ ."""
 from __future__ import annotations
 import os
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Awaitable, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Mapping, TypeVar
 from weakref import ref, ReferenceType
 
 from .exceptions import ServerNotRunningError
@@ -110,6 +110,18 @@ class ThingServerInterface:
         to the base URL of the Thing, i.e. the Thing Description's endpoint.
         """
         return f"/{self.name}/"
+
+    def get_thing_states(self) -> Mapping[str, Any]:
+        """Retrieve metadata from all Things on the server.
+
+        This function will retrieve the `.Thing.thing_state` property from
+        each `.Thing` on the server, and return it as a dictionary.
+        It is intended to make it easy to add metadata to the results
+        of actions, for example to embed in an image.
+
+        :return: a dictionary of metadata, with the `.Thing` names as keys.
+        """
+        return {k: v.thing_state for k, v in self._get_server().things.items()}
 
 
 class MockThingServerInterface(ThingServerInterface):

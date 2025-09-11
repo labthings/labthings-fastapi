@@ -17,6 +17,12 @@ from .thing_server import find_thing_server
 def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
     """Generate a function to retrieve metadata from all Things in this server.
 
+    .. warning::
+
+        This function is deprecated in favour of the `.ThingServerInterface`, which
+        is available as a property of every Thing.
+        See `.ThingServerInterface.get_thing_states` for more information.
+
     This is intended to make it easy for a `.Thing` to summarise the other
     `.Things` in the same server, as is often appropriate when embedding metadata
     in data files. For example, it's used to populate the ``UserComment``
@@ -64,7 +70,11 @@ def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
 GetThingStates = Annotated[
     Callable[[], Mapping[str, Any]], Depends(thing_states_getter)
 ]
-"""A ready-made FastAPI dependency, returning a function to collect metadata.
+r"""A ready-made FastAPI dependency, returning a function to collect metadata.
+
+.. warning::
+
+    This dependency is deprecated in favour of the `.ThingServerInterface`\ .
 
 This calls `.thing_states_getter` to provide a function that supplies a
 dictionary of metadata. It describes the state of all `.Thing` instances on
