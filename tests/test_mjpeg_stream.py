@@ -36,12 +36,10 @@ class Telly(lt.Thing):
 
         i = 0
         while self._streaming and (i < self.frame_limit or self.frame_limit < 0):
-            self.stream.add_frame(
-                jpegs[i % len(jpegs)], self._labthings_blocking_portal
-            )
+            self.stream.add_frame(jpegs[i % len(jpegs)])
             time.sleep(1 / self.framerate)
             i = i + 1
-        self.stream.stop(self._labthings_blocking_portal)
+        self.stream.stop()
         self._streaming = False
 
 
