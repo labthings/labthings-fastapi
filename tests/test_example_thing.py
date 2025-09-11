@@ -6,21 +6,11 @@ from labthings_fastapi.example_things import (
 )
 import pytest
 
-
-class DummyBlockingPortal:
-    """A dummy blocking portal for testing
-
-    This is a blocking portal that doesn't actually do anything.
-    In the future, we should improve LabThings so this is not required.
-    """
-
-    def start_task_soon(self, func, *args, **kwargs):
-        pass
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 
 
 def test_mything():
-    thing = MyThing()
-    thing._labthings_blocking_portal = DummyBlockingPortal()
+    thing = create_thing_without_server(MyThing)
     assert isinstance(thing, MyThing)
     assert thing.counter == 0
     ret = thing.anaction(3, 1, title="MyTitle", attempts=["a", "b", "c"])
@@ -40,7 +30,7 @@ def test_mything():
 
 
 def test_thing_with_broken_affordances():
-    thing = ThingWithBrokenAffordances()
+    thing = create_thing_without_server(ThingWithBrokenAffordances)
     assert isinstance(thing, ThingWithBrokenAffordances)
     with pytest.raises(RuntimeError):
         thing.broken_action()
@@ -50,11 +40,11 @@ def test_thing_with_broken_affordances():
 
 def test_thing_that_cannot_instantiate():
     with pytest.raises(RuntimeError):
-        ThingThatCantInstantiate()
+        create_thing_without_server(ThingThatCantInstantiate)
 
 
 def test_thing_that_cannot_start():
-    thing = ThingThatCantStart()
+    thing = create_thing_without_server(ThingThatCantStart)
     assert isinstance(thing, ThingThatCantStart)
     with pytest.raises(RuntimeError):
         with thing:

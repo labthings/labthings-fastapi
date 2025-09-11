@@ -5,6 +5,7 @@ from labthings_fastapi.exceptions import (
     PropertyNotObservableError,
     InvocationCancelledError,
 )
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 
 
 class ThingWithProperties(lt.Thing):
@@ -68,7 +69,7 @@ def client(server):
 
 @pytest.fixture
 def ws(client):
-    """Yield a websocket connection to a server hosting a MyThing().
+    """Yield a websocket connection to a server hosting a MyThing.
 
     This ensures the websocket is properly closed after the test, and
     avoids lots of indent levels.
@@ -83,7 +84,7 @@ def ws(client):
 @pytest.fixture
 def thing():
     """Create a ThingWithProperties, not connected to a server."""
-    return ThingWithProperties()
+    return create_thing_without_server(ThingWithProperties)
 
 
 def test_observing_dataprop(thing, mocker):

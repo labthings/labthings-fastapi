@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 
 
 class TextBlob(lt.blob.Blob):
@@ -17,7 +18,8 @@ class TextBlob(lt.blob.Blob):
 class ThingOne(lt.Thing):
     ACTION_ONE_RESULT = b"Action one result!"
 
-    def __init__(self):
+    def __init__(self, thing_server_interface):
+        super().__init__(thing_server_interface=thing_server_interface)
         self._temp_directory = TemporaryDirectory()
 
     @lt.thing_action
@@ -114,7 +116,7 @@ def test_blob_output_client(client):
 
 def test_blob_output_direct():
     """Check blob outputs work correctly when we use a Thing directly in Python."""
-    thing = ThingOne()
+    thing = create_thing_without_server(ThingOne)
     check_actions(thing)
 
 

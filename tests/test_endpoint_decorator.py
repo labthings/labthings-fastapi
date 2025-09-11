@@ -1,6 +1,5 @@
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
-import pytest
 import labthings_fastapi as lt
 
 
@@ -50,15 +49,3 @@ def test_endpoints():
         r = client.post("/thing/path_from_path", json={"a": 1, "b": 2})
         r.raise_for_status()
         assert r.json() == "post_method 1 2"
-
-
-def test_endpoint_notconnected(mocker):
-    """Check for the correct error if we add endpoints prematurely.
-
-    We should get this error if we call ``add_to_fastapi`` on an endpoint
-    where the `.Thing` does not have a valid ``path`` attribute.
-    """
-    thing = MyThing()
-
-    with pytest.raises(lt.exceptions.NotConnectedToServerError):
-        MyThing.get_method.add_to_fastapi(mocker.Mock(), thing)

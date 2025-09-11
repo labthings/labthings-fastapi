@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 import pytest
 import functools
 
-from labthings_fastapi.exceptions import NotConnectedToServerError
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 from .temp_client import poll_task, get_link
 from labthings_fastapi.example_things import MyThing
 import labthings_fastapi as lt
@@ -198,19 +198,5 @@ def test_wrapped_action():
     assert Example.action.output_model == Example.decorated.output_model
 
     # Check we can make the thing and it has a valid TD
-    example = Example()
-    example.path = "/example"
+    example = create_thing_without_server(Example)
     example.validate_thing_description()
-
-
-def test_affordance_and_fastapi_errors(mocker):
-    """Check that we get a sensible error if the Thing has no path.
-
-    The thing will not have a ``path`` property before it has been added
-    to a server.
-    """
-    thing = MyThing()
-    with pytest.raises(NotConnectedToServerError):
-        MyThing.anaction.add_to_fastapi(mocker.Mock(), thing)
-    with pytest.raises(NotConnectedToServerError):
-        MyThing.anaction.action_affordance(thing, None)

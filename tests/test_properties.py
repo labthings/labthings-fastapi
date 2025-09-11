@@ -1,13 +1,11 @@
 from threading import Thread
 from typing import Any
 
-from pytest import raises
 from pydantic import BaseModel, RootModel
 from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import NotConnectedToServerError
 from .temp_client import poll_task
 
 
@@ -232,15 +230,3 @@ def test_setting_from_thread(server):
         r = client.get("/thing/boolprop")
         assert r.status_code == 200
         assert r.json() is True
-
-
-def test_setting_without_event_loop(server):
-    """Test that an exception is raised if updating a DataProperty
-    without connecting the Thing to a running server with an event loop.
-    """
-    # This test may need to change, if we change the intended behaviour
-    # Currently it should never be necessary to change properties from the
-    # main thread, so we raise an error if you try to do so
-    thing = PropertyTestThing()
-    with raises(NotConnectedToServerError):
-        thing.boolprop = False  # Can't call it until the event loop's running

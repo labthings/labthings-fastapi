@@ -1,6 +1,7 @@
 from threading import Thread
 import tempfile
 import json
+from typing import Any
 import pytest
 import os
 import logging
@@ -9,14 +10,15 @@ from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import NotConnectedToServerError
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 from .temp_client import poll_task
 
 
 class ThingWithSettings(lt.Thing):
     """A test `.Thing` with some settings and actions."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         # Initialize functional settings with default values
         self._floatsetting: float = 1.0
         self._localonlysetting = "Local-only default."
@@ -184,7 +186,7 @@ def server():
 
 def test_setting_available():
     """Check default settings are available before connecting to server"""
-    thing = ThingWithSettings()
+    thing = create_thing_without_server(ThingWithSettings)
     assert not thing.boolsetting
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
@@ -338,7 +340,7 @@ def test_premature_Settings_save():
     The settings path is only set when a thing is connected to a server,
     so if we use an unconnected we should see the error.
     """
-    thing = ThingWithSettings()
+    thing = create_thing_without_server(ThingWithSettings)
     with pytest.raises(NotConnectedToServerError):
         thing.save_settings()
 
