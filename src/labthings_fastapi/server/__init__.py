@@ -35,6 +35,9 @@ from ..outputs.blob import BlobDataManager
 PATH_REGEX = re.compile(r"^([a-zA-Z0-9\-_]+)$")
 
 
+ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
+
+
 class ThingServer:
     """Use FastAPI to serve `.Thing` instances.
 
@@ -146,10 +149,10 @@ class ThingServer:
     def add_thing(
         self,
         name: str,
-        thing_subclass: type[Thing],
+        thing_subclass: type[ThingSubclass],
         args: Sequence[Any] | None = None,
         kwargs: Mapping[str, Any] | None = None,
-    ) -> None:
+    ) -> ThingSubclass:
         """Add a thing to the server.
 
         :param name: The name to use for the thing. This will be part of the URL
@@ -191,6 +194,7 @@ class ThingServer:
             path=self.path_for_thing(name),
             setting_storage_path=os.path.join(settings_folder, "settings.json"),
         )
+        return thing
 
     def path_for_thing(self, name: str) -> str:
         """Return the path for a thing with the given name.
