@@ -58,7 +58,6 @@ from typing import (
     TYPE_CHECKING,
 )
 from typing_extensions import Self
-import typing
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
@@ -73,10 +72,11 @@ from .thing_description._model import (
 )
 from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
-from .base_descriptor import BaseDescriptor
+from .base_descriptor import BaseDescriptor, FieldTypedBaseDescriptor
 from .exceptions import (
     NotConnectedToServerError,
     ReadOnlyPropertyError,
+    MissingTypeError,
 )
 
 if TYPE_CHECKING:
@@ -112,23 +112,6 @@ class MissingDefaultError(ValueError):
 
     This error is raised when a `.DataProperty` is instantiated without a
     ``default`` value or a ``default_factory`` function.
-    """
-
-
-class InconsistentTypeError(TypeError):
-    """Different type hints have been given for a property.
-
-    Every property should have a type hint, which may be provided in a few
-    different ways. If multiple type hints are provided, they must match.
-    See `.property` for more details.
-    """
-
-
-class MissingTypeError(TypeError):
-    """No type hints have been given for a property.
-
-    Every property should have a type hint, which may be provided in a few
-    different ways. This error indicates that no type hint was found.
     """
 
 
@@ -333,7 +316,6 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
     def __init__(self) -> None:
         """Initialise a BaseProperty."""
         super().__init__()
-        self._type: type | None = None
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
 
@@ -341,12 +323,10 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
     def value_type(self) -> type[Value]:
         """The type of this descriptor's value.
 
-        :raises MissingTypeError: if the type has not been set.
+        :raises NotImplementedError: because this method must be overridden.
         :return: the type of the descriptor's value.
         """
-        if self._type is None:
-            raise MissingTypeError("This property does not have a valid type.")
-        return self._type
+        raise NotImplementedError
 
     @builtins.property
     def model(self) -> type[BaseModel]:
@@ -471,7 +451,9 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         )
 
 
-class DataProperty(BaseProperty[Value], Generic[Value]):
+class DataProperty(
+    FieldTypedBaseDescriptor[Value], BaseProperty[Value], Generic[Value]
+):
     """A Property descriptor that acts like a regular variable.
 
     `.DataProperty` descriptors remember their value, and can be read and
@@ -530,67 +512,6 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             default=default, default_factory=default_factory
         )
         self.readonly = readonly
-        self._type: type | None = None  # Will be set in __set_name__
-
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
-        """Take note of the name and type.
-
-        This function is where we determine the type of the property. It may
-        be specified in two ways: either by subscripting ``DataProperty``
-        or by annotating the attribute:
-
-        .. code-block:: python
-
-            class MyThing(Thing):
-                subscripted_property = DataProperty[int](0)
-                annotated_property: int = DataProperty(0)
-
-        The second form often works better with autocompletion, though it is
-        preferred to use `.property` for consistent naming.
-
-        Neither form allows us to access the type during ``__init__``, which
-        is why we find the type here. If there is a problem, exceptions raised
-        will appear to come from the class definition, so it's important to
-        include the name of the attribute.
-
-        See :ref:`descriptors` for links to the Python docs about when
-        this function is called.
-
-        :param owner: the `.Thing` subclass to which we are being attached.
-        :param name: the name to which we have been assigned.
-
-        :raises InconsistentTypeError: if the type is specified twice and
-            the two types are not identical.
-        :raises MissingTypeError: if no type hints have been given.
-        """
-        # Call BaseDescriptor so we remember the name
-        super().__set_name__(owner, name)
-
-        # Check for type subscripts
-        if hasattr(self, "__orig_class__"):
-            # We have been instantiated with a subscript, e.g. BaseProperty[int].
-            #
-            # __orig_class__ is set on generic classes when they are instantiated
-            # with a subscripted type.
-            self._type = typing.get_args(self.__orig_class__)[0]
-
-        # Check for annotations on the parent class
-        annotations = typing.get_type_hints(owner, include_extras=True)
-        field_annotation = annotations.get(name, None)
-        if field_annotation is not None:
-            # We have been assigned to an annotated class attribute, e.g.
-            # myprop: int = BaseProperty(0)
-            if self._type is not None and self._type != field_annotation:
-                raise InconsistentTypeError(
-                    f"Property {name} on {owner} has conflicting types.\n\n"
-                    f"The field annotation of {field_annotation} conflicts "
-                    f"with the inferred type of {self._type}."
-                )
-            self._type = field_annotation
-        if self._type is None:
-            raise MissingTypeError(
-                f"No type hint was found for property {name} on {owner}."
-            )
 
     @builtins.property
     def value_type(self) -> type[Value]:  # noqa: DOC201
@@ -701,8 +622,22 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         super().__init__()
         self._fget: ValueGetter = fget
         self._type = return_type(self._fget)
+        if self._type is None:
+            msg = (
+                f"{fget} does not have a valid type. "
+                "Return type annotations are required for property getters."
+            )
+            raise MissingTypeError(msg)
         self._fset: ValueSetter | None = None
         self.readonly: bool = True
+
+    @builtins.property
+    def value_type(self) -> type[Value]:
+        """The type of this descriptor's value.
+
+        :return: the type of the descriptor's value.
+        """
+        return self._type
 
     @builtins.property
     def fget(self) -> ValueGetter:  # noqa: DOC201
