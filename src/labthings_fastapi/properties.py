@@ -72,7 +72,7 @@ from .thing_description._model import (
 )
 from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
-from .base_descriptor import BaseDescriptor, FieldTypedBaseDescriptor
+from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import (
     NotConnectedToServerError,
     ReadOnlyPropertyError,
@@ -302,7 +302,7 @@ def property(
     )
 
 
-class BaseProperty(BaseDescriptor[Value], Generic[Value]):
+class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
     """A descriptor that marks Properties on Things.
 
     This class is used to determine whether an attribute of a `.Thing` should
@@ -318,15 +318,6 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         super().__init__()
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
-
-    @builtins.property
-    def value_type(self) -> type[Value]:
-        """The type of this descriptor's value.
-
-        :raises NotImplementedError: because this method must be overridden.
-        :return: the type of the descriptor's value.
-        """
-        raise NotImplementedError
 
     @builtins.property
     def model(self) -> type[BaseModel]:
@@ -451,9 +442,7 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
         )
 
 
-class DataProperty(
-    FieldTypedBaseDescriptor[Value], BaseProperty[Value], Generic[Value]
-):
+class DataProperty(BaseProperty[Value], Generic[Value]):
     """A Property descriptor that acts like a regular variable.
 
     `.DataProperty` descriptors remember their value, and can be read and
@@ -512,12 +501,6 @@ class DataProperty(
             default=default, default_factory=default_factory
         )
         self.readonly = readonly
-
-    @builtins.property
-    def value_type(self) -> type[Value]:  # noqa: DOC201
-        """The type of the descriptor's value."""
-        self.assert_set_name_called()
-        return super().value_type
 
     def instance_get(self, obj: Thing) -> Value:
         """Return the property's value.

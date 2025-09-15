@@ -14,7 +14,7 @@ import textwrap
 from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
 from types import MappingProxyType
 import typing
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, ref, ReferenceType
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
@@ -362,7 +362,9 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
 
     def __init__(self) -> None:
         """Initialise the FieldTypedBaseDescriptor."""
-        self._type: type | None = None  # Will be set in __set_name__
+        super().__init__()
+        self._type: type | str | None = None  # Will be set in __set_name__
+        self._type_owner: ReferenceType[type] | None = None  # For forward-references
 
     def __set_name__(self, owner: type[Thing], name: str) -> None:
         """Take note of the name and type.
@@ -408,8 +410,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
             self._type = typing.get_args(self.__orig_class__)[0]
 
         # Check for annotations on the parent class
-        annotations = typing.get_type_hints(owner, include_extras=True)
-        field_annotation = annotations.get(name, None)
+        field_annotation, cls = get_class_attribute_annotation(owner, name)
         if field_annotation is not None:
             # We have been assigned to an annotated class attribute, e.g.
             # myprop: int = BaseProperty(0)
@@ -420,6 +421,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
                     f"with the inferred type of {self._type}."
                 )
             self._type = field_annotation
+            self._type_owner = ref(cls)
         if self._type is None:
             raise MissingTypeError(
                 f"No type hint was found for property {name} on {owner}."
@@ -433,12 +435,42 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
         at the end of the class definition. If it is called too early, a
         `.DescriptorNotAddedToClassError` will be raised.
 
+        Accessing this property will attempt to resolve forward references,
+        i.e. type annotations that are strings. If there is an error resolving
+        the forward reference, a `.MissingTypeError` will be raised.
+
         :return: the type of the descriptor's value.
-        :raises MissingTypeError: if the type is None or not specified.
+        :raises MissingTypeError: if the type is None, not resolvable, or not specified.
         """
         self.assert_set_name_called()
         if self._type is None:
             raise MissingTypeError(f"No type hint was found for property {self.name}. ")
+        if isinstance(self._type, str):
+            # We have a forward reference, so we need to resolve it.
+            if self._type_owner is None:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name} because "
+                    "the class on which it was defined wasn't saved. This is a "
+                    "LabThings bug - please report it."
+                )
+            owner = self._type_owner()
+            if owner is None:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name} because "
+                    "the class on which it was defined has been garbage collected."
+                )
+            try:
+                # We resolve the forward reference by evaluating it in the context of
+                # the module and class in which it was defined.
+                # Ruff flags it as insecure, but the string we are resolving is part of
+                # the source code: it is not user input.
+                self._type = eval(  # noqa: S307
+                    self._type, vars(inspect.getmodule(owner)), vars(owner)
+                )
+            except Exception as e:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name}."
+                ) from e
         return self._type
 
 
@@ -452,6 +484,30 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
 _class_attribute_docstring_cache: WeakKeyDictionary[type, Mapping[str, str]] = (
     WeakKeyDictionary()
 )
+
+
+def get_class_attribute_annotation(
+    cls: type, name: str
+) -> tuple[type | str, type] | tuple[None, None]:
+    """Retrieve the type annotation for an attribute of a class.
+
+    This function retrieves the type annotation for an attribute of a class,
+    if one exists. It uses `inspect.get_annotations` to retrieve the
+    annotation without resolving forward references, and it searches
+    the class and its parents by traversing the method resolution order.
+
+    :param cls: The class to inspect.
+    :param name: The name of the attribute whose annotation is required.
+    :return: A tuple of the annotation and the class on which it's defined (which
+        may be a parent of the class supplied), or ``(None, None)`` if there is
+        no annotation. A tuple is supplied so unpacking of the return value
+        will always work.
+    """
+    for base in inspect.getmro(cls):
+        annotations = inspect.get_annotations(base)
+        if name in annotations:
+            return annotations[name], base
+    return (None, None)
 
 
 def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:

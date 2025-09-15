@@ -154,7 +154,11 @@ def test_baseproperty_type_and_model():
     This checks baseproperty correctly wraps plain types in a
     `pydantic.RootModel`.
     """
-    prop = tp.BaseProperty()
+
+    class Example:
+        prop = tp.BaseProperty()
+
+    prop = Example.prop
 
     # By default, we have no type so `.type` errors.
     with pytest.raises(tp.MissingTypeError):
@@ -175,7 +179,11 @@ def test_baseproperty_type_and_model_pydantic():
     This checks baseproperty behaves correctly when its
     type is a BaseModel instance.
     """
-    prop = tp.BaseProperty()
+
+    class Example:
+        prop = tp.BaseProperty()
+
+    prop = Example.prop
 
     class MyModel(pydantic.BaseModel):
         foo: str
