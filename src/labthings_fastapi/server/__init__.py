@@ -18,6 +18,10 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from ..exceptions import ThingConnectionError
+from ..thing_connections import ThingConnection
+from ..utilities import class_attributes
+
 from ..utilities.object_reference_to_object import (
     object_reference_to_object,
 )
@@ -80,6 +84,7 @@ class ThingServer:
         self.blob_data_manager.attach_to_app(self.app)
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
+        self.thing_connections: Mapping[str, Mapping[str, str | Sequence[str]]] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
@@ -225,6 +230,29 @@ class ThingServer:
             raise KeyError(f"No thing named {name} has been added to this server.")
         return f"/{name}/"
 
+    def connect_things(self) -> None:
+        """Connect the `thing_connection` attributes of Things.
+
+        A `.Thing` may have attributes defined as ``lt.thing_connection()``, which
+        """
+        for thing_name, thing in self.things.items():
+            config = self.thing_connections.get(thing_name, {})
+            for attr_name, attr in class_attributes(thing):
+                if not isinstance(attr, ThingConnection):
+                    continue
+                target = config.get(attr_name, attr.default)
+                if target is None:
+                    raise ThingConnectionError(
+                        f"{thing_name}.{attr_name} has not been configured "
+                        "and has no default."
+                    )
+                if target not in self.things:
+                    raise ThingConnectionError(
+                        f"{thing_name}.{attr_name} is configured to connect to "
+                        f"{target}, which does not exist."
+                    )
+                attr.connect_thing(thing, self.things[target])
+
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
         """Manage set up and tear down of the server and Things.
@@ -249,6 +277,11 @@ class ThingServer:
             # We create a blocking portal to allow threaded code to call async code
             # in the event loop.
             self.blocking_portal = portal
+
+            # Now we need to connect any ThingConnections. This is done here so that
+            # all of the Things are already created and added to the server.
+            self.connect_things()
+
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
             # and shut down the hardware. NB we must make sure the blocking portal

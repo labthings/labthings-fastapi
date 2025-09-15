@@ -41,16 +41,16 @@ typed and documented on the class, i.e.
             return self.thing_a.say_hello()
 """
 
-from typing import Generic, TypeVar, TYPE_CHECKING
+from typing import Any, Generic, TypeVar, TYPE_CHECKING
 from weakref import WeakKeyDictionary, ref
 from .base_descriptor import FieldTypedBaseDescriptor
-from .exceptions import ThingNotConnectedError
+from .exceptions import ThingNotConnectedError, ThingConnectionError
 
 if TYPE_CHECKING:
     from .thing import Thing
 
 
-ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
+ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
 
 class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubclass]):
@@ -60,15 +60,25 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
     in the same LabThings server.
     """
 
-    def __init__(self, *, default_path: str | None = None) -> None:
+    def __init__(self, *, default: str | None = None) -> None:
         """Declare a ThingConnection.
 
         :param default_name: The name of the Thing that will be connected by default.
         """
-        self._default_path = default_path
-        self._things: WeakKeyDictionary[Thing, ref[ThingSubclass]] = WeakKeyDictionary()
+        super().__init__()
+        self._default = default
+        self._things: WeakKeyDictionary["Thing", ref[ThingSubclass]] = (
+            WeakKeyDictionary()
+        )
 
-    def connect_thing(self, host_thing: Thing, connected_thing: ThingSubclass) -> None:
+    @property
+    def default(self) -> str | None:
+        """The name of the Thing that will be connected by default, if any."""
+        return self._default
+
+    def connect_thing(
+        self, host_thing: "Thing", connected_thing: ThingSubclass
+    ) -> None:
         r"""Connect a `.Thing` to a `.ThingConnection`\ .
 
         This method sets up a ThingConnection on ``host_thing`` such that it will
@@ -79,10 +89,10 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
                 f"Can't connect {connected_thing} to {host_thing}.{self.name}. "
                 f"This ThingConnection must be of type {self.value_type}."
             )
-            raise TypeError(msg)
+            raise ThingConnectionError(msg)
         self._things[host_thing] = ref(connected_thing)
 
-    def instance_get(self, obj: Thing) -> ThingSubclass:
+    def instance_get(self, obj: "Thing") -> ThingSubclass:
         r"""Supply the connected `.Thing`\ .
 
         :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
@@ -96,7 +106,7 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
         # Note that ReferenceError is deliberately not handled: the Thing
         # referred to by thing_ref should exist until the server has shut down.
 
-    def __set__(self, obj: Thing, value: ThingSubclass) -> None:
+    def __set__(self, obj: "Thing", value: ThingSubclass) -> None:
         """Raise an error as this is a read-only descriptor.
 
         :param obj: the `.Thing` on which the descriptor is defined.
@@ -105,3 +115,41 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
         :raises AttributeError: this descriptor is not writeable.
         """
         raise AttributeError("This descriptor is read-only.")
+
+
+def thing_connection(default: str | None = None) -> Any:
+    r"""Declare a connection to another `.Thing` in the same server.
+
+    This function is a convenience wrapper around the `.ThingConnection` descriptor
+    class, and should be used in preference to using the descriptor directly.
+    The main reason to use the function is that it suppresses type errors when
+    using static type checkers such as `mypy` or `pyright`.
+
+    In keeping with `.property` and `.setting`, the type of the attribute should
+    be the type of the connected `.Thing`\ . For example:
+
+    .. code-block:: python
+
+        import labthings_fastapi as lt
+
+
+        class ThingA(lt.Thing): ...
+
+
+        class ThingB(lt.Thing):
+            "A class that relies on ThingA."
+
+            thing_a: ThingA = lt.thing_connection("thing_a")
+
+    In the example above, using `.ThingConnection` directly would assign an object
+    with type ``ThingConnection[ThingA]`` to the attribute ``thing_a``, which is
+    typed as ``ThingA``\ . This would cause a type error. Using
+    `.thing_connection` suppresses this error, as its return type is `Any`\ .
+
+    :param default: The name of the Thing that will be connected by default.
+        It is possible to omit this default or set it to ``None``\ , but if that
+        is done, it will cause an error unless the connection is explicitly made
+        in the server configuration. That is usually not desirable.
+    :return: A `.ThingConnection` instance.
+    """
+    return ThingConnection(default=default)

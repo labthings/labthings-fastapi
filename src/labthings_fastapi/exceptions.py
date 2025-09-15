@@ -82,3 +82,12 @@ class ThingNotConnectedError(RuntimeError):
     should be mocked), or because it has been accessed before ``__enter__``
     has been called.
     """
+
+
+class ThingConnectionError(RuntimeError):
+    """A ThingConnection could not be set up.
+
+    This error is raised if the LabThings server is unable to set up a
+    ThingConnection, for example because the named Thing does not exist,
+    or is of the wrong type, or is not specified and there is no default.
+    """

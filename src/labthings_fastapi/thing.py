@@ -101,6 +101,11 @@ class Thing:
         """The path at which the `.Thing` is exposed over HTTP."""
         return self._thing_server_interface.path
 
+    @property
+    def name(self) -> str:
+        """The name of this Thing, as known to the server."""
+        return self._thing_server_interface.name
+
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.
 
