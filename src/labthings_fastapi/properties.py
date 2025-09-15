@@ -601,6 +601,8 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         tools understand that it functions like a property.
 
         :param fget: the getter function, called when the property is read.
+
+        :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__()
         self._fget: ValueGetter = fget

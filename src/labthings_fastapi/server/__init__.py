@@ -234,6 +234,16 @@ class ThingServer:
         """Connect the `thing_connection` attributes of Things.
 
         A `.Thing` may have attributes defined as ``lt.thing_connection()``, which
+        will be populated after all `.Thing` instances are loaded on the server.
+
+        This function is responsible for supplying the `.Thing` instances required
+        for each connection. This will be done by using the name specified either
+        in the connection's default, or in the configuration of the server.
+
+        :raises ThingConnectionError: if a `.Thing` named in either the default
+            or the server configuration is missing or of the wrong type. If no
+            `.Thing` is specified (i.e. there is no default and it is not configured),
+            an error will also be raised.
         """
         for thing_name, thing in self.things.items():
             config = self.thing_connections.get(thing_name, {})

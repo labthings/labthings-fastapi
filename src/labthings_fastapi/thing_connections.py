@@ -63,7 +63,7 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
     def __init__(self, *, default: str | None = None) -> None:
         """Declare a ThingConnection.
 
-        :param default_name: The name of the Thing that will be connected by default.
+        :param default: The name of the Thing that will be connected by default.
         """
         super().__init__()
         self._default = default
@@ -83,6 +83,13 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
 
         This method sets up a ThingConnection on ``host_thing`` such that it will
         supply ``connected_thing`` when accessed.
+
+        :param host_thing: the `.Thing` on which the connection is defined.
+        :param connected_thing: the `.Thing` that will be available as the value
+            of the `.ThingConnection`\ .
+
+        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
+            type.
         """
         if not isinstance(connected_thing, self.value_type):
             msg = (
@@ -94,6 +101,10 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
 
     def instance_get(self, obj: "Thing") -> ThingSubclass:
         r"""Supply the connected `.Thing`\ .
+
+        :param obj: The `.Thing` on which the connection is defined.
+
+        :return: the `.Thing` instance that is connected.
 
         :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
         """
