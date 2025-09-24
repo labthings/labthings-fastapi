@@ -41,8 +41,11 @@ typed and documented on the class, i.e.
             return self.thing_a.say_hello()
 """
 
+import types
 from typing import Any, Generic, TypeVar, TYPE_CHECKING
-from weakref import WeakKeyDictionary, ref
+from collections.abc import Mapping, Sequence
+import typing
+from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
 from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import ThingNotConnectedError, ThingConnectionError
 
@@ -51,71 +54,107 @@ if TYPE_CHECKING:
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
+ConnectedThings = TypeVar(
+    "ConnectedThings",
+    bound="Mapping[str, Thing] | Thing | None",
+)
 
 
-class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubclass]):
-    """A descriptor that returns an instance of a Thing from this server.
+class ThingConnection(
+    Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThings]
+):
+    r"""Descriptor that returns other Things from the server.
 
-    Thing connections allow `.Thing` instances to access other `.Thing` instances
-    in the same LabThings server.
+    A `.ThingConnection` provides either one or several
+    `.Thing` instances as a property of a `.Thing`\ . This allows `.Thing`\ s
+    to communicate with each other within the server, including accessing
+    attributes that are not exposed over HTTP.
+
+    While it is possible to dynamically retrieve a `.Thing` from the `.ThingServer`
+    this is not recommended: using Thing Connections ensures all the `.Thing`
+    instances are available before the server starts, reducing the likelihood
+    of run-time crashes.
+
+    The usual way of creating these connections is the function
+    `.thing_connection`\ . This class and its subclasses are not usually
+    instantiated directly.
+
+    The type of the `.ThingConnection` attribute is key to its operation.
+    It should be assigned to an attribute typed either as a `.Thing` subclass,
+    a mapping of strings to `.Thing` or subclass instances, or an optional
+    `.Thing` instance:
+
+    .. code-block:: python
+
+        class OtherExample(lt.Thing):
+            pass
+
+
+        class Example(lt.Thing):
+            # This will always evaluate to an `OtherExample`
+            other_thing: OtherExample = lt.thing_connection("other_thing")
+
+            # This may evaluate to an `OtherExample` or `None`
+            optional: OtherExample | None = lt.thing_connection("other_thing")
+
+            # This evaluates to a mapping of `str` to `.Thing` instances
+            things: Mapping[str, OtherExample] = lt.thing_connection(["thing_a"])
     """
 
-    def __init__(self, *, default: str | None = None) -> None:
+    def __init__(self, *, default: str | None | Sequence[str] = None) -> None:
         """Declare a ThingConnection.
 
-        :param default: The name of the Thing that will be connected by default.
+        :param default: The name of the Thing(s) that will be connected by default.
+
+            If the type is optional (e.g. ``ThingSubclass | None``) a default
+            value of ``None`` will result in the connection evaluating to ``None``
+            unless it has been configured by the server.
+
+            If the type is not optional, a default value of ``None`` will result
+            in an error, unless the server has set another value in its
+            configuration.
+
+            If the type is a mapping of `str` to `.Thing` the default should be
+            of type `Sequence[str]` (and could be an empty list).
         """
         super().__init__()
         self._default = default
-        self._things: WeakKeyDictionary["Thing", ref[ThingSubclass]] = (
-            WeakKeyDictionary()
-        )
+        self._things: WeakKeyDictionary[
+            "Thing", ReferenceType["Thing"] | WeakValueDictionary[str, "Thing"] | None
+        ] = WeakKeyDictionary()
 
     @property
-    def default(self) -> str | None:
+    def thing_type(self) -> tuple[type["Thing"], ...]:
+        r"""The `.Thing` subclass(es) returned by this connection.
+
+        A tuple is returned to allow for optional thing conections that
+        are typed as the union of two Thing types. It will work with
+        `isinstance`\ .
+        """
+        if not self.is_mapping:
+            return self.value_type
+        # is_mapping already checks the type is a `Mapping`, so
+        # we can just look at its arguments.
+        _, thing_type = typing.get_args(self.value_type)
+        return thing_type
+
+    @property
+    def is_mapping(self) -> bool:
+        """Whether we return a mapping of strings to Things, or a single Thing."""
+        return typing.get_origin(self.value_type) is Mapping
+
+    @property
+    def is_optional(self) -> bool:
+        """Whether ``None`` or an empty mapping is an allowed value."""
+        if typing.get_origin(self.value_type) in (types.UnionType, typing.Union):
+            if types.NoneType in typing.get_args(self.value_type):
+                return True
+        return False
+
+    @property
+    def default(self) -> str | Sequence[str] | None:
         """The name of the Thing that will be connected by default, if any."""
         return self._default
-
-    def connect_thing(
-        self, host_thing: "Thing", connected_thing: ThingSubclass
-    ) -> None:
-        r"""Connect a `.Thing` to a `.ThingConnection`\ .
-
-        This method sets up a ThingConnection on ``host_thing`` such that it will
-        supply ``connected_thing`` when accessed.
-
-        :param host_thing: the `.Thing` on which the connection is defined.
-        :param connected_thing: the `.Thing` that will be available as the value
-            of the `.ThingConnection`\ .
-
-        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
-            type.
-        """
-        if not isinstance(connected_thing, self.value_type):
-            msg = (
-                f"Can't connect {connected_thing} to {host_thing}.{self.name}. "
-                f"This ThingConnection must be of type {self.value_type}."
-            )
-            raise ThingConnectionError(msg)
-        self._things[host_thing] = ref(connected_thing)
-
-    def instance_get(self, obj: "Thing") -> ThingSubclass:
-        r"""Supply the connected `.Thing`\ .
-
-        :param obj: The `.Thing` on which the connection is defined.
-
-        :return: the `.Thing` instance that is connected.
-
-        :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
-        """
-        try:
-            thing_ref = self._things[obj]
-            return thing_ref()
-        except KeyError as e:
-            msg = f"{self.name} has not been connected to a Thing yet."
-            raise ThingNotConnectedError(msg) from e
-        # Note that ReferenceError is deliberately not handled: the Thing
-        # referred to by thing_ref should exist until the server has shut down.
 
     def __set__(self, obj: "Thing", value: ThingSubclass) -> None:
         """Raise an error as this is a read-only descriptor.
@@ -127,8 +166,71 @@ class ThingConnection(Generic[ThingSubclass], FieldTypedBaseDescriptor[ThingSubc
         """
         raise AttributeError("This descriptor is read-only.")
 
+    def connect(self, host: "Thing", target: ConnectedThings) -> None:
+        r"""Connect a `.Thing` (or several) to a `.ThingConnection`\ .
 
-def thing_connection(default: str | None = None) -> Any:
+        This method sets up a ThingConnection on ``host_thing`` such that it will
+        supply ``target`` when accessed.
+
+        :param host: the `.Thing` on which the connection is defined.
+        :param target: the `.Thing` that will be available as the value
+            of the `.ThingConnection` or a sequence of `.Thing` instances,
+            or `None`\ .
+
+        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
+            type, if a sequence is supplied when a single `.Thing` is required,
+            or if `None` is supplied and the connection is not optional.
+        """
+        base_msg = f"Can't connect %s to {host.name}.{self.name} "
+        thing_type_msg = f"{base_msg} because it is not of type {self.thing_type}."
+        unexpected_sequence_msg = f"{base_msg} because a single Thing is needed."
+        expected_sequence_msg = f"{base_msg} because a sequence of Things is needed."
+        not_optional_msg = f"{base_msg} because it is not optional and has no default."
+        if target is None:
+            if self.is_optional:
+                self._things[host] = None
+            else:
+                raise ThingConnectionError(not_optional_msg)
+        elif isinstance(target, Sequence):
+            if self.is_mapping:
+                for t in target:
+                    if not isinstance(t, self.thing_type):
+                        raise ThingConnectionError(thing_type_msg % repr(t))
+                self._things[host] = WeakValueDictionary({t.name: t for t in target})
+            else:
+                raise ThingConnectionError(unexpected_sequence_msg % target)
+        else:
+            if not self.is_mapping:
+                if not isinstance(target, self.thing_type):
+                    raise ThingConnectionError(thing_type_msg % repr(target))
+                self._things[host] = ref(target)
+            else:
+                raise ThingConnectionError(expected_sequence_msg % target)
+
+    def instance_get(self, obj: "Thing") -> ConnectedThings:
+        r"""Supply the connected `.Thing`\ (s).
+
+        :param obj: The `.Thing` on which the connection is defined.
+
+        :return: the `.Thing` instance(s) connected.
+
+        :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
+        """
+        msg = f"{self.name} has not been connected to a Thing yet."
+        try:
+            val = self._things[obj]
+        except KeyError as e:
+            raise ThingNotConnectedError(msg) from e
+        # Note that ReferenceError is deliberately not handled: the Thing
+        # referred to by thing_ref should exist until the server has shut down.
+        if isinstance(val, ReferenceType):
+            return val()
+        else:
+            # This works for None or for WeakValueDictionary()
+            return val
+
+
+def thing_connection(default: str | Sequence[str] | None = None) -> Any:
     r"""Declare a connection to another `.Thing` in the same server.
 
     This function is a convenience wrapper around the `.ThingConnection` descriptor
