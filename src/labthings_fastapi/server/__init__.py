@@ -252,7 +252,9 @@ class ThingServer:
                     continue
                 target = config.get(attr_name, attr.default)
                 try:
-                    if isinstance(target, str | None):
+                    if target is None:
+                        attr.connect(thing, None)
+                    elif isinstance(target, str):
                         attr.connect(thing, self.things[target])
                     elif isinstance(target, Sequence):
                         attr.connect(thing, [self.things[t] for t in target])

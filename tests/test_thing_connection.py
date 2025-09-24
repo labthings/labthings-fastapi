@@ -1,5 +1,6 @@
 """Test the thing_connection module."""
 
+from collections.abc import Mapping
 import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
@@ -10,7 +11,10 @@ from labthings_fastapi.exceptions import ThingConnectionError, ThingNotConnected
 class ThingOne(lt.Thing):
     """A class that will cause chaos if it can."""
 
-    thing_two: "ThingTwo" = lt.thing_connection("thing_two")
+    other_thing: "ThingTwo" = lt.thing_connection("thing_two")
+    multiple_things: Mapping[str, lt.Thing] = lt.thing_connection(
+        ["thing_one", "thing_two"]
+    )
 
     @lt.thing_action
     def say_hello(self) -> str:
@@ -20,13 +24,13 @@ class ThingOne(lt.Thing):
     @lt.thing_action
     def ask_other_thing(self) -> str:
         """Ask ThingTwo to say hello."""
-        return self.thing_two.say_hello()
+        return self.other_thing.say_hello()
 
 
 class ThingTwo(lt.Thing):
     """A class that relies on ThingOne."""
 
-    thing_one: ThingOne = lt.thing_connection("thing_one")
+    other_thing: ThingOne = lt.thing_connection("thing_one")
 
     @lt.thing_action
     def say_hello(self) -> str:
@@ -36,7 +40,7 @@ class ThingTwo(lt.Thing):
     @lt.thing_action
     def ask_other_thing(self) -> str:
         """Ask ThingOne to say hello."""
-        return self.thing_one.say_hello()
+        return self.other_thing.say_hello()
 
 
 class ThingN(lt.Thing):
@@ -53,6 +57,22 @@ class ThingN(lt.Thing):
     def ask_other_thing(self) -> str:
         """Ask the other thing to say hello."""
         return self.other_thing.say_hello()
+
+
+class ThingOfWrongType(lt.Thing):
+    """A Thing that has no other attributes."""
+
+    pass
+
+
+def test_type_analysis():
+    """Check the correct properties are inferred from the type hints."""
+    assert ThingOne.other_thing.is_optional is False
+    assert ThingOne.other_thing.is_mapping is False
+    assert ThingOne.other_thing.thing_type is ThingTwo
+    assert ThingOne.multiple_things.is_optional is False
+    assert ThingOne.multiple_things.is_mapping is True
+    assert ThingOne.multiple_things.thing_type is lt.Thing
 
 
 CONNECTIONS = {
@@ -111,22 +131,25 @@ def test_thing_connection(cls_1, cls_2, connections) -> None:
 @pytest.mark.parametrize(
     ("connections", "error"),
     [
-        # No default, no configuration - error should say so.
-        (None, "no default"),
-        # Configured to connect to a missing thing
+        ({}, "no default"),
         ({"thing_one": {"other_thing": "non_existent_thing"}}, "does not exist"),
-        # Configured to connect to a thing that exists, but is the wrong type
-        ({"thing_one": {"other_thing": "thing_two"}}, "must be of type"),
+        ({"thing_one": {"other_thing": ("thing_one", "thing_one")}}, "single Thing"),
+        ({"thing_one": {"other_thing": "wrong_type_thing"}}, "not of type"),
+        ({"thing_one": {"other_thing": "thing_one"}}, None),
     ],
 )
-def test_thing_connection_errors(connections, error) -> None:
-    """Check that a ThingConnection without a default raises an error."""
+def test_connections_no_default(connections, error):
+    """Check a connection with no default and no config errors out."""
     server = lt.ThingServer()
-    server.add_thing("thing_one", ThingN)
-    server.add_thing("thing_two", ThingTwo)
+    thing_one = server.add_thing("thing_one", ThingN)
+    server.add_thing("wrong_type_thing", ThingOfWrongType)
 
-    if connections is not None:
-        server.thing_connections = connections
+    server.thing_connections = connections
+
+    if error is None:
+        with TestClient(server.app):
+            assert thing_one.other_thing is thing_one
+        return
 
     with pytest.RaisesGroup(ThingConnectionError) as excinfo:
         # Creating a TestClient should activate the connections
