@@ -41,10 +41,9 @@ typed and documented on the class, i.e.
             return self.thing_a.say_hello()
 """
 
-import types
-from typing import Any, Generic, TypeVar, TYPE_CHECKING
+from types import EllipsisType, NoneType, UnionType
+from typing import Any, Generic, TypeVar, TYPE_CHECKING, Union, get_args, get_origin
 from collections.abc import Mapping, Sequence
-import typing
 from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
 from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import ThingNotConnectedError, ThingConnectionError
@@ -101,7 +100,9 @@ class ThingConnection(
             things: Mapping[str, OtherExample] = lt.thing_connection(["thing_a"])
     """
 
-    def __init__(self, *, default: str | None | Sequence[str] = None) -> None:
+    def __init__(
+        self, *, default: str | None | Sequence[str] | EllipsisType = ...
+    ) -> None:
         """Declare a ThingConnection.
 
         :param default: The name of the Thing(s) that will be connected by default.
@@ -135,19 +136,19 @@ class ThingConnection(
             return self.value_type
         # is_mapping already checks the type is a `Mapping`, so
         # we can just look at its arguments.
-        _, thing_type = typing.get_args(self.value_type)
+        _, thing_type = get_args(self.value_type)
         return thing_type
 
     @property
     def is_mapping(self) -> bool:
         """Whether we return a mapping of strings to Things, or a single Thing."""
-        return typing.get_origin(self.value_type) is Mapping
+        return get_origin(self.value_type) is Mapping
 
     @property
     def is_optional(self) -> bool:
         """Whether ``None`` or an empty mapping is an allowed value."""
-        if typing.get_origin(self.value_type) in (types.UnionType, typing.Union):
-            if types.NoneType in typing.get_args(self.value_type):
+        if get_origin(self.value_type) in (UnionType, Union):
+            if NoneType in get_args(self.value_type):
                 return True
         return False
 
