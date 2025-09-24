@@ -7,7 +7,7 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations
-from typing import Any, AsyncGenerator, Optional, Sequence, TypeVar
+from typing import Any, AsyncGenerator, Optional, TypeVar
 import os.path
 import re
 
@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
 from ..exceptions import ThingConnectionError
@@ -251,17 +251,15 @@ class ThingServer:
                 if not isinstance(attr, ThingConnection):
                     continue
                 target = config.get(attr_name, attr.default)
-                if target is None:
-                    raise ThingConnectionError(
-                        f"{thing_name}.{attr_name} has not been configured "
-                        "and has no default."
-                    )
-                if target not in self.things:
-                    raise ThingConnectionError(
-                        f"{thing_name}.{attr_name} is configured to connect to "
-                        f"{target}, which does not exist."
-                    )
-                attr.connect_thing(thing, self.things[target])
+                try:
+                    if isinstance(target, str | None):
+                        attr.connect(thing, self.things[target])
+                    elif isinstance(target, Sequence):
+                        attr.connect(thing, [self.things[t] for t in target])
+                except KeyError as e:
+                    msg = f"Trying to connect {thing_name}.{attr_name} to {target}. "
+                    msg += "Target Thing does not exist."
+                    raise ThingConnectionError(msg) from e
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
