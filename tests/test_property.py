@@ -155,22 +155,19 @@ def test_baseproperty_type_and_model():
     `pydantic.RootModel`.
     """
 
+    with pytest.raises(tp.MissingTypeError):
+
+        class Example:
+            prop = tp.BaseProperty()
+
     class Example:
-        prop = tp.BaseProperty()
+        prop: "str | None" = tp.BaseProperty()
 
-    prop = Example.prop
-
-    # By default, we have no type so `.type` errors.
-    with pytest.raises(tp.MissingTypeError):
-        _ = prop.value_type
-    with pytest.raises(tp.MissingTypeError):
-        _ = prop.model
-
-    # Once _type is set, these should both work.
-    prop._type = str | None
-    assert str(prop.value_type) == "str | None"
-    assert issubclass(prop.model, pydantic.RootModel)
-    assert str(prop.model.model_fields["root"].annotation) == "str | None"
+    assert isinstance(None, Example.prop.value_type)
+    assert isinstance("test", Example.prop.value_type)
+    assert str(Example.prop.value_type) == "str | None"
+    assert issubclass(Example.prop.model, pydantic.RootModel)
+    assert str(Example.prop.model.model_fields["root"].annotation) == "str | None"
 
 
 def test_baseproperty_type_and_model_pydantic():
@@ -180,19 +177,15 @@ def test_baseproperty_type_and_model_pydantic():
     type is a BaseModel instance.
     """
 
-    class Example:
-        prop = tp.BaseProperty()
-
-    prop = Example.prop
-
     class MyModel(pydantic.BaseModel):
         foo: str
         bar: int
 
-    # Once _type is set, these should both work.
-    prop._type = MyModel
-    assert prop.value_type is MyModel
-    assert prop.model is MyModel
+    class Example:
+        prop: MyModel = tp.BaseProperty()
+
+    assert Example.prop.value_type is MyModel
+    assert Example.prop.model is MyModel
 
 
 def test_baseproperty_add_to_fastapi():
