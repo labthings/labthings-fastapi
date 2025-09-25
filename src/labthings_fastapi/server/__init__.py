@@ -18,7 +18,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from ..exceptions import ThingConnectionError
+from ..exceptions import ThingConnectionError as ThingConnectionError
 from ..thing_connections import ThingConnection
 from ..utilities import class_attributes
 
@@ -230,7 +230,7 @@ class ThingServer:
             raise KeyError(f"No thing named {name} has been added to this server.")
         return f"/{name}/"
 
-    def connect_things(self) -> None:
+    def _connect_things(self) -> None:
         """Connect the `thing_connection` attributes of Things.
 
         A `.Thing` may have attributes defined as ``lt.thing_connection()``, which
@@ -240,28 +240,17 @@ class ThingServer:
         for each connection. This will be done by using the name specified either
         in the connection's default, or in the configuration of the server.
 
-        :raises ThingConnectionError: if a `.Thing` named in either the default
-            or the server configuration is missing or of the wrong type. If no
-            `.Thing` is specified (i.e. there is no default and it is not configured),
-            an error will also be raised.
+        `.ThingConnectionError` will be raised by code called by this method if
+        the connection cannot be provided. See `.ThingConnection.connect` for more
+        details.
         """
         for thing_name, thing in self.things.items():
             config = self.thing_connections.get(thing_name, {})
             for attr_name, attr in class_attributes(thing):
                 if not isinstance(attr, ThingConnection):
                     continue
-                target = config.get(attr_name, attr.default)
-                try:
-                    if target is None:
-                        attr.connect(thing, None)
-                    elif isinstance(target, str):
-                        attr.connect(thing, self.things[target])
-                    elif isinstance(target, Sequence):
-                        attr.connect(thing, [self.things[t] for t in target])
-                except KeyError as e:
-                    msg = f"Trying to connect {thing_name}.{attr_name} to {target}. "
-                    msg += "Target Thing does not exist."
-                    raise ThingConnectionError(msg) from e
+                target = config.get(attr_name, ...)
+                attr.connect(thing, self.things, target)
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
@@ -290,7 +279,7 @@ class ThingServer:
 
             # Now we need to connect any ThingConnections. This is done here so that
             # all of the Things are already created and added to the server.
-            self.connect_things()
+            self._connect_things()
 
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise

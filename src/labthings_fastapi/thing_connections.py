@@ -43,7 +43,7 @@ typed and documented on the class, i.e.
 
 from types import EllipsisType, NoneType, UnionType
 from typing import Any, Generic, TypeVar, TYPE_CHECKING, Union, get_args, get_origin
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Iterable
 from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
 from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import ThingNotConnectedError, ThingConnectionError
@@ -101,7 +101,7 @@ class ThingConnection(
     """
 
     def __init__(
-        self, *, default: str | None | Sequence[str] | EllipsisType = ...
+        self, *, default: str | None | Iterable[str] | EllipsisType = ...
     ) -> None:
         """Declare a ThingConnection.
 
@@ -116,7 +116,7 @@ class ThingConnection(
             configuration.
 
             If the type is a mapping of `str` to `.Thing` the default should be
-            of type `Sequence[str]` (and could be an empty list).
+            of type `Iterable[str]` (and could be an empty list).
         """
         super().__init__()
         self._default = default
@@ -128,16 +128,23 @@ class ThingConnection(
     def thing_type(self) -> tuple[type["Thing"], ...]:
         r"""The `.Thing` subclass(es) returned by this connection.
 
-        A tuple is returned to allow for optional thing conections that
+        A tuple is returned to allow for optional thing connections that
         are typed as the union of two Thing types. It will work with
         `isinstance`\ .
         """
-        if not self.is_mapping:
-            return self.value_type
-        # is_mapping already checks the type is a `Mapping`, so
-        # we can just look at its arguments.
-        _, thing_type = get_args(self.value_type)
-        return thing_type
+        thing_type = self.value_type
+        if self.is_mapping:
+            # is_mapping already checks the type is a `Mapping`, so
+            # we can just look at its arguments.
+            _, thing_type = get_args(self.value_type)
+        if get_origin(thing_type) in (UnionType, Union):
+            # If it's a Union, we may have an optional type, in which
+            # case we want to exclude None.
+            return tuple(t for t in get_args(thing_type) if t is not NoneType)
+        else:
+            # If it's not a Union, it should be a single Thing subclass
+            # so wrap it in a tuple.
+            return (thing_type,)
 
     @property
     def is_mapping(self) -> bool:
@@ -153,7 +160,7 @@ class ThingConnection(
         return False
 
     @property
-    def default(self) -> str | Sequence[str] | None:
+    def default(self) -> str | Iterable[str] | None | EllipsisType:
         """The name of the Thing that will be connected by default, if any."""
         return self._default
 
@@ -167,46 +174,136 @@ class ThingConnection(
         """
         raise AttributeError("This descriptor is read-only.")
 
-    def connect(self, host: "Thing", target: ConnectedThings) -> None:
-        r"""Connect a `.Thing` (or several) to a `.ThingConnection`\ .
+    def _pick_things(
+        self,
+        things: "Mapping[str, Thing]",
+        target: str | Iterable[str] | None | EllipsisType,
+    ) -> "Iterable[Thing]":
+        r"""Pick the Things we should connect to from a list.
 
-        This method sets up a ThingConnection on ``host_thing`` such that it will
-        supply ``target`` when accessed.
+        This function is used internally by `.ThingConnection.connect` to choose
+        the Things we return when the `.ThingConnection` is accessed.
+
+        :param things: the available `.Thing` instances on the server.
+        :param target: the name(s) we should connect to, or `None` to set the
+            connection to `None` (if it is optional). A special value is `...`
+            which will pick the `.Thing` instannce(s) matching this connection's
+            type hint.
+
+        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
+            type, if a sequence is supplied when a single `.Thing` is required,
+            or if `None` is supplied and the connection is not optional.
+        :raises TypeError: if ``target`` is not one of the allowed types.
+
+        `KeyError` will also be raised if names specified in ``target`` do not
+        exist in ``things``\ .
+
+        :return: a list of `.Thing` instances to supply in response to ``__get__``\ .
+        """
+        if target is None:
+            return []
+        elif target is ...:
+            return [
+                thing
+                for _, thing in things.items()
+                if isinstance(thing, self.thing_type)
+            ]
+        elif isinstance(target, str):
+            if not isinstance(things[target], self.thing_type):
+                raise ThingConnectionError(f"{target} is the wrong type")
+            return [things[target]]
+        elif isinstance(target, Iterable):
+            for t in target:
+                if not isinstance(things[t], self.thing_type):
+                    raise ThingConnectionError(f"{t} is the wrong type")
+            return [things[t] for t in target]
+        msg = "The target specified for a ThingConnection ({target}) has the wrong "
+        msg += "type. See ThingConnection.connect() docstring for details."
+        raise TypeError(msg)
+
+    def connect(
+        self,
+        host: "Thing",
+        things: "Mapping[str, Thing]",
+        target: str | Iterable[str] | None | EllipsisType = ...,
+    ) -> None:
+        r"""Find the `.Thing`\ (s) we should supply when accessed.
+
+        This method sets up a ThingConnection on ``host_thing`` by finding the
+        `.Thing` instance(s) it should supply when its ``__get__`` method is
+        called. The logic for determining this is:
+
+        * If ``target`` is specified, we look for the specified `.Thing`\ (s).
+          ``None`` means we should return ``None`` - that's only allowed if the
+          type hint permits it.
+        * If ``target`` is not specified or is ``...`` we use the default value
+          set when the connection was defined.
+        * If the default value was ``...`` and no target was specified, we will
+          attempt to find the `.Thing` by type. Most of the time, this is the
+          desired behaviour.
+
+        If the type of this connection is a ``Mapping``\ , ``target`` should be
+        a sequence of names. This sequence may be empty.
+
+        ``None`` is treated as equivalent to the empty list, and a list with
+        one name in it is treated as equivalent to a single name.
+
+        If the type hint of this connection does not permit ``None``\ , and
+        either ``None`` is specified, or no ``target`` is given and the default
+        is set as ``None``\ , then an error will be raised. ``None`` will only
+        be returned at runtime if it is permitted by the type hint.
 
         :param host: the `.Thing` on which the connection is defined.
-        :param target: the `.Thing` that will be available as the value
-            of the `.ThingConnection` or a sequence of `.Thing` instances,
-            or `None`\ .
+        :param things: the available `.Thing` instances on the server.
+        :param target: the name(s) we should connect to, or `None` to set the
+            connection to `None` (if it is optional). The default is `...`
+            which will use the default that was set when this `.ThingConnection`
+            was defined.
 
         :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
             type, if a sequence is supplied when a single `.Thing` is required,
             or if `None` is supplied and the connection is not optional.
         """
-        base_msg = f"Can't connect %s to {host.name}.{self.name} "
-        thing_type_msg = f"{base_msg} because it is not of type {self.thing_type}."
-        unexpected_sequence_msg = f"{base_msg} because a single Thing is needed."
-        expected_sequence_msg = f"{base_msg} because a sequence of Things is needed."
-        not_optional_msg = f"{base_msg} because it is not optional and has no default."
-        if target is None:
-            if self.is_optional:
-                self._things[host] = None
-            else:
-                raise ThingConnectionError(not_optional_msg)
-        elif isinstance(target, Sequence):
+        used_target = self.default if target is ... else target
+        try:
+            # First, explicitly check for None so we can raise a helpful error.
+            if used_target is None and not self.is_optional and not self.is_mapping:
+                raise ThingConnectionError("it must be set in configuration")
+            # Most of the logic is split out into `_pick_things` to separate
+            # picking the Things from turning them into the correct mapping/reference.
+            picked = self._pick_things(things, used_target)
             if self.is_mapping:
-                for t in target:
-                    if not isinstance(t, self.thing_type):
-                        raise ThingConnectionError(thing_type_msg % repr(t))
-                self._things[host] = WeakValueDictionary({t.name: t for t in target})
+                # Mappings may have any number of entries, so no more validation needed.
+                self._things[host] = WeakValueDictionary({t.name: t for t in picked})
+            elif len(picked) == 0:
+                if self.is_optional:
+                    # Optional things may be set to None without an error.
+                    self._things[host] = None
+                else:
+                    # Otherwise a single Thing is required, so raise an error.
+                    raise ThingConnectionError("no matching Thing was found")
+            elif len(picked) == 1:
+                # A single Thing is found: we can safely use this.
+                self._things[host] = ref(picked[0])
             else:
-                raise ThingConnectionError(unexpected_sequence_msg % target)
-        else:
-            if not self.is_mapping:
-                if not isinstance(target, self.thing_type):
-                    raise ThingConnectionError(thing_type_msg % repr(target))
-                self._things[host] = ref(target)
+                # If more than one Thing is found (and we're not a mapping) this is
+                # an error.
+                raise ThingConnectionError("it can't connect to multiple Things")
+        except (ThingConnectionError, KeyError) as e:
+            reason = e.args[0]
+            if isinstance(e, KeyError):
+                reason += " is not the name of a Thing"
+            msg = f"Can't connect '{host.name}.{self.name}' because {reason}. "
+            if target is not ...:
+                msg += f"It was configured to connect to '{target}'. "
             else:
-                raise ThingConnectionError(expected_sequence_msg % target)
+                msg += "It was not configured, and used the default. "
+            if self.default is not ...:
+                msg += f"The default is '{self.default}'."
+            else:
+                msg += f"The default searches for Things by type: '{self.thing_type}'."
+
+            raise ThingConnectionError(msg) from e
 
     def instance_get(self, obj: "Thing") -> ConnectedThings:
         r"""Supply the connected `.Thing`\ (s).
@@ -231,13 +328,12 @@ class ThingConnection(
             return val
 
 
-def thing_connection(default: str | Sequence[str] | None = None) -> Any:
+def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
     r"""Declare a connection to another `.Thing` in the same server.
 
-    This function is a convenience wrapper around the `.ThingConnection` descriptor
-    class, and should be used in preference to using the descriptor directly.
-    The main reason to use the function is that it suppresses type errors when
-    using static type checkers such as `mypy` or `pyright`.
+    ``lt.thing_connection`` marks a class attribute as a connection to another
+    `.Thing` on the same server. This will be automatically supplied when the
+    server is started, based on the type hint and default value.
 
     In keeping with `.property` and `.setting`, the type of the attribute should
     be the type of the connected `.Thing`\ . For example:
@@ -253,17 +349,85 @@ def thing_connection(default: str | Sequence[str] | None = None) -> Any:
         class ThingB(lt.Thing):
             "A class that relies on ThingA."
 
-            thing_a: ThingA = lt.thing_connection("thing_a")
+            thing_a: ThingA = lt.thing_connection()
+
+    This function is a convenience wrapper around the `.ThingConnection` descriptor
+    class, and should be used in preference to using the descriptor directly.
+    The main reason to use the function is that it suppresses type errors when
+    using static type checkers such as `mypy` or `pyright` (see note below).
+
+    The type hint of a Thing Connection should be one of the following:
+
+    * A `.Thing` subclass. An instance of this subclass will be returned when
+        the attribute is accessed.
+    * An optional `.Thing` subclass (e.g. ``MyThing | None``). This will either
+        return a ``MyThing`` instance or ``None``\ .
+    * A mapping of `str` to `.Thing` (e.g. ``Mapping[str, MyThing]``). This will
+        return a mapping of `.Thing` names to `.Thing` instances. The mapping
+        may be empty.
+
+    Example:
+
+    .. code-block:: python
+
+        import labthings_fastapi as lt
+
+
+        class ThingA(lt.Thing):
+            "An example Thing."
+
+
+        class ThingB(lt.Thing):
+            "An example Thing with connections."
+
+            thing_a: ThingA = lt.thing_connection()
+            maybe_thing_a: ThingA | None = lt.thing_connection()
+            all_things_a: Mapping[str, ThingA] = lt.thing_connection()
+
+            @lt.thing_action
+            def show_connections(self) -> str:
+                "Tell someone about our connections."
+                self.thing_a  # should always evaluate to a ThingA instance
+                self.maybe_thing_a  # will be a ThingA instance or None
+                self.all_things_a  # will a mapping of names to ThingA instances
+                return f"{self.thing_a=}, {self.maybe_thing_a=}, {self.all_things_a=}"
+
+    The example above is very contrived, but shows how to apply the different types.
+
+    If no default value is supplied, and no value is configured for the connection,
+    the server will attempt to find a `.Thing` that
+    matches the specified type when the server is started. If no matching `.Thing`
+    instances are found, the descriptor will return ``None`` or an empty mapping.
+    If that is not allowed by the type hint, the server will fail to start with
+    an error.
+
+    The default value may be a string specifying a `.Thing` name, or a sequence of
+    strings (for connections that return mappings). In those cases, the relevant
+    `.Thing` will be returned from the server. If a name is given that either
+    doesn't correspond to a `.Thing` on the server, or is a `.Thing` that doesn't
+    match the type of this connection, the server will fail to start with an error.
+
+    The default may also be ``None``
+    which is appropriate when the type is optional or a mapping. If the type is
+    a `.Thing` subclass, a default value of ``None`` forces the connection to be
+    specified in configuration.
+
+    :param default: The name(s) of the Thing(s) that will be connected by default.
+        If the default is omitted or set to ``...`` the server will attempt to find
+        a matching `.Thing` instance (or instances). A default value of `None` is
+        allowed if the connection is type hinted as optional.
+    :return: A `.ThingConnection` descriptor.
+
+    Typing notes:
 
     In the example above, using `.ThingConnection` directly would assign an object
     with type ``ThingConnection[ThingA]`` to the attribute ``thing_a``, which is
     typed as ``ThingA``\ . This would cause a type error. Using
-    `.thing_connection` suppresses this error, as its return type is `Any`\ .
+    `.thing_connection` suppresses this error, as its return type is a`Any``\ .
 
-    :param default: The name of the Thing that will be connected by default.
-        It is possible to omit this default or set it to ``None``\ , but if that
-        is done, it will cause an error unless the connection is explicitly made
-        in the server configuration. That is usually not desirable.
-    :return: A `.ThingConnection` instance.
+    The use of ``Any`` or an alternative type-checking exemption seems to be
+    inevitable when implementing descriptors that are typed via attribute annotations,
+    and it is done by established libraries such as `pydantic`\ .
+
     """
     return ThingConnection(default=default)
