@@ -336,12 +336,12 @@ class ThingConnection(
         if isinstance(val, ReferenceType):
             thing = val()
             if thing is not None:
-                return thing  # type: ignore[return-value]
+                return thing  # type: ignore[return-value] (see docstring)
             else:
                 raise ReferenceError("A connected thing was garbage collected.")
         else:
             # This works for None or for WeakValueDictionary()
-            return val  # type: ignore[return-value]
+            return val  # type: ignore[return-value] (see Typing notes in docstring)
 
 
 def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
