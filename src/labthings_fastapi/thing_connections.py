@@ -43,7 +43,7 @@ typed and documented on the class, i.e.
 
 from types import EllipsisType, NoneType, UnionType
 from typing import Any, Generic, TypeVar, TYPE_CHECKING, Union, get_args, get_origin
-from collections.abc import Mapping, Iterable
+from collections.abc import Mapping, Iterable, Sequence
 from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
 from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import ThingNotConnectedError, ThingConnectionError
@@ -125,7 +125,7 @@ class ThingConnection(
         ] = WeakKeyDictionary()
 
     @property
-    def thing_type(self) -> tuple[type["Thing"], ...]:
+    def thing_type(self) -> tuple[type, ...]:
         r"""The `.Thing` subclass(es) returned by this connection.
 
         A tuple is returned to allow for optional thing connections that
@@ -178,7 +178,7 @@ class ThingConnection(
         self,
         things: "Mapping[str, Thing]",
         target: str | Iterable[str] | None | EllipsisType,
-    ) -> "Iterable[Thing]":
+    ) -> "Sequence[Thing]":
         r"""Pick the Things we should connect to from a list.
 
         This function is used internally by `.ThingConnection.connect` to choose
@@ -313,19 +313,35 @@ class ThingConnection(
         :return: the `.Thing` instance(s) connected.
 
         :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
+
+        Typing notes:
+
+        This must be annotated as ``ConnectedThings`` which is the type variable
+        corresponding to the type of this connection. The type determined
+        at runtime will be within the upper bound of ``ConnectedThings`` but it
+        would be possible for ``ConnectedThings`` to be more specific.
+
+        In general, types determined at runtime may conflict with generic types,
+        and at least for this class the important thing is that types determined
+        at runtime match the attribute annotations, which is tested in unit tests.
+
+        The return statements here consequently have their types ignored.
+
         """
         msg = f"{self.name} has not been connected to a Thing yet."
         try:
             val = self._things[obj]
         except KeyError as e:
             raise ThingNotConnectedError(msg) from e
-        # Note that ReferenceError is deliberately not handled: the Thing
-        # referred to by thing_ref should exist until the server has shut down.
         if isinstance(val, ReferenceType):
-            return val()
+            thing = val()
+            if thing is not None:
+                return thing  # type: ignore[return-value]
+            else:
+                raise ReferenceError("A connected thing was garbage collected.")
         else:
             # This works for None or for WeakValueDictionary()
-            return val
+            return val  # type: ignore[return-value]
 
 
 def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
