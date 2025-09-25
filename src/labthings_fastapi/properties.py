@@ -617,14 +617,6 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self.readonly: bool = True
 
     @builtins.property
-    def value_type(self) -> type[Value]:
-        """The type of this descriptor's value.
-
-        :return: the type of the descriptor's value.
-        """
-        return self._type
-
-    @builtins.property
     def fget(self) -> ValueGetter:  # noqa: DOC201
         """The getter function."""
         return self._fget
