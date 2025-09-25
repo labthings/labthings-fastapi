@@ -1,6 +1,7 @@
 """Test the thing_connection module."""
 
 from collections.abc import Mapping
+import gc
 import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
@@ -301,6 +302,17 @@ def test_readonly():
     obj = ThingWithManyConnections()
     with pytest.raises(AttributeError, match="read-only"):
         obj.single_default_none = Dummy("name")
+
+
+def test_referenceerror():
+    """Check an error is raised by premature deletion."""
+    obj = ThingWithManyConnections()
+    things = {"name": Dummy1("name")}
+    ThingWithManyConnections.single_no_default.connect(obj, things)
+    del things
+    gc.collect()
+    with pytest.raises(ReferenceError):
+        _ = obj.single_no_default
 
 
 # The tests below use real Things and a real ThingServer to do more
