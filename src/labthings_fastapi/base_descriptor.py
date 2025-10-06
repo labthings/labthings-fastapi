@@ -432,6 +432,12 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
             # with a subscripted type. It is not available during __init__, which
             # is why we check for it here.
             self._type = typing.get_args(self.__orig_class__)[0]
+            if isinstance(self._type, typing.ForwardRef):
+                raise MissingTypeError(
+                    f"{owner}.{name} is a subscripted descriptor, where the "
+                    f"subscript is a forward reference ({self._type}). Forward "
+                    "references are not supported as subscripts."
+                )
 
         # Check for annotations on the parent class
         field_annotation = inspect.get_annotations(owner).get(name, None)
@@ -477,7 +483,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
         :raises MissingTypeError: if the type is None, not resolvable, or not specified.
         """
         self.assert_set_name_called()
-        if self._unevaluated_type_hint is not None:
+        if self._type is None and self._unevaluated_type_hint is not None:
             # We have a forward reference, so we need to resolve it.
             if self._owner is None:
                 raise MissingTypeError(
@@ -531,30 +537,6 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
 _class_attribute_docstring_cache: WeakKeyDictionary[type, Mapping[str, str]] = (
     WeakKeyDictionary()
 )
-
-
-def get_class_attribute_annotation(
-    cls: type, name: str
-) -> tuple[type | str, type] | tuple[None, None]:
-    """Retrieve the type annotation for an attribute of a class.
-
-    This function retrieves the type annotation for an attribute of a class,
-    if one exists. It uses `inspect.get_annotations` to retrieve the
-    annotation without resolving forward references, and it searches
-    the class and its parents by traversing the method resolution order.
-
-    :param cls: The class to inspect.
-    :param name: The name of the attribute whose annotation is required.
-    :return: A tuple of the annotation and the class on which it's defined (which
-        may be a parent of the class supplied), or ``(None, None)`` if there is
-        no annotation. A tuple is supplied so unpacking of the return value
-        will always work.
-    """
-    for base in inspect.getmro(cls):
-        annotations = inspect.get_annotations(base)
-        if name in annotations:
-            return annotations[name], base
-    return (None, None)
 
 
 def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
