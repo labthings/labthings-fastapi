@@ -375,5 +375,6 @@ def server_from_config(config: dict) -> ThingServer:
             thing_subclass=cls,
             args=thing.get("args", ()),
             kwargs=thing.get("kwargs", {}),
+            thing_connections=thing.get("thing_connections", {}),
         )
     return server
