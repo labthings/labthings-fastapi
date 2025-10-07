@@ -313,6 +313,8 @@ class ThingConnection(
         :return: the `.Thing` instance(s) connected.
 
         :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
+        :raises ReferenceError: if a connected Thing no longer exists (should not
+            ever happen in normal usage).
 
         Typing notes:
 
