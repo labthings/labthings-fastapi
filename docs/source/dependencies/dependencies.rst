@@ -5,7 +5,7 @@ Dependencies
 
 .. warning::
 
-    The use of dependencies is now deprecated. See `.thing_connection` and `.ThingServerInterface` for a more intuitive way to access that functionality.
+    The use of dependencies is now deprecated. See :ref:`thing_connections` and `.ThingServerInterface` for a more intuitive way to access that functionality.
 
 LabThings makes use of the powerful "dependency injection" mechanism in FastAPI. You can see the `FastAPI documentation`_ for more information. In brief, FastAPI dependencies are annotated types that instruct FastAPI to supply certain function arguments automatically. This removes the need to set up resources at the start of a function, and ensures everything the function needs is declared and typed clearly. The most common use for dependencies in LabThings is where an action needs to make use of another `.Thing` on the same `.ThingServer`.
 
@@ -14,7 +14,7 @@ Inter-Thing dependencies
 
 .. warning::
 
-    These dependencies are deprecated - see `.thing_connection` instead.
+    These dependencies are deprecated - see :ref:`thing_connections` instead.
 
 Simple actions depend only on their input parameters and the `.Thing` on which they are defined. However, it's quite common to need something else, for example accessing another `.Thing` instance on the same LabThings server. There are two important principles to bear in mind here:
 
