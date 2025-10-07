@@ -332,7 +332,7 @@ def test_fieldtyped_definition(name, value_type):
 
 def test_fieldtyped_missingtype():
     """Check the right error is raised when no type can be found."""
-    with pytest.raises(MissingTypeError) as excinfo:
+    with raises_or_is_caused_by(MissingTypeError) as excinfo:
 
         class Example2:
             field2 = FieldTypedBaseDescriptor()
@@ -405,7 +405,7 @@ def test_fieldtyped_missingtype():
 
     # Rather than roll my own evaluator for forward references, we just
     # won't support forward references in subscripted types for now.
-    with pytest.raises(MissingTypeError) as excinfo:
+    with raises_or_is_caused_by(MissingTypeError) as excinfo:
 
         class Example4:
             field6 = FieldTypedBaseDescriptor["str"]()
@@ -418,7 +418,7 @@ def test_fieldtyped_missingtype():
 
 def test_mismatched_types():
     """Check two type hints that don't match raises an error."""
-    with pytest.raises(InconsistentTypeError):
+    with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example3:
             field: int = FieldTypedBaseDescriptor[str]()
@@ -445,7 +445,7 @@ def test_stringified_vs_unstringified_mismatch():
     If a descriptor is typed using both a subscript and a field
     annotation, they should match -
     """
-    with pytest.raises(InconsistentTypeError):
+    with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example5:
             field: "int" = FieldTypedBaseDescriptor[int]()

@@ -155,7 +155,7 @@ def test_baseproperty_type_and_model():
     `pydantic.RootModel`.
     """
 
-    with pytest.raises(tp.MissingTypeError):
+    with raises_or_is_caused_by(tp.MissingTypeError):
 
         class Example:
             prop = tp.BaseProperty()
