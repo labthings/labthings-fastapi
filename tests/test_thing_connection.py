@@ -360,7 +360,7 @@ def test_circular_connection(cls_1, cls_2, connections) -> None:
         "thing_one", cls_1, thing_connections=connections.get("thing_one", {})
     )
     thing_two = server.add_thing(
-        "thing_two", cls_2, thing_connections=connections.get("thing_one", {})
+        "thing_two", cls_2, thing_connections=connections.get("thing_two", {})
     )
     things = [thing_one, thing_two]
 
