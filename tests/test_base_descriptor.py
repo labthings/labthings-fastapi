@@ -377,8 +377,9 @@ def test_fieldtyped_missingtype():
     # We re-use field4 but manually set _type and _unevaluated_type_hint
     # to None, to test the catch-all error
     Example3.field4._unevaluated_type_hint = None
+    Example3.field4._type = None
 
-    with pytest.raises(MissingTypeError):
+    with pytest.raises(MissingTypeError) as excinfo:
         _ = Example3.field4.value_type
 
     msg = str(excinfo.value)
