@@ -342,7 +342,7 @@ CONNECTIONS = {
 @pytest.mark.parametrize(
     ("cls_1", "cls_2", "connections"),
     [
-        (ThingOne, ThingTwo, None),
+        (ThingOne, ThingTwo, {}),
         (ThingOne, ThingTwo, CONNECTIONS),
         (ThingN, ThingN, CONNECTIONS),
     ],
@@ -356,11 +356,13 @@ def test_circular_connection(cls_1, cls_2, connections) -> None:
     the LabThings server.
     """
     server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", cls_1)
-    thing_two = server.add_thing("thing_two", cls_2)
+    thing_one = server.add_thing(
+        "thing_one", cls_1, thing_connections=connections.get("thing_one", {})
+    )
+    thing_two = server.add_thing(
+        "thing_two", cls_2, thing_connections=connections.get("thing_one", {})
+    )
     things = [thing_one, thing_two]
-    if connections is not None:
-        server.thing_connections = connections
 
     # Check the connections don't work initially, because they aren't connected
     for thing in things:
@@ -455,3 +457,11 @@ def test_mapping_and_multiple():
     with TestClient(server.app):
         assert thing_one.optional_thing.name == "thing_3"
         assert names_set(thing_one.n_things) == {f"thing_{i + 3}" for i in range(3)}
+
+
+def test_connections_in_server():
+    r"Check that ``thing_connections`` is correctly remembered from ``add_thing``\ ."
+    server = lt.ThingServer()
+    thing_one_connections = {"other_thing": "thing_name"}
+    server.add_thing("thing_one", ThingOne, thing_connections=thing_one_connections)
+    assert server.thing_connections["thing_one"] is thing_one_connections

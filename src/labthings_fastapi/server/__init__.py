@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 
 from ..exceptions import ThingConnectionError as ThingConnectionError
@@ -84,7 +84,7 @@ class ThingServer:
         self.blob_data_manager.attach_to_app(self.app)
         self.add_things_view_to_app()
         self._things: dict[str, Thing] = {}
-        self.thing_connections: Mapping[str, Mapping[str, str | Sequence[str]]] = {}
+        self.thing_connections: dict[str, Mapping[str, str | Iterable[str] | None]] = {}
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
@@ -158,6 +158,7 @@ class ThingServer:
         thing_subclass: type[ThingSubclass],
         args: Sequence[Any] | None = None,
         kwargs: Mapping[str, Any] | None = None,
+        thing_connections: Mapping[str, str | Iterable[str] | None] | None = None,
     ) -> ThingSubclass:
         r"""Add a thing to the server.
 
@@ -173,6 +174,11 @@ class ThingServer:
             ``thing_subclass``\ .
         :param kwargs: keyword arguments to pass to the constructor of
             ``thing_subclass``\ .
+        :param thing_connections: a mapping that sets up the `.thing_connection`\ s.
+            Keys are the names of attributes of the `.Thing` and the values are
+            the name(s) of the `.Thing`\ (s) you'd like to connect. If this is left
+            at its default, the connections will use their default behaviour, usually
+            automatically connecting to a `.Thing` of the right type.
 
         :returns: the instance of ``thing_subclass`` that was created and added
             to the server. There is no need to retain a reference to this, as it
@@ -212,6 +218,8 @@ class ThingServer:
             thing_server_interface=interface,
         )  # type: ignore[misc]
         self._things[name] = thing
+        if thing_connections is not None:
+            self.thing_connections[name] = thing_connections
         thing.attach_to_server(
             server=self,
         )
