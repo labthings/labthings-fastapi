@@ -374,7 +374,7 @@ def test_fieldtyped_missingtype():
     assert "wasn't saved" in msg
     assert "field4" in msg
 
-    # We re-use field4 but manually set _type and _unevaluated_type_hint
+    # We reuse field4 but manually set _type and _unevaluated_type_hint
     # to None, to test the catch-all error
     Example3.field4._unevaluated_type_hint = None
     Example3.field4._type = None
