@@ -30,13 +30,17 @@ from ..utilities import model_to_dict
 from ..utilities.introspection import EmptyInput
 from ..thing_description._model import LinkElement
 from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
-from ..dependencies.invocation import (
-    CancelHook,
+from ..exceptions import (
     InvocationCancelledError,
     InvocationError,
-    invocation_logger,
 )
 from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
+from ..invocation_contexts import (
+    CancelEvent,
+    get_cancel_event,
+    set_invocation_id,
+    get_invocation_logger,
+)
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -77,7 +81,6 @@ class Invocation(Thread):
         input: Optional[BaseModel] = None,
         dependencies: Optional[dict[str, Any]] = None,
         log_len: int = 1000,
-        cancel_hook: Optional[CancelHook] = None,
     ) -> None:
         """Create a thread to run an action and track its outputs.
 
@@ -96,8 +99,6 @@ class Invocation(Thread):
             FastAPI by its dependency injection mechanism.
         :param log_len: sets the number of log entries that will be held in
             memory by the invocation's logger.
-        :param cancel_hook: is a `threading.Event` subclass that tells the
-            invocation it's time to stop. See `.CancelHook`.
         """
         Thread.__init__(self, daemon=True)
 
@@ -106,7 +107,6 @@ class Invocation(Thread):
         self.thing_ref = weakref.ref(thing)
         self.input = input if input is not None else EmptyInput()
         self.dependencies = dependencies if dependencies is not None else {}
-        self.cancel_hook = cancel_hook
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
         self._ID = id  # Task ID
@@ -195,14 +195,18 @@ class Invocation(Thread):
             raise RuntimeError("The `Thing` on which an action was run is missing!")
         return thing
 
+    @property
+    def cancel_hook(self) -> CancelEvent:
+        """The cancel event associated with this Invocation."""
+        return get_cancel_event(self.id)
+
     def cancel(self) -> None:
         """Cancel the task by requesting the code to stop.
 
         This is an opt-in feature: the action must use
         a `.CancelHook` dependency and periodically check it.
         """
-        if self.cancel_hook is not None:
-            self.cancel_hook.set()
+        self.cancel_hook.set()
 
     def response(self, request: Optional[Request] = None) -> InvocationModel:
         """Generate a representation of the invocation suitable for HTTP.
@@ -273,7 +277,8 @@ class Invocation(Thread):
         # Create a logger just for this invocation, keyed to the invocation id
         # Logs that go to this logger will be copied into `self._log`
         handler = DequeLogHandler(dest=self._log)
-        logger = invocation_logger(self.id)
+        logger = get_invocation_logger(self.id)
+        logger.setLevel(logging.INFO)
         logger.addHandler(handler)
         try:
             action.emit_changed_event(self.thing, self._status.value)
@@ -291,8 +296,10 @@ class Invocation(Thread):
                 self._start_time = datetime.datetime.now()
                 action.emit_changed_event(self.thing, self._status.value)
 
-            # The next line actually runs the action.
-            ret = action.__get__(thing)(**kwargs, **self.dependencies)
+            bound_method = action.__get__(thing)
+            # Actually run the action
+            with set_invocation_id(self.id):
+                ret = bound_method(**kwargs, **self.dependencies)
 
             with self._status_lock:
                 self._return_value = ret
@@ -390,7 +397,6 @@ class ActionManager:
         id: uuid.UUID,
         input: Any,
         dependencies: dict[str, Any],
-        cancel_hook: CancelHook,
     ) -> Invocation:
         """Invoke an action, returning the thread where it's running.
 
@@ -409,8 +415,6 @@ class ActionManager:
             keyword arguments.
         :param dependencies: is a dictionary of keyword arguments, supplied by
             FastAPI by its dependency injection mechanism.
-        :param cancel_hook: is a `threading.Event` subclass that tells the
-            invocation it's time to stop. See `.CancelHook`.
 
         :return: an `.Invocation` object that has been started.
         """
@@ -420,7 +424,6 @@ class ActionManager:
             input=input,
             dependencies=dependencies,
             id=id,
-            cancel_hook=cancel_hook,
         )
         self.append_invocation(thread)
         thread.start()

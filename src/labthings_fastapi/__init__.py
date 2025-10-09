@@ -32,6 +32,11 @@ from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
 from .client import ThingClient
+from .invocation_contexts import (
+    get_invocation_logger,
+    cancellable_sleep,
+    ThreadWithInvocationID,
+)
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.
@@ -55,4 +60,7 @@ __all__ = [
     "ThingServer",
     "cli",
     "ThingClient",
+    "get_invocation_logger",
+    "cancellable_sleep",
+    "ThreadWithInvocationID",
 ]

@@ -36,7 +36,7 @@ import uuid
 from typing import Annotated
 from fastapi import Depends
 import logging
-import threading
+from ..invocation_contexts import CancelEvent, get_invocation_logger
 
 
 def invocation_id() -> uuid.UUID:
@@ -87,9 +87,7 @@ def invocation_logger(id: InvocationID) -> logging.Logger:
 
     :return: A `logging.Logger` object specific to this invocation.
     """
-    logger = logging.getLogger(f"labthings_fastapi.actions.{id}")
-    logger.setLevel(logging.INFO)
-    return logger
+    return get_invocation_logger(id)
 
 
 InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]
@@ -98,83 +96,6 @@ InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]
 This calls `.invocation_logger` to generate a logger for the current
 invocation. For details of how to use dependencies, see :ref:`dependencies`.
 """
-
-
-class InvocationCancelledError(BaseException):
-    """An invocation was cancelled by the user.
-
-    Note that this inherits from BaseException so won't be caught by
-    `except Exception`, it must be handled specifically.
-
-    Action code may want to handle cancellation gracefully. This
-    exception should be propagated if the action's status should be
-    reported as ``cancelled``, or it may be handled so that the
-    action finishes, returns a value, and is marked as ``completed``.
-
-    If this exception is handled, the `.CancelEvent` should be reset
-    to allow another `.InvocationCancelledError` to be raised if the
-    invocation receives a second cancellation signal.
-    """
-
-
-class InvocationError(RuntimeError):
-    """The invocation ended in an anticipated error state.
-
-    When this error is raised, action execution stops as expected. The exception will be
-    logged at error level without a traceback, and the invocation will return with
-    error status.
-
-    Subclass this error for errors that do not need further traceback information
-    to be provided with the error message in logs.
-    """
-
-
-class CancelEvent(threading.Event):
-    """An Event subclass that enables cancellation of actions.
-
-    This `threading.Event` subclass adds methods to raise
-    `.InvocationCancelledError` exceptions if the invocation is cancelled,
-    usually by a ``DELETE`` request to the invocation's URL.
-    """
-
-    def __init__(self, id: InvocationID) -> None:
-        """Initialise the cancellation event.
-
-        :param id: The invocation ID, annotated as a dependency so it is
-            supplied automatically by FastAPI.
-        """
-        threading.Event.__init__(self)
-        self.invocation_id = id
-
-    def raise_if_set(self) -> None:
-        """Raise an exception if the event is set.
-
-        This is intended as a compact alternative to:
-
-        .. code-block::
-
-            if cancel_event.is_set():
-                raise InvocationCancelledError()
-
-        :raise InvocationCancelledError: if the event has been cancelled.
-        """
-        if self.is_set():
-            raise InvocationCancelledError("The action was cancelled.")
-
-    def sleep(self, timeout: float) -> None:
-        r"""Sleep for a given time in seconds, but raise an exception if cancelled.
-
-        This function can be used in place of `time.sleep`. It will usually behave
-        the same as `time.sleep`\ , but if the cancel event is set during the time
-        when we are sleeping, an exception is raised to interrupt the sleep and
-        cancel the action.
-
-        :param timeout: The time to sleep for, in seconds.
-
-        :raise InvocationCancelledError: if the event has been cancelled.
-        """
-        if self.wait(timeout):
-            raise InvocationCancelledError("The action was cancelled.")
 
 
 def invocation_cancel_hook(id: InvocationID) -> CancelHook:
