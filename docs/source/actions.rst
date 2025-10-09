@@ -58,6 +58,50 @@ The first is ``self`` (the first positional argument), which is always the
 supply resources needed by the action. Most often, this is a way of accessing
 other `.Things` on the same server.
 
+.. action_logging:
+Logging from actions
+--------------------
+It's helpful to be able to keep track of the log messages from action code.
+This may be used to display status updates to the user when an action takes
+a long time to run, or it may simply be a helpful debugging aid. To log
+messages that are associated with a particular invocation of an action,
+use ``lt.get_invocation_logger()`` to obtain a `logging.Logger` that will
+associate its messages with the current invocation.
+
+Logs are available over HTTP. If an action is run from another action,
+it will use the same logger as its parent action.
+
+.. action_cancellation:
+Cancelling actions
+------------------
+If an action could run for a long time, it is useful to be able to cancel it
+cleanly. LabThings makes provision for this by allowing actions to be cancelled
+using a ``DELETE`` HTTP request. In order to allow an action to be cancelled,
+you must give LabThings opportunities to interrupt it. This is most often done
+by replacing a `time.sleep()` statement with `.cancellable_sleep()` which
+is equivalent,  but will raise an exception if the action is cancelled.
+
+For more advanced options, see `.invocation_contexts` for detail.
+
+.. invocation_context:
+Invocation contexts
+-------------------
+Cancelling actions and capturing their logs requires action code to use a
+specific logger and check for cancel events. This is done using `contextvars`
+such that the action code can use module-level symbols rather than needing
+to explicitly pass the logger and cancel hook as arguments to the action
+method.
+
+Usually, you don't need to consider this mechanism: simply use the invocation
+logger or cancel hook as explained above. However, if you want to run actions
+outside of the server (for example, for testing purposes) or if you want to
+call one action from another action, but not share the cancellation signal
+or log, functions are provided in `.invocation_contexts` to manage this.
+
+If you start a new thread from an action, code running in that thread will
+not have the invocation ID set in a context variable. A subclass of
+`threading.Thread` is provided to do this, `.ThreadWithInvocationID`\ .
+
 Raising exceptions
 ------------------
 If an action raises an unhandled exception, the action will terminate with an Error
