@@ -82,6 +82,8 @@ def fake_invocation_context() -> Iterator[UUID]:
     """Set a dummy invocation ID for a block of code.
 
     This function should be used in a ``with:`` block.
+
+    :yields: the created invocation ID.
     """
     id = uuid4()
     with set_invocation_id(id):
@@ -129,6 +131,7 @@ class CancelEvent(Event):
         will either create one, or return the existing one.
 
         :param id: The invocation ID.
+        :return: the cancel event for the given ``id`` .
         """
         try:
             return cls._cancel_events[id]
@@ -303,8 +306,15 @@ class ThreadWithInvocationID(Thread):
         the calling thread has been cancelled. If it has, it will cancel the
         thread, before attempting to ``join`` it again.
 
+        Note that, if the invocation that calls this function is cancelled
+        while the function is running, the exception will propagate, i.e.
+        you should handle `.InvocationCancelledError` unless you wish
+        your invocation to terminate if it is cancelled.
+
         :param poll_interval: How often to check for cancellation of the
             calling thread, in seconds.
+        :raises InvocationCancelledError: if this invocation is cancelled
+            while waiting for the thread to join.
         """
         cancellation: InvocationCancelledError | None = None
         self._polls = 0
