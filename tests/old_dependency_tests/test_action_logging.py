@@ -5,7 +5,7 @@ This tests the log that is returned in an action invocation
 import logging
 from fastapi.testclient import TestClient
 import pytest
-from .temp_client import poll_task
+from ..temp_client import poll_task
 import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
 
@@ -17,17 +17,16 @@ class ThingThatLogsAndErrors(lt.Thing):
     ]
 
     @lt.thing_action
-    def action_that_logs(self):
-        logger = lt.get_invocation_logger()
+    def action_that_logs(self, logger: lt.deps.InvocationLogger):
         for m in self.LOG_MESSAGES:
             logger.info(m)
 
     @lt.thing_action
-    def action_with_unhandled_error(self):
+    def action_with_unhandled_error(self, logger: lt.deps.InvocationLogger):
         raise RuntimeError("I was asked to raise this error.")
 
     @lt.thing_action
-    def action_with_invocation_error(self):
+    def action_with_invocation_error(self, logger: lt.deps.InvocationLogger):
         raise lt.exceptions.InvocationError("This is an error, but I handled it!")
 
 

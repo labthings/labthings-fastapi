@@ -9,7 +9,7 @@ import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.deps import DirectThingClient, direct_thing_client_class
 from labthings_fastapi.thing_server_interface import create_thing_without_server
-from .temp_client import poll_task
+from ..temp_client import poll_task
 
 
 class Counter(lt.Thing):
