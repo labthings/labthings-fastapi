@@ -248,12 +248,28 @@ def get_invocation_logger(id: UUID | None = None) -> logging.Logger:
 
 
 class ThreadWithInvocationID(Thread):
-    """A thread that sets a new invocation ID.
+    r"""A thread that sets a new invocation ID.
 
     This is a subclass of `threading.Thread` and works very much the
     same way. It implements its functionality by overriding the ``run``
     method, so this should not be overridden again - you should instead
     specify the code to run using the ``target`` argument.
+
+    This function enables an action to be run in a thread, which gets its
+    own invocation ID and cancel hook. This means logs will not be interleaved
+    with the calling action, and the thread may be cancelled just like an
+    action started over HTTP, by calling its ``cancel`` method.
+
+    The thread also remembers the return value of the target function
+    in the property ``result`` and stores any exception raised in the
+    ``exception`` property.
+
+    A final LabThings-specific feature is cancellation propagation. If
+    the thread is started from an action that may be cancelled, it may
+    be joined with ``join_and_propagate_cancel``\ . This is intended
+    to be equivalent to calling ``join`` but with the added feature that,
+    if the parent thread is cancelled while waiting for the child thread
+    to join, the child thread will also be cancelled.
     """
 
     def __init__(
