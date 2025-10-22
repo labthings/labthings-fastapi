@@ -288,6 +288,13 @@ class ThreadWithInvocationID(Thread):
         self._invocation_id: UUID = uuid4()
         self._result: Any = None
         self._exception: BaseException | None = None
+        # We hold a reference to the CancelEvent below, to ensure that it
+        # doesn't get garbage collected. Garbage collection means that we
+        # might (or might not) ignore cancellation that happens before the
+        # thread has started properly. This is an edge case, but can mess
+        # up testing code, so it's safest to ensure the event exists for at
+        # least as long as this Thread.
+        self._cancel_event = CancelEvent.get_for_id(self._invocation_id)
 
     @property
     def invocation_id(self) -> UUID:
