@@ -36,7 +36,8 @@ import uuid
 from typing import Annotated
 from fastapi import Depends
 import logging
-from ..invocation_contexts import CancelEvent, get_invocation_logger
+from ..invocation_contexts import CancelEvent
+from ..logs import THING_LOGGER
 
 
 def invocation_id() -> uuid.UUID:
@@ -87,7 +88,7 @@ def invocation_logger(id: InvocationID) -> logging.Logger:
 
     :return: A `logging.Logger` object specific to this invocation.
     """
-    return get_invocation_logger(id)
+    return THING_LOGGER.getChild("OLD_DEPENDENCY_LOGGER")
 
 
 InvocationLogger = Annotated[logging.Logger, Depends(invocation_logger)]

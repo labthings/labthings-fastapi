@@ -8,6 +8,7 @@ import pytest
 from ..temp_client import poll_task
 import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
+from labthings_fastapi.logs import THING_LOGGER
 
 
 class ThingThatLogsAndErrors(lt.Thing):
@@ -41,7 +42,7 @@ def client():
 
 def test_invocation_logging(caplog, client):
     """Check the expected items appear in the log when an action is invoked."""
-    with caplog.at_level(logging.INFO, logger="labthings.action"):
+    with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
         r = client.post("/log_and_error_thing/action_that_logs")
         r.raise_for_status()
         invocation = poll_task(client, r.json())
@@ -56,7 +57,7 @@ def test_invocation_logging(caplog, client):
 
 def test_unhandled_error_logs(caplog, client):
     """Check that a log with a traceback is raised if there is an unhandled error."""
-    with caplog.at_level(logging.INFO, logger="labthings.action"):
+    with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
         r = client.post("/log_and_error_thing/action_with_unhandled_error")
         r.raise_for_status()
         invocation = poll_task(client, r.json())
@@ -69,7 +70,7 @@ def test_unhandled_error_logs(caplog, client):
 
 def test_invocation_error_logs(caplog, client):
     """Check that a log with a traceback is raised if there is an unhandled error."""
-    with caplog.at_level(logging.INFO, logger="labthings.action"):
+    with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
         r = client.post("/log_and_error_thing/action_with_invocation_error")
         r.raise_for_status()
         invocation = poll_task(client, r.json())

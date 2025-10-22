@@ -33,7 +33,6 @@ from .outputs import blob
 from .server import ThingServer, cli
 from .client import ThingClient
 from .invocation_contexts import (
-    get_invocation_logger,
     cancellable_sleep,
     raise_if_cancelled,
     ThreadWithInvocationID,
@@ -61,7 +60,6 @@ __all__ = [
     "ThingServer",
     "cli",
     "ThingClient",
-    "get_invocation_logger",
     "cancellable_sleep",
     "raise_if_cancelled",
     "ThreadWithInvocationID",
