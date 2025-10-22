@@ -26,6 +26,7 @@ from ..utilities.object_reference_to_object import (
     object_reference_to_object,
 )
 from ..actions import ActionManager
+from ..logs import configure_thing_logger
 from ..thing import Thing
 from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
@@ -89,6 +90,7 @@ class ThingServer:
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
         _thing_servers.add(self)
+        configure_thing_logger()  # Note: this is safe to call multiple times.
 
     app: FastAPI
     action_manager: ActionManager

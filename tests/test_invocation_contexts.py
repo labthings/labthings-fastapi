@@ -173,22 +173,6 @@ def test_raise_if_cancelled():
         assert not event.is_set()
 
 
-def test_invocation_logger():
-    """Check `get_invocation_logger` behaves correctly."""
-    # The function simply returns a logger with the ID in the name.
-    fake_id = uuid.uuid4()
-    logger = ic.get_invocation_logger(fake_id)
-    assert logger.name.endswith(str(fake_id))
-
-    # The ID is taken from context if not supplied.
-    with pytest.raises(exc.NoInvocationContextError):
-        ic.get_invocation_logger()
-    with ic.fake_invocation_context():
-        logger = ic.get_invocation_logger()
-        id = ic.get_invocation_id()
-        assert logger.name.endswith(str(id))
-
-
 def test_thread_with_invocation_id():
     """Test our custom thread subclass makes a new ID and can be cancelled."""
     ids = []

@@ -17,7 +17,6 @@ the current invocation ID.
 from collections.abc import Iterator, Mapping, Sequence
 from contextvars import ContextVar
 from contextlib import contextmanager
-import logging
 from threading import Event, Thread
 import time
 from typing import Any, Callable
@@ -239,25 +238,6 @@ def raise_if_cancelled() -> None:
         event.raise_if_set()
     except NoInvocationContextError:
         pass
-
-
-def get_invocation_logger(id: UUID | None = None) -> logging.Logger:
-    """Obtain a logger for the current invocation.
-
-    Use this function to get a logger to use in action code. This
-    will associate the log messages with the invocation, so that
-    they may be used as status updates or related to a particular run
-    of the action.
-
-    :param id: the invocation ID. This will be determined from context
-        so need not be specified in action code.
-    :return: a logger that is specific to a particular invocation of
-        an action.
-    """
-    if id is None:
-        id = get_invocation_id()
-    logger = logging.getLogger(f"labthings_fastapi.actions.{id}")
-    return logger
 
 
 class ThreadWithInvocationID(Thread):

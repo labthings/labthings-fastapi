@@ -128,3 +128,12 @@ class NoInvocationContextError(RuntimeError):
     To avoid this error in test code or manually created threads, you should supply
     an invocation context.
     """
+
+
+class LogConfigurationError(RuntimeError):
+    """There is a problem with logging configuration.
+
+    LabThings uses the `logging` module to collect logs from actions. This requires
+    certain handlers and filters to be set up. This exception is raised if they
+    cannot be added, or if they are not present when they are needed.
+    """

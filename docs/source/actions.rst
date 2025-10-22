@@ -61,15 +61,14 @@ other `.Things` on the same server.
 .. action_logging:
 Logging from actions
 --------------------
-It's helpful to be able to keep track of the log messages from action code.
-This may be used to display status updates to the user when an action takes
-a long time to run, or it may simply be a helpful debugging aid. To log
-messages that are associated with a particular invocation of an action,
-use ``lt.get_invocation_logger()`` to obtain a `logging.Logger` that will
-associate its messages with the current invocation.
+Action code should use `.Thing.logger` to log messages. This will be configured
+to handle messages on a per-invocation basis and make them available when the action
+is queried over HTTP.
 
-Logs are available over HTTP. If an action is run from another action,
-it will use the same logger as its parent action.
+This may be used to display status updates to the user when an action takes
+a long time to run, or it may simply be a helpful debugging aid. 
+
+See :mod:`.logs` for details of how this is implemented.
 
 .. action_cancellation:
 Cancelling actions
