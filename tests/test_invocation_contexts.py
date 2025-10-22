@@ -134,10 +134,10 @@ def test_cancel_event():
 
 def test_cancellable_sleep():
     """Check the module-level cancellable sleep."""
-    with pytest.raises(exc.NoInvocationContextError):
-        ic.cancellable_sleep(1)
-    with pytest.raises(exc.NoInvocationContextError):
-        ic.cancellable_sleep(None)
+    # with no invocation context, the function should wait
+    # and there should be no error.
+    with assert_takes_time(0.02, 0.04):
+        ic.cancellable_sleep(0.02)
 
     with ic.fake_invocation_context():
         event = ic.get_cancel_event()
@@ -146,20 +146,30 @@ def test_cancellable_sleep():
         with assert_takes_time(0.02, 0.04):
             ic.cancellable_sleep(0.02)
 
-        # passing `None` should return immediately.
-        with assert_takes_time(None, 0.002):
-            ic.cancellable_sleep(None)
-
         # check an exception gets raised and reset if appropriate
         event.set()
         with pytest.raises(exc.InvocationCancelledError):
             ic.cancellable_sleep(1)
         assert not event.is_set()
 
+
+def test_raise_if_cancelled():
+    """Check the module-level cancellable sleep."""
+    # the function should return immediately.
+    with assert_takes_time(None, 0.002):
+        ic.raise_if_cancelled()
+
+    with ic.fake_invocation_context():
+        event = ic.get_cancel_event()
+
+        # the function should return immediately.
+        with assert_takes_time(None, 0.002):
+            ic.raise_if_cancelled()
+
         # check an exception gets raised and reset if appropriate
         event.set()
         with pytest.raises(exc.InvocationCancelledError):
-            ic.cancellable_sleep(None)
+            ic.raise_if_cancelled()
         assert not event.is_set()
 
 
@@ -179,19 +189,6 @@ def test_invocation_logger():
         assert logger.name.endswith(str(id))
 
 
-def run_function_in_thread_and_propagate_cancellation(func, *args):
-    """Run a function in a ThreadWithInvocationID."""
-    t = ic.ThreadWithInvocationID(target=func, args=args)
-    t.start()
-    try:
-        t.join_and_propagate_cancel(0.005)
-    except exc.InvocationCancelledError:
-        # We still want to return the finished thread if it's
-        # cancelled.
-        pass
-    return t
-
-
 def test_thread_with_invocation_id():
     """Test our custom thread subclass makes a new ID and can be cancelled."""
     ids = []
@@ -204,6 +201,9 @@ def test_thread_with_invocation_id():
     assert t.exception is None
     assert t.result is None
 
+
+def test_thread_with_invocation_id_cancel():
+    """Test the custom thread subclass responds to cancellation."""
     # Check cancellable sleep works in the thread
     t = ic.ThreadWithInvocationID(target=ic.cancellable_sleep, args=[1])
     assert isinstance(t.invocation_id, uuid.UUID)
@@ -213,20 +213,43 @@ def test_thread_with_invocation_id():
         t.join()
     assert isinstance(t.exception, exc.InvocationCancelledError)
 
-    # Check we capture the return value
+
+def test_thread_with_invocation_id_return_value():
+    """Check we capture the return value when running in a ThreadWithInvocationID."""
     t = ic.ThreadWithInvocationID(target=lambda: True)
     t.start()
     t.join()
     assert t.exception is None
     assert t.result is True
 
+
+def run_function_in_thread_and_propagate_cancellation(func, *args):
+    """Run a function in a ThreadWithInvocationID."""
+    t = ic.ThreadWithInvocationID(target=func, args=args)
+    t.start()
+    try:
+        t.join_and_propagate_cancel(1)
+    except exc.InvocationCancelledError:
+        # We still want to return the finished thread if it's
+        # cancelled.
+        pass
+    return t
+
+
+def test_thread_with_invocation_id_cancellation_propagates():
+    """Check that a cancel event can propagate to our thread.
+
+    ``join_and_propagate_cancellation`` should cancel the spawned thread if
+    the parent thread is cancelled while it's waiting for the spawned thread
+    to join.
+    """
     # Check we can propagate cancellation.
     # First, we run `cancellable_sleep` and check it doesn't cancel
     with ic.fake_invocation_context():
         # First test our function - there is only one thread here, and we
         # check it finishes and doesn't error.
         t = run_function_in_thread_and_propagate_cancellation(
-            ic.cancellable_sleep, 0.001
+            ic.cancellable_sleep, 0.02
         )
         assert isinstance(t, ic.ThreadWithInvocationID)
         assert not t.is_alive()

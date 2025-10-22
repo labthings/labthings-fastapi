@@ -19,6 +19,7 @@ from contextvars import ContextVar
 from contextlib import contextmanager
 import logging
 from threading import Event, Thread
+import time
 from typing import Any, Callable
 from typing_extensions import Self
 from uuid import UUID, uuid4
@@ -191,8 +192,8 @@ def get_cancel_event(id: UUID | None = None) -> CancelEvent:
     return CancelEvent.get_for_id(id)
 
 
-def cancellable_sleep(interval: float | None) -> None:
-    """Sleep for a specified time, allowing cancellation.
+def cancellable_sleep(interval: float) -> None:
+    r"""Sleep for a specified time, allowing cancellation.
 
     This function should be called from action functions instead of
     `time.sleep` to allow them to be cancelled. Usually, this
@@ -206,26 +207,38 @@ def cancellable_sleep(interval: float | None) -> None:
         This function uses `.Event.wait` internally, which suffers
         from timing errors on some platforms: it may have error of
         around 10-20ms. If that's a problem, consider using
-        `time.sleep` instead. ``lt.cancellable_sleep(None)`` may then
+        `time.sleep` instead. ``lt.raise_if_cancelled()`` may then
         be used to allow cancellation.
 
-    This function may only be called from an action thread, as it
-    depends on the invocation ID being available from a context variable.
-    Use `.set_invocation_id` to make it available outside of an action
-    thread.
+    If this function is called from outside of an action thread, it
+    will revert to `time.sleep`\ .
 
-    If ``interval`` is set to None, we do not call `.Event.wait` but
-    instead we simply check whether the event is set.
-
-    :param interval: The length of time to sleep for, in seconds. If it
-        is `None` we won't wait, but we will still check for a cancel
-        event, and raise the exception if it is set.
+    :param interval: The length of time to wait for, in seconds.
     """
-    event = get_cancel_event()
-    if interval is None:
-        event.raise_if_set()
-    else:
+    try:
+        event = get_cancel_event()
         event.sleep(interval)
+    except NoInvocationContextError:
+        time.sleep(interval)
+
+
+def raise_if_cancelled() -> None:
+    """Raise an exception if the current invocation has been cancelled.
+
+    This function checks for cancellation events and, if the current
+    action invocation has been cancelled, it will raise an
+    `.InvocationCancelledError` to signal the thread to terminate.
+    It is equivalent to `.cancellable_sleep` but without waiting any
+    time.
+
+    If called outside of an invocation context, this function does
+    nothing, and will not raise an error.
+    """
+    try:
+        event = get_cancel_event()
+        event.raise_if_set()
+    except NoInvocationContextError:
+        pass
 
 
 def get_invocation_logger(id: UUID | None = None) -> logging.Logger:
@@ -335,11 +348,9 @@ class ThreadWithInvocationID(Thread):
         cancellation: InvocationCancelledError | None = None
         self._polls = 0
         self._attempted_cancels = 0
-        print(f"Checking for cancellation of invocation {get_invocation_id()}")
-        print(f"so we can cancel {self.invocation_id}")
         while self.is_alive():
             try:
-                cancellable_sleep(None)
+                raise_if_cancelled()
                 self._polls += 1
             except InvocationCancelledError as e:
                 # Propagate the cancellation signal to the thread

@@ -35,6 +35,7 @@ from .client import ThingClient
 from .invocation_contexts import (
     get_invocation_logger,
     cancellable_sleep,
+    raise_if_cancelled,
     ThreadWithInvocationID,
 )
 
@@ -62,5 +63,6 @@ __all__ = [
     "ThingClient",
     "get_invocation_logger",
     "cancellable_sleep",
+    "raise_if_cancelled",
     "ThreadWithInvocationID",
 ]
