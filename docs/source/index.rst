@@ -11,7 +11,7 @@ Documentation for LabThings-FastAPI
    tutorial/index.rst
    examples.rst
    actions.rst
-   thing_connections.rst
+   thing_slots.rst
    dependencies/dependencies.rst
    blobs.rst
    concurrency.rst

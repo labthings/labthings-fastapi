@@ -29,7 +29,7 @@ class ThingConfig(BaseModel):
         description="Keyword arguments to pass to the constructor of `cls`.",
     )
 
-    thing_connections: Mapping[str, str | Iterable[str] | None] = Field(
+    thing_slots: Mapping[str, str | Iterable[str] | None] = Field(
         default_factory=dict,
         description=(
             """Connections to other Things.

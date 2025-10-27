@@ -20,7 +20,7 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
-from .thing_connections import thing_connection
+from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
 from .decorators import (
@@ -53,7 +53,7 @@ __all__ = [
     "DataProperty",
     "DataSetting",
     "thing_action",
-    "thing_connection",
+    "thing_slot",
     "fastapi_endpoint",
     "deps",
     "outputs",

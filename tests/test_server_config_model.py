@@ -18,7 +18,7 @@ def test_ThingConfig():
     # In the absence of supplied arguments, default factories should be used
     assert len(direct.args) == 0
     assert direct.kwargs == {}
-    assert direct.thing_connections == {}
+    assert direct.thing_slots == {}
 
     with pytest.raises(ValidationError, match="No module named"):
         cm.ThingConfig(cls="missing.module")

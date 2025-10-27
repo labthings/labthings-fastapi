@@ -19,8 +19,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from ..exceptions import ThingConnectionError as ThingConnectionError
-from ..thing_connections import ThingConnection
+from ..thing_slots import ThingSlot
 from ..utilities import class_attributes
 
 from ..utilities.object_reference_to_object import (
@@ -220,27 +219,27 @@ class ThingServer:
                 *config.args,
                 **config.kwargs,
                 thing_server_interface=interface,
-            )  # type: ignore[misc]
+            )
         return things
 
     def _connect_things(self) -> None:
-        r"""Connect the `thing_connection` attributes of Things.
+        r"""Connect the `thing_slot` attributes of Things.
 
-        A `.Thing` may have attributes defined as ``lt.thing_connection()``, which
+        A `.Thing` may have attributes defined as ``lt.thing_slot()``, which
         will be populated after all `.Thing` instances are loaded on the server.
 
         This function is responsible for supplying the `.Thing` instances required
         for each connection. This will be done by using the name specified either
         in the connection's default, or in the configuration of the server.
 
-        `.ThingConnectionError` will be raised by code called by this method if
-        the connection cannot be provided. See `.ThingConnection.connect` for more
+        `.ThingSlotError` will be raised by code called by this method if
+        the connection cannot be provided. See `.ThingSlot.connect` for more
         details.
         """
         for thing_name, thing in self.things.items():
-            config = self._config.thing_configs[thing_name].thing_connections
+            config = self._config.thing_configs[thing_name].thing_slots
             for attr_name, attr in class_attributes(thing):
-                if not isinstance(attr, ThingConnection):
+                if not isinstance(attr, ThingSlot):
                     continue
                 target = config.get(attr_name, ...)
                 attr.connect(thing, self.things, target)
