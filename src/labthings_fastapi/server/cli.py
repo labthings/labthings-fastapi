@@ -19,7 +19,10 @@ the tutorial page :ref:`tutorial_running`.
 """
 
 from argparse import ArgumentParser, Namespace
+import sys
 from typing import Optional
+
+from pydantic import ValidationError
 
 from ..utilities.object_reference_to_object import (
     object_reference_to_object,
@@ -124,6 +127,8 @@ def serve_from_cli(
     if ``labthings-server`` is being run on a headless server, where
     an HTTP error page is more useful than no response.
 
+    If ``fallback`` is not specified, we will print the error and exit.
+
     :param argv: command line arguments (defaults to arguments supplied
         to the current command).
     :param dry_run: may be set to ``True`` to terminate after the server
@@ -155,5 +160,9 @@ def serve_from_cli(
             app.labthings_error = e
             uvicorn.run(app, host=args.host, port=args.port)
         else:
-            raise e
+            if isinstance(e, ValidationError):
+                print(f"Error reading LabThings configuration:\n{e}")
+                sys.exit(3)
+            else:
+                raise e
     return None  # This is required as we sometimes return the server
