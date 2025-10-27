@@ -31,6 +31,7 @@ from . import deps
 from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
+from .server.config_model import ThingConfig, ThingServerConfig
 from .client import ThingClient
 from .invocation_contexts import (
     cancellable_sleep,
@@ -59,6 +60,8 @@ __all__ = [
     "blob",
     "ThingServer",
     "cli",
+    "ThingConfig",
+    "ThingServerConfig",
     "ThingClient",
     "cancellable_sleep",
     "raise_if_cancelled",
