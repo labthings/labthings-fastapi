@@ -203,7 +203,6 @@ class ThingServer:
 
         :return: A mapping of names to `.Thing` instances.
 
-        :raise ValueError: if a thing name contains invalid characters.
         :raise TypeError: if ``cls`` is not a subclass of `.Thing`
             or if ``name`` is not string-like.
         """
@@ -237,12 +236,6 @@ class ThingServer:
         `.ThingConnectionError` will be raised by code called by this method if
         the connection cannot be provided. See `.ThingConnection.connect` for more
         details.
-
-        :param connections: holds the supplied configuration, which is used
-            in preference to looking up Things by type. It is a mapping of
-            `.Thing` names to mappings, which map attribute names to the requested
-            `.Thing`\ . For example, to connect ``mything.myslot`` to the `.Thing`
-            named `"foo"`\ , you could pass ``{"mything": {"myslot": "foo"}}``\ .
         """
         for thing_name, thing in self.things.items():
             config = self._config.thing_configs[thing_name].thing_connections

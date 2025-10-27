@@ -1,7 +1,7 @@
 """Unit tests for the `.logs` module.
 
 These tests are intended to complement the more functional tests
-in ``test_aciton_logging`` with bottom-up tests for code in the
+in ``test_action_logging`` with bottom-up tests for code in the
 `.logs` module.
 """
 

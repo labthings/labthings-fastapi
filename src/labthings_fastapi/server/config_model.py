@@ -1,7 +1,7 @@
 r"""Pydantic models to enable server configuration to be loaded from file.
 
 The models in this module allow `.ThingConfig` dataclasses to be constructed
-from dictionaries or JSON files. They also describe the full server configurtion
+from dictionaries or JSON files. They also describe the full server configuration
 with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
 """
@@ -82,6 +82,11 @@ class ThingServerConfig(BaseModel):
         will attempt to make a `.ThingConfig` from it. If it's a `type` we will
         create a `.ThingConfig` using that type as the class. We don't check for
         `.Thing` subclasses in this module to avoid a dependency loop.
+
+        :param things: The validated value of the field.
+
+        :return: A copy of the input, with all values converted to `.ThingConfig`
+            instances.
         """
         return normalise_things_config(things)
 

@@ -115,6 +115,7 @@ def add_thing_log_destination(
     :param destination: should specify a deque, to which we will append
         each log entry as it comes in. This is assumed to be thread
         safe.
+    :raises LogConfigurationError: if there is not exactly one suitable handler.
     """
     handlers = [
         h for h in THING_LOGGER.handlers if isinstance(h, DequeByInvocationIDHandler)
