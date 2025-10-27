@@ -23,13 +23,10 @@ import sys
 from typing import Optional
 
 from pydantic import ValidationError
-
-from ..utilities.object_reference_to_object import (
-    object_reference_to_object,
-)
 import uvicorn
 
 from . import ThingServer
+from . import fallback
 from .config_model import ThingServerConfig
 
 
@@ -152,9 +149,8 @@ def serve_from_cli(
     except BaseException as e:
         if args.fallback:
             print(f"Error: {e}")
-            fallback_server = "labthings_fastapi.server.fallback:app"
-            print(f"Starting fallback server {fallback_server}.")
-            app = object_reference_to_object(fallback_server)
+            print("Starting fallback server.")
+            app = fallback.app
             app.labthings_config = config
             app.labthings_server = server
             app.labthings_error = e

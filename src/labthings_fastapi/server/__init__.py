@@ -22,9 +22,6 @@ from types import MappingProxyType
 from ..thing_slots import ThingSlot
 from ..utilities import class_attributes
 
-from ..utilities.object_reference_to_object import (
-    object_reference_to_object as object_reference_to_object,
-)
 from ..actions import ActionManager
 from ..logs import configure_thing_logger
 from ..thing import Thing
