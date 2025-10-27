@@ -42,9 +42,12 @@ The following example shows the use of a Thing Connection:
             return self.thing_a.say_hello()
 
 
-    server = lt.ThingServer()
-    server.add_thing("thing_a", ThingA)
-    server.add_thing("thing_b", ThingB)
+    server = lt.ThingServer(
+        {
+            "thing_a": ThingA,
+            "thing_b": ThingB,
+        }
+    )
 
 
 In this example, ``ThingB.thing_a`` is the simplest form of Thing Connection: it
@@ -67,9 +70,9 @@ will look up the `.Thing` by name. If the default is `None` the connection will
 evaluate to `None` unless explicitly configured.
 
 Connections may also be configured when `.Thing`\ s are added to the server:
-`.ThingServer.add_thing` takes an argument that allows connections to be made
-by name (or set to `None`). Similarly, if you set up your server using a config
-file, each entry in the ``things`` list may have a ``thing_connections`` property
+`.ThingConfig` takes an argument that allows connections to be made
+by name (or set to `None`). The same field is present in a config
+file. Each entry in the ``things`` list may have a ``thing_connections`` property
 that sets up the connections. To repeat the example above with a configuration
 file:
 
