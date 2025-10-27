@@ -12,8 +12,7 @@ import labthings_fastapi as lt
 @pytest.fixture
 def client():
     """Yield a client connected to a ThingServer"""
-    server = lt.ThingServer()
-    server.add_thing("thing", MyThing)
+    server = lt.ThingServer({"thing": MyThing})
     with TestClient(server.app) as client:
         yield client
 

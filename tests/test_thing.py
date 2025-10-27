@@ -11,6 +11,5 @@ def test_td_validates():
 
 def test_add_thing():
     """Check that thing can be added to the server"""
-    server = ThingServer()
-    server.add_thing("thing", MyThing)
+    server = ThingServer({"thing": MyThing})
     assert isinstance(server.things["thing"], MyThing)

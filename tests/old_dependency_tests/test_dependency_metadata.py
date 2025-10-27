@@ -61,9 +61,12 @@ class ThingTwo(lt.Thing):
 @pytest.fixture
 def client():
     """Yield a test client connected to a ThingServer."""
-    server = lt.ThingServer()
-    server.add_thing("thing_one", ThingOne)
-    server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer(
+        {
+            "thing_one": ThingOne,
+            "thing_two": ThingTwo,
+        }
+    )
     with TestClient(server.app) as client:
         yield client
 

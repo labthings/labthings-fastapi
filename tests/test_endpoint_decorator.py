@@ -24,8 +24,7 @@ class MyThing(lt.Thing):
 
 def test_endpoints():
     """Check endpoints may be added to the app and work as expected."""
-    server = lt.ThingServer()
-    server.add_thing("thing", MyThing)
+    server = lt.ThingServer({"thing": MyThing})
     thing = server.things["thing"]
     with TestClient(server.app) as client:
         # Check the function works when used directly

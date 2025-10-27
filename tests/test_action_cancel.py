@@ -68,8 +68,7 @@ class CancellableCountingThing(lt.Thing):
 @pytest.fixture
 def server():
     """Create a server with a CancellableCountingThing added."""
-    server = lt.ThingServer()
-    server.add_thing("counting_thing", CancellableCountingThing)
+    server = lt.ThingServer({"counting_thing": CancellableCountingThing})
     return server
 
 

@@ -80,9 +80,7 @@ def test_interthing_dependency():
 
     This uses the internal thing client mechanism.
     """
-    server = lt.ThingServer()
-    server.add_thing("thing_one", ThingOne)
-    server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
     with TestClient(server.app) as client:
         r = client.post("/thing_two/action_two")
         invocation = poll_task(client, r.json())
@@ -96,10 +94,9 @@ def test_interthing_dependency_with_dependencies():
     This uses the internal thing client mechanism, and requires
     dependency injection for the called action
     """
-    server = lt.ThingServer()
-    server.add_thing("thing_one", ThingOne)
-    server.add_thing("thing_two", ThingTwo)
-    server.add_thing("thing_three", ThingThree)
+    server = lt.ThingServer(
+        {"thing_one": ThingOne, "thing_two": ThingTwo, "thing_three": ThingThree}
+    )
     with TestClient(server.app) as client:
         r = client.post("/thing_three/action_three")
         r.raise_for_status()
@@ -121,9 +118,7 @@ def test_raw_interthing_dependency():
             """An action that needs a ThingOne"""
             return thing_one.action_one()
 
-    server = lt.ThingServer()
-    server.add_thing("thing_one", ThingOne)
-    server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
     with TestClient(server.app) as client:
         r = client.post("/thing_two/action_two")
         invocation = poll_task(client, r.json())

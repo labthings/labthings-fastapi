@@ -6,7 +6,7 @@ import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 
-from labthings_fastapi.exceptions import ThingConnectionError, ThingNotConnectedError
+from labthings_fastapi.exceptions import ThingConnectionError
 
 
 class ThingOne(lt.Thing):
@@ -355,36 +355,22 @@ def test_circular_connection(cls_1, cls_2, connections) -> None:
     Thing classes. Circular dependencies should not cause any problems for
     the LabThings server.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing(
-        "thing_one", cls_1, thing_connections=connections.get("thing_one", {})
+    server = lt.ThingServer(
+        things={
+            "thing_one": lt.ThingConfig(
+                cls=cls_1, thing_connections=connections.get("thing_one", {})
+            ),
+            "thing_two": lt.ThingConfig(
+                cls=cls_2, thing_connections=connections.get("thing_two", {})
+            ),
+        }
     )
-    thing_two = server.add_thing(
-        "thing_two", cls_2, thing_connections=connections.get("thing_two", {})
-    )
-    things = [thing_one, thing_two]
-
-    # Check the connections don't work initially, because they aren't connected
-    for thing in things:
-        with pytest.raises(ThingNotConnectedError):
-            _ = thing.other_thing
+    things = [server.things[n] for n in ["thing_one", "thing_two"]]
 
     with TestClient(server.app) as _:
         # The things should be connected as the server is now running
         for thing, other in zip(things, reversed(things), strict=True):
             assert thing.other_thing is other
-
-
-def connectionerror_starting_server(server):
-    """Attempt to start a server, and return the error as a string."""
-    with pytest.RaisesGroup(ThingConnectionError) as excinfo:
-        # Creating a TestClient starts the server
-        with TestClient(server.app):
-            pass
-    # excinfo contains an ExceptionGroup because TestClient runs in a
-    # task group, hence the use of RaisesGroup and the `.exceptions[0]`
-    # below.
-    return str(excinfo.value.exceptions[0])
 
 
 @pytest.mark.parametrize(
@@ -409,28 +395,37 @@ def test_connections_none_default(connections, error):
     to specify connections for 'thing_two' in the last case - because
     that's the only one where 'thing_one' connects successfully.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingN)
-    server.add_thing("thing_two", ThingN)
-    server.add_thing("thing_three", ThingThree)
-
-    server.thing_connections = connections
+    things = {
+        "thing_one": lt.ThingConfig(
+            cls=ThingN, thing_connections=connections.get("thing_one", {})
+        ),
+        "thing_two": lt.ThingConfig(
+            cls=ThingN, thing_connections=connections.get("thing_two", {})
+        ),
+        "thing_three": lt.ThingConfig(
+            cls=ThingThree, thing_connections=connections.get("thing_three", {})
+        ),
+    }
 
     if error is None:
+        server = lt.ThingServer(things)
         with TestClient(server.app):
+            thing_one = server.things["thing_one"]
+            assert isinstance(thing_one, ThingN)
             assert thing_one.other_thing is thing_one
         return
 
-    assert error in connectionerror_starting_server(server)
+    with pytest.raises(ThingConnectionError, match=error):
+        server = lt.ThingServer(things)
 
 
 def test_optional_and_empty():
     """Check that an optional or mapping connection can be None/empty."""
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingOne)
-    _thing_two = server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
 
     with TestClient(server.app):
+        thing_one = server.things["thing_one"]
+        assert isinstance(thing_one, ThingOne)
         assert thing_one.optional_thing is None
         assert len(thing_one.n_things) == 0
 
@@ -441,27 +436,27 @@ def test_mapping_and_multiple():
     This also tests the expected error if multiple things match a
     single connection.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingOne)
-    _thing_two = server.add_thing("thing_two", ThingTwo)
-    for i in range(3):
-        server.add_thing(f"thing_{i + 3}", ThingThree)
-
-    # Attempting to start the server should fail, because
+    things = {
+        "thing_one": ThingOne,
+        "thing_two": ThingTwo,
+        "thing_3": ThingThree,
+        "thing_4": ThingThree,
+        "thing_5": ThingThree,
+    }
+    # We can't set up a server like this, because
     # thing_one.optional_thing will match multiple ThingThree instances.
-    assert "multiple Things" in connectionerror_starting_server(server)
+    with pytest.raises(ThingConnectionError, match="multiple Things"):
+        server = lt.ThingServer(things)
 
     # Set optional thing to one specific name and it will start OK.
-    server.thing_connections = {"thing_one": {"optional_thing": "thing_3"}}
-
+    things["thing_one"] = lt.ThingConfig(
+        cls=ThingOne,
+        thing_connections={"optional_thing": "thing_3"},
+    )
+    server = lt.ThingServer(things)
     with TestClient(server.app):
+        thing_one = server.things["thing_one"]
+        assert isinstance(thing_one, ThingOne)
+        assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
         assert names_set(thing_one.n_things) == {f"thing_{i + 3}" for i in range(3)}
-
-
-def test_connections_in_server():
-    r"Check that ``thing_connections`` is correctly remembered from ``add_thing``\ ."
-    server = lt.ThingServer()
-    thing_one_connections = {"other_thing": "thing_name"}
-    server.add_thing("thing_one", ThingOne, thing_connections=thing_one_connections)
-    assert server.thing_connections["thing_one"] is thing_one_connections

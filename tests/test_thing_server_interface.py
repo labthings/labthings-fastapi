@@ -26,8 +26,10 @@ class ExampleThing(lt.Thing):
 def server():
     """Return a LabThings server"""
     with tempfile.TemporaryDirectory() as dir:
-        server = lt.ThingServer(settings_folder=dir)
-        server.add_thing("example", ExampleThing)
+        server = lt.ThingServer(
+            things={"example": ExampleThing},
+            settings_folder=dir,
+        )
         yield server
 
 
@@ -57,7 +59,7 @@ def test_get_server_error():
     This is an error condition that I would find surprising if it
     ever occurred, but it's worth checking.
     """
-    server = lt.ThingServer()
+    server = lt.ThingServer(things={})
     interface = tsi.ThingServerInterface(server, NAME)
     assert interface._get_server() is server
     del server
