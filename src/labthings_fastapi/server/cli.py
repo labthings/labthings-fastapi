@@ -20,14 +20,14 @@ the tutorial page :ref:`tutorial_running`.
 
 from argparse import ArgumentParser, Namespace
 from typing import Optional
-import json
 
 from ..utilities.object_reference_to_object import (
     object_reference_to_object,
 )
 import uvicorn
 
-from . import ThingServer, server_from_config
+from . import ThingServer
+from .config_model import ThingServerConfig
 
 
 def get_default_parser() -> ArgumentParser:
@@ -74,7 +74,7 @@ def parse_args(argv: Optional[list[str]] = None) -> Namespace:
     return parser.parse_args(argv)
 
 
-def config_from_args(args: Namespace) -> dict:
+def config_from_args(args: Namespace) -> ThingServerConfig:
     """Load the configuration from a supplied file or JSON string.
 
     This function will first attempt to load a JSON file specified in the
@@ -87,28 +87,25 @@ def config_from_args(args: Namespace) -> dict:
 
     :param args: Parsed arguments from `.parse_args`.
 
-    :return: a server configuration, as a dictionary.
+    :return: the server configuration.
 
     :raise FileNotFoundError: if the configuration file specified is missing.
     :raise RuntimeError: if neither a config file nor a string is provided.
     """
     if args.config:
+        if args.json:
+            raise RuntimeError("Can't use both --config and --json simultaneously.")
         try:
             with open(args.config) as f:
-                config = json.load(f)
+                return ThingServerConfig.model_validate_json(f.read())
         except FileNotFoundError as e:
             raise FileNotFoundError(
                 f"Could not find configuration file {args.config}"
             ) from e
+    elif args.json:
+        return ThingServerConfig.model_validate_json(args.json)
     else:
-        config = {}
-    if args.json:
-        config.update(json.loads(args.json))
-
-    if len(config) == 0:
         raise RuntimeError("No configuration (or empty configuration) provided")
-
-    return config
 
 
 def serve_from_cli(
@@ -118,7 +115,7 @@ def serve_from_cli(
 
     This function will parse command line arguments, load configuration,
     set up a server, and start it. It calls `.parse_args`,
-    `.config_from_args` and `.server_from_config` to get a server, then
+    `.config_from_args` and `.ThingServer.from_config` to get a server, then
     starts `uvicorn` to serve on the specified host and port.
 
     If the ``fallback`` argument is specified, errors that stop the
@@ -143,7 +140,7 @@ def serve_from_cli(
     try:
         config, server = None, None
         config = config_from_args(args)
-        server = server_from_config(config)
+        server = ThingServer.from_config(config)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)
