@@ -51,4 +51,4 @@ Client code can be written in any language that supports an HTTP request. Howeve
 
 `.ThingClient` is a class that wraps up the required HTTP requests into a simpler interface. It can retrieve the :ref:`gen_td` over HTTP and use it to generate a new object with methods matching each `.thing_action` and properties matching each `.property`.
 
-While the current dynamic implemenation of `.ThingClient` can be inspected with functions like `help` at runtime, it does not work well with static tools like `mypy` or `pyright`\ . In the future, LabThings should be able to generate static client code that works better with autocompletion and type checking.
+While the current dynamic implementation of `.ThingClient` can be inspected with functions like `help` at runtime, it does not work well with static tools like `mypy` or `pyright`\ . In the future, LabThings should be able to generate static client code that works better with autocompletion and type checking.

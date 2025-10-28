@@ -101,7 +101,7 @@ If you start a new thread from an action, code running in that thread will
 not have an invocation ID set in a context variable. A subclass of
 `threading.Thread` is provided to do this, `.ThreadWithInvocationID`\ .
 This may be useful for test code, or if you wish to run actions in the
-backgound, with the option of cancelling them.
+background, with the option of cancelling them.
 
 Raising exceptions
 ------------------
