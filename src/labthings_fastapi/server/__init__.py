@@ -29,7 +29,6 @@ from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers  # noqa: F401
 from .config_model import (
-    ThingConfig as ThingConfig,
     ThingsConfig,
     ThingServerConfig,
     normalise_things_config as normalise_things_config,
