@@ -11,7 +11,9 @@ from typing import Any, Annotated, TypeAlias
 from collections.abc import Mapping, Sequence, Iterable
 
 
-class ThingConfig(BaseModel):
+# The type: ignore below is a spurious warning about `kwargs`.
+# see https://github.com/pydantic/pydantic/issues/3125
+class ThingConfig(BaseModel):  # type: ignore[no-redef]
     r"""The information needed to add a `.Thing` to a `.ThingServer`\ ."""
 
     cls: ImportString = Field(
