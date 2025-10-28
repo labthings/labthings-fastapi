@@ -168,3 +168,14 @@ def test_create_thing_without_server():
     assert isinstance(example, ExampleThing)
     assert example.path == "/examplething/"
     assert isinstance(example._thing_server_interface, tsi.MockThingServerInterface)
+
+    # Check we can specify the settings location
+    with tempfile.TemporaryDirectory() as folder:
+        ex2 = tsi.create_thing_without_server(ExampleThing, settings_folder=folder)
+        assert ex2._thing_server_interface.settings_file_path == os.path.join(
+            folder, "settings.json"
+        )
+
+    # We can't supply the interface as a kwarg
+    with pytest.raises(ValueError, match="may not supply"):
+        tsi.create_thing_without_server(ExampleThing, thing_server_interface=None)
