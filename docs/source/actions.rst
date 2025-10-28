@@ -5,7 +5,7 @@ Actions
 
 Actions are the way `.Thing` objects are instructed to do things. In Python
 terms, any method of a `.Thing` that we want to be able to call over HTTP
-should be decorated as an Action, using :deco:`.thing_action`.
+should be decorated as an Action, using `.thing_action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
 :ref:`wot_cc` includes a section on :ref:`wot_actions` that introduces the general concept.
@@ -91,15 +91,17 @@ such that the action code can use module-level symbols rather than needing
 to explicitly pass the logger and cancel hook as arguments to the action
 method.
 
-Usually, you don't need to consider this mechanism: simply use the invocation
-logger or cancel hook as explained above. However, if you want to run actions
+Usually, you don't need to consider this mechanism: simply use `.Thing.logger`
+or `.cancellable_sleep` as explained above. However, if you want to run actions
 outside of the server (for example, for testing purposes) or if you want to
 call one action from another action, but not share the cancellation signal
 or log, functions are provided in `.invocation_contexts` to manage this.
 
 If you start a new thread from an action, code running in that thread will
-not have the invocation ID set in a context variable. A subclass of
+not have an invocation ID set in a context variable. A subclass of
 `threading.Thread` is provided to do this, `.ThreadWithInvocationID`\ .
+This may be useful for test code, or if you wish to run actions in the
+backgound, with the option of cancelling them.
 
 Raising exceptions
 ------------------
