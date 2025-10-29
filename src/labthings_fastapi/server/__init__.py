@@ -208,9 +208,6 @@ class ThingServer:
             interface = ThingServerInterface(name=name, server=self)
             os.makedirs(interface.settings_folder, exist_ok=True)
             # This is where we instantiate the Thing
-            # I've had to type ignore this line because the *args causes an error.
-            # Given that *args and **kwargs are very loosely typed anyway, this
-            # doesn't lose us much.
             things[name] = config.cls(
                 *config.args,
                 **config.kwargs,
