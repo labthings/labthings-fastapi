@@ -34,7 +34,7 @@ Previous version
 ----------------
 
 This is a ground-up rewrite of python-labthings_, replacing Flask 1 and Marshmallow with FastAPI and Pydantic. 
-Compared to `python-labthings`_, this framework updates dependencies, shrinks the codebase, and simplifies the API  (see :doc:`lt_structure`).
+Compared to `python-labthings`_, this framework updates dependencies, shrinks the codebase, and simplifies the API  (see :doc:`structure`).
 * FastAPI more or less completely eliminates OpenAPI generation code from our codebase
 * Marshmallow schemas and endpoint classes are replaced with Python type hints, eliminating double- or triple-definition of actions and their inputs/outputs.
 * Thing Description generation is very much simplified by the new structure (multiple Things instead of one massive Thing with many extensions)
