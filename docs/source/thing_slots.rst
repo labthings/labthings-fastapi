@@ -42,12 +42,8 @@ The following example shows the use of a `.thing_slot`:
             return self.thing_a.say_hello()
 
 
-    server = lt.ThingServer(
-        {
-            "thing_a": ThingA,
-            "thing_b": ThingB,
-        }
-    )
+    things = {"thing_a": ThingA, "thing_b": ThingB}
+    server = lt.ThingServer(things)
 
 
 In this example, ``ThingB.thing_a`` is the simplest form of `.thing_slot`: it
