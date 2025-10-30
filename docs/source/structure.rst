@@ -1,5 +1,5 @@
 .. _labthings_cc:
-.. _labthings_structure:
+.. _structure:
 
 LabThings structure
 ===================
