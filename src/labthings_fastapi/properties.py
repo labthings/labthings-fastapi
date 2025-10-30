@@ -1,6 +1,6 @@
 """Define properties of `.Thing` objects.
 
-:ref:`wot_properties` are attributes of a `.Thing` that may be read or written to
+:ref:`properties` are attributes of a `.Thing` that may be read or written to
 over HTTP, and they are described in :ref:`gen_docs`. They are implemented with
 a function `.property` (usually referenced as ``lt.property``), which is
 intentionally similar to Python's built in `property`.
@@ -216,7 +216,7 @@ def property(
 ) -> Value | FunctionalProperty[Value]:
     r"""Define a Property on a `.Thing`\ .
 
-    This function may be used to define :ref:`wot_properties` in
+    This function may be used to define :ref:`properties` in
     two ways, as either a decorator or a field specifier. See the
     examples in the :mod:`.property` documentation.
 

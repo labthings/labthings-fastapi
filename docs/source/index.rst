@@ -29,7 +29,7 @@ Documentation for LabThings-FastAPI
 * Actions are decorated methods of a `.Thing` class. There is no need for separate schemas or endpoint definitions.
 * Properties are defined either as typed attributes (similar to `pydantic` or `dataclasses`) or with a `property`\ -like decorator.
 * Lifecycle and concurrency are appropriate for hardware: `Thing` code is always run in a thread, and each `Thing` is instantiated, started up, and shut down only once.
-* Vocabulary and concepts are aligned with the `W3C Web of Things <https://www.w3.org/WoT/>`_ standard (see :doc:`wot_core_concepts`)
+* Vocabulary and concepts are aligned with the `W3C Web of Things <https://www.w3.org/WoT/>`_ standard (see :ref:`wot_cc`)
 
 Previous version
 ----------------
