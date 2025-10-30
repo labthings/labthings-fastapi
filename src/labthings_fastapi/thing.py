@@ -49,17 +49,17 @@ class Thing:
     Subclassing Notes
     -----------------
 
-    * ``__init__``: You should accept any arguments you need to configure the Thing
+    *   ``__init__``: You should accept any arguments you need to configure the Thing
         in ``__init__``. Don't initialise any hardware at this time, as your Thing may
         be instantiated quite early, or even at import time. You must make sure to
         call ``super().__init__(thing_server_interface)``\ .
-    * ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
+    *   ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
         should start and stop communications with the hardware. This is Python's
         "context manager" protocol. The arguments of ``__exit__`` will be ``None``
         except after errors. You should be safe to ignore them, and just include
         code that will close down your hardware, which is equivalent to a
         ``finally:`` block.
-    * Properties and Actions are defined using decorators: the :deco:`.thing_action`
+    *   Properties and Actions are defined using decorators: the :deco:`.thing_action`
         decorator declares a method to be an action, which will run when it's triggered,
         and the :deco:`.property` decorator does the same for a property.
 
@@ -67,7 +67,7 @@ class Thing:
         not need getter and setter functions.
 
         See the documentation on those functions for more detail.
-    * `title` will be used in various places as the human-readable name of your Thing,
+    *   `title` will be used in various places as the human-readable name of your Thing,
         so it makes sense to set this in a subclass.
 
     There are various LabThings methods that you should avoid overriding unless you
