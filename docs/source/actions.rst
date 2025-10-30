@@ -8,7 +8,7 @@ terms, any method of a `.Thing` that we want to be able to call over HTTP
 should be decorated as an Action, using `.thing_action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
-:ref:`wot_cc` includes a section on :ref:`wot_actions` that introduces the general concept.
+Our implementation should align with :ref:`wot_actions` as defined by the Web of Things standard.
 
 Running actions via HTTP
 ------------------------

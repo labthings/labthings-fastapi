@@ -1,8 +1,8 @@
 """A class to represent hardware or software Things.
 
 The `.Thing` class enables most of the functionality of this library,
-and is the way in to most of its features. See :ref:`wot_cc` and :ref:`labthings_cc`
-for more.
+and is the way in to most of its features. See :ref:`structure`
+for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
