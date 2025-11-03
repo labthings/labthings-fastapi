@@ -38,3 +38,9 @@ You can then start the server using the command:
 
     labthings-server --config example_things.json
 
+.. _serving_from_python:
+
+Starting the server from Python
+-------------------------------
+
+It is also possible to start a LabThings server from within a Python script. This is the only way to serve `.Thing` classes that are not importable (e.g. if you're running example code that's not structured as a proper package). Many of the examples will start a server in this way - for example :ref:`tutorial_thing`\ .
