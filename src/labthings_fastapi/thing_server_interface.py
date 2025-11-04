@@ -4,10 +4,22 @@ from __future__ import annotations
 from concurrent.futures import Future
 import os
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Mapping, ParamSpec, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Mapping,
+    ParamSpec,
+    TypeVar,
+    Iterable,
+)
 from weakref import ref, ReferenceType
+from unittest.mock import Mock
 
 from .exceptions import ServerNotRunningError
+from .utilities import class_attributes
+from .thing_slots import ThingSlot
 
 if TYPE_CHECKING:
     from .server import ThingServer
@@ -163,6 +175,7 @@ class MockThingServerInterface(ThingServerInterface):
         self._name: str = name
         self._settings_tempdir: TemporaryDirectory | None = None
         self._settings_folder = settings_folder
+        self._mocks: list[Mock] = []
 
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
@@ -227,6 +240,7 @@ def create_thing_without_server(
     cls: type[ThingSubclass],
     *args: Any,
     settings_folder: str | None = None,
+    mock_all_slots: bool = False,
     **kwargs: Any,
 ) -> ThingSubclass:
     r"""Create a `.Thing` and supply a mock ThingServerInterface.
@@ -241,6 +255,10 @@ def create_thing_without_server(
     :param \*args: positional arguments to ``__init__``.
     :param settings_folder: The path to the settings folder. A temporary folder
         is used by default.
+    :param mock_all_slots: Set to True to create a `unittest.mock.Mock` object
+        connected to each thing slot. It follows the default of the specified
+        to the slot. So if an optional slot has a default of `None`, no mock
+        will be provided.
     :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
@@ -253,16 +271,53 @@ def create_thing_without_server(
     if "thing_server_interface" in kwargs:
         msg = "You may not supply a keyword argument called 'thing_server_interface'."
         raise ValueError(msg)
-    return cls(
-        *args,
-        **kwargs,
-        thing_server_interface=MockThingServerInterface(
-            name=name, settings_folder=settings_folder
-        ),
-    )  # type: ignore[misc]
+
+    msi = MockThingServerInterface(name=name, settings_folder=settings_folder)
     # Note: we must ignore misc typing errors above because mypy flags an error
     # that `thing_server_interface` is multiply specified.
     # This is a conflict with *args, if we had only **kwargs it would not flag
     # any error.
     # Given that args and kwargs are dynamically typed anyway, this does not
     # lose us much.
+    thing = cls(*args, **kwargs, thing_server_interface=msi)  # type: ignore[misc]
+    if mock_all_slots:
+        _mock_slots(thing)
+    return thing
+
+
+def _mock_slots(thing: Thing) -> None:
+    """Mock the slots of a thing created by create_thing_without_server.
+
+    :param thing: The thing to mock the slots of
+    """
+    for attr_name, attr in class_attributes(thing):
+        if isinstance(attr, ThingSlot):
+            # Simply use the class of the first type that can be used.
+            mock_class = attr.thing_type[0]
+
+            # The names of the mocks we need to create to make a mapping of mock
+            # things for the slot to connect to.
+            mock_names = []
+            if attr.default is ...:
+                # if default use the name of the slot with mock
+                mock_names.append(f"mock-{attr_name}")
+            elif isinstance(attr.default, str):
+                mock_names.append(attr.default)
+            elif isinstance(attr.default, Iterable):
+                mock_names = list(attr.default)
+            # Note: If attr.default is None it will connect to None so no need for
+            # adding anything mapping of mocks.
+
+            # Populate a mapping of mocks pretending to be the things on the server
+            mocks = {}
+            for name in mock_names:
+                mock = Mock(spec=mock_class)
+                mock.name = name
+                mocks[name] = mock
+                # Store a copy of this mock in the mock server interface so it isn't
+                # garbage collected.
+                # Note that this causes mypy to throw an  `attr-defined` error as _mock
+                # only exists in the MockThingServerInterface
+                thing._thing_server_interface._mocks.append(mock)  # type: ignore[attr-defined]
+
+            attr.connect(thing, mocks, ...)
