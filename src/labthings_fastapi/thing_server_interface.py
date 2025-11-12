@@ -138,7 +138,18 @@ class ThingServerInterface:
 
 
 class MockThingServerInterface(ThingServerInterface):
-    """A mock class that simulates a ThingServerInterface without the server."""
+    r"""A mock class that simulates a ThingServerInterface without the server.
+
+    This allows a `.Thing` to be instantiated but not connected to a server.
+    The methods normally provided by the server are mocked, specifically:
+
+    * The `name` is set by an argument to `__init__`\ .
+    * `start_async_task_soon` silently does nothing, i.e. the async function
+      will not be run.
+    * The settings folder will either be specified when the class is initialised,
+      or a temporary folder will be created.
+    * `get_thing_states` will return an empty dictionary.
+    """
 
     def __init__(self, name: str, settings_folder: str | None = None) -> None:
         """Initialise a ThingServerInterface.
