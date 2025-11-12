@@ -9,8 +9,7 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 from __future__ import annotations
 from typing import AsyncGenerator, Optional, TypeVar
 from typing_extensions import Self
-import os.path
-import re
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,11 +35,6 @@ from .config_model import (
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from ..outputs.blob import BlobDataManager
-
-# A path should be made up of names separated by / as a path separator.
-# Each name should be made of alphanumeric characters, hyphen, or underscore.
-# This regex enforces a trailing /
-PATH_REGEX = re.compile(r"^([a-zA-Z0-9\-_]+)$")
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
