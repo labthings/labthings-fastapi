@@ -16,7 +16,7 @@ from labthings_fastapi.invocation_contexts import (
     set_invocation_id,
 )
 import labthings_fastapi as lt
-from labthings_fastapi import exceptions as exc
+from labthings_fastapi.exceptions import LogConfigurationError
 from labthings_fastapi.thing_server_interface import create_thing_without_server
 
 
@@ -157,13 +157,13 @@ def test_add_thing_log_destination():
     id = uuid4()
     dest = deque()
 
-    with pytest.raises(exc.LogConfigurationError):
+    with pytest.raises(LogConfigurationError):
         # This won't work until the handler is added
         logs.add_thing_log_destination(id, dest)
 
     logs.THING_LOGGER.addHandler(logs.DequeByInvocationIDHandler())
     logs.THING_LOGGER.addHandler(logs.DequeByInvocationIDHandler())
-    with pytest.raises(exc.LogConfigurationError):
+    with pytest.raises(LogConfigurationError):
         # More than one handler will also make it fail with an error.
         logs.add_thing_log_destination(id, dest)
 

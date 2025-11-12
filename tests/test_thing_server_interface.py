@@ -9,7 +9,12 @@ import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import ServerNotRunningError
-from labthings_fastapi import thing_server_interface as tsi
+from labthings_fastapi.thing_server_interface import (
+    MockThingServerInterface,
+    ThingServerInterface,
+    ThingServerMissingError,
+    create_thing_without_server,
+)
 
 
 NAME = "testname"
@@ -36,13 +41,13 @@ def server():
 @pytest.fixture
 def interface(server):
     """Return a ThingServerInterface, connected to a server."""
-    return tsi.ThingServerInterface(server, NAME)
+    return ThingServerInterface(server, NAME)
 
 
 @pytest.fixture
 def mockinterface():
     """Return a MockThingServerInterface."""
-    return tsi.MockThingServerInterface(NAME)
+    return MockThingServerInterface(NAME)
 
 
 def test_get_server(server, interface):
@@ -60,11 +65,11 @@ def test_get_server_error():
     ever occurred, but it's worth checking.
     """
     server = lt.ThingServer(things={})
-    interface = tsi.ThingServerInterface(server, NAME)
+    interface = ThingServerInterface(server, NAME)
     assert interface._get_server() is server
     del server
     gc.collect()
-    with pytest.raises(tsi.ThingServerMissingError):
+    with pytest.raises(ThingServerMissingError):
         interface._get_server()
 
 
@@ -164,18 +169,18 @@ def test_mock_get_thing_states(mockinterface):
 
 def test_create_thing_without_server():
     """Check the test harness for creating things without a server."""
-    example = tsi.create_thing_without_server(ExampleThing)
+    example = create_thing_without_server(ExampleThing)
     assert isinstance(example, ExampleThing)
     assert example.path == "/examplething/"
-    assert isinstance(example._thing_server_interface, tsi.MockThingServerInterface)
+    assert isinstance(example._thing_server_interface, MockThingServerInterface)
 
     # Check we can specify the settings location
     with tempfile.TemporaryDirectory() as folder:
-        ex2 = tsi.create_thing_without_server(ExampleThing, settings_folder=folder)
+        ex2 = create_thing_without_server(ExampleThing, settings_folder=folder)
         assert ex2._thing_server_interface.settings_file_path == os.path.join(
             folder, "settings.json"
         )
 
     # We can't supply the interface as a kwarg
     with pytest.raises(ValueError, match="may not supply"):
-        tsi.create_thing_without_server(ExampleThing, thing_server_interface=None)
+        create_thing_without_server(ExampleThing, thing_server_interface=None)
