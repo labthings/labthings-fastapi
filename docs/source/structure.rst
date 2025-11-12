@@ -32,18 +32,6 @@ The attributes of a `.Thing` are made available over HTTP by decorating or marki
 * `.thing_action` is a decorator that makes methods available over HTTP.
 * `.thing_slot` tells LabThings to supply an instance of another `.Thing` at runtime, so your `.Thing` can make use of it.
 
-..
-
-    `.Thing` Lifecycle
-    ------------------
-
-    As a `.Thing` often represents a piece of hardware, it can't be dynamically created and destroyed in the way many resources of web applications are. In LabThings, the lifecycle of a Thing calls several methods to manage the hardware and configuration. In order, these are:
-
-    * ``__init__`` is called when the `.Thing` is created by the server. It shouldn't talk to the hardware yet, but it may store its arguments as configuration. For example, you might accept 
-
-    When implementing a `.Thing` it is important to include code to set up any required hardware connections in ``__enter__`` and code to shut it down again in ``__exit__`` as this will be used by the server to set up and tear down the hardware connections. The ``__init__`` method is called when the `.Thing` is first created by the server, and is primarily used 
-
-
 Client Code
 -----------
 
