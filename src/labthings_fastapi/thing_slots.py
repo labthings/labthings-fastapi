@@ -215,7 +215,7 @@ class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThin
                 if not isinstance(things[t], self.thing_type):
                     raise ThingSlotError(f"{t} is the wrong type")
             return [things[t] for t in target]
-        msg = "The target specified for a ThingSlot ({target}) has the wrong "
+        msg = f"The target specified for a ThingSlot ({target}) has the wrong "
         msg += "type. See ThingSlot.connect() docstring for details."
         raise TypeError(msg)
 
