@@ -7,7 +7,6 @@ from pytest import raises
 import pytest
 
 from labthings_fastapi import ThingServer
-from labthings_fastapi.server import server_from_config
 from labthings_fastapi.server.cli import serve_from_cli
 
 
@@ -82,7 +81,7 @@ CONFIG = {
 
 def test_server_from_config():
     """Check we can create a server from a config object"""
-    server = server_from_config(CONFIG)
+    server = ThingServer.from_config(CONFIG)
     assert isinstance(server, ThingServer)
 
 
@@ -138,8 +137,9 @@ def test_invalid_thing():
             }
         }
     )
-    with raises(ImportError):
+    with raises(SystemExit) as excinfo:
         check_serve_from_cli(["-j", config_json])
+    assert excinfo.value.code == 3
 
 
 @pytest.mark.slow

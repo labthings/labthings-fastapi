@@ -38,7 +38,7 @@ class ThingTwo(lt.Thing):
         return {"a": 1}
 
     @lt.thing_action
-    def count_and_watch_deprecated(
+    def count_and_watch(
         self, thing_one: ThingOneDep, get_metadata: lt.deps.GetThingStates
     ) -> Mapping[str, Mapping[str, Any]]:
         metadata = {}
@@ -47,40 +47,22 @@ class ThingTwo(lt.Thing):
             metadata[f"a_{a}"] = get_metadata()
         return metadata
 
-    @lt.thing_action
-    def count_and_watch(
-        self, thing_one: ThingOneDep
-    ) -> Mapping[str, Mapping[str, Any]]:
-        metadata = {}
-        for a in self.A_VALUES:
-            thing_one.a = a
-            metadata[f"a_{a}"] = self._thing_server_interface.get_thing_states()
-        return metadata
-
 
 @pytest.fixture
 def client():
     """Yield a test client connected to a ThingServer."""
-    server = lt.ThingServer()
-    server.add_thing("thing_one", ThingOne)
-    server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer(
+        {
+            "thing_one": ThingOne,
+            "thing_two": ThingTwo,
+        }
+    )
     with TestClient(server.app) as client:
         yield client
 
 
 def test_fresh_metadata(client):
     """Check that fresh metadata is retrieved by get_thing_states."""
-    r = client.post("/thing_two/count_and_watch")
-    invocation = poll_task(client, r.json())
-    assert invocation["status"] == "completed"
-    out = invocation["output"]
-    for a in ThingTwo.A_VALUES:
-        assert out[f"a_{a}"]["thing_one"]["a"] == a
-        assert out[f"a_{a}"]["thing_two"]["a"] == 1
-
-
-def test_fresh_metadata_deprecated(client):
-    """Test that the old metadata dependency retrieves fresh metadata."""
     r = client.post("/thing_two/count_and_watch")
     invocation = poll_task(client, r.json())
     assert invocation["status"] == "completed"

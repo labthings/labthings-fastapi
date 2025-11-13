@@ -555,6 +555,9 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         thread as it is communicating with the event loop via an `asyncio` blocking
         portal and can cause deadlock if run in the event loop.
 
+        This method will raise a `.ServerNotRunningError` if the event loop is not
+        running, and should only be called after the server has started.
+
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
         """

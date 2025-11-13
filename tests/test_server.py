@@ -7,10 +7,14 @@ be helpful to have some more bottom-up unit testing in this file.
 """
 
 import pytest
-from labthings_fastapi import server as ts
+import labthings_fastapi as lt
 
 
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
     with pytest.raises(TypeError, match="not a Thing"):
-        ts.server_from_config({"things": {"thingone": {"class": "builtins:object"}}})
+        lt.ThingServer.from_config(
+            lt.ThingServerConfig(
+                things={"thingone": lt.ThingConfig(cls="builtins:object")}
+            )
+        )

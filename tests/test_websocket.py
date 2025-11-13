@@ -55,8 +55,7 @@ class ThingWithProperties(lt.Thing):
 @pytest.fixture
 def server():
     """Create a server, and add a MyThing test Thing to it."""
-    server = lt.ThingServer()
-    server.add_thing("thing", ThingWithProperties)
+    server = lt.ThingServer({"thing": ThingWithProperties})
     return server
 
 

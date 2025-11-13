@@ -19,15 +19,15 @@ the tutorial page :ref:`tutorial_running`.
 """
 
 from argparse import ArgumentParser, Namespace
+import sys
 from typing import Optional
-import json
 
-from ..utilities.object_reference_to_object import (
-    object_reference_to_object,
-)
+from pydantic import ValidationError
 import uvicorn
 
-from . import ThingServer, server_from_config
+from . import ThingServer
+from . import fallback
+from .config_model import ThingServerConfig
 
 
 def get_default_parser() -> ArgumentParser:
@@ -74,7 +74,7 @@ def parse_args(argv: Optional[list[str]] = None) -> Namespace:
     return parser.parse_args(argv)
 
 
-def config_from_args(args: Namespace) -> dict:
+def config_from_args(args: Namespace) -> ThingServerConfig:
     """Load the configuration from a supplied file or JSON string.
 
     This function will first attempt to load a JSON file specified in the
@@ -87,28 +87,25 @@ def config_from_args(args: Namespace) -> dict:
 
     :param args: Parsed arguments from `.parse_args`.
 
-    :return: a server configuration, as a dictionary.
+    :return: the server configuration.
 
     :raise FileNotFoundError: if the configuration file specified is missing.
     :raise RuntimeError: if neither a config file nor a string is provided.
     """
     if args.config:
+        if args.json:
+            raise RuntimeError("Can't use both --config and --json simultaneously.")
         try:
             with open(args.config) as f:
-                config = json.load(f)
+                return ThingServerConfig.model_validate_json(f.read())
         except FileNotFoundError as e:
             raise FileNotFoundError(
                 f"Could not find configuration file {args.config}"
             ) from e
+    elif args.json:
+        return ThingServerConfig.model_validate_json(args.json)
     else:
-        config = {}
-    if args.json:
-        config.update(json.loads(args.json))
-
-    if len(config) == 0:
         raise RuntimeError("No configuration (or empty configuration) provided")
-
-    return config
 
 
 def serve_from_cli(
@@ -118,7 +115,7 @@ def serve_from_cli(
 
     This function will parse command line arguments, load configuration,
     set up a server, and start it. It calls `.parse_args`,
-    `.config_from_args` and `.server_from_config` to get a server, then
+    `.config_from_args` and `.ThingServer.from_config` to get a server, then
     starts `uvicorn` to serve on the specified host and port.
 
     If the ``fallback`` argument is specified, errors that stop the
@@ -126,6 +123,8 @@ def serve_from_cli(
     HTTP server that shows an error page. This behaviour may be helpful
     if ``labthings-server`` is being run on a headless server, where
     an HTTP error page is more useful than no response.
+
+    If ``fallback`` is not specified, we will print the error and exit.
 
     :param argv: command line arguments (defaults to arguments supplied
         to the current command).
@@ -143,20 +142,23 @@ def serve_from_cli(
     try:
         config, server = None, None
         config = config_from_args(args)
-        server = server_from_config(config)
+        server = ThingServer.from_config(config)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)
     except BaseException as e:
         if args.fallback:
             print(f"Error: {e}")
-            fallback_server = "labthings_fastapi.server.fallback:app"
-            print(f"Starting fallback server {fallback_server}.")
-            app = object_reference_to_object(fallback_server)
+            print("Starting fallback server.")
+            app = fallback.app
             app.labthings_config = config
             app.labthings_server = server
             app.labthings_error = e
             uvicorn.run(app, host=args.host, port=args.port)
         else:
-            raise e
+            if isinstance(e, ValidationError):
+                print(f"Error reading LabThings configuration:\n{e}")
+                sys.exit(3)
+            else:
+                raise e
     return None  # This is required as we sometimes return the server

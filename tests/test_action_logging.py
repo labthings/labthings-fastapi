@@ -34,8 +34,7 @@ class ThingThatLogsAndErrors(lt.Thing):
 @pytest.fixture
 def client():
     """Set up a Thing Server and yield a client to it."""
-    server = lt.ThingServer()
-    server.add_thing("log_and_error_thing", ThingThatLogsAndErrors)
+    server = lt.ThingServer({"log_and_error_thing": ThingThatLogsAndErrors})
     with TestClient(server.app) as client:
         yield client
 

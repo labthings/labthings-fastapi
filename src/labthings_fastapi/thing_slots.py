@@ -2,7 +2,7 @@ r"""Facilitate connections between Things.
 
 It is often desirable for two Things in the same server to be able to communicate.
 In order to do this in a nicely typed way that is easy to test and inspect,
-LabThings-FastAPI provides the `.thing_connection`\ . This allows a `.Thing`
+LabThings-FastAPI provides the `.thing_slot`\ . This allows a `.Thing`
 to declare that it depends on another `.Thing` being present, and provides a way for
 the server to automatically connect the two when the server is set up.
 
@@ -13,7 +13,7 @@ advantage of making connections after initialisation is that circular connection
 are not a problem: Thing `a` may depend on Thing `b` and vice versa.
 
 As with properties, thing connections will usually be declared using the function
-`.thing_connection` rather than the descriptor directly. This allows them to be
+`.thing_slot` rather than the descriptor directly. This allows them to be
 typed and documented on the class, i.e.
 
 .. code-block:: python
@@ -33,7 +33,7 @@ typed and documented on the class, i.e.
     class ThingB(lt.Thing):
         "A class that relies on ThingA."
 
-        thing_a: ThingA = lt.thing_connection()
+        thing_a: ThingA = lt.thing_slot()
 
         @lt.action
         def say_hello(self) -> str:
@@ -46,7 +46,7 @@ from typing import Any, Generic, TypeVar, TYPE_CHECKING, Union, get_args, get_or
 from collections.abc import Mapping, Iterable, Sequence
 from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
 from .base_descriptor import FieldTypedBaseDescriptor
-from .exceptions import ThingNotConnectedError, ThingConnectionError
+from .exceptions import ThingNotConnectedError, ThingSlotError
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -59,12 +59,10 @@ ConnectedThings = TypeVar(
 )
 
 
-class ThingConnection(
-    Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThings]
-):
-    r"""Descriptor that returns other Things from the server.
+class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThings]):
+    r"""Descriptor that instructs the server to supply other Things.
 
-    A `.ThingConnection` provides either one or several
+    A `.ThingSlot` provides either one or several
     `.Thing` instances as a property of a `.Thing`\ . This allows `.Thing`\ s
     to communicate with each other within the server, including accessing
     attributes that are not exposed over HTTP.
@@ -75,10 +73,10 @@ class ThingConnection(
     of run-time crashes.
 
     The usual way of creating these connections is the function
-    `.thing_connection`\ . This class and its subclasses are not usually
+    `.thing_slot`\ . This class and its subclasses are not usually
     instantiated directly.
 
-    The type of the `.ThingConnection` attribute is key to its operation.
+    The type of the `.ThingSlot` attribute is key to its operation.
     It should be assigned to an attribute typed either as a `.Thing` subclass,
     a mapping of strings to `.Thing` or subclass instances, or an optional
     `.Thing` instance:
@@ -91,19 +89,19 @@ class ThingConnection(
 
         class Example(lt.Thing):
             # This will always evaluate to an `OtherExample`
-            other_thing: OtherExample = lt.thing_connection("other_thing")
+            other_thing: OtherExample = lt.thing_slot("other_thing")
 
             # This may evaluate to an `OtherExample` or `None`
-            optional: OtherExample | None = lt.thing_connection("other_thing")
+            optional: OtherExample | None = lt.thing_slot("other_thing")
 
             # This evaluates to a mapping of `str` to `.Thing` instances
-            things: Mapping[str, OtherExample] = lt.thing_connection(["thing_a"])
+            things: Mapping[str, OtherExample] = lt.thing_slot(["thing_a"])
     """
 
     def __init__(
         self, *, default: str | None | Iterable[str] | EllipsisType = ...
     ) -> None:
-        """Declare a ThingConnection.
+        """Declare a ThingSlot.
 
         :param default: The name of the Thing(s) that will be connected by default.
 
@@ -181,8 +179,8 @@ class ThingConnection(
     ) -> "Sequence[Thing]":
         r"""Pick the Things we should connect to from a list.
 
-        This function is used internally by `.ThingConnection.connect` to choose
-        the Things we return when the `.ThingConnection` is accessed.
+        This function is used internally by `.ThingSlot.connect` to choose
+        the Things we return when the `.ThingSlot` is accessed.
 
         :param things: the available `.Thing` instances on the server.
         :param target: the name(s) we should connect to, or `None` to set the
@@ -190,7 +188,7 @@ class ThingConnection(
             which will pick the `.Thing` instannce(s) matching this connection's
             type hint.
 
-        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
+        :raises ThingSlotError: if the supplied `.Thing` is of the wrong
             type, if a sequence is supplied when a single `.Thing` is required,
             or if `None` is supplied and the connection is not optional.
         :raises TypeError: if ``target`` is not one of the allowed types.
@@ -210,15 +208,15 @@ class ThingConnection(
             ]
         elif isinstance(target, str):
             if not isinstance(things[target], self.thing_type):
-                raise ThingConnectionError(f"{target} is the wrong type")
+                raise ThingSlotError(f"{target} is the wrong type")
             return [things[target]]
         elif isinstance(target, Iterable):
             for t in target:
                 if not isinstance(things[t], self.thing_type):
-                    raise ThingConnectionError(f"{t} is the wrong type")
+                    raise ThingSlotError(f"{t} is the wrong type")
             return [things[t] for t in target]
-        msg = "The target specified for a ThingConnection ({target}) has the wrong "
-        msg += "type. See ThingConnection.connect() docstring for details."
+        msg = f"The target specified for a ThingSlot ({target}) has the wrong "
+        msg += "type. See ThingSlot.connect() docstring for details."
         raise TypeError(msg)
 
     def connect(
@@ -229,7 +227,7 @@ class ThingConnection(
     ) -> None:
         r"""Find the `.Thing`\ (s) we should supply when accessed.
 
-        This method sets up a ThingConnection on ``host_thing`` by finding the
+        This method sets up a ThingSlot on ``host_thing`` by finding the
         `.Thing` instance(s) it should supply when its ``__get__`` method is
         called. The logic for determining this is:
 
@@ -257,10 +255,10 @@ class ThingConnection(
         :param things: the available `.Thing` instances on the server.
         :param target: the name(s) we should connect to, or `None` to set the
             connection to `None` (if it is optional). The default is `...`
-            which will use the default that was set when this `.ThingConnection`
+            which will use the default that was set when this `.ThingSlot`
             was defined.
 
-        :raises ThingConnectionError: if the supplied `.Thing` is of the wrong
+        :raises ThingSlotError: if the supplied `.Thing` is of the wrong
             type, if a sequence is supplied when a single `.Thing` is required,
             or if `None` is supplied and the connection is not optional.
         """
@@ -268,7 +266,7 @@ class ThingConnection(
         try:
             # First, explicitly check for None so we can raise a helpful error.
             if used_target is None and not self.is_optional and not self.is_mapping:
-                raise ThingConnectionError("it must be set in configuration")
+                raise ThingSlotError("it must be set in configuration")
             # Most of the logic is split out into `_pick_things` to separate
             # picking the Things from turning them into the correct mapping/reference.
             picked = self._pick_things(things, used_target)
@@ -281,16 +279,16 @@ class ThingConnection(
                     self._things[host] = None
                 else:
                     # Otherwise a single Thing is required, so raise an error.
-                    raise ThingConnectionError("no matching Thing was found")
+                    raise ThingSlotError("no matching Thing was found")
             elif len(picked) == 1:
                 # A single Thing is found: we can safely use this.
                 self._things[host] = ref(picked[0])
             else:
                 # If more than one Thing is found (and we're not a mapping) this is
                 # an error.
-                raise ThingConnectionError("it can't connect to multiple Things")
-        except (ThingConnectionError, KeyError) as e:
-            reason = e.args[0]
+                raise ThingSlotError("it can't connect to multiple Things")
+        except (ThingSlotError, KeyError) as e:
+            reason = str(e.args[0])
             if isinstance(e, KeyError):
                 reason += " is not the name of a Thing"
             msg = f"Can't connect '{host.name}.{self.name}' because {reason}. "
@@ -303,7 +301,7 @@ class ThingConnection(
             else:
                 msg += f"The default searches for Things by type: '{self.thing_type}'."
 
-            raise ThingConnectionError(msg) from e
+            raise ThingSlotError(msg) from e
 
     def instance_get(self, obj: "Thing") -> ConnectedThings:
         r"""Supply the connected `.Thing`\ (s).
@@ -312,7 +310,7 @@ class ThingConnection(
 
         :return: the `.Thing` instance(s) connected.
 
-        :raises ThingNotConnectedError: if the ThingConnection has not yet been set up.
+        :raises ThingNotConnectedError: if the ThingSlot has not yet been set up.
         :raises ReferenceError: if a connected Thing no longer exists (should not
             ever happen in normal usage).
 
@@ -348,10 +346,10 @@ class ThingConnection(
             # See docstring for an explanation of the type ignore directives.
 
 
-def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
+def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
     r"""Declare a connection to another `.Thing` in the same server.
 
-    ``lt.thing_connection`` marks a class attribute as a connection to another
+    ``lt.thing_slot`` marks a class attribute as a connection to another
     `.Thing` on the same server. This will be automatically supplied when the
     server is started, based on the type hint and default value.
 
@@ -369,9 +367,9 @@ def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -
         class ThingB(lt.Thing):
             "A class that relies on ThingA."
 
-            thing_a: ThingA = lt.thing_connection()
+            thing_a: ThingA = lt.thing_slot()
 
-    This function is a convenience wrapper around the `.ThingConnection` descriptor
+    This function is a convenience wrapper around the `.ThingSlot` descriptor
     class, and should be used in preference to using the descriptor directly.
     The main reason to use the function is that it suppresses type errors when
     using static type checkers such as `mypy` or `pyright` (see note below).
@@ -400,9 +398,9 @@ def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -
         class ThingB(lt.Thing):
             "An example Thing with connections."
 
-            thing_a: ThingA = lt.thing_connection()
-            maybe_thing_a: ThingA | None = lt.thing_connection()
-            all_things_a: Mapping[str, ThingA] = lt.thing_connection()
+            thing_a: ThingA = lt.thing_slot()
+            maybe_thing_a: ThingA | None = lt.thing_slot()
+            all_things_a: Mapping[str, ThingA] = lt.thing_slot()
 
             @lt.thing_action
             def show_connections(self) -> str:
@@ -436,18 +434,18 @@ def thing_connection(default: str | Iterable[str] | None | EllipsisType = ...) -
         If the default is omitted or set to ``...`` the server will attempt to find
         a matching `.Thing` instance (or instances). A default value of `None` is
         allowed if the connection is type hinted as optional.
-    :return: A `.ThingConnection` descriptor.
+    :return: A `.ThingSlot` descriptor.
 
     Typing notes:
 
-    In the example above, using `.ThingConnection` directly would assign an object
-    with type ``ThingConnection[ThingA]`` to the attribute ``thing_a``, which is
+    In the example above, using `.ThingSlot` directly would assign an object
+    with type ``ThingSlot[ThingA]`` to the attribute ``thing_a``, which is
     typed as ``ThingA``\ . This would cause a type error. Using
-    `.thing_connection` suppresses this error, as its return type is a`Any``\ .
+    `.thing_slot` suppresses this error, as its return type is a`Any``\ .
 
     The use of ``Any`` or an alternative type-checking exemption seems to be
     inevitable when implementing descriptors that are typed via attribute annotations,
     and it is done by established libraries such as `pydantic`\ .
 
     """
-    return ThingConnection(default=default)
+    return ThingSlot(default=default)

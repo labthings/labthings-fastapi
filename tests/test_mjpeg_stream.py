@@ -46,8 +46,7 @@ class Telly(lt.Thing):
 @pytest.fixture
 def client():
     """Yield a test client connected to a ThingServer"""
-    server = lt.ThingServer()
-    server.add_thing("telly", Telly)
+    server = lt.ThingServer({"telly": Telly})
     with TestClient(server.app) as client:
         yield client
 
@@ -74,8 +73,9 @@ def test_mjpeg_stream(client):
 if __name__ == "__main__":
     import uvicorn
 
-    server = lt.ThingServer()
-    telly = server.add_thing("telly", Telly)
+    server = lt.ThingServer({"telly": Telly})
+    telly = server.things["telly"]
+    assert isinstance(telly, Telly)
     telly.framerate = 6
     telly.frame_limit = -1
     uvicorn.run(server.app, port=5000)

@@ -146,8 +146,9 @@ class ClientThing(lt.Thing):
         test_thing.localonly_boolsetting = val
 
 
-def _get_setting_file(server, thingpath):
-    path = os.path.join(server.settings_folder, thingpath.lstrip("/"), "settings.json")
+def _get_setting_file(server: lt.ThingServer, name: str):
+    """Find the location of the settings file for a given Thing on a server."""
+    path = server.things[name]._thing_server_interface.settings_file_path
     return os.path.normpath(path)
 
 
@@ -176,11 +177,12 @@ def _settings_dict(
 
 
 @pytest.fixture
-def server():
+def tempdir():
+    """A temporary directory"""
     with tempfile.TemporaryDirectory() as tempdir:
-        # Yield server rather than return so that the temp directory isn't cleaned up
+        # Yield rather than return so that the temp directory isn't cleaned up
         # until after the test is run
-        yield lt.ThingServer(settings_folder=tempdir)
+        yield tempdir
 
 
 def test_setting_available():
@@ -193,13 +195,13 @@ def test_setting_available():
     assert thing.dictsetting == {"a": 1, "b": 2}
 
 
-def test_functional_settings_save(server):
+def test_functional_settings_save(tempdir):
     """Check updated settings are saved to disk
 
     ``floatsetting`` is a functional setting, we should also test
     a `.DataSetting` for completeness."""
-    setting_file = _get_setting_file(server, "/thing")
-    server.add_thing("thing", ThingWithSettings)
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app) as client:
@@ -219,13 +221,13 @@ def test_functional_settings_save(server):
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
 
 
-def test_data_settings_save(server):
+def test_data_settings_save(tempdir):
     """Check updated settings are saved to disk
 
     This uses ``intsetting`` which is a `.DataSetting` so it tests
     a different code path to the functional setting above."""
-    setting_file = _get_setting_file(server, "/thing")
-    server.add_thing("thing", ThingWithSettings)
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
     # The settings file should not be created yet - it's created the
     # first time we write to a setting.
     assert not os.path.isfile(setting_file)
@@ -256,7 +258,7 @@ def test_data_settings_save(server):
     "method",
     ["http", "direct_thing_client", "direct"],
 )
-def test_readonly_setting(server, endpoint, value, method):
+def test_readonly_setting(tempdir, endpoint, value, method):
     """Check read-only functional settings cannot be set remotely.
 
     Functional settings must always have a setter, and will be
@@ -271,9 +273,11 @@ def test_readonly_setting(server, endpoint, value, method):
     The test is parametrized so it will run 6 times, trying one
     block of code inside the ``with`` block each time.
     """
-    setting_file = _get_setting_file(server, "/thing")
-    server.add_thing("thing", ThingWithSettings)
-    server.add_thing("client_thing", ClientThing)
+    server = lt.ThingServer(
+        things={"thing": ThingWithSettings, "client_thing": ClientThing},
+        settings_folder=tempdir,
+    )
+    setting_file = _get_setting_file(server, "thing")
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
 
@@ -319,10 +323,12 @@ def test_readonly_setting(server, endpoint, value, method):
         assert not os.path.isfile(setting_file)  # No file created
 
 
-def test_settings_dict_save(server):
+def test_settings_dict_save(tempdir):
     """Check settings are saved if the dict is updated in full"""
-    setting_file = _get_setting_file(server, "/thing")
-    thing = server.add_thing("thing", ThingWithSettings)
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    thing = server.things["thing"]
+    assert isinstance(thing, ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app):
@@ -333,14 +339,16 @@ def test_settings_dict_save(server):
             assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
 
 
-def test_settings_dict_internal_update(server):
+def test_settings_dict_internal_update(tempdir):
     """Confirm settings are not saved if the internal value of a dictionary is updated
 
     This behaviour is not ideal, but it is documented. If the behaviour is updated
     then the documentation should be updated and this test removed
     """
-    setting_file = _get_setting_file(server, "/thing")
-    thing = server.add_thing("thing", ThingWithSettings)
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    thing = server.things["thing"]
+    assert isinstance(thing, ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
     with TestClient(server.app):
@@ -350,38 +358,46 @@ def test_settings_dict_internal_update(server):
         assert not os.path.isfile(setting_file)
 
 
-def test_settings_load(server):
+def test_settings_load(tempdir):
     """Check settings can be loaded from disk when added to server"""
-    setting_file = _get_setting_file(server, "/thing")
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    del server
     setting_json = json.dumps(_settings_dict(floatsetting=3.0, stringsetting="bar"))
     # Create setting file
-    os.makedirs(os.path.dirname(setting_file))
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
     # Add thing to server and check new settings are loaded
-    thing = server.add_thing("thing", ThingWithSettings)
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    thing = server.things["thing"]
+    assert isinstance(thing, ThingWithSettings)
     assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
 
 
-def test_load_extra_settings(server, caplog):
+def test_load_extra_settings(caplog, tempdir):
     """Load from setting file. Extra setting in file should create a warning."""
-    setting_file = _get_setting_file(server, "/thing")
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    del server
     setting_dict = _settings_dict(floatsetting=3.0, stringsetting="bar")
     setting_dict["extra_setting"] = 33.33
     setting_json = json.dumps(setting_dict)
     # Create setting file
-    os.makedirs(os.path.dirname(setting_file))
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
     with caplog.at_level(logging.WARNING):
-        # Add thing to server
-        thing = server.add_thing("thing", ThingWithSettings)
+        # Create the server with the Thing added.
+        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.thing"
+
+    # Get the instance of the ThingWithSettings
+    thing = server.things["thing"]
+    assert isinstance(thing, ThingWithSettings)
 
     # Check other settings are loaded as expected
     assert not thing.boolsetting
@@ -389,24 +405,33 @@ def test_load_extra_settings(server, caplog):
     assert thing.floatsetting == 3.0
 
 
-def test_try_loading_corrupt_settings(server, caplog):
+def test_try_loading_corrupt_settings(tempdir, caplog):
     """Load from setting file. Extra setting in file should create a warning."""
-    setting_file = _get_setting_file(server, "/thing")
+    # Create the server once, so we can get the settings path
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    del server
+
+    # Construct a broken settings file
     setting_dict = _settings_dict(floatsetting=3.0, stringsetting="bar")
     setting_json = json.dumps(setting_dict)
     # Cut the start off the json to so it can't be decoded.
     setting_json = setting_json[3:]
     # Create setting file
-    os.makedirs(os.path.dirname(setting_file))
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
+    # Recreate the server and check for warnings
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        thing = server.add_thing("thing", ThingWithSettings)
+        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.thing"
+
+    # Get the instance of the ThingWithSettings
+    thing = server.things["thing"]
+    assert isinstance(thing, ThingWithSettings)
 
     # Check default settings are loaded
     assert not thing.boolsetting

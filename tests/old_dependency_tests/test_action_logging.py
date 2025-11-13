@@ -34,8 +34,7 @@ class ThingThatLogsAndErrors(lt.Thing):
 @pytest.fixture
 def client():
     """Set up a Thing Server and yield a client to it."""
-    server = lt.ThingServer()
-    server.add_thing("log_and_error_thing", ThingThatLogsAndErrors)
+    server = lt.ThingServer({"log_and_error_thing": ThingThatLogsAndErrors})
     with TestClient(server.app) as client:
         yield client
 
@@ -69,7 +68,7 @@ def test_unhandled_error_logs(caplog, client):
 
 
 def test_invocation_error_logs(caplog, client):
-    """Check that a log with a traceback is raised if there is an unhandled error."""
+    """Check that expected errors are logged without a traceback."""
     with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
         r = client.post("/log_and_error_thing/action_with_invocation_error")
         r.raise_for_status()

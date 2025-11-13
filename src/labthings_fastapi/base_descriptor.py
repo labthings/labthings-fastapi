@@ -458,7 +458,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
 
         # Ensure a type is specified.
         # If we've not set _type by now, we are not going to set it, and the
-        # descriptor will not work properly. It's beest to raise an error now.
+        # descriptor will not work properly. It's best to raise an error now.
         # Note that we need to specify the attribute name, as the exception
         # will appear to come from the end of the class definition, and not
         # from the descriptor definition.

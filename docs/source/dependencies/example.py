@@ -18,9 +18,12 @@ class TestThing(lt.Thing):
         my_thing.increment_counter()
 
 
-server = lt.ThingServer()
-server.add_thing("mything", MyThing)
-server.add_thing("testthing", TestThing)
+server = lt.ThingServer(
+    {
+        "mything": MyThing,
+        "testthing": TestThing,
+    }
+)
 
 if __name__ == "__main__":
     import uvicorn

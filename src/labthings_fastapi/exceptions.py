@@ -51,7 +51,7 @@ class PropertyNotObservableError(RuntimeError):
 class InconsistentTypeError(TypeError):
     """Different type hints have been given for a descriptor.
 
-    Some descriptors in LabThings, particularly `.DataProperty` and `.ThingConnection`
+    Some descriptors in LabThings, particularly `.DataProperty` and `.ThingSlot`
     may have their type specified in different ways. If multiple type hints are
     provided, they must match. See `.property` for more details.
     """
@@ -64,14 +64,14 @@ class MissingTypeError(TypeError):
     There are different ways of providing these type hints.
     This error indicates that no type hint was found.
 
-    See documentation for `.property` and `.thing_connection` for more details.
+    See documentation for `.property` and `.thing_slot` for more details.
     """
 
 
 class ThingNotConnectedError(RuntimeError):
-    """ThingConnections have not yet been set up.
+    r"""`.ThingSlot`\ s have not yet been set up.
 
-    This error is raised if a ThingConnection is accessed before the `.Thing` has
+    This error is raised if a `.ThingSlot` is accessed before the `.Thing` has
     been supplied by the LabThings server. This usually happens because either
     the `.Thing` is being used without a server (in which case the attribute
     should be mocked), or because it has been accessed before ``__enter__``
@@ -79,11 +79,11 @@ class ThingNotConnectedError(RuntimeError):
     """
 
 
-class ThingConnectionError(RuntimeError):
-    """A ThingConnection could not be set up.
+class ThingSlotError(RuntimeError):
+    """A `.ThingSlot` could not be set up.
 
     This error is raised if the LabThings server is unable to set up a
-    ThingConnection, for example because the named Thing does not exist,
+    `.ThingSlot`, for example because the named Thing does not exist,
     or is of the wrong type, or is not specified and there is no default.
     """
 

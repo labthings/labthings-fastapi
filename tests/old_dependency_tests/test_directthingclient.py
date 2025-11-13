@@ -144,9 +144,12 @@ def test_directthingclient_in_server(action):
 
     This uses the internal thing client mechanism.
     """
-    server = lt.ThingServer()
-    server.add_thing("counter", Counter)
-    server.add_thing("controller", Controller)
+    server = lt.ThingServer(
+        {
+            "counter": Counter,
+            "controller": Controller,
+        }
+    )
     with TestClient(server.app) as client:
         r = client.post(f"/controller/{action}")
         invocation = poll_task(client, r.json())

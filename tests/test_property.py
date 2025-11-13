@@ -15,9 +15,18 @@ import fastapi
 from fastapi.testclient import TestClient
 import pydantic
 import pytest
-from labthings_fastapi import properties as tp
+from labthings_fastapi import properties
+from labthings_fastapi.properties import (
+    BaseProperty,
+    DataProperty,
+    FunctionalProperty,
+    MissingDefaultError,
+    OverspecifiedDefaultError,
+    default_factory_from_arguments,
+)
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
-from labthings_fastapi.exceptions import NotConnectedToServerError
+from labthings_fastapi.exceptions import MissingTypeError, NotConnectedToServerError
+import labthings_fastapi as lt
 from .utilities import raises_or_is_caused_by
 
 
@@ -29,26 +38,26 @@ def test_default_factory_from_arguments():
     are provided, or if none are provided.
     """
     # Check for an error with no arguments
-    with pytest.raises(tp.MissingDefaultError):
-        tp.default_factory_from_arguments()
+    with pytest.raises(MissingDefaultError):
+        default_factory_from_arguments()
 
     # Check for an error with both arguments
-    with pytest.raises(tp.OverspecifiedDefaultError):
-        tp.default_factory_from_arguments([], list)
+    with pytest.raises(OverspecifiedDefaultError):
+        default_factory_from_arguments([], list)
 
     # Check a factory is passed unchanged
-    assert tp.default_factory_from_arguments(..., list) is list
+    assert default_factory_from_arguments(..., list) is list
 
     # Check a value is wrapped in a factory
-    factory = tp.default_factory_from_arguments(True, None)
+    factory = default_factory_from_arguments(True, None)
     assert factory() is True
 
     # Check there's an error if our default factory isn't callable
-    with pytest.raises(tp.MissingDefaultError):
-        tp.default_factory_from_arguments(default_factory=False)
+    with pytest.raises(MissingDefaultError):
+        default_factory_from_arguments(default_factory=False)
 
     # Check None works as a default value
-    factory = tp.default_factory_from_arguments(default=None)
+    factory = default_factory_from_arguments(default=None)
     assert factory() is None
 
 
@@ -79,11 +88,11 @@ def mock_and_capture_args(monkeypatch, target, name):
     monkeypatch.setattr(target, name, MockClass)
 
 
-@pytest.mark.parametrize("func", [tp.property, tp.setting])
+@pytest.mark.parametrize("func", [lt.property, lt.setting])
 def test_toplevel_function(monkeypatch, func):
     """Test the various ways in which `lt.property` or `lt.setting` may be invoked.
 
-    This test is parametrized, so `func` will be either `tp.property` or `tp.setting`.
+    This test is parametrized, so `func` will be either `lt.property` or `lt.setting`.
     We then look up the corresponding descriptor classes.
 
     It's unfortunate that the body of this test is a bit generic, but as both
@@ -95,10 +104,10 @@ def test_toplevel_function(monkeypatch, func):
     # Mock DataProperty,FunctionalProperty or the equivalent for settings
     # suffix will be "Property" or "Setting"
     suffix = func.__name__.capitalize()
-    mock_and_capture_args(monkeypatch, tp, f"Data{suffix}")
-    mock_and_capture_args(monkeypatch, tp, f"Functional{suffix}")
-    DataClass = getattr(tp, f"Data{suffix}")
-    FunctionalClass = getattr(tp, f"Functional{suffix}")
+    mock_and_capture_args(monkeypatch, properties, f"Data{suffix}")
+    mock_and_capture_args(monkeypatch, properties, f"Functional{suffix}")
+    DataClass = getattr(properties, f"Data{suffix}")
+    FunctionalClass = getattr(properties, f"Functional{suffix}")
 
     def getter(self) -> str:
         return "test"
@@ -132,19 +141,19 @@ def test_toplevel_function(monkeypatch, func):
 
     # The positional argument is the setter, so `None` is not valid
     # and probably means someone forgot to add `default=`.
-    with pytest.raises(tp.MissingDefaultError):
+    with pytest.raises(MissingDefaultError):
         func(None)
 
     # Calling with no arguments is also not valid and raises an error
-    with pytest.raises(tp.MissingDefaultError):
+    with pytest.raises(MissingDefaultError):
         func()
 
     # If more than one default is specified, we should raise an error.
-    with pytest.raises(tp.OverspecifiedDefaultError):
+    with pytest.raises(OverspecifiedDefaultError):
         func(default=[], default_factory=list)
-    with pytest.raises(tp.OverspecifiedDefaultError):
+    with pytest.raises(OverspecifiedDefaultError):
         func(getter, default=[])
-    with pytest.raises(tp.OverspecifiedDefaultError):
+    with pytest.raises(OverspecifiedDefaultError):
         func(getter, default_factory=list)
 
 
@@ -155,13 +164,13 @@ def test_baseproperty_type_and_model():
     `pydantic.RootModel`.
     """
 
-    with raises_or_is_caused_by(tp.MissingTypeError):
+    with raises_or_is_caused_by(MissingTypeError):
 
         class Example:
-            prop = tp.BaseProperty()
+            prop = BaseProperty()
 
     class Example:
-        prop: "str | None" = tp.BaseProperty()
+        prop: "str | None" = BaseProperty()
 
     assert isinstance(None, Example.prop.value_type)
     assert isinstance("test", Example.prop.value_type)
@@ -182,7 +191,7 @@ def test_baseproperty_type_and_model_pydantic():
         bar: int
 
     class Example:
-        prop: MyModel = tp.BaseProperty()
+        prop: MyModel = BaseProperty()
 
     assert Example.prop.value_type is MyModel
     assert Example.prop.model is MyModel
@@ -193,7 +202,7 @@ def test_baseproperty_add_to_fastapi():
     # Subclass to add __set__ (which is missing on BaseProperty as it's
     # implemented by subclasses).
 
-    class MyProperty(tp.BaseProperty):
+    class MyProperty(BaseProperty):
         def __set__(self, obj, val):
             pass
 
@@ -224,12 +233,12 @@ def test_baseproperty_add_to_fastapi():
 
 def test_baseproperty_set_error():
     """Check `.Baseproperty.__set__` raises an error and is overridden."""
-    assert tp.DataProperty.__get__ is tp.BaseProperty.__get__
-    assert tp.DataProperty.__set__ is not tp.BaseProperty.__set__
-    assert tp.FunctionalProperty.__set__ is not tp.BaseProperty.__set__
+    assert DataProperty.__get__ is BaseProperty.__get__
+    assert DataProperty.__set__ is not BaseProperty.__set__
+    assert FunctionalProperty.__set__ is not BaseProperty.__set__
 
     class Example:
-        bp: int = tp.BaseProperty()
+        bp: int = BaseProperty()
 
     example = Example()
     with pytest.raises(NotImplementedError):
@@ -250,12 +259,12 @@ def test_decorator_exception():
         class BadExample:
             """A class with a wrongly reused descriptor."""
 
-            prop1: int = tp.property(default=0)
+            prop1: int = lt.property(default=0)
             prop2: int = prop1
 
     # The example below should be exempted from the rule, i.e. no error
     class Example:
-        @tp.property
+        @lt.property
         def prop(self) -> bool:
             """An example getter."""
 
@@ -264,9 +273,9 @@ def test_decorator_exception():
             """A setter named differently."""
             pass
 
-    assert isinstance(Example.prop, tp.FunctionalProperty)
+    assert isinstance(Example.prop, FunctionalProperty)
     assert Example.prop.name == "prop"
-    assert not isinstance(Example.set_prop, tp.FunctionalProperty)
+    assert not isinstance(Example.set_prop, FunctionalProperty)
     assert callable(Example.set_prop)
 
 
@@ -276,7 +285,7 @@ def test_premature_api_and_affordance(mocker):
     class Example:
         path = None  # this is supplied by `lt.Thing` but we're not subclassing.
 
-        @tp.property
+        @lt.property
         def prop(self) -> bool:
             """An example getter."""
             return True
