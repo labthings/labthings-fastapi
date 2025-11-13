@@ -288,7 +288,7 @@ class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThin
                 # an error.
                 raise ThingSlotError("it can't connect to multiple Things")
         except (ThingSlotError, KeyError) as e:
-            reason = e.args[0]
+            reason = str(e.args[0])
             if isinstance(e, KeyError):
                 reason += " is not the name of a Thing"
             msg = f"Can't connect '{host.name}.{self.name}' because {reason}. "
