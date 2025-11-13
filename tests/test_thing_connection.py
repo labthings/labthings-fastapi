@@ -104,16 +104,6 @@ def dummy_things(names, cls=Dummy1):
     return {n: cls(n) for n in names}
 
 
-def names_set(thing_or_mapping):
-    """Given a mapping or a Thing, return a set of names."""
-    if thing_or_mapping is None:
-        return set()
-    if isinstance(thing_or_mapping, str):
-        return {thing_or_mapping}
-    else:
-        return {t.name for t in thing_or_mapping.values()}
-
-
 @pytest.fixture
 def mixed_things():
     """A list of Things with two different types."""
@@ -219,7 +209,7 @@ def test_connect(mixed_things):
         cls.optional_default_none.connect(obj, dummy_things(names))
         assert obj.optional_default_none is None
         cls.multiple_default_none.connect(obj, dummy_things(names))
-        assert names_set(obj.multiple_default_none) == set()
+        assert len(obj.multiple_default_none) == 0
         # single should fail, as it requires a Thing
         with pytest.raises(ThingSlotError) as excinfo:
             cls.single_default_none.connect(obj, dummy_things(names))
@@ -234,7 +224,8 @@ def test_connect(mixed_things):
         cls.optional_default_none.connect(obj, mixed_things, target)
         assert obj.optional_default_none.name == "thing1_a"
         cls.multiple_default_none.connect(obj, mixed_things, target)
-        assert names_set(obj.multiple_default_none) == {"thing1_a"}
+        assert isinstance(obj.multiple_default_none, Mapping)
+        assert set(obj.multiple_default_none.keys()) == {"thing1_a"}
 
     # A default of `...` (i.e. no default) picks by class.
     # Different types have different constraints on how many are allowed.
@@ -457,4 +448,4 @@ def test_mapping_and_multiple():
         assert isinstance(thing_one, ThingOne)
         assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
-        assert names_set(thing_one.n_things) == {f"thing_{i + 3}" for i in range(3)}
+        assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}
