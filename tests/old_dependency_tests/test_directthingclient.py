@@ -9,7 +9,7 @@ import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.deps import DirectThingClient, direct_thing_client_class
 from labthings_fastapi.thing_server_interface import create_thing_without_server
-from .temp_client import poll_task
+from ..temp_client import poll_task
 
 
 class Counter(lt.Thing):
@@ -144,9 +144,12 @@ def test_directthingclient_in_server(action):
 
     This uses the internal thing client mechanism.
     """
-    server = lt.ThingServer()
-    server.add_thing("counter", Counter)
-    server.add_thing("controller", Controller)
+    server = lt.ThingServer(
+        {
+            "counter": Counter,
+            "controller": Controller,
+        }
+    )
     with TestClient(server.app) as client:
         r = client.post(f"/controller/{action}")
         invocation = poll_task(client, r.json())

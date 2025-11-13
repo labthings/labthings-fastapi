@@ -5,7 +5,7 @@ This tests the log that is returned in an action invocation
 import logging
 from fastapi.testclient import TestClient
 import pytest
-from .temp_client import poll_task
+from ..temp_client import poll_task
 import labthings_fastapi as lt
 from labthings_fastapi.actions.invocation_model import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
@@ -18,16 +18,16 @@ class ThingThatLogsAndErrors(lt.Thing):
     ]
 
     @lt.thing_action
-    def action_that_logs(self):
+    def action_that_logs(self, logger: lt.deps.InvocationLogger):
         for m in self.LOG_MESSAGES:
-            self.logger.info(m)
+            logger.info(m)
 
     @lt.thing_action
-    def action_with_unhandled_error(self):
+    def action_with_unhandled_error(self, logger: lt.deps.InvocationLogger):
         raise RuntimeError("I was asked to raise this error.")
 
     @lt.thing_action
-    def action_with_invocation_error(self):
+    def action_with_invocation_error(self, logger: lt.deps.InvocationLogger):
         raise lt.exceptions.InvocationError("This is an error, but I handled it!")
 
 
@@ -46,7 +46,6 @@ def test_invocation_logging(caplog, client):
         r.raise_for_status()
         invocation = poll_task(client, r.json())
         assert invocation["status"] == "completed"
-        assert len(caplog.records) == len(ThingThatLogsAndErrors.LOG_MESSAGES)
         assert len(invocation["log"]) == len(ThingThatLogsAndErrors.LOG_MESSAGES)
         assert len(invocation["log"]) == len(caplog.records)
         for expected, entry in zip(
@@ -69,7 +68,7 @@ def test_unhandled_error_logs(caplog, client):
 
 
 def test_invocation_error_logs(caplog, client):
-    """Check that a log with a traceback is raised if there is an unhandled error."""
+    """Check that expected errors are logged without a traceback."""
     with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
         r = client.post("/log_and_error_thing/action_with_invocation_error")
         r.raise_for_status()

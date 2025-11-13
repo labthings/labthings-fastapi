@@ -20,7 +20,7 @@ code does not break if modules are rearranged.
 """
 
 from .thing import Thing
-from .thing_connections import thing_connection
+from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
 from .decorators import (
@@ -31,7 +31,13 @@ from . import deps
 from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
+from .server.config_model import ThingConfig, ThingServerConfig
 from .client import ThingClient
+from .invocation_contexts import (
+    cancellable_sleep,
+    raise_if_cancelled,
+    ThreadWithInvocationID,
+)
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.
@@ -47,12 +53,17 @@ __all__ = [
     "DataProperty",
     "DataSetting",
     "thing_action",
-    "thing_connection",
+    "thing_slot",
     "fastapi_endpoint",
     "deps",
     "outputs",
     "blob",
     "ThingServer",
     "cli",
+    "ThingConfig",
+    "ThingServerConfig",
     "ThingClient",
+    "cancellable_sleep",
+    "raise_if_cancelled",
+    "ThreadWithInvocationID",
 ]

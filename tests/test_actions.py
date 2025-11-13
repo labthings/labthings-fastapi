@@ -12,8 +12,7 @@ import labthings_fastapi as lt
 @pytest.fixture
 def client():
     """Yield a client connected to a ThingServer"""
-    server = lt.ThingServer()
-    server.add_thing("thing", MyThing)
+    server = lt.ThingServer({"thing": MyThing})
     with TestClient(server.app) as client:
         yield client
 
@@ -21,7 +20,8 @@ def client():
 def action_partial(client: TestClient, url: str):
     def run(payload=None):
         r = client.post(url, json=payload)
-        assert r.status_code in (200, 201)
+        if r.status_code not in (200, 201):
+            raise RuntimeError(f"Received HTTP response code {r.status_code}")
         return poll_task(client, r.json())
 
     return run
@@ -73,6 +73,10 @@ def test_no_args(client):
     run({})  # an empty dict should be OK
     run(None)  # it should also be OK to call it with None
     # Calling with no payload is equivalent to None
+    with pytest.raises(RuntimeError, match="422"):
+        run(10)  # the payload must be a dict - this will error.
+    with pytest.raises(RuntimeError, match="422"):
+        run({"key": "value"})  # non-empty dicts should cause an error.
 
 
 def test_only_kwargs(client):
@@ -88,6 +92,8 @@ def test_only_kwargs(client):
     run({})  # an empty dict should be OK
     run(None)  # it should also be OK to call it with None
     run({"foo": "bar"})  # it should be OK to call it with a payload
+    with pytest.raises(RuntimeError, match="422"):
+        run(10)  # but the payload must be a dict - this will error.
 
 
 def test_varargs():

@@ -267,7 +267,6 @@ class ActionDescriptor:
                 input=body,
                 dependencies=dependencies,
                 id=id,
-                cancel_hook=cancel_hook,
             )
             background_tasks.add_task(action_manager.expire_invocations)
             return action.response(request=request)

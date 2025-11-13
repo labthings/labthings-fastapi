@@ -9,10 +9,14 @@ on embedded hardware.
 
 import json
 from traceback import format_exception
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
+
+if TYPE_CHECKING:
+    from . import ThingServer
+    from .config_model import ThingServerConfig
 
 
 class FallbackApp(FastAPI):
@@ -28,9 +32,9 @@ class FallbackApp(FastAPI):
         :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
         """
         super().__init__(*args, **kwargs)
-        self.labthings_config = None
-        self.labthings_server = None
-        self.labthings_error = None
+        self.labthings_config: ThingServerConfig | None = None
+        self.labthings_server: ThingServer | None = None
+        self.labthings_error: BaseException | None = None
         self.log_history = None
         self.html_code = 500
 

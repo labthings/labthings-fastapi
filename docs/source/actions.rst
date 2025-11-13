@@ -5,7 +5,7 @@ Actions
 
 Actions are the way `.Thing` objects are instructed to do things. In Python
 terms, any method of a `.Thing` that we want to be able to call over HTTP
-should be decorated as an Action, using :deco:`.thing_action`.
+should be decorated as an Action, using `.thing_action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
 :ref:`wot_cc` includes a section on :ref:`wot_actions` that introduces the general concept.
@@ -57,6 +57,51 @@ The first is ``self`` (the first positional argument), which is always the
 :ref:`dependencies`, which use annotated type hints to tell LabThings to
 supply resources needed by the action. Most often, this is a way of accessing
 other `.Things` on the same server.
+
+.. action_logging:
+Logging from actions
+--------------------
+Action code should use `.Thing.logger` to log messages. This will be configured
+to handle messages on a per-invocation basis and make them available when the action
+is queried over HTTP.
+
+This may be used to display status updates to the user when an action takes
+a long time to run, or it may simply be a helpful debugging aid. 
+
+See :mod:`.logs` for details of how this is implemented.
+
+.. action_cancellation:
+Cancelling actions
+------------------
+If an action could run for a long time, it is useful to be able to cancel it
+cleanly. LabThings makes provision for this by allowing actions to be cancelled
+using a ``DELETE`` HTTP request. In order to allow an action to be cancelled,
+you must give LabThings opportunities to interrupt it. This is most often done
+by replacing a `time.sleep()` statement with `.cancellable_sleep()` which
+is equivalent,  but will raise an exception if the action is cancelled.
+
+For more advanced options, see `.invocation_contexts` for detail.
+
+.. invocation_context:
+Invocation contexts
+-------------------
+Cancelling actions and capturing their logs requires action code to use a
+specific logger and check for cancel events. This is done using `contextvars`
+such that the action code can use module-level symbols rather than needing
+to explicitly pass the logger and cancel hook as arguments to the action
+method.
+
+Usually, you don't need to consider this mechanism: simply use `.Thing.logger`
+or `.cancellable_sleep` as explained above. However, if you want to run actions
+outside of the server (for example, for testing purposes) or if you want to
+call one action from another action, but not share the cancellation signal
+or log, functions are provided in `.invocation_contexts` to manage this.
+
+If you start a new thread from an action, code running in that thread will
+not have an invocation ID set in a context variable. A subclass of
+`threading.Thread` is provided to do this, `.ThreadWithInvocationID`\ .
+This may be useful for test code, or if you wish to run actions in the
+background, with the option of cancelling them.
 
 Raising exceptions
 ------------------

@@ -30,8 +30,7 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
             self.is_on = not self.is_on
 
     
-    server = lt.ThingServer()
-    server.add_thing("light", Light)
+    server = lt.ThingServer({"light": Light})
 
     if __name__ == "__main__":
         import uvicorn

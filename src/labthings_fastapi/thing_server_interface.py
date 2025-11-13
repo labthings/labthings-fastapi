@@ -138,17 +138,31 @@ class ThingServerInterface:
 
 
 class MockThingServerInterface(ThingServerInterface):
-    """A mock class that simulates a ThingServerInterface without the server."""
+    r"""A mock class that simulates a ThingServerInterface without the server.
 
-    def __init__(self, name: str) -> None:
+    This allows a `.Thing` to be instantiated but not connected to a server.
+    The methods normally provided by the server are mocked, specifically:
+
+    * The `name` is set by an argument to `__init__`\ .
+    * `start_async_task_soon` silently does nothing, i.e. the async function
+      will not be run.
+    * The settings folder will either be specified when the class is initialised,
+      or a temporary folder will be created.
+    * `get_thing_states` will return an empty dictionary.
+    """
+
+    def __init__(self, name: str, settings_folder: str | None = None) -> None:
         """Initialise a ThingServerInterface.
 
         :param name: The name of the Thing we're providing an interface to.
+        :param settings_folder: The location where we should save settings.
+            By default, this is a temporary directory.
         """
         # We deliberately don't call super().__init__(), as it won't work without
         # a server.
         self._name: str = name
         self._settings_tempdir: TemporaryDirectory | None = None
+        self._settings_folder = settings_folder
 
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
@@ -183,6 +197,8 @@ class MockThingServerInterface(ThingServerInterface):
 
         :returns: the path to a temporary folder.
         """
+        if self._settings_folder:
+            return self._settings_folder
         if not self._settings_tempdir:
             self._settings_tempdir = TemporaryDirectory()
         return self._settings_tempdir.name
@@ -208,7 +224,10 @@ ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
 
 def create_thing_without_server(
-    cls: type[ThingSubclass], *args: Any, **kwargs: Any
+    cls: type[ThingSubclass],
+    *args: Any,
+    settings_folder: str | None = None,
+    **kwargs: Any,
 ) -> ThingSubclass:
     r"""Create a `.Thing` and supply a mock ThingServerInterface.
 
@@ -220,6 +239,8 @@ def create_thing_without_server(
 
     :param cls: The `.Thing` subclass to instantiate.
     :param \*args: positional arguments to ``__init__``.
+    :param settings_folder: The path to the settings folder. A temporary folder
+        is used by default.
     :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
@@ -233,7 +254,11 @@ def create_thing_without_server(
         msg = "You may not supply a keyword argument called 'thing_server_interface'."
         raise ValueError(msg)
     return cls(
-        *args, **kwargs, thing_server_interface=MockThingServerInterface(name=name)
+        *args,
+        **kwargs,
+        thing_server_interface=MockThingServerInterface(
+            name=name, settings_folder=settings_folder
+        ),
     )  # type: ignore[misc]
     # Note: we must ignore misc typing errors above because mypy flags an error
     # that `thing_server_interface` is multiply specified.

@@ -20,6 +20,7 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
+from .logs import THING_LOGGER
 from .properties import BaseProperty, DataProperty, BaseSetting
 from .descriptors import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
@@ -105,6 +106,11 @@ class Thing:
     def name(self) -> str:
         """The name of this Thing, as known to the server."""
         return self._thing_server_interface.name
+
+    @property
+    def logger(self) -> logging.Logger:
+        """A logger, named after this Thing."""
+        return THING_LOGGER.getChild(self.name)
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.

@@ -1,4 +1,4 @@
-"""Test the thing_connection module."""
+"""Test the thing_slot module."""
 
 from collections.abc import Mapping
 import gc
@@ -6,27 +6,27 @@ import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 
-from labthings_fastapi.exceptions import ThingConnectionError, ThingNotConnectedError
+from labthings_fastapi.exceptions import ThingSlotError
 
 
 class ThingOne(lt.Thing):
     """A class that will cause chaos if it can."""
 
-    other_thing: "ThingTwo" = lt.thing_connection()
-    n_things: "Mapping[str, ThingThree]" = lt.thing_connection()
-    optional_thing: "ThingThree | None" = lt.thing_connection()
+    other_thing: "ThingTwo" = lt.thing_slot()
+    n_things: "Mapping[str, ThingThree]" = lt.thing_slot()
+    optional_thing: "ThingThree | None" = lt.thing_slot()
 
 
 class ThingTwo(lt.Thing):
     """A class that relies on ThingOne."""
 
-    other_thing: ThingOne = lt.thing_connection()
+    other_thing: ThingOne = lt.thing_slot()
 
 
 class ThingN(lt.Thing):
     """A class that emulates ThingOne and ThingTwo more generically."""
 
-    other_thing: "ThingN" = lt.thing_connection(None)
+    other_thing: "ThingN" = lt.thing_slot(None)
 
 
 class ThingThree(lt.Thing):
@@ -38,7 +38,7 @@ class ThingThree(lt.Thing):
 class ThingThatMustBeConfigured(lt.Thing):
     """A Thing that has a default that won't work."""
 
-    other_thing: lt.Thing = lt.thing_connection(None)
+    other_thing: lt.Thing = lt.thing_slot(None)
 
 
 class Dummy:
@@ -58,43 +58,41 @@ class Dummy2(Dummy):
 
 
 class ThingWithManyConnections:
-    """A class with lots of ThingConnections.
+    """A class with lots of ThingSlots.
 
     This class is not actually meant to be used - it is a host for
-    the thing_connection attributes. It's not a Thing, to simplify
+    the thing_slot attributes. It's not a Thing, to simplify
     testing. The "thing" types it depends on are also not Things,
     again to simplify testing.
     """
 
     name = "thing"
 
-    single_no_default: Dummy1 = lt.thing_connection()
-    optional_no_default: Dummy1 | None = lt.thing_connection()
-    multiple_no_default: Mapping[str, Dummy1] = lt.thing_connection()
+    single_no_default: Dummy1 = lt.thing_slot()
+    optional_no_default: Dummy1 | None = lt.thing_slot()
+    multiple_no_default: Mapping[str, Dummy1] = lt.thing_slot()
 
-    single_default_none: Dummy1 = lt.thing_connection(None)
-    optional_default_none: Dummy1 | None = lt.thing_connection(None)
-    multiple_default_none: Mapping[str, Dummy1] = lt.thing_connection(None)
+    single_default_none: Dummy1 = lt.thing_slot(None)
+    optional_default_none: Dummy1 | None = lt.thing_slot(None)
+    multiple_default_none: Mapping[str, Dummy1] = lt.thing_slot(None)
 
-    single_default_str: Dummy1 = lt.thing_connection("dummy_a")
-    optional_default_str: Dummy1 | None = lt.thing_connection("dummy_a")
-    multiple_default_str: Mapping[str, Dummy1] = lt.thing_connection("dummy_a")
+    single_default_str: Dummy1 = lt.thing_slot("dummy_a")
+    optional_default_str: Dummy1 | None = lt.thing_slot("dummy_a")
+    multiple_default_str: Mapping[str, Dummy1] = lt.thing_slot("dummy_a")
 
-    single_default_seq: Dummy1 = lt.thing_connection(["dummy_a", "dummy_b"])
-    optional_default_seq: Dummy1 | None = lt.thing_connection(["dummy_a", "dummy_b"])
-    multiple_default_seq: Mapping[str, Dummy1] = lt.thing_connection(
-        ["dummy_a", "dummy_b"]
-    )
+    single_default_seq: Dummy1 = lt.thing_slot(["dummy_a", "dummy_b"])
+    optional_default_seq: Dummy1 | None = lt.thing_slot(["dummy_a", "dummy_b"])
+    multiple_default_seq: Mapping[str, Dummy1] = lt.thing_slot(["dummy_a", "dummy_b"])
 
 
 class ThingWithFutureConnection:
-    """A class with a ThingConnection in the future."""
+    """A class with a ThingSlot in the future."""
 
     name = "thing"
 
-    single: "DummyFromTheFuture" = lt.thing_connection()
-    optional: "DummyFromTheFuture | None" = lt.thing_connection()
-    multiple: "Mapping[str, DummyFromTheFuture]" = lt.thing_connection()
+    single: "DummyFromTheFuture" = lt.thing_slot()
+    optional: "DummyFromTheFuture | None" = lt.thing_slot()
+    multiple: "Mapping[str, DummyFromTheFuture]" = lt.thing_slot()
 
 
 class DummyFromTheFuture(Dummy):
@@ -104,16 +102,6 @@ class DummyFromTheFuture(Dummy):
 def dummy_things(names, cls=Dummy1):
     """Turn a list or set of names into a dict of Things."""
     return {n: cls(n) for n in names}
-
-
-def names_set(thing_or_mapping):
-    """Given a mapping or a Thing, return a set of names."""
-    if thing_or_mapping is None:
-        return set()
-    if isinstance(thing_or_mapping, str):
-        return {thing_or_mapping}
-    else:
-        return {t.name for t in thing_or_mapping.values()}
 
 
 @pytest.fixture
@@ -194,12 +182,12 @@ def test_pick_things(mixed_things):
     # Check for the error if we specify the wrong type (for string and sequence)
     # Note that only one thing of the wrong type will still cause the error.
     for target in ["thing2_a", ["thing2_a"], ["thing1_a", "thing2_a"]]:
-        with pytest.raises(ThingConnectionError) as excinfo:
+        with pytest.raises(ThingSlotError) as excinfo:
             picked_names(mixed_things, target)
         assert "wrong type" in str(excinfo.value)
 
     # Check for a KeyError if we specify a missing Thing. This is converted to
-    # a ThingConnectionError by `connect`.
+    # a ThingSlotError by `connect`.
     for target in ["something_else", {"thing1_a", "something_else"}]:
         with pytest.raises(KeyError):
             picked_names(mixed_things, target)
@@ -221,9 +209,9 @@ def test_connect(mixed_things):
         cls.optional_default_none.connect(obj, dummy_things(names))
         assert obj.optional_default_none is None
         cls.multiple_default_none.connect(obj, dummy_things(names))
-        assert names_set(obj.multiple_default_none) == set()
+        assert len(obj.multiple_default_none) == 0
         # single should fail, as it requires a Thing
-        with pytest.raises(ThingConnectionError) as excinfo:
+        with pytest.raises(ThingSlotError) as excinfo:
             cls.single_default_none.connect(obj, dummy_things(names))
         assert "must be set" in str(excinfo.value)
 
@@ -236,7 +224,8 @@ def test_connect(mixed_things):
         cls.optional_default_none.connect(obj, mixed_things, target)
         assert obj.optional_default_none.name == "thing1_a"
         cls.multiple_default_none.connect(obj, mixed_things, target)
-        assert names_set(obj.multiple_default_none) == {"thing1_a"}
+        assert isinstance(obj.multiple_default_none, Mapping)
+        assert set(obj.multiple_default_none.keys()) == {"thing1_a"}
 
     # A default of `...` (i.e. no default) picks by class.
     # Different types have different constraints on how many are allowed.
@@ -245,7 +234,7 @@ def test_connect(mixed_things):
     # but a single connection fails, as it can't be None.
     no_matches = {n: Dummy2(n) for n in ["one", "two"]}
     obj = cls()
-    with pytest.raises(ThingConnectionError) as excinfo:
+    with pytest.raises(ThingSlotError) as excinfo:
         cls.single_no_default.connect(obj, no_matches)
     assert "no matching Thing" in str(excinfo.value)
     cls.optional_no_default.connect(obj, no_matches)
@@ -269,11 +258,11 @@ def test_connect(mixed_things):
     match2 = Dummy1("four")
     two_matches = {"four": match2, **one_match}
     obj = cls()
-    with pytest.raises(ThingConnectionError) as excinfo:
+    with pytest.raises(ThingSlotError) as excinfo:
         cls.single_no_default.connect(obj, two_matches)
     assert "multiple Things" in str(excinfo.value)
     assert "Things by type" in str(excinfo.value)
-    with pytest.raises(ThingConnectionError) as excinfo:
+    with pytest.raises(ThingSlotError) as excinfo:
         cls.optional_no_default.connect(obj, two_matches)
     assert "multiple Things" in str(excinfo.value)
     assert "Things by type" in str(excinfo.value)
@@ -281,16 +270,16 @@ def test_connect(mixed_things):
     assert obj.multiple_no_default == {"three": match, "four": match2}
 
     # _pick_things raises KeyErrors for invalid names.
-    # Check KeyErrors are turned back into ThingConnectionErrors
+    # Check KeyErrors are turned back into ThingSlotErrors
     obj = cls()
-    with pytest.raises(ThingConnectionError) as excinfo:
+    with pytest.raises(ThingSlotError) as excinfo:
         cls.single_default_str.connect(obj, mixed_things)
     assert "not the name of a Thing" in str(excinfo.value)
     assert f"{obj.name}.single_default_str" in str(excinfo.value)
     assert "not configured, and used the default" in str(excinfo.value)
     # The error message changes if a target is specified.
     obj = cls()
-    with pytest.raises(ThingConnectionError) as excinfo:
+    with pytest.raises(ThingSlotError) as excinfo:
         cls.single_default_str.connect(obj, mixed_things, "missing")
     assert "not the name of a Thing" in str(excinfo.value)
     assert f"{obj.name}.single_default_str" in str(excinfo.value)
@@ -355,36 +344,22 @@ def test_circular_connection(cls_1, cls_2, connections) -> None:
     Thing classes. Circular dependencies should not cause any problems for
     the LabThings server.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing(
-        "thing_one", cls_1, thing_connections=connections.get("thing_one", {})
+    server = lt.ThingServer(
+        things={
+            "thing_one": lt.ThingConfig(
+                cls=cls_1, thing_slots=connections.get("thing_one", {})
+            ),
+            "thing_two": lt.ThingConfig(
+                cls=cls_2, thing_slots=connections.get("thing_two", {})
+            ),
+        }
     )
-    thing_two = server.add_thing(
-        "thing_two", cls_2, thing_connections=connections.get("thing_two", {})
-    )
-    things = [thing_one, thing_two]
-
-    # Check the connections don't work initially, because they aren't connected
-    for thing in things:
-        with pytest.raises(ThingNotConnectedError):
-            _ = thing.other_thing
+    things = [server.things[n] for n in ["thing_one", "thing_two"]]
 
     with TestClient(server.app) as _:
         # The things should be connected as the server is now running
         for thing, other in zip(things, reversed(things), strict=True):
             assert thing.other_thing is other
-
-
-def connectionerror_starting_server(server):
-    """Attempt to start a server, and return the error as a string."""
-    with pytest.RaisesGroup(ThingConnectionError) as excinfo:
-        # Creating a TestClient starts the server
-        with TestClient(server.app):
-            pass
-    # excinfo contains an ExceptionGroup because TestClient runs in a
-    # task group, hence the use of RaisesGroup and the `.exceptions[0]`
-    # below.
-    return str(excinfo.value.exceptions[0])
 
 
 @pytest.mark.parametrize(
@@ -409,28 +384,37 @@ def test_connections_none_default(connections, error):
     to specify connections for 'thing_two' in the last case - because
     that's the only one where 'thing_one' connects successfully.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingN)
-    server.add_thing("thing_two", ThingN)
-    server.add_thing("thing_three", ThingThree)
-
-    server.thing_connections = connections
+    things = {
+        "thing_one": lt.ThingConfig(
+            cls=ThingN, thing_slots=connections.get("thing_one", {})
+        ),
+        "thing_two": lt.ThingConfig(
+            cls=ThingN, thing_slots=connections.get("thing_two", {})
+        ),
+        "thing_three": lt.ThingConfig(
+            cls=ThingThree, thing_slots=connections.get("thing_three", {})
+        ),
+    }
 
     if error is None:
+        server = lt.ThingServer(things)
         with TestClient(server.app):
+            thing_one = server.things["thing_one"]
+            assert isinstance(thing_one, ThingN)
             assert thing_one.other_thing is thing_one
         return
 
-    assert error in connectionerror_starting_server(server)
+    with pytest.raises(ThingSlotError, match=error):
+        server = lt.ThingServer(things)
 
 
 def test_optional_and_empty():
     """Check that an optional or mapping connection can be None/empty."""
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingOne)
-    _thing_two = server.add_thing("thing_two", ThingTwo)
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
 
     with TestClient(server.app):
+        thing_one = server.things["thing_one"]
+        assert isinstance(thing_one, ThingOne)
         assert thing_one.optional_thing is None
         assert len(thing_one.n_things) == 0
 
@@ -441,27 +425,27 @@ def test_mapping_and_multiple():
     This also tests the expected error if multiple things match a
     single connection.
     """
-    server = lt.ThingServer()
-    thing_one = server.add_thing("thing_one", ThingOne)
-    _thing_two = server.add_thing("thing_two", ThingTwo)
-    for i in range(3):
-        server.add_thing(f"thing_{i + 3}", ThingThree)
-
-    # Attempting to start the server should fail, because
+    things = {
+        "thing_one": ThingOne,
+        "thing_two": ThingTwo,
+        "thing_3": ThingThree,
+        "thing_4": ThingThree,
+        "thing_5": ThingThree,
+    }
+    # We can't set up a server like this, because
     # thing_one.optional_thing will match multiple ThingThree instances.
-    assert "multiple Things" in connectionerror_starting_server(server)
+    with pytest.raises(ThingSlotError, match="multiple Things"):
+        server = lt.ThingServer(things)
 
     # Set optional thing to one specific name and it will start OK.
-    server.thing_connections = {"thing_one": {"optional_thing": "thing_3"}}
-
+    things["thing_one"] = lt.ThingConfig(
+        cls=ThingOne,
+        thing_slots={"optional_thing": "thing_3"},
+    )
+    server = lt.ThingServer(things)
     with TestClient(server.app):
+        thing_one = server.things["thing_one"]
+        assert isinstance(thing_one, ThingOne)
+        assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
-        assert names_set(thing_one.n_things) == {f"thing_{i + 3}" for i in range(3)}
-
-
-def test_connections_in_server():
-    r"Check that ``thing_connections`` is correctly remembered from ``add_thing``\ ."
-    server = lt.ThingServer()
-    thing_one_connections = {"other_thing": "thing_name"}
-    server.add_thing("thing_one", ThingOne, thing_connections=thing_one_connections)
-    assert server.thing_connections["thing_one"] is thing_one_connections
+        assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}

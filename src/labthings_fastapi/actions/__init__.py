@@ -19,24 +19,29 @@ import datetime
 import logging
 from collections import deque
 from threading import Thread, Lock
-from typing import MutableSequence, Optional, Any
+from typing import Optional, Any
 import uuid
 from typing import TYPE_CHECKING
 import weakref
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
+from labthings_fastapi.logs import add_thing_log_destination
+
 from ..utilities import model_to_dict
 from ..utilities.introspection import EmptyInput
 from ..thing_description._model import LinkElement
 from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
-from ..dependencies.invocation import (
-    CancelHook,
+from ..exceptions import (
     InvocationCancelledError,
     InvocationError,
-    invocation_logger,
 )
 from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
+from ..invocation_contexts import (
+    CancelEvent,
+    get_cancel_event,
+    set_invocation_id,
+)
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
@@ -77,7 +82,6 @@ class Invocation(Thread):
         input: Optional[BaseModel] = None,
         dependencies: Optional[dict[str, Any]] = None,
         log_len: int = 1000,
-        cancel_hook: Optional[CancelHook] = None,
     ) -> None:
         """Create a thread to run an action and track its outputs.
 
@@ -96,8 +100,6 @@ class Invocation(Thread):
             FastAPI by its dependency injection mechanism.
         :param log_len: sets the number of log entries that will be held in
             memory by the invocation's logger.
-        :param cancel_hook: is a `threading.Event` subclass that tells the
-            invocation it's time to stop. See `.CancelHook`.
         """
         Thread.__init__(self, daemon=True)
 
@@ -106,7 +108,6 @@ class Invocation(Thread):
         self.thing_ref = weakref.ref(thing)
         self.input = input if input is not None else EmptyInput()
         self.dependencies = dependencies if dependencies is not None else {}
-        self.cancel_hook = cancel_hook
 
         # A UUID for the Invocation (not the same as the threading.Thread ident)
         self._ID = id  # Task ID
@@ -195,14 +196,18 @@ class Invocation(Thread):
             raise RuntimeError("The `Thing` on which an action was run is missing!")
         return thing
 
+    @property
+    def cancel_hook(self) -> CancelEvent:
+        """The cancel event associated with this Invocation."""
+        return get_cancel_event(self.id)
+
     def cancel(self) -> None:
         """Cancel the task by requesting the code to stop.
 
         This is an opt-in feature: the action must use
         a `.CancelHook` dependency and periodically check it.
         """
-        if self.cancel_hook is not None:
-            self.cancel_hook.set()
+        self.cancel_hook.set()
 
     def response(self, request: Optional[Request] = None) -> InvocationModel:
         """Generate a representation of the invocation suitable for HTTP.
@@ -270,95 +275,57 @@ class Invocation(Thread):
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
         action: ActionDescriptor = self.action  # type: ignore[call-overload]
-        # Create a logger just for this invocation, keyed to the invocation id
-        # Logs that go to this logger will be copied into `self._log`
-        handler = DequeLogHandler(dest=self._log)
-        logger = invocation_logger(self.id)
-        logger.addHandler(handler)
-        try:
-            action.emit_changed_event(self.thing, self._status.value)
-
-            thing = self.thing
-            kwargs = model_to_dict(self.input)
-            if thing is None:  # pragma: no cover
-                # The Thing is stored as a weakref, but it will always exist
-                # while the server is running - this error should never
-                # occur.
-                raise RuntimeError("Cannot start an invocation without a Thing.")
-
-            with self._status_lock:
-                self._status = InvocationStatus.RUNNING
-                self._start_time = datetime.datetime.now()
+        logger = self.thing.logger
+        # The line below saves records matching our ID to ``self._log``
+        add_thing_log_destination(self.id, self._log)
+        with set_invocation_id(self.id):
+            try:
                 action.emit_changed_event(self.thing, self._status.value)
 
-            # The next line actually runs the action.
-            ret = action.__get__(thing)(**kwargs, **self.dependencies)
+                thing = self.thing
+                kwargs = model_to_dict(self.input)
+                if thing is None:  # pragma: no cover
+                    # The Thing is stored as a weakref, but it will always exist
+                    # while the server is running - this error should never
+                    # occur.
+                    raise RuntimeError("Cannot start an invocation without a Thing.")
 
-            with self._status_lock:
-                self._return_value = ret
-                self._status = InvocationStatus.COMPLETED
-                action.emit_changed_event(self.thing, self._status.value)
-        except InvocationCancelledError:
-            logger.info(f"Invocation {self.id} was cancelled.")
-            with self._status_lock:
-                self._status = InvocationStatus.CANCELLED
-                action.emit_changed_event(self.thing, self._status.value)
-        except Exception as e:  # skipcq: PYL-W0703
-            # First log
-            if isinstance(e, InvocationError):
-                # Log without traceback
-                logger.error(e)
-            else:
-                logger.exception(e)
-            # Then set status
-            with self._status_lock:
-                self._status = InvocationStatus.ERROR
-                self._exception = e
-                action.emit_changed_event(self.thing, self._status.value)
-        finally:
-            with self._status_lock:
-                self._end_time = datetime.datetime.now()
-                self.expiry_time = self._end_time + datetime.timedelta(
-                    seconds=self.retention_time,
-                )
-            logger.removeHandler(handler)  # Stop saving logs
-            # If we don't remove the log handler, it's a circular ref/memory leak.
+                with self._status_lock:
+                    self._status = InvocationStatus.RUNNING
+                    self._start_time = datetime.datetime.now()
+                    action.emit_changed_event(self.thing, self._status.value)
 
+                bound_method = action.__get__(thing)
+                # Actually run the action
+                ret = bound_method(**kwargs, **self.dependencies)
 
-class DequeLogHandler(logging.Handler):
-    """A log handler that stores entries in memory."""
-
-    def __init__(
-        self,
-        dest: MutableSequence,
-        level: int = logging.INFO,
-    ) -> None:
-        """Set up a log handler that appends messages to a deque.
-
-        .. warning::
-            This log handler does not currently rotate or truncate
-            the list - so if you use it on a thread that produces a
-            lot of log messages, you may run into memory problems.
-
-            Using a `.deque` with a finite capacity helps to mitigate
-            this.
-
-        :param dest: should specify a deque, to which we will append
-            each log entry as it comes in. This is assumed to be thread
-            safe.
-        :param level: sets the level of the logger. For most invocations,
-            a log level of `logging.INFO` is appropriate.
-        """
-        logging.Handler.__init__(self)
-        self.setLevel(level)
-        self.dest = dest
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Save a log record to the destination deque.
-
-        :param record: the `logging.LogRecord` object to add.
-        """
-        self.dest.append(record)
+                with self._status_lock:
+                    self._return_value = ret
+                    self._status = InvocationStatus.COMPLETED
+                    action.emit_changed_event(self.thing, self._status.value)
+            except InvocationCancelledError:
+                logger.info(f"Invocation {self.id} was cancelled.")
+                with self._status_lock:
+                    self._status = InvocationStatus.CANCELLED
+                    action.emit_changed_event(self.thing, self._status.value)
+            except Exception as e:  # skipcq: PYL-W0703
+                # First log
+                if isinstance(e, InvocationError):
+                    # Log without traceback
+                    logger.error(e)
+                else:
+                    logger.exception(e)
+                # Then set status
+                with self._status_lock:
+                    self._status = InvocationStatus.ERROR
+                    self._exception = e
+                    action.emit_changed_event(self.thing, self._status.value)
+            finally:
+                with self._status_lock:
+                    self._end_time = datetime.datetime.now()
+                    self.expiry_time = self._end_time + datetime.timedelta(
+                        seconds=self.retention_time,
+                    )
 
 
 class ActionManager:
@@ -390,7 +357,6 @@ class ActionManager:
         id: uuid.UUID,
         input: Any,
         dependencies: dict[str, Any],
-        cancel_hook: CancelHook,
     ) -> Invocation:
         """Invoke an action, returning the thread where it's running.
 
@@ -409,8 +375,6 @@ class ActionManager:
             keyword arguments.
         :param dependencies: is a dictionary of keyword arguments, supplied by
             FastAPI by its dependency injection mechanism.
-        :param cancel_hook: is a `threading.Event` subclass that tells the
-            invocation it's time to stop. See `.CancelHook`.
 
         :return: an `.Invocation` object that has been started.
         """
@@ -420,7 +384,6 @@ class ActionManager:
             input=input,
             dependencies=dependencies,
             id=id,
-            cancel_hook=cancel_hook,
         )
         self.append_invocation(thread)
         thread.start()

@@ -1,11 +1,11 @@
 """
-This tests the log that is returned in an action invocation
+This tests that actions may be cancelled.
 """
 
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from .temp_client import poll_task, task_href
+from ..temp_client import poll_task, task_href
 import labthings_fastapi as lt
 import time
 
@@ -20,10 +20,10 @@ class CancellableCountingThing(lt.Thing):
     """
 
     @lt.thing_action
-    def count_slowly(self, n: int = 10):
+    def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):
         for _i in range(n):
             try:
-                lt.cancellable_sleep(0.1)
+                cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError as e:
                 # Set check to true to show that cancel was called.
                 self.check = True
@@ -31,21 +31,23 @@ class CancellableCountingThing(lt.Thing):
             self.counter += 1
 
     @lt.thing_action
-    def count_slowly_but_ignore_cancel(self, n: int = 10):
+    def count_slowly_but_ignore_cancel(self, cancel: lt.deps.CancelHook, n: int = 10):
         """
         Used to check that cancellation alter task behaviour
         """
         counting_increment = 1
         for _i in range(n):
             try:
-                lt.cancellable_sleep(0.1)
+                cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError:
                 # Rather than cancel, this disobedient task just counts faster
                 counting_increment = 3
             self.counter += counting_increment
 
     @lt.thing_action
-    def count_and_only_cancel_if_asked_twice(self, n: int = 10):
+    def count_and_only_cancel_if_asked_twice(
+        self, cancel: lt.deps.CancelHook, n: int = 10
+    ):
         """
         A task that changes behaviour on cancel, but if asked a second time will cancel
         """
@@ -53,13 +55,15 @@ class CancellableCountingThing(lt.Thing):
         counting_increment = 1
         for _i in range(n):
             try:
-                lt.cancellable_sleep(0.1)
+                cancel.sleep(0.1)
             except lt.exceptions.InvocationCancelledError as e:
                 # If this is the second time, this is called actually cancel.
                 if cancelled_once:
                     raise (e)
                 # If not, remember that this cancel event happened.
                 cancelled_once = True
+                # Reset the CancelHook
+                cancel.clear()
                 # Count backwards instead!
                 counting_increment = -1
             self.counter += counting_increment

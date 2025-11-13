@@ -1,5 +1,12 @@
+"""Test the fallback server.
+
+If the server is started from the command line, with ``--fallback`` specified,
+we start a lightweight fallback server to show an error message. This test
+verifies that it works as expected.
+"""
+
 from fastapi.testclient import TestClient
-from labthings_fastapi.server import server_from_config
+import labthings_fastapi as lt
 from labthings_fastapi.server.fallback import app
 
 
@@ -34,7 +41,7 @@ def test_fallback_with_error():
 
 
 def test_fallback_with_server():
-    config = {
+    config_dict = {
         "things": {
             "thing1": "labthings_fastapi.example_things:MyThing",
             "thing2": {
@@ -43,7 +50,8 @@ def test_fallback_with_server():
             },
         }
     }
-    app.labthings_server = server_from_config(config)
+    config = lt.ThingServerConfig.model_validate(config_dict)
+    app.labthings_server = lt.ThingServer.from_config(config)
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text

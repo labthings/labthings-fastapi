@@ -7,37 +7,34 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations
-from typing import Any, AsyncGenerator, Optional, TypeVar
-import os.path
-import re
+from typing import AsyncGenerator, Optional, TypeVar
+from typing_extensions import Self
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from ..exceptions import ThingConnectionError as ThingConnectionError
-from ..thing_connections import ThingConnection
+from ..thing_slots import ThingSlot
 from ..utilities import class_attributes
 
-from ..utilities.object_reference_to_object import (
-    object_reference_to_object,
-)
 from ..actions import ActionManager
+from ..logs import configure_thing_logger
 from ..thing import Thing
 from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers  # noqa: F401
+from .config_model import (
+    ThingsConfig,
+    ThingServerConfig,
+    normalise_things_config as normalise_things_config,
+)
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from ..outputs.blob import BlobDataManager
-
-# A path should be made up of names separated by / as a path separator.
-# Each name should be made of alphanumeric characters, hyphen, or underscore.
-# This regex enforces a trailing /
-PATH_REGEX = re.compile(r"^([a-zA-Z0-9\-_]+)$")
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
@@ -61,8 +58,12 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
-    def __init__(self, settings_folder: Optional[str] = None) -> None:
-        """Initialise a LabThings server.
+    def __init__(
+        self,
+        things: ThingsConfig,
+        settings_folder: Optional[str] = None,
+    ) -> None:
+        r"""Initialise a LabThings server.
 
         Setting up the `.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
@@ -72,29 +73,43 @@ class ThingServer:
         We also create the `.ActionManager` to manage :ref:`actions` and the
         `.BlobManager` to manage the downloading of :ref:`blobs`.
 
+        :param things: A mapping of Thing names to `.Thing` subclasses, or
+            `.ThingConfig` objects specifying the subclass, its initialisation
+            arguments, and any connections to other `.Thing`\ s.
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
         """
+        configure_thing_logger()  # Note: this is safe to call multiple times.
+        self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
         self.app = FastAPI(lifespan=self.lifespan)
-        self.set_cors_middleware()
+        self._set_cors_middleware()
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
         self.blob_data_manager = BlobDataManager()
         self.blob_data_manager.attach_to_app(self.app)
-        self.add_things_view_to_app()
-        self._things: dict[str, Thing] = {}
-        self.thing_connections: dict[str, Mapping[str, str | Iterable[str] | None]] = {}
+        self._add_things_view_to_app()
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
         _thing_servers.add(self)
+        # The function calls below create and set up the Things.
+        self._things = self._create_things()
+        self._connect_things()
+        self._attach_things_to_server()
 
-    app: FastAPI
-    action_manager: ActionManager
-    blob_data_manager: BlobDataManager
+    @classmethod
+    def from_config(cls, config: ThingServerConfig) -> Self:
+        r"""Create a ThingServer from a configuration model.
 
-    def set_cors_middleware(self) -> None:
+        This is equivalent to ``ThingServer(**dict(config))``\ .
+
+        :param config: The configuration parameters for the server.
+        :return: A `.ThingServer` configured as per the model.
+        """
+        return cls(**dict(config))
+
+    def _set_cors_middleware(self) -> None:
         """Configure the server to allow requests from other origins.
 
         This is required to allow web applications access to the HTTP API,
@@ -152,83 +167,10 @@ class ThingServer:
             f"There are {len(instances)} Things of class {cls}, expected 1."
         )
 
-    def add_thing(
-        self,
-        name: str,
-        thing_subclass: type[ThingSubclass],
-        args: Sequence[Any] | None = None,
-        kwargs: Mapping[str, Any] | None = None,
-        thing_connections: Mapping[str, str | Iterable[str] | None] | None = None,
-    ) -> ThingSubclass:
-        r"""Add a thing to the server.
-
-        This function will create an instance of ``thing_subclass`` and supply
-        the ``args`` and ``kwargs`` arguments to its ``__init__`` method. That
-        instance will then be added to the server with the given name.
-
-        :param name: The name to use for the thing. This will be part of the URL
-            used to access the thing, and must only contain alphanumeric characters,
-            hyphens and underscores.
-        :param thing_subclass: The `.Thing` subclass to add to the server.
-        :param args: positional arguments to pass to the constructor of
-            ``thing_subclass``\ .
-        :param kwargs: keyword arguments to pass to the constructor of
-            ``thing_subclass``\ .
-        :param thing_connections: a mapping that sets up the `.thing_connection`\ s.
-            Keys are the names of attributes of the `.Thing` and the values are
-            the name(s) of the `.Thing`\ (s) you'd like to connect. If this is left
-            at its default, the connections will use their default behaviour, usually
-            automatically connecting to a `.Thing` of the right type.
-
-        :returns: the instance of ``thing_subclass`` that was created and added
-            to the server. There is no need to retain a reference to this, as it
-            is stored in the server's dictionary of `.Thing` instances.
-
-        :raise ValueError: if ``path`` contains invalid characters.
-        :raise KeyError: if a `.Thing` has already been added at ``path``\ .
-        :raise TypeError: if ``thing_subclass`` is not a subclass of `.Thing`
-            or if ``name`` is not string-like. This usually means arguments
-            are being passed the wrong way round.
-        """
-        if not isinstance(name, str):
-            raise TypeError("Thing names must be strings.")
-        if PATH_REGEX.match(name) is None:
-            msg = (
-                f"'{name}' contains unsafe characters. Use only alphanumeric "
-                "characters, hyphens and underscores"
-            )
-            raise ValueError(msg)
-        if name in self._things:
-            raise KeyError(f"{name} has already been added to this thing server.")
-        if not issubclass(thing_subclass, Thing):
-            raise TypeError(f"{thing_subclass} is not a Thing subclass.")
-        if args is None:
-            args = []
-        if kwargs is None:
-            kwargs = {}
-        interface = ThingServerInterface(name=name, server=self)
-        os.makedirs(interface.settings_folder, exist_ok=True)
-        # This is where we instantiate the Thing
-        # I've had to ignore this line because the *args causes an error.
-        # Given that *args and **kwargs are very loosely typed anyway, this
-        # doesn't lose us much.
-        thing = thing_subclass(
-            *args,
-            **kwargs,
-            thing_server_interface=interface,
-        )  # type: ignore[misc]
-        self._things[name] = thing
-        if thing_connections is not None:
-            self.thing_connections[name] = thing_connections
-        thing.attach_to_server(
-            server=self,
-        )
-        return thing
-
     def path_for_thing(self, name: str) -> str:
         """Return the path for a thing with the given name.
 
-        :param name: The name of the thing, as passed to `.add_thing`.
+        :param name: The name of the thing.
 
         :return: The path at which the thing is served.
 
@@ -238,27 +180,64 @@ class ThingServer:
             raise KeyError(f"No thing named {name} has been added to this server.")
         return f"/{name}/"
 
-    def _connect_things(self) -> None:
-        """Connect the `thing_connection` attributes of Things.
+    def _create_things(self) -> Mapping[str, Thing]:
+        r"""Create the Things, add them to the server, and connect them up if needed.
 
-        A `.Thing` may have attributes defined as ``lt.thing_connection()``, which
+        This method is responsible for creating instances of `.Thing` subclasses
+        and adding them to the server. It also ensures the `.Thing`\ s are connected
+        together if required.
+
+        The Things are defined in ``self._config.thing_configs`` which in turn is
+        generated from the ``things`` argument to ``__init__``\ .
+
+        :return: A mapping of names to `.Thing` instances.
+
+        :raise TypeError: if ``cls`` is not a subclass of `.Thing`.
+        """
+        things: dict[str, Thing] = {}
+        for name, config in self._config.thing_configs.items():
+            if not issubclass(config.cls, Thing):
+                raise TypeError(f"{config.cls} is not a Thing subclass.")
+            interface = ThingServerInterface(name=name, server=self)
+            os.makedirs(interface.settings_folder, exist_ok=True)
+            # This is where we instantiate the Thing
+            things[name] = config.cls(
+                *config.args,
+                **config.kwargs,
+                thing_server_interface=interface,
+            )
+        return things
+
+    def _connect_things(self) -> None:
+        r"""Connect the `thing_slot` attributes of Things.
+
+        A `.Thing` may have attributes defined as ``lt.thing_slot()``, which
         will be populated after all `.Thing` instances are loaded on the server.
 
         This function is responsible for supplying the `.Thing` instances required
         for each connection. This will be done by using the name specified either
         in the connection's default, or in the configuration of the server.
 
-        `.ThingConnectionError` will be raised by code called by this method if
-        the connection cannot be provided. See `.ThingConnection.connect` for more
+        `.ThingSlotError` will be raised by code called by this method if
+        the connection cannot be provided. See `.ThingSlot.connect` for more
         details.
         """
         for thing_name, thing in self.things.items():
-            config = self.thing_connections.get(thing_name, {})
+            config = self._config.thing_configs[thing_name].thing_slots
             for attr_name, attr in class_attributes(thing):
-                if not isinstance(attr, ThingConnection):
+                if not isinstance(attr, ThingSlot):
                     continue
                 target = config.get(attr_name, ...)
                 attr.connect(thing, self.things, target)
+
+    def _attach_things_to_server(self) -> None:
+        """Add the Things to the FastAPI App.
+
+        This calls `.Thing.attach_to_server` on each `.Thing` that is a part of
+        this `.ThingServer` in order to add the HTTP endpoints and load settings.
+        """
+        for thing in self.things.values():
+            thing.attach_to_server(self)
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
@@ -285,10 +264,6 @@ class ThingServer:
             # in the event loop.
             self.blocking_portal = portal
 
-            # Now we need to connect any ThingConnections. This is done here so that
-            # all of the Things are already created and added to the server.
-            self._connect_things()
-
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
             # and shut down the hardware. NB we must make sure the blocking portal
@@ -300,7 +275,7 @@ class ThingServer:
 
         self.blocking_portal = None
 
-    def add_things_view_to_app(self) -> None:
+    def _add_things_view_to_app(self) -> None:
         """Add an endpoint that shows the list of attached things."""
         thing_server = self
 
@@ -342,39 +317,3 @@ class ThingServer:
                 t: f"{str(request.base_url).rstrip('/')}{t}"
                 for t in thing_server.things.keys()
             }
-
-
-def server_from_config(config: dict) -> ThingServer:
-    r"""Create a ThingServer from a configuration dictionary.
-
-    This function creates a `.ThingServer` and adds a number of `.Thing`
-    instances from a configuration dictionary.
-
-    :param config: A dictionary, in the format used by :ref:`config_files`
-
-    :return: A `.ThingServer` with instances of the specified `.Thing`
-        subclasses attached. The server will not be started by this
-        function.
-
-    :raise ImportError: if a Thing could not be loaded from the specified
-        object reference.
-    """
-    server = ThingServer(config.get("settings_folder", None))
-    for name, thing in config.get("things", {}).items():
-        if isinstance(thing, str):
-            thing = {"class": thing}
-        try:
-            cls = object_reference_to_object(thing["class"])
-        except ImportError as e:
-            raise ImportError(
-                f"Could not import {thing['class']}, which was "
-                f"specified as the class for {name}."
-            ) from e
-        server.add_thing(
-            name=name,
-            thing_subclass=cls,
-            args=thing.get("args", ()),
-            kwargs=thing.get("kwargs", {}),
-            thing_connections=thing.get("thing_connections", {}),
-        )
-    return server
