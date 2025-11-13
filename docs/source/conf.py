@@ -23,6 +23,7 @@ extensions = [
     # "autodoc2",
     "autoapi.extension",
     "sphinx_rtd_theme",
+    "sphinx_toolbox.decorators",
 ]
 
 templates_path = ["_templates"]
