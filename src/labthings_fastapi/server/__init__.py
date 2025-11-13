@@ -187,13 +187,12 @@ class ThingServer:
         and adding them to the server. It also ensures the `.Thing`\ s are connected
         together if required.
 
-        The Things are defined in ``self._things_config`` which in turn is generated
-        from the ``things`` argument to ``__init__``\ .
+        The Things are defined in ``self._config.thing_configs`` which in turn is
+        generated from the ``things`` argument to ``__init__``\ .
 
         :return: A mapping of names to `.Thing` instances.
 
-        :raise TypeError: if ``cls`` is not a subclass of `.Thing`
-            or if ``name`` is not string-like.
+        :raise TypeError: if ``cls`` is not a subclass of `.Thing`.
         """
         things: dict[str, Thing] = {}
         for name, config in self._config.thing_configs.items():
