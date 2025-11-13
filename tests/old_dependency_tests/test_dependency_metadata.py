@@ -84,7 +84,7 @@ def test_fresh_metadata(client):
 
 def test_fresh_metadata_deprecated(client):
     """Test that the old metadata dependency retrieves fresh metadata."""
-    r = client.post("/thing_two/count_and_watch")
+    r = client.post("/thing_two/count_and_watch_deprecated") 
     invocation = poll_task(client, r.json())
     assert invocation["status"] == "completed"
     out = invocation["output"]
