@@ -61,6 +61,10 @@ INVALID_THING_NAMES = [
     "special * chars",
     False,
     1,
+    "/",
+    "thing/with/slashes",
+    "trailingslash/",
+    "/leadingslash",
 ]
 
 
