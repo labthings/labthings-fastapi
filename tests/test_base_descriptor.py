@@ -1,11 +1,14 @@
+import gc
 import pytest
 from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
+    FieldTypedBaseDescriptor,
     DescriptorNotAddedToClassError,
     DescriptorAddedToClassTwiceError,
     get_class_attribute_docstrings,
 )
 from .utilities import raises_or_is_caused_by
+from labthings_fastapi.exceptions import MissingTypeError, InconsistentTypeError
 
 
 class MockProperty(BaseDescriptor[str]):
@@ -284,3 +287,165 @@ def test_decorator_different_names():
     assert "prop" in str(excinfo.value)
     assert "FirstExampleClass" in str(excinfo.value)
     assert "SecondExampleClass" in str(excinfo.value)
+
+
+class CustomType:
+    """A custom datatype."""
+
+    pass
+
+
+class FieldTypedExample:
+    """An example with field-typed descriptors."""
+
+    int_or_str_prop: int | str = FieldTypedBaseDescriptor()
+    int_or_str_subscript = FieldTypedBaseDescriptor[int | str]()
+    int_or_str_stringified: "int | str" = FieldTypedBaseDescriptor()
+    customprop: CustomType = FieldTypedBaseDescriptor()
+    customprop_subscript = FieldTypedBaseDescriptor[CustomType]()
+    futureprop: "FutureType" = FieldTypedBaseDescriptor()
+
+
+class FutureType:
+    """A custom datatype, defined after the descriptor."""
+
+    pass
+
+
+@pytest.mark.parametrize(
+    ("name", "value_type"),
+    [
+        ("int_or_str_prop", int | str),
+        ("int_or_str_subscript", int | str),
+        ("int_or_str_stringified", int | str),
+        ("customprop", CustomType),
+        ("customprop_subscript", CustomType),
+        ("futureprop", FutureType),
+    ],
+)
+def test_fieldtyped_definition(name, value_type):
+    """Test that field-typed descriptors pick up their type correctly."""
+    prop = getattr(FieldTypedExample, name)
+    assert prop.name == name
+    assert prop.value_type == value_type
+
+
+def test_fieldtyped_missingtype():
+    """Check the right error is raised when no type can be found."""
+    with raises_or_is_caused_by(MissingTypeError) as excinfo:
+
+        class Example2:
+            field2 = FieldTypedBaseDescriptor()
+
+    msg = str(excinfo.value)
+    assert msg.startswith("No type hint was found")
+    # We check the field name is included, because the exception will
+    # arise from the end of the class definition, rather than the line
+    # where the field is defined.
+    assert "field2" in msg
+
+    # This one defines OK, but should error when we access its type.
+    # Note that Ruff already spots the bad forward reference, hence the
+    # directive to ignore F821.
+    class Example3:
+        field3: "BadForwardReference" = FieldTypedBaseDescriptor()  # noqa: F821
+        field4: "int" = FieldTypedBaseDescriptor()
+        field5: "int" = FieldTypedBaseDescriptor()
+
+    with pytest.raises(MissingTypeError) as excinfo:
+        _ = Example3.field3.value_type
+
+    msg = str(excinfo.value)
+    assert "resolve forward ref" in msg
+    assert "field3" in msg
+
+    # If we try to resolve a forward reference and the owner is None, it
+    # should raise an error.
+    # I don't see how this could happen in practice, _owner is always
+    # set if we find a forward reference.
+    # We force this error condition by manually setting _owner to None
+    Example3.field4._owner = None
+
+    with pytest.raises(MissingTypeError) as excinfo:
+        _ = Example3.field4.value_type
+
+    msg = str(excinfo.value)
+    assert "resolve forward ref" in msg
+    assert "wasn't saved" in msg
+    assert "field4" in msg
+
+    # We reuse field4 but manually set _type and _unevaluated_type_hint
+    # to None, to test the catch-all error
+    Example3.field4._unevaluated_type_hint = None
+    Example3.field4._type = None
+
+    with pytest.raises(MissingTypeError) as excinfo:
+        _ = Example3.field4.value_type
+
+    msg = str(excinfo.value)
+    assert "bug in LabThings" in msg
+    assert "caught before now" in msg
+    assert "field4" in msg
+
+    # If the class is finalised before we evaluate type hints, we should
+    # get a MissingTypeError. This probably only happens on dynamically
+    # generated classes, and I think it's unlikely we'd dynamically generate
+    # Thing subclasses in a way that they go out of scope.
+    prop = Example3.field5
+    del Example3
+    gc.collect()
+
+    with pytest.raises(MissingTypeError) as excinfo:
+        _ = prop.value_type
+
+    msg = str(excinfo.value)
+    assert "resolve forward ref" in msg
+    assert "garbage collected" in msg
+    assert "field5" in msg
+
+    # Rather than roll my own evaluator for forward references, we just
+    # won't support forward references in subscripted types for now.
+    with raises_or_is_caused_by(MissingTypeError) as excinfo:
+
+        class Example4:
+            field6 = FieldTypedBaseDescriptor["str"]()
+
+    msg = str(excinfo.value)
+    assert "forward reference" in msg
+    assert "not supported as subscripts"
+    assert "field6" in msg
+
+
+def test_mismatched_types():
+    """Check two type hints that don't match raises an error."""
+    with raises_or_is_caused_by(InconsistentTypeError):
+
+        class Example3:
+            field: int = FieldTypedBaseDescriptor[str]()
+
+
+def test_double_specified_types():
+    """Check two type hints that match are allowed.
+
+    This is a very odd thing to do, but it feels right to allow
+    it, provided the types are an exact match.
+    """
+
+    class Example4:
+        field: int | None = FieldTypedBaseDescriptor[int | None]()
+
+    assert Example4.field.value_type == int | None
+
+
+def test_stringified_vs_unstringified_mismatch():
+    """Test that string type hints don't match non-string ones.
+
+    This behaviour may change in the future - but this test is here
+    to make sure that, if it does, we are changing it deliberately.
+    If a descriptor is typed using both a subscript and a field
+    annotation, they should match -
+    """
+    with raises_or_is_caused_by(InconsistentTypeError):
+
+        class Example5:
+            field: "int" = FieldTypedBaseDescriptor[int]()

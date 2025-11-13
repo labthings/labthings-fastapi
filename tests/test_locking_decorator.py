@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 from .temp_client import poll_task
 
 
@@ -35,8 +36,9 @@ class LockedExample(lt.Thing):
 
     flag: bool = lt.property(default=False)
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Initialise the lock."""
+        super().__init__(**kwargs)
         self._lock = RLock()  # This lock is used by @requires_lock
         self._event = Event()  # This is used to keep tests quick
         # by stopping waits as soon as they are no longer needed
@@ -70,8 +72,7 @@ class LockedExample(lt.Thing):
 @pytest.fixture
 def thing(mocker) -> LockedExample:
     """Instantiate the LockedExample thing."""
-    thing = LockedExample()
-    thing._labthings_blocking_portal = mocker.Mock()
+    thing = create_thing_without_server(LockedExample)
     return thing
 
 
@@ -114,9 +115,8 @@ def echo_via_client(client):
 
 def test_locking_in_server():
     """Check the lock works within LabThings."""
-    server = lt.ThingServer()
-    thing = LockedExample()
-    server.add_thing(thing, "/thing")
+    server = lt.ThingServer({"thing": LockedExample})
+    thing = server.things["thing"]
     with TestClient(server.app) as client:
         # Start a long task
         r1 = client.post("/thing/wait_wrapper", json={})

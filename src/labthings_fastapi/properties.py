@@ -58,7 +58,6 @@ from typing import (
     TYPE_CHECKING,
 )
 from typing_extensions import Self
-import typing
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
@@ -73,10 +72,11 @@ from .thing_description._model import (
 )
 from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
-from .base_descriptor import BaseDescriptor
+from .base_descriptor import FieldTypedBaseDescriptor
 from .exceptions import (
     NotConnectedToServerError,
     ReadOnlyPropertyError,
+    MissingTypeError,
 )
 
 if TYPE_CHECKING:
@@ -85,14 +85,15 @@ if TYPE_CHECKING:
 
 # Note on ignored linter codes:
 #
-# D103 refers to missing docstrings. I have ignored this on @overload definitions
-# because they shouldn't have docstrings - the docstring belongs only on the
-# function they overload.
-# D105 is the same as D103, but for __init__ (i.e. magic methods).
-# DOC101 and DOC103 are also a result of overloads not having docstrings
-# DOC201 is ignored on properties. Because we are overriding the
-# builtin `property`, we are using `@builtins.property` which is not recognised
-# by pydoclint as a property. I've therefore ignored those codes manually.
+# DOC101 and DOC103 are a result of overloads not having docstrings. While
+#     the related D codes (checked by Ruff) don't flag overloads, pydoclint
+#     doesn't ignore overloads. This is most likely a pydoclint bug that
+#     we are working around.
+# DOC201 is ignored on properties.
+#     Because we are overriding the
+#     builtin `property`, we are using `@builtins.property` which is not
+#     recognised by pydoclint as a property. I've therefore ignored those
+#     codes manually.
 # pydocstyle ("D" codes) is run in Ruff and correctly recognises
 # builtins.property as a property decorator.
 
@@ -111,23 +112,6 @@ class MissingDefaultError(ValueError):
 
     This error is raised when a `.DataProperty` is instantiated without a
     ``default`` value or a ``default_factory`` function.
-    """
-
-
-class InconsistentTypeError(TypeError):
-    """Different type hints have been given for a property.
-
-    Every property should have a type hint, which may be provided in a few
-    different ways. If multiple type hints are provided, they must match.
-    See `.property` for more details.
-    """
-
-
-class MissingTypeError(TypeError):
-    """No type hints have been given for a property.
-
-    Every property should have a type hint, which may be provided in a few
-    different ways. This error indicates that no type hint was found.
     """
 
 
@@ -207,19 +191,17 @@ def default_factory_from_arguments(
 
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
-def property(  # noqa: D103
+def property(
     getter: Callable[[Any], Value],
 ) -> FunctionalProperty[Value]: ...
 
 
 @overload  # use as `field: int = property(default=0)`
-def property(  # noqa: D103
-    *, default: Value, readonly: bool = False
-) -> Value: ...
+def property(*, default: Value, readonly: bool = False) -> Value: ...
 
 
 @overload  # use as `field: int = property(default_factory=lambda: 0)`
-def property(  # noqa: D103
+def property(
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 
@@ -320,7 +302,7 @@ def property(
     )
 
 
-class BaseProperty(BaseDescriptor[Value], Generic[Value]):
+class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
     """A descriptor that marks Properties on Things.
 
     This class is used to determine whether an attribute of a `.Thing` should
@@ -334,20 +316,8 @@ class BaseProperty(BaseDescriptor[Value], Generic[Value]):
     def __init__(self) -> None:
         """Initialise a BaseProperty."""
         super().__init__()
-        self._type: type | None = None
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
-
-    @builtins.property
-    def value_type(self) -> type[Value]:
-        """The type of this descriptor's value.
-
-        :raises MissingTypeError: if the type has not been set.
-        :return: the type of the descriptor's value.
-        """
-        if self._type is None:
-            raise MissingTypeError("This property does not have a valid type.")
-        return self._type
 
     @builtins.property
     def model(self) -> type[BaseModel]:
@@ -480,12 +450,12 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     """
 
     @overload
-    def __init__(  # noqa: D105,D107,DOC101,DOC103
+    def __init__(  # noqa: DOC101,DOC103
         self, default: Value, *, readonly: bool = False
     ) -> None: ...
 
     @overload
-    def __init__(  # noqa: D105,D107,DOC101,DOC103
+    def __init__(  # noqa: DOC101,DOC103
         self, *, default_factory: ValueFactory, readonly: bool = False
     ) -> None: ...
 
@@ -531,73 +501,6 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             default=default, default_factory=default_factory
         )
         self.readonly = readonly
-        self._type: type | None = None  # Will be set in __set_name__
-
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
-        """Take note of the name and type.
-
-        This function is where we determine the type of the property. It may
-        be specified in two ways: either by subscripting ``DataProperty``
-        or by annotating the attribute:
-
-        .. code-block:: python
-
-            class MyThing(Thing):
-                subscripted_property = DataProperty[int](0)
-                annotated_property: int = DataProperty(0)
-
-        The second form often works better with autocompletion, though it is
-        preferred to use `.property` for consistent naming.
-
-        Neither form allows us to access the type during ``__init__``, which
-        is why we find the type here. If there is a problem, exceptions raised
-        will appear to come from the class definition, so it's important to
-        include the name of the attribute.
-
-        See :ref:`descriptors` for links to the Python docs about when
-        this function is called.
-
-        :param owner: the `.Thing` subclass to which we are being attached.
-        :param name: the name to which we have been assigned.
-
-        :raises InconsistentTypeError: if the type is specified twice and
-            the two types are not identical.
-        :raises MissingTypeError: if no type hints have been given.
-        """
-        # Call BaseDescriptor so we remember the name
-        super().__set_name__(owner, name)
-
-        # Check for type subscripts
-        if hasattr(self, "__orig_class__"):
-            # We have been instantiated with a subscript, e.g. BaseProperty[int].
-            #
-            # __orig_class__ is set on generic classes when they are instantiated
-            # with a subscripted type.
-            self._type = typing.get_args(self.__orig_class__)[0]
-
-        # Check for annotations on the parent class
-        annotations = typing.get_type_hints(owner, include_extras=True)
-        field_annotation = annotations.get(name, None)
-        if field_annotation is not None:
-            # We have been assigned to an annotated class attribute, e.g.
-            # myprop: int = BaseProperty(0)
-            if self._type is not None and self._type != field_annotation:
-                raise InconsistentTypeError(
-                    f"Property {name} on {owner} has conflicting types.\n\n"
-                    f"The field annotation of {field_annotation} conflicts "
-                    f"with the inferred type of {self._type}."
-                )
-            self._type = field_annotation
-        if self._type is None:
-            raise MissingTypeError(
-                f"No type hint was found for property {name} on {owner}."
-            )
-
-    @builtins.property
-    def value_type(self) -> type[Value]:  # noqa: DOC201
-        """The type of the descriptor's value."""
-        self.assert_set_name_called()
-        return super().value_type
 
     def instance_get(self, obj: Thing) -> Value:
         """Return the property's value.
@@ -652,21 +555,13 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         thread as it is communicating with the event loop via an `asyncio` blocking
         portal and can cause deadlock if run in the event loop.
 
+        This method will raise a `.ServerNotRunningError` if the event loop is not
+        running, and should only be called after the server has started.
+
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
-
-        :raise NotConnectedToServerError: if the Thing that is calling the property
-            update is not connected to a server with a running event loop.
         """
-        runner = obj._labthings_blocking_portal
-        if not runner:
-            thing_name = obj.__class__.__name__
-            msg = (
-                f"Cannot emit property updated changed event. Is {thing_name} "
-                "connected to a running server?"
-            )
-            raise NotConnectedToServerError(msg)
-        runner.start_task_soon(
+        obj._thing_server_interface.start_async_task_soon(
             self.emit_changed_event_async,
             obj,
             value,
@@ -709,10 +604,18 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         tools understand that it functions like a property.
 
         :param fget: the getter function, called when the property is read.
+
+        :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__()
         self._fget: ValueGetter = fget
         self._type = return_type(self._fget)
+        if self._type is None:
+            msg = (
+                f"{fget} does not have a valid type. "
+                "Return type annotations are required for property getters."
+            )
+            raise MissingTypeError(msg)
         self._fset: ValueSetter | None = None
         self.readonly: bool = True
 
@@ -752,7 +655,8 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         .. code-block:: python
 
             class MyThing(lt.Thing):
-                def __init__(self):
+                def __init__(self, thing_server_interface):
+                    super().__init__(thing_server_interface=thing_server_interface)
                     self._myprop: int = 0
 
                 @lt.property
@@ -833,19 +737,17 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
 
 @overload  # use as a decorator  @setting
-def setting(  # noqa: D103
+def setting(
     getter: Callable[[Any], Value],
 ) -> FunctionalSetting[Value]: ...
 
 
 @overload  # use as `field: int = setting(default=0)``
-def setting(  # noqa: D103
-    *, default: Value, readonly: bool = False
-) -> Value: ...
+def setting(*, default: Value, readonly: bool = False) -> Value: ...
 
 
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`
-def setting(  # noqa: D103
+def setting(
     *, default_factory: Callable[[], Value], readonly: bool = False
 ) -> Value: ...
 

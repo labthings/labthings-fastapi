@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from fastapi import Request
 import pytest
 import labthings_fastapi as lt
-from .temp_client import poll_task
+from ..temp_client import poll_task
 from labthings_fastapi.client.in_server import direct_thing_client_class
 from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 
@@ -24,7 +24,7 @@ class ThingOne(lt.Thing):
         return self.ACTION_ONE_RESULT
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):
@@ -39,7 +39,7 @@ class ThingTwo(lt.Thing):
         return thing_one.action_one()
 
 
-ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "/thing_two/")
+ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "thing_two")
 
 
 class ThingThree(lt.Thing):
@@ -57,8 +57,8 @@ def dependency_names(func: callable) -> list[str]:
 
 def test_direct_thing_dependency():
     """Check that direct thing clients are distinct classes"""
-    ThingOneClient = direct_thing_client_class(ThingOne, "/thing_one/")
-    ThingTwoClient = direct_thing_client_class(ThingTwo, "/thing_two/")
+    ThingOneClient = direct_thing_client_class(ThingOne, "thing_one")
+    ThingTwoClient = direct_thing_client_class(ThingTwo, "thing_two")
     print(f"{ThingOneClient}: ThingOneClient{inspect.signature(ThingOneClient)}")
     for k in dir(ThingOneClient):
         if k.startswith("__"):
@@ -80,9 +80,7 @@ def test_interthing_dependency():
 
     This uses the internal thing client mechanism.
     """
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    server.add_thing(ThingTwo(), "/thing_two")
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
     with TestClient(server.app) as client:
         r = client.post("/thing_two/action_two")
         invocation = poll_task(client, r.json())
@@ -96,10 +94,9 @@ def test_interthing_dependency_with_dependencies():
     This uses the internal thing client mechanism, and requires
     dependency injection for the called action
     """
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    server.add_thing(ThingTwo(), "/thing_two")
-    server.add_thing(ThingThree(), "/thing_three")
+    server = lt.ThingServer(
+        {"thing_one": ThingOne, "thing_two": ThingTwo, "thing_three": ThingThree}
+    )
     with TestClient(server.app) as client:
         r = client.post("/thing_three/action_three")
         r.raise_for_status()
@@ -121,9 +118,7 @@ def test_raw_interthing_dependency():
             """An action that needs a ThingOne"""
             return thing_one.action_one()
 
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one")
-    server.add_thing(ThingTwo(), "/thing_two")
+    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
     with TestClient(server.app) as client:
         r = client.post("/thing_two/action_two")
         invocation = poll_task(client, r.json())
@@ -153,7 +148,7 @@ def test_conflicting_dependencies():
             return thing_two.action_two()
 
     with pytest.raises(lt.client.in_server.DependencyNameClashError):
-        lt.deps.direct_thing_client_dependency(ThingFour, "/thing_four/")
+        lt.deps.direct_thing_client_dependency(ThingFour, "thing_four")
 
 
 def check_request():

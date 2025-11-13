@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, RootModel
 import numpy as np
 
+from labthings_fastapi.thing_server_interface import create_thing_without_server
 from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
 import labthings_fastapi as lt
 
@@ -63,19 +64,21 @@ def test_0d():
 
 
 class MyNumpyThing(lt.Thing):
+    """A thing that uses numpy types."""
+
     @lt.thing_action
     def action_with_arrays(self, a: NDArray) -> NDArray:
         return a * 2
 
 
 def test_thing_description():
-    thing = MyNumpyThing()
-    # We must mock a path, or it can't generate a Thing Description.
-    thing.path = "/mynumpything"
+    """Make sure the TD validates when numpy types are used."""
+    thing = create_thing_without_server(MyNumpyThing)
     assert thing.validate_thing_description() is None
 
 
 def test_denumpifying_dict():
+    """Check DenumpifyingDict converts arrays to lists."""
     d = DenumpifyingDict(
         root={
             "a": np.array([1, 2, 3]),
@@ -94,6 +97,7 @@ def test_denumpifying_dict():
 
 
 def test_rootmodel():
+    """Check that RootModels with NDArray convert between array and list."""
     for input in [[0, 1, 2], np.arange(3)]:
         m = ArrayModel(root=input)
         assert isinstance(m.root, np.ndarray)

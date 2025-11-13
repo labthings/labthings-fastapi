@@ -31,10 +31,7 @@ class TestThing(lt.Thing):
 if __name__ == "__main__":
     import uvicorn
 
-    server = lt.ThingServer()
-
-    # The line below creates a TestThing instance and adds it to the server
-    server.add_thing(TestThing(), "/counter/")
+    server = lt.ThingServer({"counter": TestThing})
 
     # We run the server using `uvicorn`:
     uvicorn.run(server.app, port=5000)

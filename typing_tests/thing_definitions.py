@@ -26,6 +26,8 @@ from labthings_fastapi.properties import FunctionalProperty
 from typing_extensions import assert_type
 import typing
 
+from labthings_fastapi.thing_server_interface import create_thing_without_server
+
 
 def optional_int_factory() -> int | None:
     """Return an optional int."""
@@ -107,7 +109,8 @@ class TestPropertyDefaultsMatch(lt.Thing):
 
 
 # Check that the type hints on an instance of the class are correct.
-test_defaults_match = TestPropertyDefaultsMatch()
+test_defaults_match = create_thing_without_server(TestPropertyDefaultsMatch)
+assert_type(test_defaults_match, TestPropertyDefaultsMatch)
 assert_type(test_defaults_match.intprop, int)
 assert_type(test_defaults_match.intprop2, int)
 assert_type(test_defaults_match.intprop3, int)
@@ -167,7 +170,8 @@ class TestExplicitDescriptor(lt.Thing):
 
 
 # Check instance attributes are typed correctly.
-test_explicit_descriptor = TestExplicitDescriptor()
+test_explicit_descriptor = create_thing_without_server(TestExplicitDescriptor)
+assert_type(test_explicit_descriptor, TestExplicitDescriptor)
 assert_type(test_explicit_descriptor.intprop1, int)
 assert_type(test_explicit_descriptor.intprop2, int)
 assert_type(test_explicit_descriptor.intprop3, int)
@@ -270,7 +274,8 @@ assert_type(TestFunctionalProperty.fprop, FunctionalProperty[int])
 # Don't check ``strprop`` because it caused an error and thus will
 # not have the right type, even though the error is ignored.
 
-test_functional_property = TestFunctionalProperty()
+test_functional_property = create_thing_without_server(TestFunctionalProperty)
+assert_type(test_functional_property, TestFunctionalProperty)
 assert_type(test_functional_property.intprop1, int)
 assert_type(test_functional_property.intprop2, int)
 assert_type(test_functional_property.intprop3, int)

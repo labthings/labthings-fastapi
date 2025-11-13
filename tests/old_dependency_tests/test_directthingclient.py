@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.deps import DirectThingClient, direct_thing_client_class
-from .temp_client import poll_task
+from labthings_fastapi.thing_server_interface import create_thing_without_server
+from ..temp_client import poll_task
 
 
 class Counter(lt.Thing):
@@ -40,10 +41,9 @@ def counter_client(mocker) -> DirectThingClient:
     :param mocker: the mocker test fixture from ``pytest-mock``\ .
     :returns: a ``DirectThingClient`` subclass wrapping a ``Counter``\ .
     """
-    counter = Counter()
-    counter._labthings_blocking_portal = mocker.Mock(["start_task_soon"])
+    counter = create_thing_without_server(Counter)
 
-    CounterClient = direct_thing_client_class(Counter, "/counter")
+    CounterClient = direct_thing_client_class(Counter, "counter")
 
     class StandaloneCounterClient(CounterClient):
         def __init__(self, wrapped):
@@ -54,7 +54,7 @@ def counter_client(mocker) -> DirectThingClient:
     return StandaloneCounterClient(counter)
 
 
-CounterDep = lt.deps.direct_thing_client_dependency(Counter, "/counter/")
+CounterDep = lt.deps.direct_thing_client_dependency(Counter, "counter")
 RawCounterDep = lt.deps.raw_thing_dependency(Counter)
 
 
@@ -144,9 +144,12 @@ def test_directthingclient_in_server(action):
 
     This uses the internal thing client mechanism.
     """
-    server = lt.ThingServer()
-    server.add_thing(Counter(), "/counter")
-    server.add_thing(Controller(), "/controller")
+    server = lt.ThingServer(
+        {
+            "counter": Counter,
+            "controller": Controller,
+        }
+    )
     with TestClient(server.app) as client:
         r = client.post(f"/controller/{action}")
         invocation = poll_task(client, r.json())

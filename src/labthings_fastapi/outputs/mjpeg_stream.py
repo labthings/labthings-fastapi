@@ -24,11 +24,11 @@ from copy import copy
 from contextlib import asynccontextmanager
 import threading
 import anyio
-from anyio.from_thread import BlockingPortal
 import logging
 
 if TYPE_CHECKING:
     from ..thing import Thing
+    from ..thing_server_interface import ThingServerInterface
 
 
 @dataclass
@@ -126,12 +126,17 @@ class MJPEGStream:
     of new frames, and then retrieving the frame (shortly) afterwards.
     """
 
-    def __init__(self, ringbuffer_size: int = 10) -> None:
+    def __init__(
+        self, thing_server_interface: ThingServerInterface, ringbuffer_size: int = 10
+    ) -> None:
         """Initialise an MJPEG stream.
 
         See the class docstring for `.MJPEGStream`. Note that it will
         often be initialised by `.MJPEGStreamDescriptor`.
 
+        :param thing_server_interface: the `.ThingServerInterface` of the
+            `.Thing` associated with this stream. It's used to run the async
+            code that relays frames to open connections.
         :param ringbuffer_size: The number of frames to retain in
             memory, to allow retrieval after the frame has been sent.
         """
@@ -139,6 +144,7 @@ class MJPEGStream:
         self.condition = anyio.Condition()
         self._streaming = False
         self._ringbuffer: list[RingbufferEntry] = []
+        self._thing_server_interface = thing_server_interface
         self.reset(ringbuffer_size=ringbuffer_size)
 
     def reset(self, ringbuffer_size: Optional[int] = None) -> None:
@@ -161,18 +167,16 @@ class MJPEGStream:
             ]
             self.last_frame_i = -1
 
-    def stop(self, portal: BlockingPortal) -> None:
+    def stop(self) -> None:
         """Stop the stream.
 
         Stop the stream and cause all clients to disconnect.
-
-        :param portal: an `anyio.from_thread.BlockingPortal` that allows
-            this function to use the event loop to notify that the stream
-            should stop.
         """
         with self._lock:
             self._streaming = False
-            portal.start_task_soon(self.notify_stream_stopped)
+            self._thing_server_interface.start_async_task_soon(
+                self.notify_stream_stopped
+            )
 
     async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
         """Return the ith frame acquired by the camera.
@@ -308,7 +312,7 @@ class MJPEGStream:
         """
         return MJPEGStreamResponse(self.frame_async_generator())
 
-    def add_frame(self, frame: bytes, portal: BlockingPortal) -> None:
+    def add_frame(self, frame: bytes) -> None:
         """Add a JPEG to the MJPEG stream.
 
         This function adds a frame to the stream. It may be called from
@@ -317,10 +321,6 @@ class MJPEGStream:
         are handled.
 
         :param frame: The frame to add
-        :param portal: The blocking portal to use for scheduling tasks.
-            This is necessary because tasks are handled asynchronously.
-            The blocking portal may be obtained with a dependency, in
-            `labthings_fastapi.dependencies.blocking_portal.BlockingPortal`.
 
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
@@ -337,7 +337,9 @@ class MJPEGStream:
             entry.timestamp = datetime.now()
             entry.frame = frame
             entry.index = self.last_frame_i + 1
-            portal.start_task_soon(self.notify_new_frame, entry.index)
+            self._thing_server_interface.start_async_task_soon(
+                self.notify_new_frame, entry.index
+            )
 
     async def notify_new_frame(self, i: int) -> None:
         """Notify any waiting tasks that a new frame is available.
@@ -420,7 +422,10 @@ class MJPEGStreamDescriptor:
         try:
             return obj.__dict__[self.name]
         except KeyError:
-            obj.__dict__[self.name] = MJPEGStream(**self._kwargs)
+            obj.__dict__[self.name] = MJPEGStream(
+                **self._kwargs,
+                thing_server_interface=obj._thing_server_interface,
+            )
             return obj.__dict__[self.name]
 
     async def viewer_page(self, url: str) -> HTMLResponse:
@@ -451,8 +456,7 @@ class MJPEGStreamDescriptor:
                 stream = MJPEGStreamDescriptor()
 
 
-            server = lt.ThingServer()
-            server.add_thing(Camera(), "/camera")
+            server = lt.ThingServer({"camera": Camera})
 
         :param app: the `fastapi.FastAPI` application to which we are being added.
         :param thing: the host `.Thing` instance.

@@ -25,12 +25,15 @@ class CounterThing(lt.Thing):
     "A pointless counter"
 
 
-thing = CounterThing()
-server = lt.ThingServer()
-server.add_thing(thing, "/thing")
+@pytest.fixture
+def client():
+    """Yield a TestClient connected to a ThingServer."""
+    server = lt.ThingServer({"thing": CounterThing})
+    with TestClient(server.app) as client:
+        yield client
 
 
-def test_action_expires():
+def test_action_expires(client):
     """Check the action is removed from the server
 
     We've set the retention period to be very short, so the action
@@ -44,23 +47,22 @@ def test_action_expires():
     This behaviour might change in the future, making the second run
     unnecessary.
     """
-    with TestClient(server.app) as client:
-        before_value = client.get("/thing/counter").json()
-        r = client.post("/thing/increment_counter")
-        invocation = poll_task(client, r.json())
-        time.sleep(0.02)
-        r2 = client.post("/thing/increment_counter")
-        poll_task(client, r2.json())
-        after_value = client.get("/thing/counter").json()
-        assert after_value == before_value + 2
-        invocation["status"] = "running"  # Force an extra poll
-        # When the second action runs, the first one should expire
-        # so polling it again should give a 404.
-        with pytest.raises(httpx.HTTPStatusError):
-            poll_task(client, invocation)
+    before_value = client.get("/thing/counter").json()
+    r = client.post("/thing/increment_counter")
+    invocation = poll_task(client, r.json())
+    time.sleep(0.02)
+    r2 = client.post("/thing/increment_counter")
+    poll_task(client, r2.json())
+    after_value = client.get("/thing/counter").json()
+    assert after_value == before_value + 2
+    invocation["status"] = "running"  # Force an extra poll
+    # When the second action runs, the first one should expire
+    # so polling it again should give a 404.
+    with pytest.raises(httpx.HTTPStatusError):
+        poll_task(client, invocation)
 
 
-def test_actions_list():
+def test_actions_list(client):
     """Check that the /action_invocations/ path works.
 
     The /action_invocations/ path should return a list of invocation
@@ -68,10 +70,9 @@ def test_actions_list():
 
     It's implemented in `ActionManager.list_all_invocations`.
     """
-    with TestClient(server.app) as client:
-        r = client.post("/thing/increment_counter_longlife")
-        invocation = poll_task(client, r.json())
-        r2 = client.get(ACTION_INVOCATIONS_PATH)
-        r2.raise_for_status()
-        invocations = r2.json()
-        assert invocations == [invocation]
+    r = client.post("/thing/increment_counter_longlife")
+    invocation = poll_task(client, r.json())
+    r2 = client.get(ACTION_INVOCATIONS_PATH)
+    r2.raise_for_status()
+    invocations = r2.json()
+    assert invocations == [invocation]

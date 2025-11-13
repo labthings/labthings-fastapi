@@ -4,13 +4,14 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 
 from typing import Any, Mapping
 from fastapi.testclient import TestClient
-from .temp_client import poll_task
+import pytest
+from ..temp_client import poll_task
 import labthings_fastapi as lt
 
 
 class ThingOne(lt.Thing):
-    def __init__(self):
-        lt.Thing.__init__(self)
+    def __init__(self, thing_server_interface):
+        super().__init__(thing_server_interface=thing_server_interface)
         self._a = 0
 
     @lt.property
@@ -26,7 +27,7 @@ class ThingOne(lt.Thing):
         return {"a": self.a}
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "/thing_one/")
+ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):
@@ -47,15 +48,25 @@ class ThingTwo(lt.Thing):
         return metadata
 
 
-def test_fresh_metadata():
-    server = lt.ThingServer()
-    server.add_thing(ThingOne(), "/thing_one/")
-    server.add_thing(ThingTwo(), "/thing_two/")
+@pytest.fixture
+def client():
+    """Yield a test client connected to a ThingServer."""
+    server = lt.ThingServer(
+        {
+            "thing_one": ThingOne,
+            "thing_two": ThingTwo,
+        }
+    )
     with TestClient(server.app) as client:
-        r = client.post("/thing_two/count_and_watch")
-        invocation = poll_task(client, r.json())
-        assert invocation["status"] == "completed"
-        out = invocation["output"]
-        for a in ThingTwo.A_VALUES:
-            assert out[f"a_{a}"]["/thing_one/"]["a"] == a
-            assert out[f"a_{a}"]["/thing_two/"]["a"] == 1
+        yield client
+
+
+def test_fresh_metadata(client):
+    """Check that fresh metadata is retrieved by get_thing_states."""
+    r = client.post("/thing_two/count_and_watch")
+    invocation = poll_task(client, r.json())
+    assert invocation["status"] == "completed"
+    out = invocation["output"]
+    for a in ThingTwo.A_VALUES:
+        assert out[f"a_{a}"]["thing_one"]["a"] == a
+        assert out[f"a_{a}"]["thing_two"]["a"] == 1

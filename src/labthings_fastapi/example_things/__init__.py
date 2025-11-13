@@ -137,11 +137,14 @@ class ThingWithBrokenAffordances(Thing):
 class ThingThatCantInstantiate(Thing):
     """A Thing that raises an exception in __init__."""
 
-    def __init__(self) -> None:
-        """Fail to initialise.
+    def __init__(self, **kwargs: Any) -> None:
+        r"""Fail to initialise.
+
+        :param \**kwargs: keyword arguments passed to Thing.__init__
 
         :raise RuntimeError: every time.
         """
+        super().__init__(**kwargs)
         raise RuntimeError("This thing can't be instantiated")
 
 

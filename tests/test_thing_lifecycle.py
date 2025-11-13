@@ -1,8 +1,9 @@
+import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 
 
-class TestThing(lt.Thing):
+class LifecycleThing(lt.Thing):
     alive: bool = lt.property(default=False)
     "Whether the thing is alive."
 
@@ -16,20 +17,28 @@ class TestThing(lt.Thing):
         self.alive = False
 
 
-thing = TestThing()
-server = lt.ThingServer()
-server.add_thing(thing, "/thing")
+@pytest.fixture
+def server():
+    """A ThingServer with a LifecycleThing."""
+    return lt.ThingServer({"thing": LifecycleThing})
 
 
-def test_thing_alive():
+@pytest.fixture
+def thing(server):
+    """The thing attached to our server."""
+    return server.things["thing"]
+
+
+def test_thing_alive(server, thing):
     assert thing.alive is False
     with TestClient(server.app) as client:
+        assert thing.alive is True
         r = client.get("/thing/alive")
         assert r.json() is True
     assert thing.alive is False
 
 
-def test_thing_alive_twice():
+def test_thing_alive_twice(server, thing):
     """It's unlikely we need to stop and restart the server within one
     Python session, except for testing. This test should explicitly make
     sure our lifecycle stuff is closing down cleanly and can restart.

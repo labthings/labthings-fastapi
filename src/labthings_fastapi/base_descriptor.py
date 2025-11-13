@@ -7,15 +7,18 @@ the code that implements it.
 
 from __future__ import annotations
 import ast
+import builtins
 import inspect
 from itertools import pairwise
 import textwrap
 from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
 from types import MappingProxyType
-from weakref import WeakKeyDictionary
+import typing
+from weakref import WeakKeyDictionary, ref, ReferenceType
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
+from .exceptions import MissingTypeError, InconsistentTypeError
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -169,6 +172,7 @@ class BaseDescriptor(Generic[Value]):
 
     def __init__(self) -> None:
         """Initialise a BaseDescriptor."""
+        super().__init__()
         self._name: str | None = None
         self._title: str | None = None
         self._description: str | None = None
@@ -351,6 +355,176 @@ class BaseDescriptor(Generic[Value]):
             "__instance_get__ must be defined on BaseDescriptor subclasses. \n\n"
             "See BaseDescriptor.__instance_get__ for details."
         )
+
+
+class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
+    """A BaseDescriptor that determines its type like a dataclass field."""
+
+    def __init__(self) -> None:
+        """Initialise the FieldTypedBaseDescriptor.
+
+        Very little happens at initialisation time: most of the type determination
+        happens in ``__set_name__`` and ``value_type`` so that type hints can
+        be lazily evaluated.
+        """
+        super().__init__()
+        self._type: type | None = None  # the type of the descriptor's value.
+        # It may be set during __set_name__ if a type is available, or the
+        # first time `self.value_type` is accessed.
+        self._unevaluated_type_hint: str | None = None  # Set in `__set_name__`
+        # Type hints are not un-stringized in `__set_name__` but we remember them
+        # for later evaluation in `value_type`.
+        self._owner: ReferenceType[type] | None = None  # For forward-reference types
+        # When we evaluate the type hints in `value_type` we need a reference to
+        # the object on which they are defined, to provide the context for the
+        # evaluation.
+
+    def __set_name__(self, owner: type[Thing], name: str) -> None:
+        r"""Take note of the name and type.
+
+        This function is where we determine the type of the property. It may
+        be specified in two ways: either by subscripting the descriptor
+        or by annotating the attribute. This example is for ``DataProperty``
+        as this class is not intended to be used directly.
+
+        .. code-block:: python
+
+            class MyThing(Thing):
+                subscripted_property = DataProperty[int](0)
+                annotated_property: int = DataProperty(0)
+
+        The second form often works better with autocompletion, though it
+        is usually called via a function to avoid type checking errors.
+
+        Neither form allows us to access the type during ``__init__``, which
+        is why we find the type here. If there is a problem, exceptions raised
+        will appear to come from the class definition, so it's important to
+        include the name of the attribute.
+
+        See :ref:`descriptors` for links to the Python docs about when
+        this function is called.
+
+        For subscripted types (i.e. the first form above), we use
+        `typing.get_args` to retrieve the value type. This will be evaluated
+        immediately, resolving any forward references.
+
+        We use `typing.get_type_hints` to resolve type hints on the owning
+        class. This takes care of a lot of subtleties like un-stringifying
+        forward references. In order to support forward references, we only
+        check for the existence of a type hint during ``__set_name__`` and
+        will evaluate it fully during ``value_type``\ .
+
+        :param owner: the `.Thing` subclass to which we are being attached.
+        :param name: the name to which we have been assigned.
+
+        :raises InconsistentTypeError: if the type is specified twice and
+            the two types are not identical.
+        :raises MissingTypeError: if no type hints have been given.
+        """
+        # Call BaseDescriptor so we remember the name
+        super().__set_name__(owner, name)
+
+        # Check for type subscripts
+        if hasattr(self, "__orig_class__"):
+            # We have been instantiated with a subscript, e.g. BaseProperty[int].
+            #
+            # __orig_class__ is set on generic classes when they are instantiated
+            # with a subscripted type. It is not available during __init__, which
+            # is why we check for it here.
+            self._type = typing.get_args(self.__orig_class__)[0]
+            if isinstance(self._type, typing.ForwardRef):
+                raise MissingTypeError(
+                    f"{owner}.{name} is a subscripted descriptor, where the "
+                    f"subscript is a forward reference ({self._type}). Forward "
+                    "references are not supported as subscripts."
+                )
+
+        # Check for annotations on the parent class
+        field_annotation = inspect.get_annotations(owner).get(name, None)
+        if field_annotation is not None:
+            # We have been assigned to an annotated class attribute, e.g.
+            # myprop: int = BaseProperty(0)
+            if self._type is not None and self._type != field_annotation:
+                # As a rule, if _type is already set, we don't expect any
+                # annotation on the attribute, so this error should not
+                # be a frequent occurrence.
+                raise InconsistentTypeError(
+                    f"Property {name} on {owner} has conflicting types.\n\n"
+                    f"The field annotation of {field_annotation} conflicts "
+                    f"with the inferred type of {self._type}."
+                )
+            self._unevaluated_type_hint = field_annotation
+            self._owner = ref(owner)
+
+        # Ensure a type is specified.
+        # If we've not set _type by now, we are not going to set it, and the
+        # descriptor will not work properly. It's best to raise an error now.
+        # Note that we need to specify the attribute name, as the exception
+        # will appear to come from the end of the class definition, and not
+        # from the descriptor definition.
+        if self._type is None and self._unevaluated_type_hint is None:
+            raise MissingTypeError(
+                f"No type hint was found for attribute {name} on {owner}."
+            )
+
+    @builtins.property
+    def value_type(self) -> type[Value]:
+        """The type of this descriptor's value.
+
+        This is only available after ``__set_name__`` has been called, which happens
+        at the end of the class definition. If it is called too early, a
+        `.DescriptorNotAddedToClassError` will be raised.
+
+        Accessing this property will attempt to resolve forward references,
+        i.e. type annotations that are strings. If there is an error resolving
+        the forward reference, a `.MissingTypeError` will be raised.
+
+        :return: the type of the descriptor's value.
+        :raises MissingTypeError: if the type is None, not resolvable, or not specified.
+        """
+        self.assert_set_name_called()
+        if self._type is None and self._unevaluated_type_hint is not None:
+            # We have a forward reference, so we need to resolve it.
+            if self._owner is None:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name} because "
+                    "the class on which it was defined wasn't saved. This is a "
+                    "LabThings bug - please report it."
+                )
+            owner = self._owner()
+            if owner is None:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name} because "
+                    "the class on which it was defined has been garbage collected."
+                )
+            try:
+                # Resolving a forward reference has quirks, and rather than tie us
+                # to undocumented implementation details of `typing` we just use
+                # `typing.get_type_hints`.
+                # This isn't efficient (it resolves everything, rather than just
+                # the one annotation we need, and it traverses the MRO when we know
+                # the class we're defined on) but it is part of the public API,
+                # and therefore much less likely to break.
+                #
+                # Note that we already checked there was an annotation in
+                # __set_name__.
+                hints = typing.get_type_hints(owner, include_extras=True)
+                self._type = hints[self.name]
+            except Exception as e:
+                raise MissingTypeError(
+                    f"Can't resolve forward reference for type of {self.name}."
+                ) from e
+        if self._type is None:
+            # We should never reach this line: if `__set_name__` was called, we'd
+            # have raised an exception there if _type was None. If `__set_name__`
+            # has not been called, `self.assert_set_name_called()` would have failed.
+            # This block is required for `mypy` to know that self._type is not None.
+            raise MissingTypeError(
+                f"No type hint was found for property {self.name}. This may indicate "
+                "a bug in LabThings, as the error should have been caught before now."
+            )
+
+        return self._type
 
 
 # get_class_attribute_docstrings is a relatively expensive function that

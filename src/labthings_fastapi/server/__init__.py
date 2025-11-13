@@ -7,32 +7,37 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations
-from typing import AsyncGenerator, Optional, Sequence, TypeVar
-import os.path
-import re
+from typing import AsyncGenerator, Optional, TypeVar
+from typing_extensions import Self
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from ..utilities.object_reference_to_object import (
-    object_reference_to_object,
-)
+from ..thing_slots import ThingSlot
+from ..utilities import class_attributes
+
 from ..actions import ActionManager
+from ..logs import configure_thing_logger
 from ..thing import Thing
+from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers  # noqa: F401
+from .config_model import (
+    ThingsConfig,
+    ThingServerConfig,
+    normalise_things_config as normalise_things_config,
+)
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from ..outputs.blob import BlobDataManager
 
-# A path should be made up of names separated by / as a path separator.
-# Each name should be made of alphanumeric characters, hyphen, or underscore.
-# This regex enforces a trailing /
-PATH_REGEX = re.compile(r"^/([a-zA-Z0-9\-_]+\/)+$")
+
+ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
 
 
 class ThingServer:
@@ -53,8 +58,12 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
-    def __init__(self, settings_folder: Optional[str] = None) -> None:
-        """Initialise a LabThings server.
+    def __init__(
+        self,
+        things: ThingsConfig,
+        settings_folder: Optional[str] = None,
+    ) -> None:
+        r"""Initialise a LabThings server.
 
         Setting up the `.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
@@ -64,28 +73,43 @@ class ThingServer:
         We also create the `.ActionManager` to manage :ref:`actions` and the
         `.BlobManager` to manage the downloading of :ref:`blobs`.
 
+        :param things: A mapping of Thing names to `.Thing` subclasses, or
+            `.ThingConfig` objects specifying the subclass, its initialisation
+            arguments, and any connections to other `.Thing`\ s.
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
         """
+        configure_thing_logger()  # Note: this is safe to call multiple times.
+        self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
         self.app = FastAPI(lifespan=self.lifespan)
-        self.set_cors_middleware()
+        self._set_cors_middleware()
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
         self.blob_data_manager = BlobDataManager()
         self.blob_data_manager.attach_to_app(self.app)
-        self.add_things_view_to_app()
-        self._things: dict[str, Thing] = {}
+        self._add_things_view_to_app()
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
         _thing_servers.add(self)
+        # The function calls below create and set up the Things.
+        self._things = self._create_things()
+        self._connect_things()
+        self._attach_things_to_server()
 
-    app: FastAPI
-    action_manager: ActionManager
-    blob_data_manager: BlobDataManager
+    @classmethod
+    def from_config(cls, config: ThingServerConfig) -> Self:
+        r"""Create a ThingServer from a configuration model.
 
-    def set_cors_middleware(self) -> None:
+        This is equivalent to ``ThingServer(**dict(config))``\ .
+
+        :param config: The configuration parameters for the server.
+        :return: A `.ThingServer` configured as per the model.
+        """
+        return cls(**dict(config))
+
+    def _set_cors_middleware(self) -> None:
         """Configure the server to allow requests from other origins.
 
         This is required to allow web applications access to the HTTP API,
@@ -143,35 +167,77 @@ class ThingServer:
             f"There are {len(instances)} Things of class {cls}, expected 1."
         )
 
-    def add_thing(self, thing: Thing, path: str) -> None:
-        """Add a thing to the server.
+    def path_for_thing(self, name: str) -> str:
+        """Return the path for a thing with the given name.
 
-        :param thing: The `.Thing` instance to add to the server.
-        :param path: the relative path to access the thing on the server. Must only
-            contain alphanumeric characters, hyphens, or underscores.
+        :param name: The name of the thing.
 
-        :raise ValueError: if ``path`` contains invalid characters.
-        :raise KeyError: if a `.Thing` has already been added at ``path``.
+        :return: The path at which the thing is served.
+
+        :raise KeyError: if no thing with the given name has been added.
         """
-        # Ensure leading and trailing /
-        if not path.endswith("/"):
-            path += "/"
-        if not path.startswith("/"):
-            path = "/" + path
-        if PATH_REGEX.match(path) is None:
-            msg = (
-                f"{path} contains unsafe characters. Use only alphanumeric "
-                "characters, hyphens and underscores"
+        if name not in self._things:
+            raise KeyError(f"No thing named {name} has been added to this server.")
+        return f"/{name}/"
+
+    def _create_things(self) -> Mapping[str, Thing]:
+        r"""Create the Things, add them to the server, and connect them up if needed.
+
+        This method is responsible for creating instances of `.Thing` subclasses
+        and adding them to the server. It also ensures the `.Thing`\ s are connected
+        together if required.
+
+        The Things are defined in ``self._config.thing_configs`` which in turn is
+        generated from the ``things`` argument to ``__init__``\ .
+
+        :return: A mapping of names to `.Thing` instances.
+
+        :raise TypeError: if ``cls`` is not a subclass of `.Thing`.
+        """
+        things: dict[str, Thing] = {}
+        for name, config in self._config.thing_configs.items():
+            if not issubclass(config.cls, Thing):
+                raise TypeError(f"{config.cls} is not a Thing subclass.")
+            interface = ThingServerInterface(name=name, server=self)
+            os.makedirs(interface.settings_folder, exist_ok=True)
+            # This is where we instantiate the Thing
+            things[name] = config.cls(
+                *config.args,
+                **config.kwargs,
+                thing_server_interface=interface,
             )
-            raise ValueError(msg)
-        if path in self._things:
-            raise KeyError(f"{path} has already been added to this thing server.")
-        self._things[path] = thing
-        settings_folder = os.path.join(self.settings_folder, path.lstrip("/"))
-        os.makedirs(settings_folder, exist_ok=True)
-        thing.attach_to_server(
-            self, path, os.path.join(settings_folder, "settings.json")
-        )
+        return things
+
+    def _connect_things(self) -> None:
+        r"""Connect the `thing_slot` attributes of Things.
+
+        A `.Thing` may have attributes defined as ``lt.thing_slot()``, which
+        will be populated after all `.Thing` instances are loaded on the server.
+
+        This function is responsible for supplying the `.Thing` instances required
+        for each connection. This will be done by using the name specified either
+        in the connection's default, or in the configuration of the server.
+
+        `.ThingSlotError` will be raised by code called by this method if
+        the connection cannot be provided. See `.ThingSlot.connect` for more
+        details.
+        """
+        for thing_name, thing in self.things.items():
+            config = self._config.thing_configs[thing_name].thing_slots
+            for attr_name, attr in class_attributes(thing):
+                if not isinstance(attr, ThingSlot):
+                    continue
+                target = config.get(attr_name, ...)
+                attr.connect(thing, self.things, target)
+
+    def _attach_things_to_server(self) -> None:
+        """Add the Things to the FastAPI App.
+
+        This calls `.Thing.attach_to_server` on each `.Thing` that is a part of
+        this `.ThingServer` in order to add the HTTP endpoints and load settings.
+        """
+        for thing in self.things.values():
+            thing.attach_to_server(self)
 
     @asynccontextmanager
     async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
@@ -192,19 +258,12 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
-
-        :raises RuntimeError: if a `.Thing` already has a blocking portal attached.
-            This should never happen, and suggests the server is being used to
-            serve a `.Thing` that is already being served elsewhere.
         """
         async with BlockingPortal() as portal:
+            # We create a blocking portal to allow threaded code to call async code
+            # in the event loop.
             self.blocking_portal = portal
-            # We attach a blocking portal to each thing, so that threaded code can
-            # make callbacks to async code (needed for events etc.)
-            for thing in self.things.values():
-                if thing._labthings_blocking_portal is not None:
-                    raise RuntimeError("Things may only ever have one blocking portal")
-                thing._labthings_blocking_portal = portal
+
             # we __aenter__ and __aexit__ each Thing, which will in turn call the
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
             # and shut down the hardware. NB we must make sure the blocking portal
@@ -213,13 +272,10 @@ class ThingServer:
                 for thing in self.things.values():
                     await stack.enter_async_context(thing)
                 yield
-            for _name, thing in self.things.items():
-                # Remove the blocking portal - the event loop is about to stop.
-                thing._labthings_blocking_portal = None
 
         self.blocking_portal = None
 
-    def add_things_view_to_app(self) -> None:
+    def _add_things_view_to_app(self) -> None:
         """Add an endpoint that shows the list of attached things."""
         thing_server = self
 
@@ -261,37 +317,3 @@ class ThingServer:
                 t: f"{str(request.base_url).rstrip('/')}{t}"
                 for t in thing_server.things.keys()
             }
-
-
-def server_from_config(config: dict) -> ThingServer:
-    r"""Create a ThingServer from a configuration dictionary.
-
-    This function creates a `.ThingServer` and adds a number of `.Thing`
-    instances from a configuration dictionary.
-
-    :param config: A dictionary, in the format used by :ref:`config_files`
-
-    :return: A `.ThingServer` with instances of the specified `.Thing`
-        subclasses attached. The server will not be started by this
-        function.
-
-    :raise ImportError: if a Thing could not be loaded from the specified
-        object reference.
-    :raise TypeError: if a class is specified that does not subclass `.Thing`\ .
-    """
-    server = ThingServer(config.get("settings_folder", None))
-    for path, thing in config.get("things", {}).items():
-        if isinstance(thing, str):
-            thing = {"class": thing}
-        try:
-            cls = object_reference_to_object(thing["class"])
-        except ImportError as e:
-            raise ImportError(
-                f"Could not import {thing['class']}, which was "
-                f"specified as the class for {path}."
-            ) from e
-        instance = cls(*thing.get("args", {}), **thing.get("kwargs", {}))
-        if not isinstance(instance, Thing):
-            raise TypeError(f"{thing['class']} is not a Thing")
-        server.add_thing(instance, path)
-    return server
