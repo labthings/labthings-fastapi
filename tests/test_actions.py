@@ -73,6 +73,10 @@ def test_no_args(client):
     run({})  # an empty dict should be OK
     run(None)  # it should also be OK to call it with None
     # Calling with no payload is equivalent to None
+    with pytest.raises(RuntimeError, match="422"):
+        run(10)  # the payload must be a dict - this will error.
+    with pytest.raises(RuntimeError, match="422"):
+        run({"key": "value"})  # non-empty dicts should cause an error.
 
 
 def test_only_kwargs(client):
