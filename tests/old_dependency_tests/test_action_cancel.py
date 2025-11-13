@@ -1,5 +1,5 @@
 """
-This tests the log that is returned in an action invocation
+This tests that actions may be cancelled.
 """
 
 import uuid
