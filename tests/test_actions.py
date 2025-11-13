@@ -20,7 +20,8 @@ def client():
 def action_partial(client: TestClient, url: str):
     def run(payload=None):
         r = client.post(url, json=payload)
-        assert r.status_code in (200, 201)
+        if r.status_code not in (200, 201):
+            raise RuntimeError(f"Received HTTP response code {r.status_code}")
         return poll_task(client, r.json())
 
     return run
@@ -87,6 +88,8 @@ def test_only_kwargs(client):
     run({})  # an empty dict should be OK
     run(None)  # it should also be OK to call it with None
     run({"foo": "bar"})  # it should be OK to call it with a payload
+    with pytest.raises(RuntimeError, match="422"):
+        run(10)  # but the payload must be a dict - this will error.
 
 
 def test_varargs():
