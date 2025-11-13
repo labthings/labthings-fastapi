@@ -6,10 +6,10 @@ Documentation for LabThings-FastAPI
    :caption: Contents:
 
    quickstart/quickstart.rst
-   wot_core_concepts.rst
-   structure.rst
    tutorial/index.rst
+   structure.rst
    examples.rst
+   documentation.rst
    actions.rst
    thing_slots.rst
    dependencies/dependencies.rst
@@ -17,6 +17,7 @@ Documentation for LabThings-FastAPI
    concurrency.rst
    using_things.rst
    see_also.rst
+   wot_core_concepts.rst
 
    autoapi/index
 

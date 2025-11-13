@@ -10,7 +10,7 @@ LabThings describes its HTTP API in two ways: with a :ref:`wot_td` and with an O
 OpenAPI
 -------
 
-OpenAPI_ is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses.
+`OpenAPI <https://www.openapis.org/>` is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses.
 
 .. _gen_td:
 
@@ -30,4 +30,3 @@ OpenAPI describes each HTTP endpoint individually. There are usually more HTTP e
 
 .. _WoT: https://www.w3.org/WoT/
 .. _Thing Description: https://www.w3.org/TR/wot-thing-description/
-.. _OpenAPI: https://www.openapis.org/

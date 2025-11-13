@@ -20,7 +20,7 @@ LabThings-FastAPI is built on top of `fastapi`\ , which is a fast, modern HTTP f
 * Generating a :ref:`gen_td` in addition to the :ref:`openapi` documentation produced by `fastapi`\ .
 * Making connections between `.Thing` instances as required.
 
-`.Thing`\ s
+Things
 -----------
 
 Each unit of hardware (or software) that should be exposed by the server is implemented as a subclass of `.Thing`\ . A `.Thing` subclass represents a particular type of instrument (whether hardware or software), and its functionality is described using actions and properties, described below. `.Thing`\ s don't have to correspond to separate pieces of hardware: it's possible (and indeed recommended) to use `.Thing` subclasses for software components, plug-ins, swappable modules, or anything else that needs to add functionality to the server. `.Thing`\ s may access each other's attributes, so you can write a `.Thing` that implements a particular measurement protocol or task, using hardware that's accessed through other `.Thing` instances on the server. Each `.Thing` is documented by a :ref:`gen_td` which outlines its features in a higher-level way than :ref:`openapi`\ .
