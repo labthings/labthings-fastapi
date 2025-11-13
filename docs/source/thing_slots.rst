@@ -1,4 +1,4 @@
-.. thing_slots:
+.. _thing_slots:
 
 Thing Slots
 ===========

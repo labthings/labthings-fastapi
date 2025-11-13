@@ -58,7 +58,8 @@ The first is ``self`` (the first positional argument), which is always the
 supply resources needed by the action. Most often, this is a way of accessing
 other `.Things` on the same server.
 
-.. action_logging:
+.. _action_logging:
+
 Logging from actions
 --------------------
 Action code should use `.Thing.logger` to log messages. This will be configured
@@ -70,7 +71,8 @@ a long time to run, or it may simply be a helpful debugging aid.
 
 See :mod:`.logs` for details of how this is implemented.
 
-.. action_cancellation:
+.. _action_cancellation:
+
 Cancelling actions
 ------------------
 If an action could run for a long time, it is useful to be able to cancel it
@@ -82,7 +84,8 @@ is equivalent,  but will raise an exception if the action is cancelled.
 
 For more advanced options, see `.invocation_contexts` for detail.
 
-.. invocation_context:
+.. _invocation_context:
+
 Invocation contexts
 -------------------
 Cancelling actions and capturing their logs requires action code to use a
