@@ -1,6 +1,6 @@
 """Actions module.
 
-:ref:`wot_actions` are represented by methods, decorated with the `.thing_action`
+:ref:`actions` are represented by methods, decorated with the `.thing_action`
 decorator.
 
 See the :ref:`actions` documentation for a top-level overview of actions in

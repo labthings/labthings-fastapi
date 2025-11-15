@@ -20,6 +20,8 @@ LabThings-FastAPI is built on top of `fastapi`\ , which is a fast, modern HTTP f
 * Generating a :ref:`gen_td` in addition to the :ref:`openapi` documentation produced by `fastapi`\ .
 * Making connections between `.Thing` instances as required.
 
+.. _things:
+
 Things
 -----------
 
@@ -35,7 +37,7 @@ The attributes of a `.Thing` are made available over HTTP by decorating or marki
 Client Code
 -----------
 
-Client code can be written in any language that supports an HTTP request. However, LabThings FastAPI provides additional functionality that makes writing client code in Python easier.
+Client code can be written in any language that supports an HTTP request. However, LabThings FastAPI provides additional functionality that makes writing client code in Python easier. See :ref:`using_things` for more detail.
 
 `.ThingClient` is a class that wraps up the required HTTP requests into a simpler interface. It can retrieve the :ref:`gen_td` over HTTP and use it to generate a new object with methods matching each `.thing_action` and properties matching each `.property`.
 

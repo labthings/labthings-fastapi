@@ -1,3 +1,5 @@
+.. _using_things:
+
 Using Things
 ============
 
@@ -5,7 +7,16 @@ The interface to a `Thing` is defined by its actions, properties and events [#ev
 
 `.ThingClient` subclasses can be generated dynamically from a URL using :meth:`.ThingClient.from_url`. This creates an object with the right methods, properties and docstrings, though type hints are often missing. The client can be "introspected" to explore its methods and properties using tools that work at run-time (e.g. autocompletion in a Jupyter notebook), but "static" analysis tools will not yet work.
 
+Both the input and return types of the functions of a `.ThingClient` are intended to match those of the `.Thing` it's connected to, however there are currently some differences. In particular, `pydantic` models are usually converted to dictionaries. This is something that is on the long-term roadmap to improve, possibly with :ref:`code generation <client_codegen>`\ .
+
 .. [#events] Events are not yet implemented.
+
+.. _things_from_things:
+
+Using Things from other Things
+------------------------------
+
+Code within a Thing may access other Things on the same server using `.thing_slot`\ s. These are attributes of the `.Thing` that will be supplied by the server when it is set up. When you access a `.thing_slot` it will return the other `.Thing` instance, and it may be used like any other Python object. `.thing_slot`\ s may be optional, or may be configured to return multiple `.Thing` instances: see the `.thing_slot` documentation for more details.
 
 Using Things from other languages
 ----------------------------------
@@ -19,18 +30,7 @@ Dynamic class generation
 
 The object returned by `.ThingClient.from_url` is an instance of a dynamically-created subclass of `.ThingClient`. Dynamically creating the class is needed because we don't know what the methods and properties should be until we have downloaded the Thing Description. However, this means most code autocompletion tools, type checkers, and linters will not work well with these classes. In the future, LabThings-FastAPI will generate custom client subclasses that can be shared in client modules, which should fix these problems (see below).
 
-.. _things_from_things:
-
-Using Things from other Things
-------------------------------
-
-One goal of LabThings-FastAPI is to make code portable between a client (e.g. a Jupyter notebook, or a Python script on another computer) and server-side code (i.e. code inside an action of a `.Thing`). This is done using a `.DirectThingClient` class, which is a subclass of `.ThingClient`. 
-
-A `.DirectThingClient` class will call actions and properties of other `.Thing` subclasses using the same interface that would be used by a remote client, which means code for an action may be developed as an HTTP client, for example in a Jupyter notebook, and then moved to the server with minimal changes. Currently, there are a few differences in behaviour between working locally or remotely, most notably the return types (which are usually Pydantic models on the server, and currently dictionaries on the client). This should be improved in the future.
-
-It is also possible for a `.Thing` to access other `.Thing` instances directly. This gives access to functionality that is only available in Python, i.e. not available through a `.ThingClient` over HTTP. However, the `.Thing` must then be supplied manually with any :ref:`dependencies` required by its actions, and the public API as defined by the :ref:`wot_td` is no longer enforced.
-
-Actions that make use of other `.Thing` objects on the same server should access them using :ref:`dependencies`.
+.. _client_codegen:
 
 Planned future development: static code generation
 --------------------------------------------------

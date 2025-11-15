@@ -3,7 +3,7 @@
 Generated documentation
 =======================
 
-LabThings describes its HTTP API in two ways: with a :ref:`wot_td` and with an OpenAPI_ document.
+LabThings describes its HTTP API in two ways: with a :ref:`gen_td` and with an OpenAPI_ document.
 
 .. _openapi:
 
@@ -17,9 +17,9 @@ OpenAPI
 Thing Description
 -----------------
 
-Each :ref:`wot_thing` is documented by a Thing Description, which is a JSON document describing all of the ways to interact with that Thing (:ref:`wot_affordances`\ ). The WoT_ standard defines the `Thing Description`_ and includes a JSON Schema against which it may be validated.
+Each :ref:`Thing <things>` is documented by a :ref:`gen_td`, which is a JSON document describing all of the ways to interact with that Thing (:ref:`wot_affordances`\ ). The WoT_ standard defines the `Thing Description`_ and includes a JSON Schema against which it may be validated.
 
-Thing Description documents are higher-level than OpenAPI_ and focus on the capabilities of the Thing. For example, they include a list of properties, where each action is described only once. LabThings treats the Thing Description as your public API, and as a general rule anything not described in the Thing Description is not available over HTTP or to a `.DirectThingClient`\ .
+Thing Description documents are higher-level than OpenAPI_ and focus on the capabilities of the Thing. For example, they include a list of properties, where each action is described only once. LabThings treats the Thing Description as your public API, and as a general rule anything not described in the Thing Description is not available over HTTP.
 
 Comparison of Thing Description and OpenAPI
 -------------------------------------------

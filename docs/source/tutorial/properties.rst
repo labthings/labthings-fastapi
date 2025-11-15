@@ -1,4 +1,5 @@
 .. _tutorial_properties:
+.. _properties:
 
 Properties
 =========================

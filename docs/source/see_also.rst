@@ -10,7 +10,7 @@ Descriptors
 
 Descriptors are a way to intercept attribute access on an object. By default, attributes of an object are just variables - so an object called ``foo`` might have an attribute called ``bar``, and you may read its value with ``foo.bar``, write its value with ``foo.bar = "baz"``, and delete the attribute with ``del foo.bar``. If ``foo`` is a descriptor, Python will call the ``__get__`` method of that descriptor when it's read and the ``__set__`` method when it's written to. You have quite probably used a descriptor already, because the built-in `~builtins.property` creates a descriptor object: that's what runs your getter method when the property is accessed. The descriptor protocol is described with plenty of examples in the `Descriptor Guide`_ in the Python documentation.
 
-In LabThings-FastAPI, descriptors are used to implement :ref:`wot_actions` and :ref:`wot_properties` on `.Thing` subclasses. The intention is that these will function like standard Python methods and properties, but will also be available over HTTP, along with automatic documentation in the :ref:`wot_td` and OpenAPI documents.
+In LabThings-FastAPI, descriptors are used to implement :ref:`actions` and :ref:`properties` on `.Thing` subclasses. The intention is that these will function like standard Python methods and properties, but will also be available over HTTP, along with :ref:`gen_docs`.
 
 There are a few useful notes that relate to many of the descriptors in LabThings-FastAPI:
 
