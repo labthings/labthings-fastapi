@@ -29,12 +29,12 @@ from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
 from .exceptions import PropertyNotObservableError
+from .thing_server_interface import ThingServerInterface
 
 
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
-    from .thing_server_interface import ThingServerInterface
 
 _LOGGER = logging.getLogger(__name__)
 
