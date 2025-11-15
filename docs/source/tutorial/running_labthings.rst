@@ -9,7 +9,7 @@ Once you have activated the virtual environment, you should be able to run an ex
 
 .. code-block:: bash
 
-    labthings-server --json '{"things":{"/mything":"labthings_fastapi.example_things:MyThing"}}'
+    labthings-server --json '{"things":{"mything":"labthings_fastapi.example_things:MyThing"}}'
 
 This command will start a LabThings server, and will print the root URL for your server (by default, ``http://127.0.0.1:5000``). The ``127.0.0.1`` part means the server is only accessible from your computer, so you don't need to worry about other computers on your network accessing it.
 
@@ -28,7 +28,7 @@ It is worth unpicking the command you ran to start the server: it has one argume
 
     {
         "things": {
-            "/mything": "labthings_fastapi.example_things:MyThing"
+            "mything": "labthings_fastapi.example_things:MyThing"
         }
     }
 
