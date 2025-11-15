@@ -36,6 +36,8 @@ from .config_model import (
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from ..outputs.blob import BlobDataManager
 
+__all__ = ["ThingServer"]
+
 
 ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
 

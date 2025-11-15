@@ -79,6 +79,9 @@ class Thing:
     title: str
     """A human-readable description of the Thing"""
 
+    _thing_server_interface: ThingServerInterface
+    """Provide access to features of the server that this `.Thing` is attached to."""
+
     def __init__(self, thing_server_interface: ThingServerInterface) -> None:
         """Initialise a Thing.
 

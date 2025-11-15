@@ -11,6 +11,7 @@ Properties can be defined in two ways as shown below:
 
     import labthings_fastapi as lt
 
+
     class Counter(lt.Thing):
         "A counter that knows what's remaining."
 
@@ -29,19 +30,19 @@ Properties can be defined in two ways as shown below:
         def remaining(self, value: int) -> None:
             self.target = self.count + value
 
-    The first two properties are simple variables: they may be read and assigned
-    to, and will behave just like a regular variable. Their syntax is similar to
-    `dataclasses` or `pydantic` in that `.property` is used as a "field specifier"
-    to set options like the default value, and the type annotation is on the
-    class attribute. Documentation is in strings immediately following the
-    properties, which is understood by most automatic documentation tools.
+The first two properties are simple variables: they may be read and assigned
+to, and will behave just like a regular variable. Their syntax is similar to
+`dataclasses` or `pydantic` in that `.property` is used as a "field specifier"
+to set options like the default value, and the type annotation is on the
+class attribute. Documentation is in strings immediately following the
+properties, which is understood by most automatic documentation tools.
 
-    ``remaining`` is defined using a "getter" function, meaning this code will
-    be run each time ``counter.remaining`` is accessed. Its type will be the
-    return type of the function, and its docstring will come from the function
-    too. Setters with only a getter are read-only.
+``remaining`` is defined using a "getter" function, meaning this code will
+be run each time ``counter.remaining`` is accessed. Its type will be the
+return type of the function, and its docstring will come from the function
+too. Setters with only a getter are read-only.
 
-    Adding a "setter" to properties is optional, and makes them read-write.
+Adding a "setter" to properties is optional, and makes them read-write.
 """
 
 from __future__ import annotations
@@ -217,7 +218,7 @@ def property(
 
     This function may be used to define :ref:`wot_properties` in
     two ways, as either a decorator or a field specifier. See the
-    examples in the :mod:`.thing_property` documentation.
+    examples in the :mod:`.property` documentation.
 
     Properties should always have a type annotation. This type annotation
     will be used in automatic documentation and also to serialise the value

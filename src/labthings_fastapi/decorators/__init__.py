@@ -25,9 +25,9 @@ Properties
 ----------
 
 As with Actions, Properties can be declared by decorating either a function, or
-an attribute, with :deco:`.thing_property`. You can use the decorator either on
+an attribute, with :deco:`.property`. You can use the decorator either on
 a function (in which case that
-function acts as the "getter" just like with Python's :deco`property` decorator).
+function acts as the "getter" just like with Python's :deco:`property` decorator).
 
 Events
 ------
