@@ -61,4 +61,4 @@ Thing Description documents are higher-level than OpenAPI_ and focus on the capa
 Interaction Affordances
 -----------------------
 
-The Web of Things standard often talks about Affordances. This is the collective term for _wot_properties, _wot_actions, and _wot_events.
+The Web of Things standard often talks about Affordances. This is the collective term for :ref:`wot_properties`, :ref:`wot_actions`, and :ref:`wot_events`.

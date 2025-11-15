@@ -1,6 +1,6 @@
 """Actions module.
 
-:ref:`wot_actions` are represented by methods, decorated with the `.thing_action`
+:ref:`actions` are represented by methods, decorated with the `.thing_action`
 decorator.
 
 See the :ref:`actions` documentation for a top-level overview of actions in
@@ -35,29 +35,22 @@ from .invocation_model import InvocationModel, InvocationStatus, LogRecordModel
 from ..exceptions import (
     InvocationCancelledError,
     InvocationError,
+    NoBlobManagerError,
 )
 from ..outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
-from ..invocation_contexts import (
-    CancelEvent,
-    get_cancel_event,
-    set_invocation_id,
-)
+from .. import invocation_contexts
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
     from ..descriptors import ActionDescriptor
     from ..thing import Thing
 
+
+__all__ = ["ACTION_INVOCATIONS_PATH", "Invocation", "ActionManager"]
+
+
 ACTION_INVOCATIONS_PATH = "/action_invocations"
 """The API route used to list `.Invocation` objects."""
-
-
-class NoBlobManagerError(RuntimeError):
-    """Raised if an API route accesses Invocation outputs without a BlobIOContextDep.
-
-    Any access to an invocation output must have BlobIOContextDep as a dependency, as
-    the output may be a blob, and the blob needs this context to resolve its URL.
-    """
 
 
 class Invocation(Thread):
@@ -197,9 +190,9 @@ class Invocation(Thread):
         return thing
 
     @property
-    def cancel_hook(self) -> CancelEvent:
+    def cancel_hook(self) -> invocation_contexts.CancelEvent:
         """The cancel event associated with this Invocation."""
-        return get_cancel_event(self.id)
+        return invocation_contexts.get_cancel_event(self.id)
 
     def cancel(self) -> None:
         """Cancel the task by requesting the code to stop.
@@ -278,7 +271,7 @@ class Invocation(Thread):
         logger = self.thing.logger
         # The line below saves records matching our ID to ``self._log``
         add_thing_log_destination(self.id, self._log)
-        with set_invocation_id(self.id):
+        with invocation_contexts.set_invocation_id(self.id):
             try:
                 action.emit_changed_event(self.thing, self._status.value)
 
