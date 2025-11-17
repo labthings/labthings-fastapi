@@ -137,3 +137,14 @@ class LogConfigurationError(RuntimeError):
     certain handlers and filters to be set up. This exception is raised if they
     cannot be added, or if they are not present when they are needed.
     """
+
+
+class UnsupportedConstraintError(ValueError):
+    """A constraint argument is not supported.
+
+    This exception is raised when a constraint argument is passed to
+    a property that is not in the supported list. See
+    `labthings_fastapi.properties.CONSTRAINT_ARGS` for the list of
+    supported arguments. Their meaning is described in the `pydantic.Field`
+    documentation.
+    """
