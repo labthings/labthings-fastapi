@@ -12,6 +12,11 @@ from labthings_fastapi.testing import create_thing_without_server
 from ..temp_client import poll_task
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
+
+
 class Counter(lt.Thing):
     ACTION_ONE_RESULT = "Action one result!"
 

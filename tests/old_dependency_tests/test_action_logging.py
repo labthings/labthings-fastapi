@@ -11,6 +11,11 @@ from labthings_fastapi.actions.invocation_model import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
+
+
 class ThingThatLogsAndErrors(lt.Thing):
     LOG_MESSAGES = [
         "message 1",

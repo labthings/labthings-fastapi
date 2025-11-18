@@ -21,8 +21,14 @@ from dataclasses import dataclass
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+import pytest
 from .module_with_deps import FancyIDDep, FancyID, ClassDependsOnFancyID
 import labthings_fastapi as lt
+
+
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
 
 
 def test_dep_from_module():

@@ -12,6 +12,11 @@ from labthings_fastapi.client.in_server import direct_thing_client_class
 from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
+
+
 class ThingOne(lt.Thing):
     ACTION_ONE_RESULT = "Action one result!"
 

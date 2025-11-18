@@ -10,6 +10,11 @@ import labthings_fastapi as lt
 import time
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
+
+
 class CancellableCountingThing(lt.Thing):
     counter: int = lt.property(default=0)
     check: bool = lt.property(default=False)

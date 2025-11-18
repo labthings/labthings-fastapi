@@ -9,7 +9,13 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from labthings_fastapi.deps import InvocationID
 from fastapi.testclient import TestClient
+import pytest
 from .module_with_deps import FancyIDDep
+
+
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
 
 
 def test_invocation_id():

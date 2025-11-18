@@ -285,7 +285,8 @@ def direct_thing_client_class(
         "`direct_thing_client_class` is deprecated and will be removed in v0.0.13. "
         "Use `lt.thing_slot` instead.",
         DeprecationWarning,
-        stacklevel=2,
+        stacklevel=3,  # This is called from `direct_thing_client_dependency` so we
+        # need stacklevel=3 to point to user code.
     )
 
     def init_proxy(

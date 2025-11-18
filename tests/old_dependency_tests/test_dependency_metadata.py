@@ -9,6 +9,11 @@ from ..temp_client import poll_task
 import labthings_fastapi as lt
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
+
+
 class ThingOne(lt.Thing):
     def __init__(self, thing_server_interface):
         super().__init__(thing_server_interface=thing_server_interface)
