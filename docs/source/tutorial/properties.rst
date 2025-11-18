@@ -135,3 +135,10 @@ Observable properties
 Properties can be made observable, which means that clients can subscribe to changes in the property's value. This is useful for properties that change frequently, such as sensor readings or instrument settings. In order for a property to be observable, LabThings must know whenever it changes. Currently, this means only data properties can be observed, as functional properties do not have a simple value that can be tracked.
 
 Properties are currently only observable via websockets: in the future, it may be possible to observe them from other `.Thing` instances or from other parts of the code.
+
+.. _settings:
+
+Settings
+------------
+
+Settings are properties with an additional feature: they are saved to disk. This means that settings will be automatically restored after the server is restarted. The function `.setting` can be used to declare a `.DataSetting` or decorate a function to make a `.FunctionalSetting` in the same way that `.property` can. It is usually imported as ``lt.setting``\ .

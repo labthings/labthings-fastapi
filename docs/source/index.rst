@@ -20,6 +20,7 @@ Documentation for LabThings-FastAPI
    wot_core_concepts.rst
 
    autoapi/index
+   developer_notes/index
 
 `labthings-fastapi` is a Python library to simplify the process of making laboratory instruments available via a HTTP. It aims to create an API that is usable from any modern programming language, with API documentation in both :ref:`openapi` and :ref:`gen_td` formats. It is the underlying framework for v3 of the `OpenFlexure Microscope software <https://gitlab.com/openflexure/openflexure-microscope-server/>`_. Key features and design aims are:
 

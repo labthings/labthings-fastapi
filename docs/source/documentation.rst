@@ -10,7 +10,7 @@ LabThings describes its HTTP API in two ways: with a :ref:`gen_td` and with an O
 OpenAPI
 -------
 
-`OpenAPI <https://www.openapis.org/>` is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses.
+`OpenAPI <https://www.openapis.org/>` is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses. The OpenAPI document is generated automatically by `fastapi`\ , and may be downloaded at `/openapi.json` or viewed in a web browser at the `/docs` or `/redoc` endpoints of a running LabThings server. Both of the web browser views rely on JavaScript libraries that are not currently bundled with LabThings, so an internet connection is required to view them. The OpenAPI document is available without an internet connection.
 
 .. _gen_td:
 

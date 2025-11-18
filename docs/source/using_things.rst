@@ -12,6 +12,7 @@ Both the input and return types of the functions of a `.ThingClient` are intende
 .. [#events] Events are not yet implemented.
 
 .. _things_from_things:
+.. _thing_slots:
 
 Using Things from other Things
 ------------------------------

@@ -11,7 +11,7 @@ import importlib.metadata
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "labthings-fastapi"
-copyright = "2024, Richard Bowman"
+copyright = "2025, Richard Bowman"
 author = "Richard Bowman"
 release = importlib.metadata.version("labthings-fastapi")
 
