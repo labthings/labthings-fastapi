@@ -41,7 +41,7 @@ from ..invocation_contexts import CancelEvent
 from ..logs import THING_LOGGER
 
 
-def invocation_id() -> uuid.UUID:
+def invocation_id_internal() -> uuid.UUID:
     """Generate a UUID for an action invocation.
 
     This is for use as a FastAPI dependency (see :ref:`dependencies`).
@@ -67,7 +67,15 @@ def invocation_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
-def invocation_id_wrapper(id: uuid.UUID = Depends(invocation_id)) -> uuid.UUID:
+NonWarningInvocationID = Annotated[uuid.UUID, Depends(invocation_id_internal)]
+"""A FastAPI dependency that supplies the invocation ID.
+
+This is equivalent to `.InvocationID`, but does not raise a deprecation
+warning. It should only be used by internal LabThings functions.
+"""
+
+
+def invocation_id(id: NonWarningInvocationID) -> uuid.UUID:
     """Wrap the invocation ID dependency.
 
     This exists to provide a deprecation warning, and calls `.invocation_id`.
@@ -80,12 +88,12 @@ def invocation_id_wrapper(id: uuid.UUID = Depends(invocation_id)) -> uuid.UUID:
         "The invocation ID dependency is deprecated and will be removed in v0.0.13. "
         "Use `Thing.invocation_id` instead.",
         DeprecationWarning,
-        stacklevel=2,
+        stacklevel=3,
     )
     return id
 
 
-InvocationID = Annotated[uuid.UUID, Depends(invocation_id_wrapper)]
+InvocationID = Annotated[uuid.UUID, Depends(invocation_id)]
 """A FastAPI dependency that supplies the invocation ID.
 
 This calls :func:`.invocation_id` to generate a new `.UUID`. It is used
@@ -96,7 +104,7 @@ using this dependency.
 """
 
 
-def invocation_logger(id: InvocationID) -> logging.Logger:
+def invocation_logger(id: NonWarningInvocationID) -> logging.Logger:
     """Make a logger object for an action invocation.
 
     This function should be used as a dependency for an action, and
@@ -111,7 +119,7 @@ def invocation_logger(id: InvocationID) -> logging.Logger:
         "The invocation logger dependency is deprecated and will be removed in "
         "v0.0.13. Use `Thing.logger` instead.",
         DeprecationWarning,
-        stacklevel=2,
+        stacklevel=3,
     )
     return THING_LOGGER.getChild("OLD_DEPENDENCY_LOGGER")
 
@@ -124,7 +132,7 @@ invocation. For details of how to use dependencies, see :ref:`dependencies`.
 """
 
 
-def invocation_cancel_hook(id: InvocationID) -> CancelHook:
+def invocation_cancel_hook(id: NonWarningInvocationID) -> CancelHook:
     """Make a cancel hook for a particular invocation.
 
     This is for use as a FastAPI dependency, and will create a
@@ -138,7 +146,7 @@ def invocation_cancel_hook(id: InvocationID) -> CancelHook:
         "The cancel hook dependency is deprecated and will be removed in v0.0.13. "
         "Use `lt.cancellable_sleep` or `lt.raise_if_cancelled` instead.",
         DeprecationWarning,
-        stacklevel=2,
+        stacklevel=3,
     )
     return CancelEvent(id)
 
