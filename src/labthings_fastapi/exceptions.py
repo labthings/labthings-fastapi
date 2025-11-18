@@ -137,3 +137,11 @@ class LogConfigurationError(RuntimeError):
     certain handlers and filters to be set up. This exception is raised if they
     cannot be added, or if they are not present when they are needed.
     """
+
+
+class NoBlobManagerError(RuntimeError):
+    """Raised if an API route accesses Invocation outputs without a BlobIOContextDep.
+
+    Any access to an invocation output must have BlobIOContextDep as a dependency, as
+    the output may be a blob, and the blob needs this context to resolve its URL.
+    """

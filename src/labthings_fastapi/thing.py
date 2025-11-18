@@ -1,8 +1,8 @@
 """A class to represent hardware or software Things.
 
 The `.Thing` class enables most of the functionality of this library,
-and is the way in to most of its features. See :ref:`wot_cc` and :ref:`labthings_cc`
-for more.
+and is the way in to most of its features. See :ref:`structure`
+for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
@@ -29,12 +29,12 @@ from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
 from .exceptions import PropertyNotObservableError
+from .thing_server_interface import ThingServerInterface
 
 
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
-    from .thing_server_interface import ThingServerInterface
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,17 +49,17 @@ class Thing:
     Subclassing Notes
     -----------------
 
-    * ``__init__``: You should accept any arguments you need to configure the Thing
+    *   ``__init__``: You should accept any arguments you need to configure the Thing
         in ``__init__``. Don't initialise any hardware at this time, as your Thing may
         be instantiated quite early, or even at import time. You must make sure to
         call ``super().__init__(thing_server_interface)``\ .
-    * ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
+    *   ``__enter__(self)`` and ``__exit__(self, exc_t, exc_v, exc_tb)`` are where you
         should start and stop communications with the hardware. This is Python's
         "context manager" protocol. The arguments of ``__exit__`` will be ``None``
         except after errors. You should be safe to ignore them, and just include
         code that will close down your hardware, which is equivalent to a
         ``finally:`` block.
-    * Properties and Actions are defined using decorators: the :deco:`.thing_action`
+    *   Properties and Actions are defined using decorators: the :deco:`.thing_action`
         decorator declares a method to be an action, which will run when it's triggered,
         and the :deco:`.property` decorator does the same for a property.
 
@@ -67,7 +67,7 @@ class Thing:
         not need getter and setter functions.
 
         See the documentation on those functions for more detail.
-    * `title` will be used in various places as the human-readable name of your Thing,
+    *   `title` will be used in various places as the human-readable name of your Thing,
         so it makes sense to set this in a subclass.
 
     There are various LabThings methods that you should avoid overriding unless you
@@ -78,6 +78,9 @@ class Thing:
 
     title: str
     """A human-readable description of the Thing"""
+
+    _thing_server_interface: ThingServerInterface
+    """Provide access to features of the server that this `.Thing` is attached to."""
 
     def __init__(self, thing_server_interface: ThingServerInterface) -> None:
         """Initialise a Thing.

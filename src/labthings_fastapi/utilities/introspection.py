@@ -64,7 +64,7 @@ def input_model_from_signature(
 
         LabThings-FastAPI does not currently support actions that take
         positional arguments, because this does not convert nicely into
-        JSONSchema or Thing Description documents (see :ref:`wot_td`).
+        JSONSchema or Thing Description documents (see :ref:`gen_docs`).
 
     :param func: the function to analyse.
     :param remove_first_positional_arg: Remove the first argument from the

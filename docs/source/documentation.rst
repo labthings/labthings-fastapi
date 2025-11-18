@@ -3,23 +3,23 @@
 Generated documentation
 =======================
 
-LabThings describes its HTTP API in two ways: with a :ref:`wot_td` and with an OpenAPI_ document.
+LabThings describes its HTTP API in two ways: with a :ref:`gen_td` and with an OpenAPI_ document.
 
 .. _openapi:
 
 OpenAPI
 -------
 
-OpenAPI_ is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses.
+`OpenAPI <https://www.openapis.org/>` is a standard way to describe an HTTP interface. It lists all of the possible HTTP requests that may be made, along with a description of each one, and a description of the possible responses. The OpenAPI document is generated automatically by `fastapi`\ , and may be downloaded at `/openapi.json` or viewed in a web browser at the `/docs` or `/redoc` endpoints of a running LabThings server. Both of the web browser views rely on JavaScript libraries that are not currently bundled with LabThings, so an internet connection is required to view them. The OpenAPI document is available without an internet connection.
 
 .. _gen_td:
 
 Thing Description
 -----------------
 
-Each :ref:`wot_thing` is documented by a Thing Description, which is a JSON document describing all of the ways to interact with that Thing (:ref:`wot_affordances`\ ). The WoT_ standard defines the `Thing Description`_ and includes a JSON Schema against which it may be validated.
+Each :ref:`Thing <things>` is documented by a :ref:`gen_td`, which is a JSON document describing all of the ways to interact with that Thing (:ref:`wot_affordances`\ ). The WoT_ standard defines the `Thing Description`_ and includes a JSON Schema against which it may be validated.
 
-Thing Description documents are higher-level than OpenAPI_ and focus on the capabilities of the Thing. For example, they include a list of properties, where each action is described only once. LabThings treats the Thing Description as your public API, and as a general rule anything not described in the Thing Description is not available over HTTP or to a `.DirectThingClient`\ .
+Thing Description documents are higher-level than OpenAPI_ and focus on the capabilities of the Thing. For example, they include a list of properties, where each action is described only once. LabThings treats the Thing Description as your public API, and as a general rule anything not described in the Thing Description is not available over HTTP.
 
 Comparison of Thing Description and OpenAPI
 -------------------------------------------
@@ -30,4 +30,3 @@ OpenAPI describes each HTTP endpoint individually. There are usually more HTTP e
 
 .. _WoT: https://www.w3.org/WoT/
 .. _Thing Description: https://www.w3.org/TR/wot-thing-description/
-.. _OpenAPI: https://www.openapis.org/

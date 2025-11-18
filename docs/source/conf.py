@@ -1,5 +1,6 @@
 import logging
 import labthings_fastapi
+import importlib.metadata
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -10,9 +11,9 @@ import labthings_fastapi
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "labthings-fastapi"
-copyright = "2024, Richard Bowman"
+copyright = "2025, Richard Bowman"
 author = "Richard Bowman"
-release = "0.0.10"
+release = importlib.metadata.version("labthings-fastapi")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -23,6 +24,7 @@ extensions = [
     # "autodoc2",
     "autoapi.extension",
     "sphinx_rtd_theme",
+    "sphinx_toolbox.decorators",
 ]
 
 templates_path = ["_templates"]

@@ -390,8 +390,8 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
         .. code-block:: python
 
             class MyThing(Thing):
-                subscripted_property = DataProperty[int](0)
-                annotated_property: int = DataProperty(0)
+                subscripted_property = DataProperty[int](default=0)
+                annotated_property: int = DataProperty(default=0)
 
         The second form often works better with autocompletion, though it
         is usually called via a function to avoid type checking errors.
