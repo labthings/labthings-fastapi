@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 
 
 class TextBlob(lt.blob.Blob):

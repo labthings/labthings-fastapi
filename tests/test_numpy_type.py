@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, RootModel
 import numpy as np
 
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
 import labthings_fastapi as lt
 

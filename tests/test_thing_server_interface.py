@@ -12,12 +12,13 @@ import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import ServerNotRunningError, ThingNotConnectedError
 from labthings_fastapi.thing_server_interface import (
-    MockThingServerInterface,
     ThingServerInterface,
     ThingServerMissingError,
+)
+from labthings_fastapi.testing import (
+    MockThingServerInterface,
     create_thing_without_server,
 )
-
 
 NAME = "testname"
 EXAMPLE_THING_STATE = {"foo": "bar"}
