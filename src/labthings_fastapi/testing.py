@@ -168,6 +168,8 @@ def _mock_slots(thing: Thing) -> None:
     :param thing: The thing to mock the slots of.
     :raises TypeError: If this was called on a Thing with a real ThingServerInterface
     """
+    # Populate a mapping of mocks pretending to be the things on the server
+    mocks = {}
     for attr_name, attr in class_attributes(thing):
         if isinstance(attr, ThingSlot):
             # Simply use the class of the first type that can be used.
@@ -186,8 +188,7 @@ def _mock_slots(thing: Thing) -> None:
             # Note: If attr.default is None it will connect to None so no need for
             # adding anything mapping of mocks.
 
-            # Populate a mapping of mocks pretending to be the things on the server
-            mocks = {}
+            # Add mock to dictionary
             for name in mock_names:
                 mock = Mock(spec=mock_class)
                 mock.name = name
@@ -204,6 +205,6 @@ def _mock_slots(thing: Thing) -> None:
                     )
 
     # Finally connect the mocked slots.
-    for attr in class_attributes(thing):
+    for _attr_name, attr in class_attributes(thing):
         if isinstance(attr, ThingSlot):
             attr.connect(thing, mocks, ...)

@@ -57,10 +57,12 @@ DIF_GROUPED_NAMES = ["snap", "crackle", "pop"]
 class ExampleWithSlots(lt.Thing):
     example: ExampleThing = lt.thing_slot()
     dif_example: DifferentExampleThing = lt.thing_slot("diffy")
-    optionally_another_example: DifferentExampleThing | None = lt.thing_slot()
+    optionally_another_example: AnotherExampleThing | None = lt.thing_slot()
     unused_option: UnusedExampleThing | None = lt.thing_slot(None)
     grouped_things: Mapping[str, GroupedThing] = lt.thing_slot()
-    dif_grouped_things: Mapping[str, GroupedThing] = lt.thing_slot(DIF_GROUPED_NAMES)
+    dif_grouped_things: Mapping[str, DifferentGroupedThing] = lt.thing_slot(
+        DIF_GROUPED_NAMES
+    )
 
 
 @pytest.fixture
@@ -254,8 +256,8 @@ def test_mocking_slots():
     assert slotty.dif_example.name == DIF_EXAMPLE_NAME
 
     # optionally_another_example, was optional but should be a mock pretending to be
-    # a DifferentExampleThing
-    assert isinstance(slotty.optionally_another_example, DifferentExampleThing)
+    # a AnotherExampleThing
+    assert isinstance(slotty.optionally_another_example, AnotherExampleThing)
     assert isinstance(slotty.optionally_another_example, Mock)
 
     # unused_option was an optional slot, but defaults to None. So should be None
