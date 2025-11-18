@@ -3,6 +3,7 @@ This tests Things that depend on other Things
 """
 
 import inspect
+import warnings
 from fastapi.testclient import TestClient
 from fastapi import Request
 import pytest
@@ -29,7 +30,9 @@ class ThingOne(lt.Thing):
         return self.ACTION_ONE_RESULT
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):
@@ -44,7 +47,9 @@ class ThingTwo(lt.Thing):
         return thing_one.action_one()
 
 
-ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "thing_two")
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    ThingTwoDep = lt.deps.direct_thing_client_dependency(ThingTwo, "thing_two")
 
 
 class ThingThree(lt.Thing):

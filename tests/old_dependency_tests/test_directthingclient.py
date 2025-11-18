@@ -4,6 +4,7 @@ This module tests inter-Thing interactions. It does not yet test exhaustively,
 and has been added primarily to fix #165.
 """
 
+import warnings
 from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
@@ -59,8 +60,10 @@ def counter_client(mocker) -> DirectThingClient:
     return StandaloneCounterClient(counter)
 
 
-CounterDep = lt.deps.direct_thing_client_dependency(Counter, "counter")
-RawCounterDep = lt.deps.raw_thing_dependency(Counter)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    CounterDep = lt.deps.direct_thing_client_dependency(Counter, "counter")
+    RawCounterDep = lt.deps.raw_thing_dependency(Counter)
 
 
 class Controller(lt.Thing):
