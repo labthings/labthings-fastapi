@@ -26,6 +26,7 @@ def test_quickstart_counter():
     p.run_monitored(terminate_outputs=["Application startup complete"])
 
 
+@pytest.mark.filterwarnings("ignore:.*removed in v0.0.13.*:DeprecationWarning")
 def test_dependency_example():
     """Check the dependency example creates a server object.
 
