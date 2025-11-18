@@ -165,7 +165,8 @@ def create_thing_without_server(
 def _mock_slots(thing: Thing) -> None:
     """Mock the slots of a thing created by create_thing_without_server.
 
-    :param thing: The thing to mock the slots of
+    :param thing: The thing to mock the slots of.
+    :raises TypeError: If this was called on a Thing with a real ThingServerInterface
     """
     for attr_name, attr in class_attributes(thing):
         if isinstance(attr, ThingSlot):
@@ -193,8 +194,16 @@ def _mock_slots(thing: Thing) -> None:
                 mocks[name] = mock
                 # Store a copy of this mock in the mock server interface so it isn't
                 # garbage collected.
-                # Note that this causes mypy to throw an  `attr-defined` error as _mock
-                # only exists in the MockThingServerInterface
-                thing._thing_server_interface._mocks.append(mock)  # type: ignore[attr-defined]
+                interface = thing._thing_server_interface
+                if isinstance(interface, MockThingServerInterface):
+                    interface._mocks.append(mock)
+                else:
+                    raise TypeError(
+                        "Slots may not be mocked when a Thing is attached to a real "
+                        "server."
+                    )
 
+    # Finally connect the mocked slots.
+    for attr in class_attributes(thing):
+        if isinstance(attr, ThingSlot):
             attr.connect(thing, mocks, ...)
