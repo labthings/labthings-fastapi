@@ -1,4 +1,4 @@
-.. tutorial_thing:
+.. _tutorial_thing:
 
 Writing a Thing
 =========================

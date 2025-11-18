@@ -12,12 +12,11 @@ Both the input and return types of the functions of a `.ThingClient` are intende
 .. [#events] Events are not yet implemented.
 
 .. _things_from_things:
-.. _thing_slots:
 
 Using Things from other Things
 ------------------------------
 
-Code within a Thing may access other Things on the same server using `.thing_slot`\ s. These are attributes of the `.Thing` that will be supplied by the server when it is set up. When you access a `.thing_slot` it will return the other `.Thing` instance, and it may be used like any other Python object. `.thing_slot`\ s may be optional, or may be configured to return multiple `.Thing` instances: see the `.thing_slot` documentation for more details.
+Code within a Thing may access other Things on the same server using :ref:`thing_slots`. These are attributes of the `.Thing` that will be supplied by the server when it is set up. When you access a `.thing_slot` it will return the other `.Thing` instance, and it may be used like any other Python object. `.thing_slot`\ s may be optional, or may be configured to return multiple `.Thing` instances: see the :ref:`thing_slots` documentation for more details.
 
 Using Things from other languages
 ----------------------------------
