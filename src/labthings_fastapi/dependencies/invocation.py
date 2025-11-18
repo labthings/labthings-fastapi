@@ -34,6 +34,7 @@ same objects. This avoids the need for the action to be aware of its
 from __future__ import annotations
 import uuid
 from typing import Annotated
+from warnings import warn
 from fastapi import Depends
 import logging
 from ..invocation_contexts import CancelEvent
@@ -66,7 +67,25 @@ def invocation_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
-InvocationID = Annotated[uuid.UUID, Depends(invocation_id)]
+def invocation_id_wrapper(id: uuid.UUID = Depends(invocation_id)) -> uuid.UUID:
+    """Wrap the invocation ID dependency.
+
+    This exists to provide a deprecation warning, and calls `.invocation_id`.
+
+    :param id: The invocation ID, supplied by FastAPI.
+
+    :return: The same invocation ID.
+    """
+    warn(
+        "The invocation ID dependency is deprecated and will be removed in v0.0.13. "
+        "Use `Thing.invocation_id` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return id
+
+
+InvocationID = Annotated[uuid.UUID, Depends(invocation_id_wrapper)]
 """A FastAPI dependency that supplies the invocation ID.
 
 This calls :func:`.invocation_id` to generate a new `.UUID`. It is used
@@ -88,6 +107,12 @@ def invocation_logger(id: InvocationID) -> logging.Logger:
 
     :return: A `logging.Logger` object specific to this invocation.
     """
+    warn(
+        "The invocation logger dependency is deprecated and will be removed in "
+        "v0.0.13. Use `Thing.logger` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return THING_LOGGER.getChild("OLD_DEPENDENCY_LOGGER")
 
 
@@ -109,6 +134,12 @@ def invocation_cancel_hook(id: InvocationID) -> CancelHook:
 
     :return: a `.CancelHook` event.
     """
+    warn(
+        "The cancel hook dependency is deprecated and will be removed in v0.0.13. "
+        "Use `lt.cancellable_sleep` or `lt.raise_if_cancelled` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return CancelEvent(id)
 
 

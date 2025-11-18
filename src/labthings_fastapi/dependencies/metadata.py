@@ -8,6 +8,7 @@ simplify the task of adding metadata to data collected by `.Thing` instances.
 from __future__ import annotations
 from typing import Annotated, Any, Callable
 from collections.abc import Mapping
+from warnings import warn
 
 from fastapi import Depends, Request
 
@@ -55,6 +56,12 @@ def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
 
     :return: a function that returns a dictionary of metadata.
     """
+    warn(
+        "The `GetThingStates` dependency is deprecated and will be removed in v0.0.13. "
+        "Use `Thing.thing_server_interface.get_thing_states` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     server = find_thing_server(request.app)
 
     def get_metadata() -> dict[str, Any]:

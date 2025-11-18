@@ -53,6 +53,7 @@ from typing import (
     Mapping,
     Optional,
 )
+from warnings import warn
 from weakref import WeakValueDictionary
 from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
@@ -586,6 +587,12 @@ def blob_type(media_type: str) -> type[Blob]:
 
     :raise ValueError: if the media type contains ``'`` or ``\``.
     """
+    warn(
+        "`blob_type` is deprecated and will be removed in v0.0.13. "
+        "Create a subclass of `Blob` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if "'" in media_type or "\\" in media_type:
         raise ValueError("media_type must not contain single quotes or backslashes")
     return create_model(

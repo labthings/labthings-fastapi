@@ -13,13 +13,14 @@ from typing import (
     Union,
     overload,
 )
+from uuid import UUID
 from weakref import WeakSet
 
-from fastapi import Body, FastAPI, Request, BackgroundTasks
+from fastapi import Body, FastAPI, Request, BackgroundTasks, Depends
 from pydantic import create_model
 
 from ..actions import InvocationModel
-from ..dependencies.invocation import CancelHook, InvocationID
+from ..dependencies.invocation import CancelHook, invocation_id
 from ..dependencies.action_manager import ActionManagerContextDep
 from ..utilities.introspection import (
     EmptyInput,
@@ -256,7 +257,7 @@ class ActionDescriptor:
             _blob_manager: BlobIOContextDep,
             request: Request,
             body: Any,  # This annotation will be overwritten below.
-            id: InvocationID,
+            id: Annotated[UUID, Depends(invocation_id)],
             cancel_hook: CancelHook,
             background_tasks: BackgroundTasks,
             **dependencies: Any,

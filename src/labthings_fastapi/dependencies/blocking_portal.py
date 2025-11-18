@@ -25,6 +25,7 @@ The `.ThingServer` sets up an `anyio.from_thread.BlockingPortal` when the server
 
 from __future__ import annotations
 from typing import Annotated
+from warnings import warn
 from fastapi import Depends, Request
 from anyio.from_thread import BlockingPortal as RealBlockingPortal
 from .thing_server import find_thing_server
@@ -47,6 +48,12 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
         blocking portal. This should not normally happen, as dependencies
         are only evaluated while the server is running.
     """
+    warn(
+        "The blocking portal dependency is deprecated and will be removed in v0.0.13. "
+        "Use `Thing.thing_server_interface` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     portal = find_thing_server(request.app).blocking_portal
     if portal is None:  # pragma: no cover
         raise ServerNotRunningError(
