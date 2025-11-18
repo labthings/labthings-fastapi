@@ -49,21 +49,20 @@ class ThingOne(lt.Thing):
         return blob
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
-
-
 class ThingTwo(lt.Thing):
+    thing_one: ThingOne = lt.thing_slot()
+
     @lt.thing_action
-    def check_both(self, thing_one: ThingOneDep) -> bool:
+    def check_both(self) -> bool:
         """An action that checks the output of ThingOne"""
-        check_actions(thing_one)
+        check_actions(self.thing_one)
         return True
 
     @lt.thing_action
-    def check_passthrough(self, thing_one: ThingOneDep) -> bool:
+    def check_passthrough(self) -> bool:
         """An action that checks the passthrough of ThingOne"""
-        output = thing_one.action_one()
-        passthrough = thing_one.passthrough_blob(blob=output)
+        output = self.thing_one.action_one()
+        passthrough = self.thing_one.passthrough_blob(blob=output)
         assert passthrough.content == ThingOne.ACTION_ONE_RESULT
         return True
 
@@ -81,6 +80,7 @@ def client():
         yield client
 
 
+@pytest.mark.filterwarnings("ignore:.*removed in v0.0.13.*:DeprecationWarning")
 def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
     with pytest.raises(ValueError):
@@ -121,13 +121,6 @@ def test_blob_output_direct():
     """Check blob outputs work correctly when we use a Thing directly in Python."""
     thing = create_thing_without_server(ThingOne)
     check_actions(thing)
-
-
-def test_blob_output_inserver(client):
-    """Test that the blob output works the same when used via a DirectThingClient."""
-    tc = lt.ThingClient.from_url("/thing_two/", client=client)
-    output = tc.check_both()
-    assert output is True
 
 
 def check_blob(output, expected_content: bytes):
