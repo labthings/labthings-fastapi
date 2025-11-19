@@ -67,7 +67,6 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from labthings_fastapi.dependencies.thing_server import find_thing_server
 from starlette.exceptions import HTTPException
 from typing_extensions import Self, Protocol, runtime_checkable
 
@@ -697,6 +696,10 @@ class BlobDataManager:
         app.get("/blob/{blob_id}")(self.download_blob)
 
 
+blob_data_manager = BlobDataManager()
+"""A global register of all BlobData objects."""
+
+
 blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
 """This context variable gives access to a function that makes BlobData objects
 downloadable, by assigning a URL and adding them to the
@@ -748,12 +751,10 @@ async def blob_serialisation_context_manager(
 
     :yield: the `.BlobDataManager`. This is usually ignored.
     """
-    thing_server = find_thing_server(request.app)
-    blob_manager: BlobDataManager = thing_server.blob_data_manager
     url_for = request.url_for
 
     def blobdata_to_url(blob: ServerSideBlobData) -> str:
-        blob_id = blob_manager.add_blob(blob)
+        blob_id = blob_data_manager.add_blob(blob)
         return str(url_for("download_blob", blob_id=blob_id))
 
     def url_to_blobdata(url: str) -> ServerSideBlobData:
@@ -763,12 +764,12 @@ async def blob_serialisation_context_manager(
                 status_code=404, detail="Could not find blob ID in href"
             )
         invocation_id = uuid.UUID(m.group(1))
-        return blob_manager.get_blob(invocation_id)
+        return blob_data_manager.get_blob(invocation_id)
 
     t1 = blobdata_to_url_ctx.set(blobdata_to_url)
     t2 = url_to_blobdata_ctx.set(url_to_blobdata)
     try:
-        yield blob_manager
+        yield blob_data_manager
     finally:
         blobdata_to_url_ctx.reset(t1)
         url_to_blobdata_ctx.reset(t2)
