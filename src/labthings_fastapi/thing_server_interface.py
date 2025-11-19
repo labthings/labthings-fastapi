@@ -18,6 +18,7 @@ from .exceptions import ServerNotRunningError
 
 if TYPE_CHECKING:
     from .server import ThingServer
+    from .actions import ActionManager
 
 
 Params = ParamSpec("Params")
@@ -141,3 +142,11 @@ class ThingServerInterface:
         :return: a dictionary of metadata, with the `.Thing` names as keys.
         """
         return {k: v.thing_state for k, v in self._get_server().things.items()}
+
+    @property
+    def action_manager(self) -> ActionManager:
+        """The ActionManager for the Thing attached to this interface.
+
+        This property may be removed in future, and is for internal use only.
+        """
+        return self._get_server().action_manager

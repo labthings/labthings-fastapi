@@ -20,7 +20,6 @@ from pydantic import create_model
 
 from ..actions import InvocationModel
 from ..dependencies.invocation import NonWarningInvocationID
-from ..dependencies.action_manager import ActionManagerContextDep
 from ..utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
@@ -252,7 +251,6 @@ class ActionDescriptor:
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
-            action_manager: ActionManagerContextDep,
             _blob_manager: BlobIOContextDep,
             request: Request,
             body: Any,  # This annotation will be overwritten below.
@@ -260,6 +258,7 @@ class ActionDescriptor:
             background_tasks: BackgroundTasks,
             **dependencies: Any,
         ) -> InvocationModel:
+            action_manager = thing._thing_server_interface.action_manager
             action = action_manager.invoke_action(
                 action=self,
                 thing=thing,
@@ -330,9 +329,8 @@ class ActionDescriptor:
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations(
-            action_manager: ActionManagerContextDep, _blob_manager: BlobIOContextDep
-        ) -> list[InvocationModel]:
+        def list_invocations(_blob_manager: BlobIOContextDep) -> list[InvocationModel]:
+            action_manager = thing._thing_server_interface.action_manager
             return action_manager.list_invocations(self, thing)
 
     def action_affordance(
