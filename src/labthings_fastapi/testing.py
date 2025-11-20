@@ -21,6 +21,7 @@ from .thing_server_interface import ThingServerInterface
 
 if TYPE_CHECKING:
     from .thing import Thing
+    from .actions import ActionManager
 
 Params = ParamSpec("Params")
 ReturnType = TypeVar("ReturnType")
@@ -108,6 +109,14 @@ class MockThingServerInterface(ThingServerInterface):
         :returns: an empty dictionary.
         """
         return {}
+
+    @property
+    def action_manager(self) -> ActionManager:
+        """Raise an error, as there's no action manager without a server.
+
+        :raises NotImplementedError: always.
+        """
+        raise NotImplementedError("MockThingServerInterface has no ActionManager.")
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
