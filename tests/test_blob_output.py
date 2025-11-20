@@ -123,6 +123,13 @@ def test_blob_output_direct():
     check_actions(thing)
 
 
+def test_blob_output_inserver(client):
+    """Test that the blob output works the same when used via a `.thing_slot`."""
+    tc = lt.ThingClient.from_url("/thing_two/", client=client)
+    output = tc.check_both()
+    assert output is True
+
+
 def check_blob(output, expected_content: bytes):
     """Test that a BlobOutput can be retrieved in three ways"""
     print(f"Testing blob output {output} which has attributes {output.__dict__}")
