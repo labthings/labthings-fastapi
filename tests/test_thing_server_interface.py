@@ -56,7 +56,7 @@ DIF_GROUPED_NAMES = ["snap", "crackle", "pop"]
 
 class ExampleWithSlots(lt.Thing):
     example: ExampleThing = lt.thing_slot()
-    dif_example: DifferentExampleThing = lt.thing_slot("diffy")
+    dif_example: DifferentExampleThing = lt.thing_slot(DIF_EXAMPLE_NAME)
     optionally_another_example: AnotherExampleThing | None = lt.thing_slot()
     unused_option: UnusedExampleThing | None = lt.thing_slot(None)
     grouped_things: Mapping[str, GroupedThing] = lt.thing_slot()
