@@ -89,27 +89,33 @@ class BlobData(Protocol):
 
     @property
     def media_type(self) -> str:
-        """The MIME type of the data, e.g. 'image/png' or 'application/json'."""
-        pass
+        """The MIME type of the data, e.g. 'image/png' or 'application/json'.
+
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("media_type property must be implemented.")
 
     @property
     def content(self) -> bytes:
-        """The data as a `bytes` object."""
-        pass
+        """The data as a `bytes` object.
+
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("content property must be implemented.")
 
     def save(self, filename: str) -> None:
         """Save the data to a file.
 
         :param filename: the path where the file should be saved.
         """
-        ...
+        ...  # pragma: no cover
 
     def open(self) -> io.IOBase:
         """Return a file-like object that may be read from.
 
         :return: an open file-like object.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class ServerSideBlobData(BlobData, Protocol):
@@ -135,7 +141,7 @@ class ServerSideBlobData(BlobData, Protocol):
 
         :return: a response that streams the data from disk or memory.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class BlobBytes:
