@@ -3,19 +3,22 @@
 import gc
 import os
 import tempfile
+from typing import Mapping
+from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import ServerNotRunningError
+from labthings_fastapi.exceptions import ServerNotRunningError, ThingNotConnectedError
 from labthings_fastapi.thing_server_interface import (
-    MockThingServerInterface,
     ThingServerInterface,
     ThingServerMissingError,
+)
+from labthings_fastapi.testing import (
+    MockThingServerInterface,
     create_thing_without_server,
 )
-
 
 NAME = "testname"
 EXAMPLE_THING_STATE = {"foo": "bar"}
@@ -25,6 +28,41 @@ class ExampleThing(lt.Thing):
     @lt.property
     def thing_state(self):
         return EXAMPLE_THING_STATE
+
+
+class DifferentExampleThing(lt.Thing):
+    pass
+
+
+class AnotherExampleThing(lt.Thing):
+    pass
+
+
+class UnusedExampleThing(lt.Thing):
+    pass
+
+
+class GroupedThing(lt.Thing):
+    pass
+
+
+class DifferentGroupedThing(lt.Thing):
+    pass
+
+
+DIF_EXAMPLE_NAME = "diffy"
+DIF_GROUPED_NAMES = ["snap", "crackle", "pop"]
+
+
+class ExampleWithSlots(lt.Thing):
+    example: ExampleThing = lt.thing_slot()
+    dif_example: DifferentExampleThing = lt.thing_slot(DIF_EXAMPLE_NAME)
+    optionally_another_example: AnotherExampleThing | None = lt.thing_slot()
+    unused_option: UnusedExampleThing | None = lt.thing_slot(None)
+    grouped_things: Mapping[str, GroupedThing] = lt.thing_slot()
+    dif_grouped_things: Mapping[str, DifferentGroupedThing] = lt.thing_slot(
+        DIF_GROUPED_NAMES
+    )
 
 
 @pytest.fixture
@@ -184,3 +222,59 @@ def test_create_thing_without_server():
     # We can't supply the interface as a kwarg
     with pytest.raises(ValueError, match="may not supply"):
         create_thing_without_server(ExampleThing, thing_server_interface=None)
+
+
+def test_not_mocking_slots():
+    """Check slots are not mocked by default."""
+    slotty = create_thing_without_server(ExampleWithSlots)
+
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.example
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.dif_example
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.optionally_another_example
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.unused_option
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.grouped_things
+    with pytest.raises(ThingNotConnectedError):
+        _ = slotty.dif_grouped_things
+
+
+def test_mocking_slots():
+    """Check the type of things and thing connections is correctly determined."""
+    slotty = create_thing_without_server(ExampleWithSlots, mock_all_slots=True)
+
+    # example is a mock pretending to be an ExampleThing
+    assert isinstance(slotty.example, ExampleThing)
+    assert isinstance(slotty.example, Mock)
+
+    # dif_example is a mock pretending to be a DifferentExampleThing, its name is set.
+    assert isinstance(slotty.dif_example, DifferentExampleThing)
+    assert isinstance(slotty.dif_example, Mock)
+    assert slotty.dif_example.name == DIF_EXAMPLE_NAME
+
+    # optionally_another_example, was optional but should be a mock pretending to be
+    # a AnotherExampleThing
+    assert isinstance(slotty.optionally_another_example, AnotherExampleThing)
+    assert isinstance(slotty.optionally_another_example, Mock)
+
+    # unused_option was an optional slot, but defaults to None. So should be None
+    assert slotty.unused_option is None
+
+    # The grouped_things should be a mapping
+    assert isinstance(slotty.grouped_things, Mapping)
+    for thing in slotty.grouped_things.values():
+        # All of the things should be mocks pretenting to be a GroupedThing
+        assert isinstance(thing, GroupedThing)
+    # No default so only one was created
+    assert len(slotty.grouped_things) == 1
+
+    # The dif_grouped_things should be a mapping
+    assert isinstance(slotty.dif_grouped_things, Mapping)
+    # The keys should be set from DIF_GROUPED_NAMES
+    assert set(DIF_GROUPED_NAMES) == set(slotty.dif_grouped_things.keys())
+    # These should also be the thing names
+    grouped_thing_names = {i.name for i in slotty.dif_grouped_things.values()}
+    assert set(DIF_GROUPED_NAMES) == grouped_thing_names

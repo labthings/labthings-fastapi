@@ -17,7 +17,7 @@ from labthings_fastapi.invocation_contexts import (
 )
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import LogConfigurationError
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 
 
 class ThingThatLogs(lt.Thing):

@@ -26,7 +26,7 @@ from labthings_fastapi.properties import FunctionalProperty
 from typing_extensions import assert_type
 import typing
 
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 
 
 def optional_int_factory() -> int | None:

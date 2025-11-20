@@ -5,7 +5,7 @@ from labthings_fastapi.exceptions import (
     PropertyNotObservableError,
     InvocationCancelledError,
 )
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 
 
 class ThingWithProperties(lt.Thing):

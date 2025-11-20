@@ -6,7 +6,7 @@ from labthings_fastapi.example_things import (
 )
 import pytest
 
-from labthings_fastapi.thing_server_interface import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server
 
 
 def test_mything():
