@@ -1,6 +1,6 @@
 """Actions module.
 
-:ref:`actions` are represented by methods, decorated with the `.thing_action`
+:ref:`actions` are represented by methods, decorated with the `.action`
 decorator.
 
 See the :ref:`actions` documentation for a top-level overview of actions in
@@ -9,7 +9,7 @@ LabThings-FastAPI.
 Developer notes
 ---------------
 
-Currently much of the code related to Actions is in `.thing_action` and the
+Currently much of the code related to Actions is in `.action` and the
 underlying `.ActionDescriptor`. This is likely to be refactored in the near
 future.
 """
@@ -926,7 +926,7 @@ class ActionDescriptor:
         )
 
 
-def mark_thing_action(func: Callable, **kwargs: Any) -> ActionDescriptor:
+def mark_action(func: Callable, **kwargs: Any) -> ActionDescriptor:
     r"""Mark a method of a Thing as an Action.
 
     We replace the function with a descriptor that's a
@@ -946,11 +946,11 @@ def mark_thing_action(func: Callable, **kwargs: Any) -> ActionDescriptor:
 
 
 @overload
-def thing_action(func: Callable, **kwargs: Any) -> ActionDescriptor: ...
+def action(func: Callable, **kwargs: Any) -> ActionDescriptor: ...
 
 
 @overload
-def thing_action(
+def action(
     **kwargs: Any,
 ) -> Callable[
     [
@@ -960,8 +960,8 @@ def thing_action(
 ]: ...
 
 
-@wraps(mark_thing_action)
-def thing_action(
+@wraps(mark_action)
+def action(
     func: Optional[Callable] = None, **kwargs: Any
 ) -> (
     ActionDescriptor
@@ -974,7 +974,7 @@ def thing_action(
 ):
     r"""Mark a method of a `.Thing` as a LabThings Action.
 
-    Methods decorated with :deco:`thing_action` will be available to call
+    Methods decorated with :deco:`action` will be available to call
     over HTTP as actions. See :ref:`actions` for an introduction to the concept
     of actions.
 
@@ -996,6 +996,6 @@ def thing_action(
     # return a partial object, which then calls the
     # wrapped function once.
     if func is not None:
-        return mark_thing_action(func, **kwargs)
+        return mark_action(func, **kwargs)
     else:
-        return partial(mark_thing_action, **kwargs)
+        return partial(mark_action, **kwargs)

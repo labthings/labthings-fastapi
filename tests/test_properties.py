@@ -33,11 +33,11 @@ class PropertyTestThing(lt.Thing):
     def floatprop(self, value: float):
         self._float = value
 
-    @lt.thing_action
+    @lt.action
     def toggle_boolprop(self):
         self.boolprop = not self.boolprop
 
-    @lt.thing_action
+    @lt.action
     def toggle_boolprop_from_thread(self):
         """Toggle boolprop from a new threading.Thread.
 

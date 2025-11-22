@@ -57,7 +57,7 @@ class ThingWithSettings(lt.Thing):
 
     localonly_boolsetting: bool = lt.setting(default=False, readonly=True)
 
-    @lt.thing_action
+    @lt.action
     def write_localonly_setting(self, value: str) -> None:
         """Change the value of the local-only setting.
 
@@ -67,7 +67,7 @@ class ThingWithSettings(lt.Thing):
         """
         self.localonlysetting = value
 
-    @lt.thing_action
+    @lt.action
     def toggle_localonly_boolsetting(self) -> None:
         """Toggle the local-only bool setting.
 
@@ -77,11 +77,11 @@ class ThingWithSettings(lt.Thing):
         """
         self.localonly_boolsetting = not self.localonly_boolsetting
 
-    @lt.thing_action
+    @lt.action
     def toggle_boolsetting(self):
         self.boolsetting = not self.boolsetting
 
-    @lt.thing_action
+    @lt.action
     def toggle_boolsetting_from_thread(self):
         t = Thread(target=self.toggle_boolsetting)
         t.start()

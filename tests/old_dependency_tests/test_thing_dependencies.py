@@ -21,7 +21,7 @@ pytestmark = pytest.mark.filterwarnings(
 class ThingOne(lt.Thing):
     ACTION_ONE_RESULT = "Action one result!"
 
-    @lt.thing_action
+    @lt.action
     def action_one(self) -> str:
         """An action that takes no arguments"""
         return self.action_one_internal()
@@ -36,12 +36,12 @@ with warnings.catch_warnings():
 
 
 class ThingTwo(lt.Thing):
-    @lt.thing_action
+    @lt.action
     def action_two(self, thing_one: ThingOneDep) -> str:
         """An action that needs a ThingOne"""
         return thing_one.action_one()
 
-    @lt.thing_action
+    @lt.action
     def action_two_a(self, thing_one: ThingOneDep) -> str:
         """Another action that needs a ThingOne"""
         return thing_one.action_one()
@@ -53,7 +53,7 @@ with warnings.catch_warnings():
 
 
 class ThingThree(lt.Thing):
-    @lt.thing_action
+    @lt.action
     def action_three(self, thing_two: ThingTwoDep) -> str:
         """An action that needs a ThingTwo"""
         # Note that we don't have to supply the ThingOne dependency
@@ -123,7 +123,7 @@ def test_raw_interthing_dependency():
     ThingOneDep = lt.deps.raw_thing_dependency(ThingOne)
 
     class ThingTwo(lt.Thing):
-        @lt.thing_action
+        @lt.action
         def action_two(self, thing_one: ThingOneDep) -> str:
             """An action that needs a ThingOne"""
             return thing_one.action_one()
@@ -149,11 +149,11 @@ def test_conflicting_dependencies():
     )
 
     class ThingFour(lt.Thing):
-        @lt.thing_action
+        @lt.action
         def action_four(self, thing_two: ThingTwoDepNoActions) -> str:
             return str(thing_two)
 
-        @lt.thing_action
+        @lt.action
         def action_five(self, thing_two: ThingTwoDep) -> str:
             return thing_two.action_two()
 

@@ -31,7 +31,7 @@ The attributes of a `.Thing` are made available over HTTP by decorating or marki
 
 * `.property` may be used as a decorator analogous to Python's built-in ``@property``\ . It can also be used to mark class attributes as variables that should be available over HTTP.
 * `.setting` works similarly to `.property` but it is persisted to disk when the server stops, so the value is remembered.
-* `.thing_action` is a decorator that makes methods available over HTTP.
+* `.action` is a decorator that makes methods available over HTTP.
 * `.thing_slot` tells LabThings to supply an instance of another `.Thing` at runtime, so your `.Thing` can make use of it.
 
 Client Code
@@ -39,7 +39,7 @@ Client Code
 
 Client code can be written in any language that supports an HTTP request. However, LabThings FastAPI provides additional functionality that makes writing client code in Python easier. See :ref:`using_things` for more detail.
 
-`.ThingClient` is a class that wraps up the required HTTP requests into a simpler interface. It can retrieve the :ref:`gen_td` over HTTP and use it to generate a new object with methods matching each `.thing_action` and properties matching each `.property`.
+`.ThingClient` is a class that wraps up the required HTTP requests into a simpler interface. It can retrieve the :ref:`gen_td` over HTTP and use it to generate a new object with methods matching each `.action` and properties matching each `.property`.
 
 While the current dynamic implementation of `.ThingClient` can be inspected with functions like `help` at runtime, it does not work well with static tools like `mypy` or `pyright`\ . In the future, LabThings should be able to generate static client code that works better with autocompletion and type checking.
 

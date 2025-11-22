@@ -18,7 +18,7 @@ subclass, defining the
 
 
     class MyThing(Thing):
-        @thing_action
+        @action
         def get_image(self) -> MyImageBlob:
             # Do something to get the image data
             data = self._get_image_data()

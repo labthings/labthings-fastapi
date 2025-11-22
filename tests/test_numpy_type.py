@@ -66,7 +66,7 @@ def test_0d():
 class MyNumpyThing(lt.Thing):
     """A thing that uses numpy types."""
 
-    @lt.thing_action
+    @lt.action
     def action_with_arrays(self, a: NDArray) -> NDArray:
         return a * 2
 

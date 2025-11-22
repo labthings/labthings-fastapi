@@ -23,7 +23,7 @@ from .thing import Thing
 from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
-from .actions import thing_action
+from .actions import action
 from .endpoints import fastapi_endpoint
 from . import deps
 from . import outputs
@@ -50,7 +50,7 @@ __all__ = [
     "setting",
     "DataProperty",
     "DataSetting",
-    "thing_action",
+    "action",
     "thing_slot",
     "fastapi_endpoint",
     "deps",

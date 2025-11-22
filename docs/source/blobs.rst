@@ -37,7 +37,7 @@ A camera might want to return an image as a `.Blob` object. The code for the act
         content_type = "image/jpeg"
 
     class Camera(lt.Thing):
-        @lt.thing_action
+        @lt.action
         def capture_image(self) -> JPEGBlob:
             # Capture an image and return it as a Blob
             image_data = self._capture_image()  # This returns a bytes object holding the JPEG data
@@ -79,19 +79,19 @@ We could define a more sophisticated camera that can capture raw images and conv
         content_type = "image/x-raw"
 
     class Camera(lt.Thing):
-        @lt.thing_action
+        @lt.action
         def capture_raw_image(self) -> RAWBlob:
             # Capture a raw image and return it as a Blob
             raw_data = self._capture_raw_image()  # This returns a bytes object holding the raw data
             return RAWBlob.from_bytes(raw_data)
         
-        @lt.thing_action
+        @lt.action
         def convert_raw_to_jpeg(self, raw_blob: RAWBlob) -> JPEGBlob:
             # Convert a raw image Blob to a JPEG Blob
             jpeg_data = self._convert_raw_to_jpeg(raw_blob.data)  # This returns a bytes object holding the JPEG data
             return JPEGBlob.from_bytes(jpeg_data)
         
-        @lt.thing_action
+        @lt.action
         def capture_image(self) -> JPEGBlob:
             # Capture an image and return it as a Blob
             raw_blob = self.capture_raw_image()  # Capture the raw image

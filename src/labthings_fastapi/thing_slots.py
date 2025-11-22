@@ -402,7 +402,7 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
             maybe_thing_a: ThingA | None = lt.thing_slot()
             all_things_a: Mapping[str, ThingA] = lt.thing_slot()
 
-            @lt.thing_action
+            @lt.action
             def show_connections(self) -> str:
                 "Tell someone about our connections."
                 self.thing_a  # should always evaluate to a ThingA instance
