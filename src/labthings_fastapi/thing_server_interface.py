@@ -144,7 +144,7 @@ class ThingServerInterface:
         return {k: v.thing_state for k, v in self._get_server().things.items()}
 
     @property
-    def action_manager(self) -> ActionManager:
+    def _action_manager(self) -> ActionManager:
         """The ActionManager for the Thing attached to this interface.
 
         This property may be removed in future, and is for internal use only.
