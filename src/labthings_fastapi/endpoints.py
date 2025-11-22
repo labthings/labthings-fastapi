@@ -16,9 +16,9 @@ more detail.
 from __future__ import annotations
 from functools import partial, wraps
 
-from ..base_descriptor import BaseDescriptor
-from ..exceptions import NotConnectedToServerError
-from ..utilities.introspection import get_docstring
+from .base_descriptor import BaseDescriptor
+from .exceptions import NotConnectedToServerError
+from .utilities.introspection import get_docstring
 
 from typing import (
     Any,
@@ -31,7 +31,7 @@ from typing import (
 from fastapi import FastAPI
 
 if TYPE_CHECKING:
-    from ..thing import Thing
+    from .thing import Thing
 
 HTTPMethod = Literal["get", "post", "put", "delete"]
 """Valid HTTP verbs to use with `.fastapi_endpoint` or `.EndpointDescriptor`."""

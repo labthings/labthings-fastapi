@@ -23,9 +23,9 @@ from .thing import Thing
 from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
+from .endpoints import fastapi_endpoint
 from .decorators import (
     thing_action,
-    fastapi_endpoint,
 )
 from . import deps
 from . import outputs
