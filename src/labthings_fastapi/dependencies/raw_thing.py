@@ -109,7 +109,7 @@ def raw_thing_dependency(cls: type[ThingInstance]) -> type[ThingInstance]:
 
 
         class MyThing(Thing):
-            @thing_action
+            @action
             def do_something(self, other_thing: MyOtherThing) -> None:
                 "This action needs no arguments"
                 other_thing.function_only_available_in_python()

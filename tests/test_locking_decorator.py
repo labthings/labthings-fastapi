@@ -43,7 +43,7 @@ class LockedExample(lt.Thing):
         self._event = Event()  # This is used to keep tests quick
         # by stopping waits as soon as they are no longer needed
 
-    @lt.thing_action
+    @lt.action
     @requires_lock
     def wait_wrapper(self, time: float = 1) -> None:
         """Wait a specified time, calling wait_with_flag.
@@ -53,13 +53,13 @@ class LockedExample(lt.Thing):
         """
         self.wait_with_flag(time)
 
-    @lt.thing_action
+    @lt.action
     @requires_lock
     def echo(self, message: str) -> str:
         """Echo a message back to the sender."""
         return message
 
-    @lt.thing_action
+    @lt.action
     @requires_lock
     def wait_with_flag(self, time: float = 1) -> None:
         """Wait a specified time with the flag True."""

@@ -24,7 +24,7 @@ class CancellableCountingThing(lt.Thing):
     and react by performing another task, in this case, setting this variable.
     """
 
-    @lt.thing_action
+    @lt.action
     def count_slowly(self, cancel: lt.deps.CancelHook, n: int = 10):
         for _i in range(n):
             try:
@@ -35,7 +35,7 @@ class CancellableCountingThing(lt.Thing):
                 raise (e)
             self.counter += 1
 
-    @lt.thing_action
+    @lt.action
     def count_slowly_but_ignore_cancel(self, cancel: lt.deps.CancelHook, n: int = 10):
         """
         Used to check that cancellation alter task behaviour
@@ -49,7 +49,7 @@ class CancellableCountingThing(lt.Thing):
                 counting_increment = 3
             self.counter += counting_increment
 
-    @lt.thing_action
+    @lt.action
     def count_and_only_cancel_if_asked_twice(
         self, cancel: lt.deps.CancelHook, n: int = 10
     ):

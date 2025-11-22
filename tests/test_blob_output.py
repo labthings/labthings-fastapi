@@ -26,12 +26,12 @@ class ThingOne(lt.Thing):
         super().__init__(thing_server_interface=thing_server_interface)
         self._temp_directory = TemporaryDirectory()
 
-    @lt.thing_action
+    @lt.action
     def action_one(self) -> TextBlob:
         """An action that makes a blob response from bytes"""
         return TextBlob.from_bytes(self.ACTION_ONE_RESULT)
 
-    @lt.thing_action
+    @lt.action
     def action_two(self) -> TextBlob:
         """An action that makes a blob response from a file and tempdir"""
         td = TemporaryDirectory()
@@ -39,7 +39,7 @@ class ThingOne(lt.Thing):
             f.write(self.ACTION_ONE_RESULT)
         return TextBlob.from_temporary_directory(td, "serverside")
 
-    @lt.thing_action
+    @lt.action
     def action_three(self) -> TextBlob:
         """An action that makes a blob response from a file"""
         fpath = os.path.join(self._temp_directory.name, "serverside")
@@ -47,7 +47,7 @@ class ThingOne(lt.Thing):
             f.write(self.ACTION_ONE_RESULT)
         return TextBlob.from_file(fpath)
 
-    @lt.thing_action
+    @lt.action
     def passthrough_blob(self, blob: TextBlob) -> TextBlob:
         """An action that passes through a blob response"""
         return blob
@@ -56,13 +56,13 @@ class ThingOne(lt.Thing):
 class ThingTwo(lt.Thing):
     thing_one: ThingOne = lt.thing_slot()
 
-    @lt.thing_action
+    @lt.action
     def check_both(self) -> bool:
         """An action that checks the output of ThingOne"""
         check_actions(self.thing_one)
         return True
 
-    @lt.thing_action
+    @lt.action
     def check_passthrough(self) -> bool:
         """An action that checks the passthrough of ThingOne"""
         output = self.thing_one.action_one()

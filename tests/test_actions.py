@@ -100,7 +100,7 @@ def test_varargs():
     """Test that we can't use *args in an action"""
     with pytest.raises(TypeError):
 
-        @lt.thing_action
+        @lt.action
         def action_with_varargs(self, *args) -> None:
             """An action that takes *args"""
             pass
@@ -177,7 +177,7 @@ def test_wrapped_action():
     """Check functools.wraps does not confuse schema generation"""
 
     class Example(lt.Thing):
-        @lt.thing_action
+        @lt.action
         def action(
             self,
             portal: lt.deps.BlockingPortal,
@@ -187,7 +187,7 @@ def test_wrapped_action():
             """An example action with type annotations."""
             return 0.5
 
-        @lt.thing_action
+        @lt.action
         @example_decorator
         def decorated(
             self,

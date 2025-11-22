@@ -5,7 +5,7 @@ Actions
 
 Actions are the way `.Thing` objects are instructed to do things. In Python
 terms, any method of a `.Thing` that we want to be able to call over HTTP
-should be decorated as an Action, using `.thing_action`.
+should be decorated as an Action, using `.action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
 Our implementation should align with :ref:`wot_actions` as defined by the Web of Things standard.

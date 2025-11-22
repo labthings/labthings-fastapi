@@ -21,7 +21,7 @@ pytestmark = pytest.mark.filterwarnings(
 class Counter(lt.Thing):
     ACTION_ONE_RESULT = "Action one result!"
 
-    @lt.thing_action
+    @lt.action
     def increment(self) -> str:
         """An action that takes no arguments"""
         return self.increment_internal()
@@ -74,7 +74,7 @@ class Controller(lt.Thing):
     the server.
     """
 
-    @lt.thing_action
+    @lt.action
     def count_in_twos(self, counter: CounterDep) -> str:
         """An action that needs a Counter and uses its affordances.
 
@@ -87,7 +87,7 @@ class Controller(lt.Thing):
         assert counter.count == 2
         return "success"
 
-    @lt.thing_action
+    @lt.action
     def count_internal(self, counter: CounterDep) -> str:
         """An action that tries to access local-only attributes.
 
@@ -108,7 +108,7 @@ class Controller(lt.Thing):
             pass
         return "success"
 
-    @lt.thing_action
+    @lt.action
     def count_raw(self, counter: RawCounterDep) -> str:
         """Increment the counter using a method that is not an Action."""
         counter.count = 0

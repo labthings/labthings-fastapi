@@ -12,7 +12,7 @@ MyThingDep = Annotated[MyThingClient, Depends()]
 class TestThing(lt.Thing):
     """A test thing with a counter property and a couple of actions."""
 
-    @lt.thing_action
+    @lt.action
     def increment_counter(self, my_thing: MyThingDep) -> None:
         """Increment the counter on another thing."""
         my_thing.increment_counter()

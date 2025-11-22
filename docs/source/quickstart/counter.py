@@ -7,7 +7,7 @@ import labthings_fastapi as lt
 class TestThing(lt.Thing):
     """A test thing with a counter property and a couple of actions."""
 
-    @lt.thing_action
+    @lt.action
     def increment_counter(self) -> None:
         """Increment the counter property.
 
@@ -17,7 +17,7 @@ class TestThing(lt.Thing):
         """
         self.counter += 1
 
-    @lt.thing_action
+    @lt.action
     def slowly_increase_counter(self) -> None:
         """Increment the counter slowly over a minute."""
         for _i in range(60):
