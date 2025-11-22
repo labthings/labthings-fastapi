@@ -111,7 +111,7 @@ class MockThingServerInterface(ThingServerInterface):
         return {}
 
     @property
-    def action_manager(self) -> ActionManager:
+    def _action_manager(self) -> ActionManager:
         """Raise an error, as there's no action manager without a server.
 
         :raises NotImplementedError: always.

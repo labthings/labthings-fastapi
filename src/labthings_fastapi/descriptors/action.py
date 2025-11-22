@@ -258,7 +258,7 @@ class ActionDescriptor:
             background_tasks: BackgroundTasks,
             **dependencies: Any,
         ) -> InvocationModel:
-            action_manager = thing._thing_server_interface.action_manager
+            action_manager = thing._thing_server_interface._action_manager
             action = action_manager.invoke_action(
                 action=self,
                 thing=thing,
@@ -330,7 +330,7 @@ class ActionDescriptor:
             summary=f"All invocations of {self.name}.",
         )
         def list_invocations(_blob_manager: BlobIOContextDep) -> list[InvocationModel]:
-            action_manager = thing._thing_server_interface.action_manager
+            action_manager = thing._thing_server_interface._action_manager
             return action_manager.list_invocations(self, thing)
 
     def action_affordance(
