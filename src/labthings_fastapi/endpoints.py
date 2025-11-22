@@ -61,6 +61,7 @@ class EndpointDescriptor(BaseDescriptor):
             FastAPI decorator, allowing you to specify responses, OpenAPI
             parameters, etc.
         """
+        super().__init__()
         self.func = func
         self.http_method = http_method
         self._path = path

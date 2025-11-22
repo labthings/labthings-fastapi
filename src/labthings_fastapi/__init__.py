@@ -23,10 +23,8 @@ from .thing import Thing
 from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
+from .actions import thing_action
 from .endpoints import fastapi_endpoint
-from .decorators import (
-    thing_action,
-)
 from . import deps
 from . import outputs
 from .outputs import blob

@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from .logs import THING_LOGGER
 from .properties import BaseProperty, DataProperty, BaseSetting
-from .descriptors import ActionDescriptor
+from .actions import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation

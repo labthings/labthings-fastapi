@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 import pytest
 from ..temp_client import poll_task
 import labthings_fastapi as lt
-from labthings_fastapi.actions.invocation_model import LogRecordModel
+from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
 
 

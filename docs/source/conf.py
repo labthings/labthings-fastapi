@@ -73,7 +73,7 @@ convenience_modules = {
 canonical_fq_names = [
     "labthings_fastapi.descriptors.action.ActionDescriptor",
     "labthings_fastapi.outputs.blob.BlobDataManager",
-    "labthings_fastapi.actions.invocation_model.InvocationModel",
+    "labthings_fastapi.invocations.InvocationModel",
     "labthings_fastapi.outputs.MJPEGStream",
     "labthings_fastapi.outputs.MJPEGStreamDescriptor",
     "labthings_fastapi.outputs.blob.BlobIOContextDep",
