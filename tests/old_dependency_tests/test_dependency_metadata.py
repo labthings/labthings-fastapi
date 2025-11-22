@@ -3,10 +3,16 @@ This tests metadata retrieval, as used by e.g. the camera for EXIF info
 """
 
 from typing import Any, Mapping
+import warnings
 from fastapi.testclient import TestClient
 import pytest
 from ..temp_client import poll_task
 import labthings_fastapi as lt
+
+
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+)
 
 
 class ThingOne(lt.Thing):
@@ -27,7 +33,9 @@ class ThingOne(lt.Thing):
         return {"a": self.a}
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
 
 
 class ThingTwo(lt.Thing):

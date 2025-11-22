@@ -172,6 +172,11 @@ def test_get_thing_states(interface):
     assert states == {"example": EXAMPLE_THING_STATE}
 
 
+def test_action_manager(server, interface):
+    """Check the action manager is retrieved properly."""
+    assert interface._action_manager is server.action_manager
+
+
 def test_mock_start_async_task_soon(mockinterface):
     """Check nothing happens when we run an async task."""
     mutable = [False]
@@ -203,6 +208,12 @@ def test_mock_path(mockinterface):
 def test_mock_get_thing_states(mockinterface):
     """Check an empty dictionary is returned."""
     assert mockinterface.get_thing_states() == {}
+
+
+def test_mock_action_manager(mockinterface):
+    """Check that accessing the action manager raises an error."""
+    with pytest.raises(NotImplementedError):
+        _ = mockinterface._action_manager
 
 
 def test_create_thing_without_server():

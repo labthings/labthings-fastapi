@@ -136,7 +136,7 @@ It may be possible to have actions return binary data directly in the future, bu
 
 .. note::
 
-    Serialising or deserialising `.Blob` objects requires access to the `.BlobDataManager` associated with the `.ThingServer`. As there is no way to pass this in to the relevant methods at serialisation/deserialisation time, we use context variables to access them. This means that a `.blob_serialisation_context_manager` should be used to set (and then clear) those context variables. This is done by the `.BlobIOContextDep` dependency on the relevant endpoints (currently any endpoint that may return the output of an action).
+    Serialising or deserialising `.Blob` objects requires access to the `.BlobDataManager`\ . As there is no way to pass this in to the relevant methods at serialisation/deserialisation time, we use context variables to access them. This means that a `.blob_serialisation_context_manager` should be used to set (and then clear) those context variables. This is done by the `.BlobIOContextDep` dependency on the relevant endpoints (currently any endpoint that may return the output of an action).
 
 
 Memory management and retention

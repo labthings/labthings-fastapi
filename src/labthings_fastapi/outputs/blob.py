@@ -53,6 +53,7 @@ from typing import (
     Mapping,
     Optional,
 )
+from warnings import warn
 from weakref import WeakValueDictionary
 from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
@@ -66,7 +67,6 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from labthings_fastapi.dependencies.thing_server import find_thing_server
 from starlette.exceptions import HTTPException
 from typing_extensions import Self, Protocol, runtime_checkable
 
@@ -89,27 +89,33 @@ class BlobData(Protocol):
 
     @property
     def media_type(self) -> str:
-        """The MIME type of the data, e.g. 'image/png' or 'application/json'."""
-        pass
+        """The MIME type of the data, e.g. 'image/png' or 'application/json'.
+
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("media_type property must be implemented.")
 
     @property
     def content(self) -> bytes:
-        """The data as a `bytes` object."""
-        pass
+        """The data as a `bytes` object.
+
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("content property must be implemented.")
 
     def save(self, filename: str) -> None:
         """Save the data to a file.
 
         :param filename: the path where the file should be saved.
         """
-        ...
+        ...  # pragma: no cover
 
     def open(self) -> io.IOBase:
         """Return a file-like object that may be read from.
 
         :return: an open file-like object.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class ServerSideBlobData(BlobData, Protocol):
@@ -135,7 +141,7 @@ class ServerSideBlobData(BlobData, Protocol):
 
         :return: a response that streams the data from disk or memory.
         """
-        ...
+        ...  # pragma: no cover
 
 
 class BlobBytes:
@@ -586,6 +592,12 @@ def blob_type(media_type: str) -> type[Blob]:
 
     :raise ValueError: if the media type contains ``'`` or ``\``.
     """
+    warn(
+        "`blob_type` is deprecated and will be removed in v0.0.13. "
+        "Create a subclass of `Blob` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if "'" in media_type or "\\" in media_type:
         raise ValueError("media_type must not contain single quotes or backslashes")
     return create_model(
@@ -690,6 +702,10 @@ class BlobDataManager:
         app.get("/blob/{blob_id}")(self.download_blob)
 
 
+blob_data_manager = BlobDataManager()
+"""A global register of all BlobData objects."""
+
+
 blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
 """This context variable gives access to a function that makes BlobData objects
 downloadable, by assigning a URL and adding them to the
@@ -741,12 +757,10 @@ async def blob_serialisation_context_manager(
 
     :yield: the `.BlobDataManager`. This is usually ignored.
     """
-    thing_server = find_thing_server(request.app)
-    blob_manager: BlobDataManager = thing_server.blob_data_manager
     url_for = request.url_for
 
     def blobdata_to_url(blob: ServerSideBlobData) -> str:
-        blob_id = blob_manager.add_blob(blob)
+        blob_id = blob_data_manager.add_blob(blob)
         return str(url_for("download_blob", blob_id=blob_id))
 
     def url_to_blobdata(url: str) -> ServerSideBlobData:
@@ -756,12 +770,12 @@ async def blob_serialisation_context_manager(
                 status_code=404, detail="Could not find blob ID in href"
             )
         invocation_id = uuid.UUID(m.group(1))
-        return blob_manager.get_blob(invocation_id)
+        return blob_data_manager.get_blob(invocation_id)
 
     t1 = blobdata_to_url_ctx.set(blobdata_to_url)
     t2 = url_to_blobdata_ctx.set(url_to_blobdata)
     try:
-        yield blob_manager
+        yield blob_data_manager
     finally:
         blobdata_to_url_ctx.reset(t1)
         url_to_blobdata_ctx.reset(t2)

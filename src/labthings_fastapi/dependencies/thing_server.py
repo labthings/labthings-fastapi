@@ -29,6 +29,7 @@ and :ref:`things_from_things` for more on how `.Things` interact.
 from __future__ import annotations
 from weakref import WeakSet
 from typing import TYPE_CHECKING
+from warnings import warn
 from fastapi import FastAPI, Request
 
 if TYPE_CHECKING:
@@ -58,6 +59,13 @@ def find_thing_server(app: FastAPI) -> ThingServer:
         if this function is called on a `fastapi.FastAPI` instance
         that was not created by a `.ThingServer`.
     """
+    warn(
+        "`find_thing_server` and `thing_server_from_request` are deprecated "
+        "and will be removed in v0.0.13. Use `Thing.thing_server_interface` "
+        "instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     for server in _thing_servers:
         if server.app == app:
             return server

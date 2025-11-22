@@ -4,10 +4,14 @@ This tests Things that depend on other Things
 
 import os
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from httpx import HTTPStatusError
+from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
+from labthings_fastapi.client.outputs import ClientBlobOutput
 from labthings_fastapi.testing import create_thing_without_server
 
 
@@ -49,21 +53,20 @@ class ThingOne(lt.Thing):
         return blob
 
 
-ThingOneDep = lt.deps.direct_thing_client_dependency(ThingOne, "thing_one")
-
-
 class ThingTwo(lt.Thing):
+    thing_one: ThingOne = lt.thing_slot()
+
     @lt.thing_action
-    def check_both(self, thing_one: ThingOneDep) -> bool:
+    def check_both(self) -> bool:
         """An action that checks the output of ThingOne"""
-        check_actions(thing_one)
+        check_actions(self.thing_one)
         return True
 
     @lt.thing_action
-    def check_passthrough(self, thing_one: ThingOneDep) -> bool:
+    def check_passthrough(self) -> bool:
         """An action that checks the passthrough of ThingOne"""
-        output = thing_one.action_one()
-        passthrough = thing_one.passthrough_blob(blob=output)
+        output = self.thing_one.action_one()
+        passthrough = self.thing_one.passthrough_blob(blob=output)
         assert passthrough.content == ThingOne.ACTION_ONE_RESULT
         return True
 
@@ -81,6 +84,23 @@ def client():
         yield client
 
 
+def test_blobdata_protocol():
+    """Check the definition of the blobdata protocol, and the implementations."""
+
+    class BadBlob(lt.blob.BlobData):
+        pass
+
+    bad_blob = BadBlob()
+
+    assert not isinstance(bad_blob, lt.blob.ServerSideBlobData)
+
+    with pytest.raises(NotImplementedError):
+        _ = bad_blob.media_type
+    with pytest.raises(NotImplementedError):
+        _ = bad_blob.content
+
+
+@pytest.mark.filterwarnings("ignore:.*removed in v0.0.13.*:DeprecationWarning")
 def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
     with pytest.raises(ValueError):
@@ -105,10 +125,41 @@ def test_blob_creation():
     blob = TextBlob.from_temporary_directory(td, "test_input")
     assert blob.content == TEXT
     assert blob.data._temporary_directory is td
+    # Using a filename that does not exist should generate an error.
+    with pytest.raises(IOError):
+        _ = TextBlob.from_file(os.path.join(td.name, "nonexistent"))
+    with pytest.raises(IOError):
+        _ = TextBlob.from_temporary_directory(td, "nonexistent")
 
     # Finally, check we can make a blob from a bytes object, no file.
     blob = TextBlob.from_bytes(TEXT)
     assert blob.content == TEXT
+
+
+def test_blob_serialisation():
+    """Check that blobs may be serialised."""
+    blob = TextBlob.from_bytes(b"Some data")
+    # Can't serialise a blob (with data) without a BlobDataManager
+    with pytest.raises(PydanticSerializationError):
+        blob.model_dump()
+    # Fake the required context variable, and it should work
+    try:
+        token = lt.outputs.blob.blobdata_to_url_ctx.set(lambda b: "https://example/")
+        data = blob.model_dump()
+        assert data["href"] == "https://example/"
+        assert data["media_type"] == "text/plain"
+    finally:
+        lt.outputs.blob.blobdata_to_url_ctx.reset(token)
+
+    # Blobs that already refer to a remote URL should serialise without error
+    # though there's currently no way to create one on the server.
+    remoteblob = TextBlob.model_construct(
+        media_type="text/plain",
+        href="https://example/",
+    )
+    data = remoteblob.model_dump()
+    assert data["href"] == "https://example/"
+    assert data["media_type"] == "text/plain"
 
 
 def test_blob_output_client(client):
@@ -124,7 +175,7 @@ def test_blob_output_direct():
 
 
 def test_blob_output_inserver(client):
-    """Test that the blob output works the same when used via a DirectThingClient."""
+    """Test that the blob output works the same when used via a `.thing_slot`."""
     tc = lt.ThingClient.from_url("/thing_two/", client=client)
     output = tc.check_both()
     assert output is True
@@ -165,6 +216,21 @@ def test_blob_input(client):
     passthrough = tc.passthrough_blob(blob=output)
     print(f"Output is {passthrough}")
     assert passthrough.content == ThingOne.ACTION_ONE_RESULT
+
+    # Check that a bad URL results in an error.
+    # This URL is not totally bad - it follows the right form, but the
+    # UUID is not found on the server.
+    bad_blob = ClientBlobOutput(
+        media_type="text/plain", href=f"http://nonexistent.local/blob/{uuid4()}"
+    )
+    with pytest.raises(LookupError):
+        tc.passthrough_blob(blob=bad_blob)
+    # Try again with a totally bogus URL
+    bad_blob = ClientBlobOutput(
+        media_type="text/plain", href="http://nonexistent.local/totally_bogus"
+    )
+    with pytest.raises(HTTPStatusError, match="404 Not Found"):
+        tc.passthrough_blob(blob=bad_blob)
 
     # Check that the same thing works on the server side
     tc2 = lt.ThingClient.from_url("/thing_two/", client=client)

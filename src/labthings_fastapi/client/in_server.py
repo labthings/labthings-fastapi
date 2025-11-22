@@ -18,6 +18,7 @@ from functools import wraps
 import inspect
 import logging
 from typing import Any, Mapping, Optional, Union
+from warnings import warn
 from pydantic import BaseModel
 from ..descriptors.action import ActionDescriptor
 
@@ -69,6 +70,12 @@ class DirectThingClient:
             type hints instructs FastAPI to inject dependency arguments,
             such as access to other `.Things`.
         """
+        warn(
+            "`DirectThingClient` is deprecated and will be removed in v0.0.13. Use "
+            "`lt.thing_slot` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         server = find_thing_server(request.app)
         self._wrapped_thing = server.things[self.thing_name]
         self._request = request
@@ -274,6 +281,13 @@ def direct_thing_client_class(
 
         This class may be used as a FastAPI dependency: see :ref:`things_from_things`.
     """
+    warn(
+        "`direct_thing_client_class` is deprecated and will be removed in v0.0.13. "
+        "Use `lt.thing_slot` instead.",
+        DeprecationWarning,
+        stacklevel=3,  # This is called from `direct_thing_client_dependency` so we
+        # need stacklevel=3 to point to user code.
+    )
 
     def init_proxy(
         self: DirectThingClient, request: Request, **dependencies: Mapping[str, Any]
