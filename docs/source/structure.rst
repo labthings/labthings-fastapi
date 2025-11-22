@@ -42,3 +42,10 @@ Client code can be written in any language that supports an HTTP request. Howeve
 `.ThingClient` is a class that wraps up the required HTTP requests into a simpler interface. It can retrieve the :ref:`gen_td` over HTTP and use it to generate a new object with methods matching each `.thing_action` and properties matching each `.property`.
 
 While the current dynamic implementation of `.ThingClient` can be inspected with functions like `help` at runtime, it does not work well with static tools like `mypy` or `pyright`\ . In the future, LabThings should be able to generate static client code that works better with autocompletion and type checking.
+
+Data types
+-----------
+
+LabThings follows `fastapi`\ 's approach of using type hints to define the data types of action parameters and property values. Standard Python types can be used wherever possible, and `pydantic` will be used in the background to generate JSONSchema definitions as part of the API documentation. More complicated datatypes may be described using `pydantic` models, which can be used as type hints in action signatures or property definitions.
+
+Binary data that is not easily serialised to JSON (e.g. images, large arrays, or files) may be represented using the `.Blob` datatype. This is described in more detail in :ref:`blobs`\ .
