@@ -6,11 +6,7 @@ affordance" (see :ref:`wot_affordances`) rely on docstrings and Python
 type hints to provide a full description of the parameters, so it's
 important that you use these effectively.
 
-If you have a complex datatype, it's recommended to use a `pydantic` model
-to describe it - this is often the case for complicated properties or events.
-For actions, a model is created automatically based on the function's
-signature: if you want to add descriptions or validators to individual
-arguments, you may use `pydantic.Field` to do this.
+
 
 Actions
 -------
@@ -38,8 +34,6 @@ from functools import wraps, partial
 from typing import Any, Optional, Callable, overload
 from ..descriptors import (
     ActionDescriptor,
-    EndpointDescriptor,
-    HTTPMethod,
 )
 
 
@@ -116,51 +110,3 @@ def thing_action(
         return mark_thing_action(func, **kwargs)
     else:
         return partial(mark_thing_action, **kwargs)
-
-
-def fastapi_endpoint(
-    method: HTTPMethod, path: Optional[str] = None, **kwargs: Any
-) -> Callable[[Callable], EndpointDescriptor]:
-    r"""Mark a function as a FastAPI endpoint without making it an action.
-
-    This decorator will cause a method of a `.Thing` to be directly added to
-    the HTTP API, bypassing the machinery underlying Action and Property
-    affordances. Such endpoints will not be documented in the :ref:`wot_td` but
-    may be used as the target of links. For example, this could allow a file
-    to be downloaded from the `.Thing` at a known URL, or serve a video stream
-    that wouldn't be supported as a `.Blob`\ .
-
-    The majority of `.Thing` implementations won't need this decorator, but
-    it is here to enable flexibility when it's needed.
-
-    This decorator always takes arguments; in particular, ``method`` is
-    required. It should be used as:
-
-    .. code-block:: python
-
-        class DownloadThing(Thing):
-            @fastapi_endpoint("get")
-            def plain_text_response(self) -> str:
-                return "example string"
-
-    This decorator is intended to work very similarly to the `fastapi` decorators
-    ``@app.get``, ``@app.post``, etc., with two changes:
-
-    1. The path is relative to the host `.Thing` and will default to the name
-        of the method.
-    2. The method will be called with the host `.Thing` as its first argument,
-        i.e. it will be bound to the class as usua.
-
-    :param method: The HTTP verb this endpoint responds to.
-    :param path: The path, relative to the host `.Thing` base URL.
-    :param \**kwargs: Additional keyword arguments are passed to the
-        `fastapi.FastAPI.get` decorator if ``method`` is ``get``, or to
-        the equivalent decorator for other HTTP verbs.
-
-    :return: When used as intended, the result is an `.EndpointDescriptor`.
-    """
-
-    def decorator(func: Callable) -> EndpointDescriptor:
-        return EndpointDescriptor(func, http_method=method, path=path, **kwargs)
-
-    return decorator
