@@ -1,12 +1,16 @@
 from threading import Thread
 from typing import Any
 
+from annotated_types import Ge, Le, Gt, Lt, MultipleOf, MinLen, MaxLen
 from pydantic import BaseModel, RootModel
 from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import ServerNotRunningError
+from labthings_fastapi.exceptions import (
+    ServerNotRunningError,
+    UnsupportedConstraintError,
+)
 from .temp_client import poll_task
 
 
@@ -48,6 +52,17 @@ class PropertyTestThing(lt.Thing):
         t.start()
         # Ensure the thread has finished before the action completes:
         t.join()
+
+    constrained_int: int = lt.property(default=5, ge=0, le=10, multiple_of=2)
+    "An integer property with constraints"
+
+    constrained_float: float = lt.property(default=5, gt=0, lt=10, allow_inf_nan=False)
+    "A float property with constraints"
+
+    constrained_str: str = lt.property(
+        default="hello", min_length=3, max_length=10, pattern="^[a-z]+$"
+    )
+    "A string property with constraints"
 
 
 @pytest.fixture
@@ -242,3 +257,111 @@ def test_setting_without_event_loop():
     assert isinstance(thing, PropertyTestThing)
     with pytest.raises(ServerNotRunningError):
         thing.boolprop = False  # Can't call it until the event loop's running
+
+
+def test_constrained_properties():
+    """Test that constraints on property values generate correct models."""
+    constrained_int = PropertyTestThing.constrained_int
+    assert constrained_int.value_type is int
+    m = constrained_int.model
+    assert issubclass(m, RootModel)
+    for ann in [Ge(0), Le(10), MultipleOf(2)]:
+        assert any(meta == ann for meta in m.model_fields["root"].metadata)
+
+    constrained_float = PropertyTestThing.constrained_float
+    assert constrained_float.value_type is float
+    m = constrained_float.model
+    assert issubclass(m, RootModel)
+    for ann in [Gt(0), Lt(10)]:
+        assert any(meta == ann for meta in m.model_fields["root"].metadata)
+
+    constrained_str = PropertyTestThing.constrained_str
+    assert constrained_str.value_type is str
+    m = constrained_str.model
+    assert issubclass(m, RootModel)
+    for ann in [MinLen(3), MaxLen(10)]:
+        assert any(meta == ann for meta in m.model_fields["root"].metadata)
+
+
+def test_constrained_properties_http(server):
+    """Test properties with constraints on their values.
+
+    This tests that the constraints are enforced when setting
+    the properties via HTTP PUT requests.
+
+    It also checks that the constraints propagate to the JSONSchema.
+    """
+    with TestClient(server.app) as client:
+        r = client.get("/thing/")
+        r.raise_for_status()
+        thing_description = r.json()
+        properties = thing_description["properties"]
+
+        # Test constrained_int
+        r = client.put("/thing/constrained_int", json=8)
+        assert r.status_code == 201  # Successful write
+        r = client.put("/thing/constrained_int", json=11)
+        assert r.status_code == 422  # Above 'le' constraint
+        r = client.put("/thing/constrained_int", json=-2)
+        assert r.status_code == 422  # Below 'ge' constraint
+        r = client.put("/thing/constrained_int", json=5)
+        assert r.status_code == 422  # Not a multiple_of 2
+        property = properties["constrained_int"]
+        assert property["minimum"] == 0
+        assert property["maximum"] == 10
+        assert property["multipleOf"] == 2
+
+        # Test constrained_float
+        r = client.put("/thing/constrained_float", json=5.5)
+        assert r.status_code == 201  # Successful write
+        r = client.put("/thing/constrained_float", json=10.0)
+        assert r.status_code == 422  # Not less than 'lt' constraint
+        r = client.put("/thing/constrained_float", json=0.0)
+        assert r.status_code == 422  # Not greater than 'gt' constraint
+        r = client.put("/thing/constrained_float", json="Infinity")
+        assert r.status_code == 422  # inf not allowed
+        property = properties["constrained_float"]
+        assert property["exclusiveMaximum"] == 10.0
+        assert property["exclusiveMinimum"] == 0.0
+
+        # Check unconstrained float allows inf, so we know the test
+        # above is different from the default case.
+        r = client.put("/thing/floatprop", json="Infinity")
+        assert r.status_code == 201  # inf is allowed for unconstrained float
+
+        # Test constrained_str
+        r = client.put("/thing/constrained_str", json="valid")
+        assert r.status_code == 201  # Successful write
+        r = client.put("/thing/constrained_str", json="no")
+        assert r.status_code == 422  # Below min_length
+        r = client.put("/thing/constrained_str", json="thisisaverylongstring")
+        assert r.status_code == 422  # Above max_length
+        r = client.put("/thing/constrained_str", json="Invalid1")
+        assert r.status_code == 422  # Does not match pattern
+        property = properties["constrained_str"]
+        assert property["minLength"] == 3
+        assert property["maxLength"] == 10
+        assert property["pattern"] == "^[a-z]+$"
+
+
+def test_bad_property_constraints():
+    """Test that bad constraints raise errors at definition time."""
+
+    class BadConstraintThing(lt.Thing):
+        bad_prop: int = lt.property(default=0, allow_inf_nan=False)
+
+    # Some constraints cause errors when the model is built. So far
+    # I believe only allow_inf_nan on int does this.
+    with pytest.raises(UnsupportedConstraintError):
+        _ = BadConstraintThing.bad_prop.model
+
+    # Other bad constraints raise errors when the property is created.
+    # This should happen for any argument not in CONSTRAINT_ARGS
+    with pytest.raises(UnsupportedConstraintError):
+
+        class AnotherBadConstraintThing(lt.Thing):
+            another_bad_prop: str = lt.property(default="foo", bad_constraint=2)
+
+    # Some in appropriate constraints (e.g. multiple_of on str) are passed through
+    # as metadata if used on the wrong type. We don't currently raise errors
+    # for these.

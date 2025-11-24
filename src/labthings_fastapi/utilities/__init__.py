@@ -1,10 +1,14 @@
 """Utility functions used by LabThings-FastAPI."""
 
 from __future__ import annotations
+from collections.abc import Mapping
 from typing import Any, Dict, Iterable, TYPE_CHECKING, Optional
 from weakref import WeakSet
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
+from pydantic_core import SchemaError
+
+from labthings_fastapi.exceptions import UnsupportedConstraintError
 from .introspection import EmptyObject
 
 if TYPE_CHECKING:
@@ -81,7 +85,9 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
     return obj.__dict__[LABTHINGS_DICT_KEY]
 
 
-def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
+def wrap_plain_types_in_rootmodel(
+    model: type, constraints: Mapping[str, Any] | None = None
+) -> type[BaseModel]:
     """Ensure a type is a subclass of BaseModel.
 
     If a `pydantic.BaseModel` subclass is passed to this function, we will pass it
@@ -90,15 +96,41 @@ def wrap_plain_types_in_rootmodel(model: type) -> type[BaseModel]:
     and not a model instance.
 
     :param model: A Python type or `pydantic` model.
+    :param constraints: is passed as keyword arguments to `pydantic.Field`
+        to add validation constraints to the property.
 
     :return: A `pydantic` model, wrapping Python types in a ``RootModel`` if needed.
+
+    :raises UnsupportedConstraintError: if constraints are provided for an
+        unsuitable type, for example `allow_inf_nan` for an `int` property, or
+        any constraints for a `BaseModel` subclass.
+    :raises SchemaError: if other errors prevent Pydantic from creating a schema
+        for the generated model.
     """
     try:  # This needs to be a `try` as basic types are not classes
         if issubclass(model, BaseModel):
+            if constraints:
+                raise UnsupportedConstraintError(
+                    "Constraints may only be applied to plain types, not Models."
+                )
             return model
     except TypeError:
         pass  # some plain types aren't classes and that's OK - they still get wrapped.
-    return create_model(f"{model!r}", root=(model, ...), __base__=RootModel)
+    constraints = constraints or {}
+    try:
+        return create_model(
+            f"{model!r}",
+            root=(model, Field(**constraints)),
+            __base__=RootModel,
+        )
+    except SchemaError as e:
+        for error in e.errors():
+            if error["loc"][-1] in constraints:
+                key = error["loc"][-1]
+                raise UnsupportedConstraintError(
+                    f"Constraint {key} is not supported for type {model!r}."
+                ) from e
+        raise e
 
 
 def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
