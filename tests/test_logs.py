@@ -21,7 +21,7 @@ from labthings_fastapi.testing import create_thing_without_server
 
 
 class ThingThatLogs(lt.Thing):
-    @lt.thing_action
+    @lt.action
     def log_a_message(self, msg: str):
         """Log a message to the thing's logger."""
         self.logger.info(msg)

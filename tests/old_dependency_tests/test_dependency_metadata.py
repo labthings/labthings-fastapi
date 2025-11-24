@@ -45,7 +45,7 @@ class ThingTwo(lt.Thing):
     def thing_state(self):
         return {"a": 1}
 
-    @lt.thing_action
+    @lt.action
     def count_and_watch(
         self, thing_one: ThingOneDep, get_metadata: lt.deps.GetThingStates
     ) -> Mapping[str, Mapping[str, Any]]:

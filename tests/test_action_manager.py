@@ -8,12 +8,12 @@ from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
 
 
 class CounterThing(lt.Thing):
-    @lt.thing_action(retention_time=0.01)
+    @lt.action(retention_time=0.01)
     def increment_counter(self):
         """Increment the counter."""
         self.counter += 1
 
-    @lt.thing_action(retention_time=1)
+    @lt.action(retention_time=1)
     def increment_counter_longlife(self):
         """Increment the counter.
 

@@ -34,18 +34,18 @@ class ThingWithProperties(lt.Thing):
     def set_funcprop(self, val: int) -> None:
         pass
 
-    @lt.thing_action
+    @lt.action
     def increment_dataprop(self):
         """Increment the data property."""
         self.dataprop += 1
 
-    @lt.thing_action
+    @lt.action
     def raise_error(self):
         r"""Raise an exception to test for error status."""
         self.dataprop += 1
         raise Exception("A deliberate failure.")
 
-    @lt.thing_action
+    @lt.action
     def cancel_myself(self):
         """Increment the data property, then pretend to be cancelled."""
         self.dataprop += 1

@@ -12,7 +12,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from ..thing_description._model import Links
+from .thing_description._model import Links
 
 
 class InvocationStatus(Enum):
@@ -92,3 +92,4 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
 
 
 InvocationModel = GenericInvocationModel[Any, Any]
+"""A model to serialise `.Invocation` objects when they are polled over HTTP."""

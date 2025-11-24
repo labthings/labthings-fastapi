@@ -20,7 +20,7 @@ import logging
 from typing import Any, Mapping, Optional, Union
 from warnings import warn
 from pydantic import BaseModel
-from ..descriptors.action import ActionDescriptor
+from ..actions import ActionDescriptor
 
 from ..properties import BaseProperty
 from ..utilities import attributes

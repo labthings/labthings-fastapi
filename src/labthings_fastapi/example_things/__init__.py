@@ -7,7 +7,7 @@ moved into the unit tests.
 import time
 from typing import Any, Optional, Annotated
 from labthings_fastapi.thing import Thing
-from labthings_fastapi.decorators import thing_action
+from labthings_fastapi.actions import action
 from labthings_fastapi.properties import property as lt_property
 from pydantic import Field
 
@@ -15,7 +15,7 @@ from pydantic import Field
 class MyThing(Thing):
     """An example Thing with a few affordances."""
 
-    @thing_action
+    @action
     def anaction(
         self,
         repeats: Annotated[
@@ -56,7 +56,7 @@ class MyThing(Thing):
         self.increment_counter()
         return {"end_result": "finished!!"}
 
-    @thing_action
+    @action
     def make_a_dict(
         self,
         extra_key: Optional[str] = None,
@@ -73,7 +73,7 @@ class MyThing(Thing):
             out[extra_key] = extra_value
         return out
 
-    @thing_action
+    @action
     def increment_counter(self) -> None:
         """Increment the counter property.
 
@@ -83,7 +83,7 @@ class MyThing(Thing):
         """
         self.counter += 1
 
-    @thing_action
+    @action
     def slowly_increase_counter(self, increments: int = 60, delay: float = 1) -> None:
         """Increment the counter slowly over a minute.
 
@@ -100,12 +100,12 @@ class MyThing(Thing):
     foo: str = lt_property(default="Example")
     "A pointless string for demo purposes."
 
-    @thing_action
+    @action
     def action_without_arguments(self) -> None:
         """Do something that takes no arguments."""
         pass
 
-    @thing_action
+    @action
     def action_with_only_kwargs(self, **kwargs: dict) -> None:
         r"""Do something that takes \**kwargs.
 
@@ -117,7 +117,7 @@ class MyThing(Thing):
 class ThingWithBrokenAffordances(Thing):
     """A Thing that raises exceptions in actions/properties."""
 
-    @thing_action
+    @action
     def broken_action(self) -> None:
         """Do something that raises an exception.
 

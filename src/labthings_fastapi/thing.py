@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from .logs import THING_LOGGER
 from .properties import BaseProperty, DataProperty, BaseSetting
-from .descriptors import ActionDescriptor
+from .actions import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -59,7 +59,7 @@ class Thing:
         except after errors. You should be safe to ignore them, and just include
         code that will close down your hardware, which is equivalent to a
         ``finally:`` block.
-    *   Properties and Actions are defined using decorators: the :deco:`.thing_action`
+    *   Properties and Actions are defined using decorators: the :deco:`.action`
         decorator declares a method to be an action, which will run when it's triggered,
         and the :deco:`.property` decorator does the same for a property.
 
