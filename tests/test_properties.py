@@ -1,8 +1,10 @@
+from dataclasses import dataclass
+from tempfile import TemporaryDirectory
 from threading import Thread
 from typing import Any
 
 from annotated_types import Ge, Le, Gt, Lt, MultipleOf, MinLen, MaxLen
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, ValidationError
 from fastapi.testclient import TestClient
 import pytest
 
@@ -11,10 +13,18 @@ from labthings_fastapi.exceptions import (
     ServerNotRunningError,
     UnsupportedConstraintError,
 )
+from labthings_fastapi.properties import BaseProperty
 from .temp_client import poll_task
 
 
 class PropertyTestThing(lt.Thing):
+    """A Thing with various properties for testing."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._constrained_functional_int = 0
+        self._constrained_functional_str_setting = "ddd"
+
     boolprop: bool = lt.property(default=False)
     "A boolean property"
 
@@ -64,11 +74,117 @@ class PropertyTestThing(lt.Thing):
     )
     "A string property with constraints"
 
+    constrained_int_setting: int = lt.setting(default=5, ge=0, le=10, multiple_of=2)
+    "An integer setting with constraints"
+
+    @lt.property
+    def constrained_functional_int(self) -> int:
+        return self._constrained_functional_int
+
+    @constrained_functional_int.setter
+    def set_constrained_functional_int(self, value: int):
+        self._constrained_functional_int = value
+
+    constrained_functional_int.constraints = {"ge": 0, "le": 10}
+
+    @lt.setting
+    def constrained_functional_str_setting(self) -> str:
+        return self._constrained_functional_str_setting
+
+    @constrained_functional_str_setting.setter
+    def set_constrained_functional_str_setting(self, value: str):
+        self._constrained_functional_str_setting = value
+
+    constrained_functional_str_setting.constraints = {
+        "min_length": 3,
+        "max_length": 10,
+        "pattern": "^d+$",
+    }
+
+
+@dataclass
+class ConstrainedPropInfo:
+    name: str
+    prop: BaseProperty
+    value_type: type
+    constraints: list[Any]
+    valid_values: list[Any]
+    invalid_values: list[Any]
+    jsonschema_constraints: dict[str, Any]
+
+
+CONSTRAINED_PROPS = [
+    ConstrainedPropInfo(
+        name="constrained_int",
+        prop=PropertyTestThing.constrained_int,
+        value_type=int,
+        constraints=[Ge(0), Le(10), MultipleOf(2)],
+        valid_values=[0, 2, 4, 6, 8, 10],
+        invalid_values=[-2, 11, 3],
+        jsonschema_constraints={"minimum": 0, "maximum": 10, "multipleOf": 2},
+    ),
+    ConstrainedPropInfo(
+        name="constrained_float",
+        prop=PropertyTestThing.constrained_float,
+        value_type=float,
+        constraints=[Gt(0), Lt(10)],
+        valid_values=[0.1, 5.0, 9.9],
+        invalid_values=[0.0, 10.0, -1.0, float("inf")],
+        jsonschema_constraints={"exclusiveMinimum": 0.0, "exclusiveMaximum": 10.0},
+    ),
+    ConstrainedPropInfo(  # This checks "inf" is OK by default.
+        name="floatprop",
+        prop=PropertyTestThing.floatprop,
+        value_type=float,
+        constraints=[],
+        valid_values=[-1.0, 0.0, 1.0, float("inf"), float("-inf"), float("nan")],
+        invalid_values=[],
+        jsonschema_constraints={},
+    ),
+    ConstrainedPropInfo(
+        name="constrained_str",
+        prop=PropertyTestThing.constrained_str,
+        value_type=str,
+        constraints=[MinLen(3), MaxLen(10)],
+        valid_values=["abc", "ddddd", "tencharsaa"],
+        invalid_values=["d", "ab", "verylongstring", "Invalid1"],
+        jsonschema_constraints={"minLength": 3, "maxLength": 10, "pattern": "^[a-z]+$"},
+    ),
+    ConstrainedPropInfo(
+        name="constrained_int_setting",
+        prop=PropertyTestThing.constrained_int_setting,
+        value_type=int,
+        constraints=[Ge(0), Le(10), MultipleOf(2)],
+        valid_values=[0, 2, 4, 6, 8, 10],
+        invalid_values=[-2, 11, 3],
+        jsonschema_constraints={"minimum": 0, "maximum": 10, "multipleOf": 2},
+    ),
+    ConstrainedPropInfo(
+        name="constrained_functional_int",
+        prop=PropertyTestThing.constrained_functional_int,
+        value_type=int,
+        constraints=[Ge(0), Le(10)],
+        valid_values=[0, 5, 10],
+        invalid_values=[-1, 11],
+        jsonschema_constraints={"minimum": 0, "maximum": 10},
+    ),
+    ConstrainedPropInfo(
+        name="constrained_functional_str_setting",
+        prop=PropertyTestThing.constrained_functional_str_setting,
+        value_type=str,
+        constraints=[MinLen(3), MaxLen(10)],
+        valid_values=["ddd", "dddd"],
+        invalid_values=["dd", "thisisaverylongstring", "abc"],
+        jsonschema_constraints={"minLength": 3, "maxLength": 10, "pattern": "^d+$"},
+    ),
+]
+
 
 @pytest.fixture
 def server():
-    server = lt.ThingServer({"thing": PropertyTestThing})
-    return server
+    with TemporaryDirectory() as dirpath:
+        server = lt.ThingServer({"thing": PropertyTestThing}, settings_folder=dirpath)
+        yield server
 
 
 def test_types_are_found():
@@ -259,31 +375,38 @@ def test_setting_without_event_loop():
         thing.boolprop = False  # Can't call it until the event loop's running
 
 
-def test_constrained_properties():
+@pytest.mark.parametrize("prop_info", CONSTRAINED_PROPS)
+def test_constrained_properties(prop_info):
     """Test that constraints on property values generate correct models."""
-    constrained_int = PropertyTestThing.constrained_int
-    assert constrained_int.value_type is int
-    m = constrained_int.model
+    prop = prop_info.prop
+    assert prop.value_type is prop_info.value_type
+    m = prop.model
     assert issubclass(m, RootModel)
-    for ann in [Ge(0), Le(10), MultipleOf(2)]:
+    for ann in prop_info.constraints:
         assert any(meta == ann for meta in m.model_fields["root"].metadata)
-
-    constrained_float = PropertyTestThing.constrained_float
-    assert constrained_float.value_type is float
-    m = constrained_float.model
-    assert issubclass(m, RootModel)
-    for ann in [Gt(0), Lt(10)]:
-        assert any(meta == ann for meta in m.model_fields["root"].metadata)
-
-    constrained_str = PropertyTestThing.constrained_str
-    assert constrained_str.value_type is str
-    m = constrained_str.model
-    assert issubclass(m, RootModel)
-    for ann in [MinLen(3), MaxLen(10)]:
-        assert any(meta == ann for meta in m.model_fields["root"].metadata)
+    for valid in prop_info.valid_values:
+        instance = m(root=valid)
+        validated = instance.model_dump()
+        assert validated == valid or validated is valid  # `is` for NaN
+    for invalid in prop_info.invalid_values:
+        with pytest.raises(ValidationError):
+            _ = m(root=invalid)
 
 
-def test_constrained_properties_http(server):
+def convert_inf_nan(value):
+    """Replace `float(`inf)` and `float(-inf)` with strings."""
+    if value == float("inf"):
+        return "Infinity"
+    elif value == float("-inf"):
+        return "-Infinity"
+    elif value != value:  # NaN check
+        return "NaN"
+    else:
+        return value
+
+
+@pytest.mark.parametrize("prop_info", CONSTRAINED_PROPS)
+def test_constrained_properties_http(server, prop_info):
     """Test properties with constraints on their values.
 
     This tests that the constraints are enforced when setting
@@ -297,51 +420,16 @@ def test_constrained_properties_http(server):
         thing_description = r.json()
         properties = thing_description["properties"]
 
-        # Test constrained_int
-        r = client.put("/thing/constrained_int", json=8)
-        assert r.status_code == 201  # Successful write
-        r = client.put("/thing/constrained_int", json=11)
-        assert r.status_code == 422  # Above 'le' constraint
-        r = client.put("/thing/constrained_int", json=-2)
-        assert r.status_code == 422  # Below 'ge' constraint
-        r = client.put("/thing/constrained_int", json=5)
-        assert r.status_code == 422  # Not a multiple_of 2
-        property = properties["constrained_int"]
-        assert property["minimum"] == 0
-        assert property["maximum"] == 10
-        assert property["multipleOf"] == 2
-
-        # Test constrained_float
-        r = client.put("/thing/constrained_float", json=5.5)
-        assert r.status_code == 201  # Successful write
-        r = client.put("/thing/constrained_float", json=10.0)
-        assert r.status_code == 422  # Not less than 'lt' constraint
-        r = client.put("/thing/constrained_float", json=0.0)
-        assert r.status_code == 422  # Not greater than 'gt' constraint
-        r = client.put("/thing/constrained_float", json="Infinity")
-        assert r.status_code == 422  # inf not allowed
-        property = properties["constrained_float"]
-        assert property["exclusiveMaximum"] == 10.0
-        assert property["exclusiveMinimum"] == 0.0
-
-        # Check unconstrained float allows inf, so we know the test
-        # above is different from the default case.
-        r = client.put("/thing/floatprop", json="Infinity")
-        assert r.status_code == 201  # inf is allowed for unconstrained float
-
-        # Test constrained_str
-        r = client.put("/thing/constrained_str", json="valid")
-        assert r.status_code == 201  # Successful write
-        r = client.put("/thing/constrained_str", json="no")
-        assert r.status_code == 422  # Below min_length
-        r = client.put("/thing/constrained_str", json="thisisaverylongstring")
-        assert r.status_code == 422  # Above max_length
-        r = client.put("/thing/constrained_str", json="Invalid1")
-        assert r.status_code == 422  # Does not match pattern
-        property = properties["constrained_str"]
-        assert property["minLength"] == 3
-        assert property["maxLength"] == 10
-        assert property["pattern"] == "^[a-z]+$"
+        for valid in prop_info.valid_values:
+            r = client.put(f"/thing/{prop_info.name}", json=convert_inf_nan(valid))
+            err = f"Failed to set {prop_info.name}={valid}, {r.json()}"
+            assert r.status_code == 201, err  # 201 means it was set successfully
+        for invalid in prop_info.invalid_values:
+            r = client.put(f"/thing/{prop_info.name}", json=convert_inf_nan(invalid))
+            assert r.status_code == 422  # Unprocessable entity - invalid value
+        property = properties[prop_info.name]
+        for key, value in prop_info.jsonschema_constraints.items():
+            assert property[key] == value
 
 
 def test_bad_property_constraints():
@@ -362,6 +450,6 @@ def test_bad_property_constraints():
         class AnotherBadConstraintThing(lt.Thing):
             another_bad_prop: str = lt.property(default="foo", bad_constraint=2)
 
-    # Some in appropriate constraints (e.g. multiple_of on str) are passed through
+    # Some inappropriate constraints (e.g. multiple_of on str) are passed through
     # as metadata if used on the wrong type. We don't currently raise errors
     # for these.
