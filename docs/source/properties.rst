@@ -1,4 +1,3 @@
-.. _tutorial_properties:
 .. _properties:
 
 Properties
@@ -116,6 +115,53 @@ It is possible to make a property read-only for clients by setting its ``readonl
 In the example above, ``twice_my_property`` may be set by code within ``MyThing`` but cannot be written to via HTTP requests or `.DirectThingClient` instances.
 
 Functional properties may not be observed, as they are not backed by a simple value. If you need to notify clients when the value changes, you can use a data property that is updated by the functional property. In the example above, ``my_property`` may be observed, while ``twice_my_property`` cannot be observed. It would be possible to observe changes in ``my_property`` and then query ``twice_my_property`` for its new value.
+
+.. _property_constraints:
+
+Property constraints
+--------------------
+
+It's often helpful to make it clear that there are limits on the values a property can take. For example, a temperature property might only be valid between -40 and 125 degrees Celsius. LabThings allows you to specify constraints on properties using the same arguments as `pydantic` `Field`_ definitions. These constraints will be enforced when the property is written to via HTTP, and they will also appear in the :ref:`gen_td` and :ref:`gen_docs`. The module-level constant `.property.CONSTRAINT_ARGS` lists all supported constraint arguments.
+
+We can modify the previous example to show how to add constraints to both data and functional properties:
+
+.. code-block:: python
+
+    import labthings_fastapi as lt
+
+    class AirSensor(lt.Thing):
+        temperature: float = lt.property(
+            default=20.0,
+            ge=-40.0,  # Greater than or equal to -40.0
+            le=125.0   # Less than or equal to 125.0
+        )
+        """The current temperature in degrees Celsius."""
+
+        @lt.property
+        def humidity(self) -> float:
+            """The current humidity percentage."""
+            return self._humidity
+
+        @humidity.setter
+        def humidity(self, value: float):
+            """Set the current humidity percentage."""
+            self._humidity = value
+
+        # Add constraints to the functional property
+        humidity.constraints = {
+            "ge": 0.0,   # Greater than or equal to 0.0
+            "le": 100.0  # Less than or equal to 100.0
+        }
+
+        sensor_name: str = lt.property(default="my_sensor", pattern="^[a-zA-Z0-9_]+$")
+
+In the example above, the ``temperature`` property is a data property with constraints that limit its value to between -40.0 and 125.0 degrees Celsius. The ``humidity`` property is a functional property with constraints that limit its value to between 0.0 and 100.0 percent. The ``sensor_name`` property is a data property with a regex pattern constraint that only allows alphanumeric characters and underscores.
+
+Note that the constraints for functional properties are set by assigning a dictionary to the property's ``constraints`` attribute. This dictionary should contain the same keys and values as the arguments to `pydantic` `Field`_ definitions. The `.property` decorator does not currently accept arguments, so constraints may only be set this way for functional properties and settings.
+
+.. note::
+
+    Property values are not validated when they are set directly, only via HTTP. This behaviour may change in the future.
 
 HTTP interface
 --------------
