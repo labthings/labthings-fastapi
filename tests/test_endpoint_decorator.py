@@ -9,15 +9,15 @@ class PostBodyModel(BaseModel):
 
 
 class MyThing(lt.Thing):
-    @lt.fastapi_endpoint("get")
+    @lt.endpoint("get")
     def path_from_name(self) -> str:
         return "path_from_name"
 
-    @lt.fastapi_endpoint("get", path="path_from_path")
+    @lt.endpoint("get", path="path_from_path")
     def get_method(self) -> str:
         return "get_method"
 
-    @lt.fastapi_endpoint("post", path="path_from_path")
+    @lt.endpoint("post", path="path_from_path")
     def post_method(self, body: PostBodyModel) -> str:
         return f"post_method {body.a} {body.b}"
 

@@ -9,7 +9,7 @@ It may use any `fastapi` responses or arguments, as it passes keyword
 arguments through to the relevant `fastapi` decorator.
 
 This will most usually be applied as a decorator with arguments, available
-as :deco:`.fastapi_endpoint`. See the documentation for that function for
+as :deco:`.endpoint`. See the documentation for that function for
 more detail.
 """
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 HTTPMethod = Literal["get", "post", "put", "delete"]
-"""Valid HTTP verbs to use with `.fastapi_endpoint` or `.EndpointDescriptor`."""
+"""Valid HTTP verbs to use with `.endpoint` or `.EndpointDescriptor`."""
 
 
 class EndpointDescriptor(BaseDescriptor):
@@ -49,7 +49,7 @@ class EndpointDescriptor(BaseDescriptor):
     ) -> None:
         r"""Initialise an EndpointDescriptor.
 
-        See `.fastapi_endpoint`, which is the usual way of instantiating this
+        See `.endpoint`, which is the usual way of instantiating this
         class.
 
         :param func: is the method (defined on a `.Thing`) wrapped by this
@@ -107,8 +107,8 @@ class EndpointDescriptor(BaseDescriptor):
                 "path set on the Thing. This usually means it is not connected "
                 "to a ThingServer."
             )
-        # fastapi_endpoint is equivalent to app.get/app.post/whatever
-        fastapi_endpoint = getattr(app, self.http_method)
+        # endpoint is equivalent to app.get/app.post/whatever
+        endpoint = getattr(app, self.http_method)
         bound_function = partial(self.func, thing)
         # NB the line above can't use self.__get__ as wraps() confuses FastAPI
         kwargs: dict[str, Any] = {  # Auto-populate description and summary
@@ -116,10 +116,10 @@ class EndpointDescriptor(BaseDescriptor):
             "summary": self.title,
         }
         kwargs.update(self.kwargs)
-        fastapi_endpoint(thing.path + self.path, **kwargs)(bound_function)
+        endpoint(thing.path + self.path, **kwargs)(bound_function)
 
 
-def fastapi_endpoint(
+def endpoint(
     method: HTTPMethod, path: Optional[str] = None, **kwargs: Any
 ) -> Callable[[Callable], EndpointDescriptor]:
     r"""Mark a function as a FastAPI endpoint without making it an action.
@@ -140,7 +140,7 @@ def fastapi_endpoint(
     .. code-block:: python
 
         class DownloadThing(Thing):
-            @fastapi_endpoint("get")
+            @endpoint("get")
             def plain_text_response(self) -> str:
                 return "example string"
 
