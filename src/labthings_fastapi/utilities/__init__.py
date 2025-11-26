@@ -15,6 +15,16 @@ if TYPE_CHECKING:
     from ..thing import Thing
 
 
+__all__ = [
+    "class_attributes",
+    "attributes",
+    "LabThingsObjectData",
+    "labthings_data",
+    "wrap_plain_types_in_rootmodel",
+    "model_to_dict",
+]
+
+
 def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]:
     """List all the attributes of an object's class.
 

@@ -121,7 +121,7 @@ Functional properties may not be observed, as they are not backed by a simple va
 Property constraints
 --------------------
 
-It's often helpful to make it clear that there are limits on the values a property can take. For example, a temperature property might only be valid between -40 and 125 degrees Celsius. LabThings allows you to specify constraints on properties using the same arguments as `pydantic` `Field`_ definitions. These constraints will be enforced when the property is written to via HTTP, and they will also appear in the :ref:`gen_td` and :ref:`gen_docs`. The module-level constant `.property.CONSTRAINT_ARGS` lists all supported constraint arguments.
+It's often helpful to make it clear that there are limits on the values a property can take. For example, a temperature property might only be valid between -40 and 125 degrees Celsius. LabThings allows you to specify constraints on properties using the same arguments as `pydantic.Field` definitions. These constraints will be enforced when the property is written to via HTTP, and they will also appear in the :ref:`gen_td` and :ref:`gen_docs`. The module-level constant `.property.CONSTRAINT_ARGS` lists all supported constraint arguments.
 
 We can modify the previous example to show how to add constraints to both data and functional properties:
 
@@ -157,7 +157,7 @@ We can modify the previous example to show how to add constraints to both data a
 
 In the example above, the ``temperature`` property is a data property with constraints that limit its value to between -40.0 and 125.0 degrees Celsius. The ``humidity`` property is a functional property with constraints that limit its value to between 0.0 and 100.0 percent. The ``sensor_name`` property is a data property with a regex pattern constraint that only allows alphanumeric characters and underscores.
 
-Note that the constraints for functional properties are set by assigning a dictionary to the property's ``constraints`` attribute. This dictionary should contain the same keys and values as the arguments to `pydantic` `Field`_ definitions. The `.property` decorator does not currently accept arguments, so constraints may only be set this way for functional properties and settings.
+Note that the constraints for functional properties are set by assigning a dictionary to the property's ``constraints`` attribute. This dictionary should contain the same keys and values as the arguments to `pydantic.Field` definitions. The `.property` decorator does not currently accept arguments, so constraints may only be set this way for functional properties and settings.
 
 .. note::
 
