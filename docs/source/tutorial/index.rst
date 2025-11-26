@@ -8,14 +8,11 @@ LabThings-FastAPI tutorial
    installing_labthings.rst
    running_labthings.rst
    writing_a_thing.rst
-   properties.rst
 
 ..
    In due course, these pages should exist...
-   writing_a_thing.rst
    client_code.rst
    blobs.rst
-   thing_dependencies.rst
 
 In this tutorial, we'll cover how to start up and interact with a LabThings-FastAPI server.
 

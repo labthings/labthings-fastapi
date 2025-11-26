@@ -47,6 +47,7 @@ Adding a "setter" to properties is optional, and makes them read-write.
 
 from __future__ import annotations
 import builtins
+from collections.abc import Mapping
 from types import EllipsisType
 from typing import (
     Annotated,
@@ -78,6 +79,7 @@ from .exceptions import (
     NotConnectedToServerError,
     ReadOnlyPropertyError,
     MissingTypeError,
+    UnsupportedConstraintError,
 )
 
 if TYPE_CHECKING:
@@ -97,6 +99,20 @@ if TYPE_CHECKING:
 #     codes manually.
 # pydocstyle ("D" codes) is run in Ruff and correctly recognises
 # builtins.property as a property decorator.
+
+
+CONSTRAINT_ARGS = {
+    "gt",
+    "ge",
+    "lt",
+    "le",
+    "multiple_of",
+    "allow_inf_nan",
+    "min_length",
+    "max_length",
+    "pattern",
+}
+"""The set of supported constraint arguments for properties."""
 
 
 # The following exceptions are raised only when creating/setting up properties.
@@ -198,12 +214,14 @@ def property(
 
 
 @overload  # use as `field: int = property(default=0)`
-def property(*, default: Value, readonly: bool = False) -> Value: ...
+def property(
+    *, default: Value, readonly: bool = False, **constraints: Any
+) -> Value: ...
 
 
 @overload  # use as `field: int = property(default_factory=lambda: 0)`
 def property(
-    *, default_factory: Callable[[], Value], readonly: bool = False
+    *, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any
 ) -> Value: ...
 
 
@@ -213,6 +231,7 @@ def property(
     default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,
+    **constraints: Any,
 ) -> Value | FunctionalProperty[Value]:
     r"""Define a Property on a `.Thing`\ .
 
@@ -243,6 +262,11 @@ def property(
         a `.DirectThingClient`). This is automatically true if
         ``property`` is used as a decorator and no setter is
         specified.
+    :param \**constraints: additional keyword arguments are passed
+        to `pydantic.Field` and allow constraints to be added to the
+        property. For example, ``ge=0`` constrains a numeric property
+        to be non-negative. See `pydantic.Field` for the full range
+        of constraint arguments.
 
     :return: a property descriptor, either a `.FunctionalProperty`
         if used as a decorator, or a `.DataProperty` if used as
@@ -281,7 +305,7 @@ def property(
     value is passed as the first argument.
     """
     if getter is not ...:
-        # If the default is callable, we're being used as a decorator
+        # If the getter argument is callable, we're being used as a decorator
         # without arguments.
         if not callable(getter):
             raise MissingDefaultError(
@@ -300,6 +324,7 @@ def property(
     return DataProperty(  # type: ignore[return-value]
         default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
+        constraints=constraints,
     )
 
 
@@ -314,11 +339,41 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
     use `.property` to declare properties on your `.Thing` subclass.
     """
 
-    def __init__(self) -> None:
-        """Initialise a BaseProperty."""
+    def __init__(self, constraints: Mapping[str, Any] | None = None) -> None:
+        """Initialise a BaseProperty.
+
+        :param constraints: is passed as keyword arguments to `pydantic.Field`
+            to add validation constraints to the property. See `pydantic.Field`
+            for details. The module-level constant `CONSTRAINT_ARGS` lists
+            the supported constraint arguments.
+
+        :raises UnsupportedConstraintError: if unsupported constraint arguments
+            are supplied. See `CONSTRAINT_ARGS` for the supported arguments.
+        """
         super().__init__()
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
+        self.constraints = constraints or {}
+        for key in self.constraints:
+            if key not in CONSTRAINT_ARGS:
+                raise UnsupportedConstraintError(
+                    f"Unknown constraint argument: {key}. \n"
+                    f"Supported arguments are: {', '.join(CONSTRAINT_ARGS)}."
+                )
+
+    constraints: Mapping[str, Any]
+    """Validation constraints applied to this property.
+
+    This mapping contains keyword arguments that will be passed to
+    `pydantic.Field` to add validation constraints to the property.
+    See `pydantic.Field` for details. The module-level constant
+    `CONSTRAINT_ARGS` lists the supported constraint arguments.
+
+    Note that these constraints will be enforced when values are
+    received over HTTP, but they are not automatically enforced
+    when setting the property directly on the `.Thing` instance
+    from Python code.
+    """
 
     @builtins.property
     def model(self) -> type[BaseModel]:
@@ -335,7 +390,10 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
         :return: a Pydantic model for the property's type.
         """
         if self._model is None:
-            self._model = wrap_plain_types_in_rootmodel(self.value_type)
+            self._model = wrap_plain_types_in_rootmodel(
+                self.value_type,
+                constraints=self.constraints,
+            )
         return self._model
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
@@ -452,12 +510,20 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
 
     @overload
     def __init__(  # noqa: DOC101,DOC103
-        self, default: Value, *, readonly: bool = False
+        self,
+        default: Value,
+        *,
+        readonly: bool = False,
+        constraints: Mapping[str, Any] | None = None,
     ) -> None: ...
 
     @overload
     def __init__(  # noqa: DOC101,DOC103
-        self, *, default_factory: ValueFactory, readonly: bool = False
+        self,
+        *,
+        default_factory: ValueFactory,
+        readonly: bool = False,
+        constraints: Mapping[str, Any] | None = None,
     ) -> None: ...
 
     def __init__(
@@ -466,6 +532,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         *,
         default_factory: ValueFactory | None = None,
         readonly: bool = False,
+        constraints: Mapping[str, Any] | None = None,
     ) -> None:
         """Create a property that acts like a regular variable.
 
@@ -496,8 +563,11 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         :param readonly: if ``True``, the property may not be written to via
             HTTP, or via `.DirectThingClient` objects, i.e. it may only be
             set as an attribute of the `.Thing` and not from a client.
+        :param constraints: is passed as keyword arguments to `pydantic.Field`
+            to add validation constraints to the property. See `pydantic.Field`
+            for details.
         """
-        super().__init__()
+        super().__init__(constraints=constraints)
         self._default_factory = default_factory_from_arguments(
             default=default, default_factory=default_factory
         )
@@ -596,6 +666,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
     def __init__(
         self,
         fget: ValueGetter,
+        constraints: Mapping[str, Any] | None = None,
     ) -> None:
         """Set up a FunctionalProperty.
 
@@ -605,10 +676,13 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         tools understand that it functions like a property.
 
         :param fget: the getter function, called when the property is read.
+        :param constraints: is passed as keyword arguments to `pydantic.Field`
+            to add validation constraints to the property. See `pydantic.Field`
+            for details.
 
         :raises MissingTypeError: if the getter does not have a return type annotation.
         """
-        super().__init__()
+        super().__init__(constraints=constraints)
         self._fget: ValueGetter = fget
         self._type = return_type(self._fget)
         if self._type is None:
@@ -744,12 +818,12 @@ def setting(
 
 
 @overload  # use as `field: int = setting(default=0)``
-def setting(*, default: Value, readonly: bool = False) -> Value: ...
+def setting(*, default: Value, readonly: bool = False, **constraints: Any) -> Value: ...
 
 
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`
 def setting(
-    *, default_factory: Callable[[], Value], readonly: bool = False
+    *, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any
 ) -> Value: ...
 
 
@@ -759,6 +833,7 @@ def setting(
     default: Value | EllipsisType = ...,
     default_factory: ValueFactory | None = None,
     readonly: bool = False,
+    **constraints: Any,
 ) -> FunctionalSetting[Value] | Value:
     r"""Define a Setting on a `.Thing`\ .
 
@@ -804,6 +879,11 @@ def setting(
     :param readonly: whether the setting should be read-only
         via the `.ThingClient` interface (i.e. over HTTP or via
         a `.DirectThingClient`).
+    :param \**constraints: additional keyword arguments are passed
+        to `pydantic.Field` and allow constraints to be added to the
+        property. For example, ``ge=0`` constrains a numeric property
+        to be non-negative. See `pydantic.Field` for the full range
+        of constraint arguments.
 
     :return: a setting descriptor.
 
@@ -817,7 +897,7 @@ def setting(
     well.
     """
     if getter is not ...:
-        # If the default is callable, we're being used as a decorator
+        # If the getter argument is callable, we're being used as a decorator
         # without arguments.
         if not callable(getter):
             raise MissingDefaultError(
@@ -836,6 +916,7 @@ def setting(
     return DataSetting(  # type: ignore[return-value]
         default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
+        constraints=constraints,
     )
 
 

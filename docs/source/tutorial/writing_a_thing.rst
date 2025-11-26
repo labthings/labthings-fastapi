@@ -18,7 +18,7 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
     class Light(lt.Thing):
         """A computer-controlled light, our first example Thing."""
 
-        brightness: int = lt.property(default=100)
+        brightness: int = lt.property(default=100, ge=0, le=100)
         """The brightness of the light, in % of maximum."""
 
         is_on: bool = lt.property(default=False, readonly=true)
@@ -39,4 +39,34 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
 
 If you visit `http://localhost:5000/light`, you will see the Thing Description. You can also interact with it using the OpenAPI documentation at `http://localhost:5000/docs`. If you visit `http://localhost:5000/light/brightness`, you can set the brightness of the light, and if you visit `http://localhost:5000/light/is_on`, you can see whether the light is on. Changing values on the server requires a ``PUT`` or ``POST`` request, which is easiest to do using the OpenAPI "Try it out" feature. Check that you can use a ``POST`` request to the ``toggle`` endpoint to turn the light on and off.
 
-There are two types of :ref:`wot_affordances` in this example: properties and actions. Properties are used to read and write values, while actions are used to perform operations that change the state of the Thing. In this case, we have a property for the brightness of the light and a property to indicate whether the light is on or off. The action ``toggle`` changes the state of the light by toggling the ``is_on`` property between ``True`` and ``False``.
+This example has both properties and actions. Properties are used to read and write values, while actions are used to perform operations that change the state of the Thing.
+
+.. _tutorial_properties:
+
+Properties
+----------
+
+We have a property for the brightness of the light and a property to indicate whether the light is on or off. These are both "data properties" because they function just like variables.
+
+``is_on`` is a boolean value, so it may be either `True` or `False`. ``brightness`` is an integer, and the `ge` and `le` arguments constrain it to take a value between 0 and 100. See :ref:`property_constraints` for more details.
+
+It's also possible to have properties defined using a function, for example we could add in:
+
+.. code-block:: python
+
+    @lt.property
+    def status(self) -> str:
+        """A human-readable status of the light."""
+        if self.is_on:
+            return f"The light is on at {self.brightness}% brightness."
+        else:
+            return "The light is off."
+
+This is a "functional property" because its value is determined by a function. Functional properties may be read-only (as in this example) or read-write (see :ref:`properties`).
+
+.. _tutorial_actions:
+
+Actions
+-----------
+
+The action ``toggle`` changes the state of the light by toggling the ``is_on`` property between ``True`` and ``False``. For more detail on how actions work, see :ref:`actions`.
