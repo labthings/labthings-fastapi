@@ -145,3 +145,14 @@ class NoBlobManagerError(RuntimeError):
     Any access to an invocation output must have BlobIOContextDep as a dependency, as
     the output may be a blob, and the blob needs this context to resolve its URL.
     """
+
+
+class UnsupportedConstraintError(ValueError):
+    """A constraint argument is not supported.
+
+    This exception is raised when a constraint argument is passed to
+    a property that is not in the supported list. See
+    `labthings_fastapi.properties.CONSTRAINT_ARGS` for the list of
+    supported arguments. Their meaning is described in the `pydantic.Field`
+    documentation.
+    """

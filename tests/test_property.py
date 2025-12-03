@@ -128,7 +128,8 @@ def test_toplevel_function(monkeypatch, func):
     assert prop.args == ()
     assert prop.kwargs["default_factory"]() == 0
     assert prop.kwargs["readonly"] is False
-    assert len(prop.kwargs) == 2
+    assert prop.kwargs["constraints"] == {}
+    assert len(prop.kwargs) == 3
 
     # The same thing should happen when we use a factory,
     # except it should pass through the factory function unchanged.
@@ -137,7 +138,8 @@ def test_toplevel_function(monkeypatch, func):
     assert prop.args == ()
     assert prop.kwargs["default_factory"] is list
     assert prop.kwargs["readonly"] is False
-    assert len(prop.kwargs) == 2
+    assert prop.kwargs["constraints"] == {}
+    assert len(prop.kwargs) == 3
 
     # The positional argument is the setter, so `None` is not valid
     # and probably means someone forgot to add `default=`.

@@ -8,15 +8,16 @@ Documentation for LabThings-FastAPI
    quickstart/quickstart.rst
    tutorial/index.rst
    structure.rst
-   examples.rst
-   documentation.rst
    actions.rst
+   properties.rst
+   documentation.rst
    thing_slots.rst
    dependencies/dependencies.rst
    blobs.rst
    concurrency.rst
    using_things.rst
    see_also.rst
+   examples.rst
    wot_core_concepts.rst
 
    autoapi/index
