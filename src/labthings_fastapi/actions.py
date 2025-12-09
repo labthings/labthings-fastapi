@@ -717,17 +717,10 @@ class ActionDescriptor(
         in future. In its present form, this is equivalent to a regular
         Python method, i.e. all we do is supply the first argument, `self`.
 
-        If `obj` is None, the descriptor is returned, so we can get
-        the descriptor conveniently as an attribute of the class.
-
         :param obj: the `.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
-        :param type: the class of the `.Thing` to which we are attached.
-            If the descriptor is accessed via the class it is returned
-            directly.
-        :return: the action function, bound to ``obj`` (when accessed
-            via an instance), or the descriptor (accessed via the class).
+        :return: the action function, bound to ``obj``.
         """
         # TODO
         # `obj` should be of type `OwnerT`, but `BaseDescriptor` currently
