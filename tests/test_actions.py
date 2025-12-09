@@ -206,3 +206,58 @@ def test_wrapped_action():
     # Check we can make the thing and it has a valid TD
     example = create_thing_without_server(Example)
     example.validate_thing_description()
+
+
+def test_action_docs():
+    """Check that action documentation is included in the TD."""
+
+    class DocThing(lt.Thing):
+        @lt.action
+        def documented_action(self) -> None:
+            """This is the action docstring."""
+            pass
+
+        @lt.action
+        def convert_type(self, a: int) -> float:
+            """Convert an integer to a float."""
+            return float(a)
+
+        @lt.action
+        def no_doc_action(self) -> None:
+            pass
+
+        @lt.action
+        def long_docstring(self) -> None:
+            """Do something with a very long docstring.
+
+            It has multiple paragraphs.
+
+            Here is the second paragraph.
+
+            And here is the third.
+            """
+            pass
+
+    thing = create_thing_without_server(DocThing)
+    td = thing.thing_description()
+    actions = td.actions
+    assert actions is not None
+    assert actions["documented_action"].description == "This is the action docstring."
+
+    assert actions["convert_type"].description == "Convert an integer to a float."
+    input = actions["convert_type"].input
+    assert input is not None
+    input_properties = input.properties
+    assert input_properties is not None
+    assert input_properties["a"].type.value == "integer"
+    output = actions["convert_type"].output
+    assert output is not None
+    assert output.type.value == "number"
+
+    assert actions["no_doc_action"].description is None
+    assert actions["no_doc_action"].title == "no_doc_action"
+
+    assert actions["long_docstring"].title == "Do something with a very long docstring."
+    assert actions["long_docstring"].description.startswith(
+        "It has multiple paragraphs."
+    )

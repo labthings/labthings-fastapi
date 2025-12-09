@@ -923,29 +923,6 @@ class ActionDescriptor(
         )
 
 
-def mark_action(
-    func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn], **kwargs: Any
-) -> ActionDescriptor[ActionParams, ActionReturn, OwnerT]:
-    r"""Mark a method of a Thing as an Action.
-
-    We replace the function with a descriptor that's a
-    subclass of `.ActionDescriptor`
-
-    :param func: The function to be decorated.
-    :param \**kwargs: Additional keyword arguments are passed to the constructor
-        of `.ActionDescriptor`.
-
-    :return: An `.ActionDescriptor` wrapping the method.
-    """
-
-    class ActionDescriptorSubclass(ActionDescriptor):
-        pass
-
-    # TODO do we need this?
-
-    return ActionDescriptorSubclass(func, **kwargs)
-
-
 @overload
 def action(
     func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn], **kwargs: Any
@@ -999,6 +976,6 @@ def action(
     # return a partial object, which then calls the
     # wrapped function once.
     if func is not None:
-        return mark_action(func, **kwargs)
+        return ActionDescriptor(func, **kwargs)
     else:
-        return partial(mark_action, **kwargs)
+        return partial(ActionDescriptor, **kwargs)
