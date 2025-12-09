@@ -40,27 +40,37 @@ class ThingWithActions(lt.Thing):
 thing = create_thing_without_server(ThingWithActions)
 
 assert_type(thing.no_args_no_return(), None)
-thing.no_args_no_return("arg")  # type: ignore[arg-type]
-thing.no_args_no_return(unexpected=123)  # type: ignore[arg-type]
+thing.no_args_no_return("arg")  # type: ignore[call-arg]
+thing.no_args_no_return(unexpected=123)  # type: ignore[call-arg]
 
 assert_type(thing.with_args_no_return(1, "test"), None)
-thing.with_args_no_return()  # type: ignore[arg-type]
+thing.with_args_no_return()  # type: ignore[call-arg]
 thing.with_args_no_return(1, 2)  # type: ignore[arg-type]
 
 assert_type(thing.no_args_with_return(), float)
-thing.with_args_no_return("unexpected")  # type: ignore[arg-type]
-thing.with_args_no_return(unexpected=123)  # type: ignore[arg-type]
+thing.with_args_no_return("unexpected")  # type: ignore[arg-type, call-arg]
+thing.with_args_no_return(unexpected=123)  # type: ignore[call-arg]
 
 assert_type(thing.with_args_with_return(10, "data"), float)
-thing.with_args_no_return()  # type: ignore[arg-type]
+thing.with_args_no_return()  # type: ignore[call-arg]
 thing.with_args_no_return(10, 20)  # type: ignore[arg-type]
 
 
-# We should also make sure the attribute is a descriptor
-assert_type(ThingWithActions.no_args_no_return, ActionDescriptor)
-assert_type(ThingWithActions.with_args_no_return, ActionDescriptor)
-assert_type(ThingWithActions.no_args_with_return, ActionDescriptor)
-assert_type(ThingWithActions.with_args_with_return, ActionDescriptor)
+# We should also make sure the attribute is a correctly-typed descriptor
+assert_type(
+    ThingWithActions.no_args_no_return, ActionDescriptor[[], None, ThingWithActions]
+)
+# assert_type doesn't work well with the ParamSpec for arguments, so we use an
+# assignment instead to check the type is correct.
+with_args_no_return_descriptor: ActionDescriptor[[int, str], None, ThingWithActions] = (
+    ThingWithActions.with_args_no_return
+)
+assert_type(
+    ThingWithActions.no_args_with_return, ActionDescriptor[[], float, ThingWithActions]
+)
+with_args_with_return_descriptor: ActionDescriptor[
+    [int, str], float, ThingWithActions
+] = ThingWithActions.with_args_with_return
 
 # Pick any one and check for the documentation-related properties
 assert_type(ThingWithActions.with_args_with_return.__doc__, str | None)
