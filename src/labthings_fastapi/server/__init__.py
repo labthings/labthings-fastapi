@@ -241,7 +241,7 @@ class ThingServer:
             thing.attach_to_server(self)
 
     @asynccontextmanager
-    async def lifespan(self, app: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(self, app: FastAPI) -> AsyncGenerator[None, None]:
         """Manage set up and tear down of the server and Things.
 
         This method is used as a lifespan function for the FastAPI app. See

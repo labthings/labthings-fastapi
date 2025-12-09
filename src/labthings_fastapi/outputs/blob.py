@@ -730,7 +730,7 @@ because it requires access to the `BlobDataManager`.
 
 async def blob_serialisation_context_manager(
     request: Request,
-) -> AsyncGenerator[BlobDataManager]:
+) -> AsyncGenerator[BlobDataManager, None]:
     r"""Set context variables to allow blobs to be [de]serialised.
 
     In order to serialise a `.Blob` to a JSON-serialisable dictionary, we must
