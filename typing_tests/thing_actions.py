@@ -37,22 +37,36 @@ class ThingWithActions(lt.Thing):
 
 
 # What we really care about is that the instance attributes are right.
+# The lines below create an instance, then check each of the four actions
+# has the correct input parameters and return type.
+# Note that this test will fail if there are unused ignores, so the
+# lines with ignore comments assert that errors are raised.
 thing = create_thing_without_server(ThingWithActions)
 
+# Check the function returns the expected type, when called with the expected args
 assert_type(thing.no_args_no_return(), None)
+# Check that using arguments causes mypy to raise an error.
 thing.no_args_no_return("arg")  # type: ignore[call-arg]
 thing.no_args_no_return(unexpected=123)  # type: ignore[call-arg]
 
+# Check the return type is None, when called with the expected args
 assert_type(thing.with_args_no_return(1, "test"), None)
+# Check that missing arguments are caught by mypy
 thing.with_args_no_return()  # type: ignore[call-arg]
+# Check that wrong argument types are caught by mypy
 thing.with_args_no_return(1, 2)  # type: ignore[arg-type]
 
+# Check the return type is correct when called without arguments
 assert_type(thing.no_args_with_return(), float)
+# Check that using arguments causes mypy to raise an error.
 thing.with_args_no_return("unexpected")  # type: ignore[arg-type, call-arg]
 thing.with_args_no_return(unexpected=123)  # type: ignore[call-arg]
 
+# Check the return type is correct when called with the expected args
 assert_type(thing.with_args_with_return(10, "data"), float)
+# Check that missing arguments are caught by mypy
 thing.with_args_no_return()  # type: ignore[call-arg]
+# Check that wrong argument types are caught by mypy
 thing.with_args_no_return(10, 20)  # type: ignore[arg-type]
 
 
@@ -61,7 +75,7 @@ assert_type(
     ThingWithActions.no_args_no_return, ActionDescriptor[[], None, ThingWithActions]
 )
 # assert_type doesn't work well with the ParamSpec for arguments, so we use an
-# assignment instead to check the type is correct.
+# assignment instead to check the type is compatible.
 with_args_no_return_descriptor: ActionDescriptor[[int, str], None, ThingWithActions] = (
     ThingWithActions.with_args_no_return
 )
@@ -72,7 +86,8 @@ with_args_with_return_descriptor: ActionDescriptor[
     [int, str], float, ThingWithActions
 ] = ThingWithActions.with_args_with_return
 
-# Pick any one and check for the documentation-related properties
+# Check the documentation-related properties are correctly typed
+# There's no need to check all four actions here, as they should all be the same.
 assert_type(ThingWithActions.with_args_with_return.__doc__, str | None)
 assert_type(ThingWithActions.with_args_with_return.description, str | None)
 assert_type(ThingWithActions.with_args_with_return.title, str)
