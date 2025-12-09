@@ -209,7 +209,7 @@ def test_wrapped_action():
 
 
 def test_action_docs():
-    """Check that action documentation is included in the TD."""
+    """Check that action documentation is included in the Thing Description."""
 
     class DocThing(lt.Thing):
         @lt.action

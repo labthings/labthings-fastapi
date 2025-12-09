@@ -722,7 +722,6 @@ class ActionDescriptor(
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        # TODO
         # `obj` should be of type `OwnerT`, but `BaseDescriptor` currently
         # isn't generic in the type of the owning Thing, so we can't express
         # that here.
