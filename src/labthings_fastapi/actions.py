@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections import deque
-from functools import partial, wraps
+from functools import partial
 import inspect
 from threading import Thread, Lock
 import uuid
@@ -27,9 +27,11 @@ from typing import (
     Annotated,
     Any,
     Callable,
+    Concatenate,
+    Generic,
     Optional,
-    Literal,
-    Union,
+    ParamSpec,
+    TypeVar,
     overload,
 )
 from weakref import WeakSet
@@ -37,10 +39,9 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
 
-from labthings_fastapi.logs import add_thing_log_destination
-
+from .base_descriptor import BaseDescriptor
+from .logs import add_thing_log_destination
 from .utilities import model_to_dict
-from .thing_description._model import LinkElement
 from .invocations import InvocationModel, InvocationStatus, LogRecordModel
 from .dependencies.invocation import NonWarningInvocationID
 from .exceptions import (
@@ -55,13 +56,11 @@ from .utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
     fastapi_dependency_params,
-    get_docstring,
-    get_summary,
     input_model_from_signature,
     return_type,
 )
 from .thing_description import type_to_dataschema
-from .thing_description._model import ActionAffordance, ActionOp, Form
+from .thing_description._model import ActionAffordance, ActionOp, Form, LinkElement
 from .utilities import labthings_data
 
 
@@ -622,7 +621,15 @@ using the link included in each action.
 """
 
 
-class ActionDescriptor:
+ActionParams = ParamSpec("ActionParams")
+ActionReturn = TypeVar("ActionReturn")
+OwnerT = TypeVar("OwnerT", bound="Thing")
+
+
+class ActionDescriptor(
+    BaseDescriptor[Callable[ActionParams, ActionReturn]],
+    Generic[ActionParams, ActionReturn, OwnerT],
+):
     """Wrap actions to enable them to be run over HTTP.
 
     This class is responsible for generating the action description for
@@ -640,7 +647,7 @@ class ActionDescriptor:
 
     def __init__(
         self,
-        func: Callable,
+        func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn],
         response_timeout: float = 1,
         retention_time: float = 300,
     ) -> None:
@@ -662,7 +669,12 @@ class ActionDescriptor:
         :param retention_time: how long, in seconds, the action should be kept
             for after it has completed.
         """
+        super().__init__()
         self.func = func
+        if func.__doc__ is not None:
+            # Use the docstring from the function, if there is one.
+            self.__doc__ = func.__doc__
+        name = func.__name__  # this is checked in __set_name__
         self.response_timeout = response_timeout
         self.retention_time = retention_time
         self.dependency_params = fastapi_dependency_params(func)
@@ -673,63 +685,47 @@ class ActionDescriptor:
         )
         self.output_model = return_type(func)
         self.invocation_model = create_model(
-            f"{self.name}_invocation",
+            f"{name}_invocation",
             __base__=InvocationModel,
             input=(self.input_model, ...),
             output=(Optional[self.output_model], None),
         )
-        self.invocation_model.__name__ = f"{self.name}_invocation"
+        self.invocation_model.__name__ = f"{name}_invocation"
 
-    @overload
-    def __get__(self, obj: Literal[None], type: type[Thing]) -> ActionDescriptor:  # noqa: D105
-        ...
+    def __set_name__(self, owner: type[Thing], name: str) -> None:
+        """Ensure the action name matches the function name.
 
-    @overload
-    def __get__(self, obj: Thing, type: type[Thing] | None = None) -> Callable:  # noqa: D105
-        ...
+        It's assumed in a few places that the function name and the
+        descriptor's name are the same. This should always be the case
+        if it's used as a decorator.
 
-    def __get__(
-        self, obj: Optional[Thing], type: Optional[type[Thing]] = None
-    ) -> Union[ActionDescriptor, Callable]:
+        :param owner: The class owning the descriptor.
+        :param name: The name of the descriptor in the class.
+        :raises ValueError: if the action name does not match the function name.
+        """
+        super().__set_name__(owner, name)
+        if self.name != self.func.__name__:
+            raise ValueError(
+                f"Action name '{self.name}' does not match function name "
+                f"'{self.func.__name__}'",
+            )
+
+    def instance_get(self, obj: Thing) -> Callable[ActionParams, ActionReturn]:
         """Return the function, bound to an object as for a normal method.
 
         This currently doesn't validate the arguments, though it may do so
         in future. In its present form, this is equivalent to a regular
         Python method, i.e. all we do is supply the first argument, `self`.
 
-        If `obj` is None, the descriptor is returned, so we can get
-        the descriptor conveniently as an attribute of the class.
-
         :param obj: the `.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
-        :param type: the class of the `.Thing` to which we are attached.
-            If the descriptor is accessed via the class it is returned
-            directly.
-        :return: the action function, bound to ``obj`` (when accessed
-            via an instance), or the descriptor (accessed via the class).
+        :return: the action function, bound to ``obj``.
         """
-        if obj is None:
-            return self
-        # TODO: do we attempt dependency injection here? I think not.
-        # If we want dependency injection, we should be calling the action
-        # via some sort of client object.
-        return partial(self.func, obj)
-
-    @property
-    def name(self) -> str:
-        """The name of the wrapped function."""
-        return self.func.__name__
-
-    @property
-    def title(self) -> str:
-        """A human-readable title."""
-        return get_summary(self.func) or self.name
-
-    @property
-    def description(self) -> str | None:
-        """A description of the action."""
-        return get_docstring(self.func, remove_summary=True)
+        # `obj` should be of type `OwnerT`, but `BaseDescriptor` currently
+        # isn't generic in the type of the owning Thing, so we can't express
+        # that here.
+        return partial(self.func, obj)  # type: ignore[arg-type]
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.
@@ -926,27 +922,10 @@ class ActionDescriptor:
         )
 
 
-def mark_action(func: Callable, **kwargs: Any) -> ActionDescriptor:
-    r"""Mark a method of a Thing as an Action.
-
-    We replace the function with a descriptor that's a
-    subclass of `.ActionDescriptor`
-
-    :param func: The function to be decorated.
-    :param \**kwargs: Additional keyword arguments are passed to the constructor
-        of `.ActionDescriptor`.
-
-    :return: An `.ActionDescriptor` wrapping the method.
-    """
-
-    class ActionDescriptorSubclass(ActionDescriptor):
-        pass
-
-    return ActionDescriptorSubclass(func, **kwargs)
-
-
 @overload
-def action(func: Callable, **kwargs: Any) -> ActionDescriptor: ...
+def action(
+    func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn], **kwargs: Any
+) -> ActionDescriptor[ActionParams, ActionReturn, OwnerT]: ...
 
 
 @overload
@@ -954,22 +933,22 @@ def action(
     **kwargs: Any,
 ) -> Callable[
     [
-        Callable,
+        Callable[Concatenate[OwnerT, ActionParams], ActionReturn],
     ],
-    ActionDescriptor,
+    ActionDescriptor[ActionParams, ActionReturn, OwnerT],
 ]: ...
 
 
-@wraps(mark_action)
 def action(
-    func: Optional[Callable] = None, **kwargs: Any
+    func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn] | None = None,
+    **kwargs: Any,
 ) -> (
-    ActionDescriptor
+    ActionDescriptor[ActionParams, ActionReturn, OwnerT]
     | Callable[
         [
-            Callable,
+            Callable[Concatenate[OwnerT, ActionParams], ActionReturn],
         ],
-        ActionDescriptor,
+        ActionDescriptor[ActionParams, ActionReturn, OwnerT],
     ]
 ):
     r"""Mark a method of a `.Thing` as a LabThings Action.
@@ -996,6 +975,6 @@ def action(
     # return a partial object, which then calls the
     # wrapped function once.
     if func is not None:
-        return mark_action(func, **kwargs)
+        return ActionDescriptor(func, **kwargs)
     else:
-        return partial(mark_action, **kwargs)
+        return partial(ActionDescriptor, **kwargs)

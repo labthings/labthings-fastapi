@@ -206,3 +206,83 @@ def test_wrapped_action():
     # Check we can make the thing and it has a valid TD
     example = create_thing_without_server(Example)
     example.validate_thing_description()
+
+
+def test_action_docs():
+    """Check that action documentation is included in the Thing Description.
+
+    This test was added to check that the generated documentation is correct,
+    after some refactoring of `lt.action`.
+
+    `name`, `title` and `description` attributes are now handled by `BaseDescriptor`
+    and are tested more extensively there - but it seemed worthwhile to have some
+    tests of them in the context of actions.
+    """
+
+    class DocThing(lt.Thing):
+        @lt.action
+        def documented_action(self) -> None:
+            """This is the action docstring."""
+            pass
+
+        @lt.action
+        def convert_type(self, a: int) -> float:
+            """Convert an integer to a float."""
+            return float(a)
+
+        @lt.action
+        def no_doc_action(self) -> None:
+            pass
+
+        @lt.action
+        def long_docstring(self) -> None:
+            """Do something with a very long docstring.
+
+            It has multiple paragraphs.
+
+            Here is the second paragraph.
+
+            And here is the third.
+            """
+            pass
+
+    # Create a Thing, and generate the Thing Description. This uses `BaseDescriptor`
+    # functionality to extract the name, title, and description.
+    thing = create_thing_without_server(DocThing)
+    td = thing.thing_description()
+    actions = td.actions
+    # The various `assert <whatever> is not None` statements are mostly for type
+    # checking/autocompletion while writing the tests.
+    assert actions is not None
+
+    # The function docstring should propagate through as the description.
+    assert actions["documented_action"].description == "This is the action docstring."
+
+    # It's important that we check more than one action, to ensure there is no
+    # "leakage" between instances. Previous implementations always subclassed
+    # `ActionDescriptor` to avoid leakage when methods were manipulated at runtime.
+    # This is no longer done, so we can instantiate `ActionDescriptor` directly - but
+    # it's good to make sure we can have multiple actions with different docstrings.
+    assert actions["convert_type"].description == "Convert an integer to a float."
+
+    # convert_type also allows us to check that the action inputs and outputs are
+    # correctly represented in the thing description.
+    input = actions["convert_type"].input
+    assert input is not None
+    input_properties = input.properties
+    assert input_properties is not None
+    assert input_properties["a"].type.value == "integer"
+    output = actions["convert_type"].output
+    assert output is not None
+    assert output.type.value == "number"
+
+    # An action with no docstring should have no description, and a default title.
+    assert actions["no_doc_action"].description is None
+    assert actions["no_doc_action"].title == "no_doc_action"
+
+    # An action with a long docstring should have the docstring body as description,
+    # and the first line as title.
+    assert actions["long_docstring"].title == "Do something with a very long docstring."
+    assert actions["long_docstring"].description.startswith(
+        "It has multiple paragraphs."
+    )
