@@ -6,9 +6,56 @@ with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
 """
 
-from pydantic import BaseModel, Field, ImportString, AliasChoices, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    ImportString,
+    AliasChoices,
+    field_validator,
+    ValidationError,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+)
+from pydantic_core import PydanticCustomError
 from typing import Any, Annotated, TypeAlias
 from collections.abc import Mapping, Sequence, Iterable
+
+
+def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:
+    """Prevent errors during import from causing odd validation errors.
+
+    This is used to wrap the pydantic ImportString validator, and ensures that any
+    module that won't import shows up with a single clear error.
+
+    :param value: The value being validated.
+    :param handler: The validator handler.
+
+    :return: The validated value.
+
+    :raises PydanticCustomError: if an import error occurs.
+    :raises Exception: if the ImportString logic raises a ValidationError
+        containing only import errors, this will be re-raised. All other
+        exceptions are wrapped in a PydanticCustomError.
+    """
+    try:
+        return handler(value)
+    except Exception as e:
+        # ImportErrors get wrapped as ValidationErrors, and that's fine:
+        # it results in a sensible error message.
+        if isinstance(e, ValidationError):
+            if all(err["type"] == "import_error" for err in e.errors()):
+                raise
+        raise PydanticCustomError(
+            "import_error",
+            "An exception was raised when importing '{name}'.",
+            {"name": str(value), "error": e},
+        ) from e
+
+
+ThingImportString = Annotated[
+    ImportString,
+    WrapValidator(contain_import_errors),
+]
 
 
 # The type: ignore below is a spurious warning about `kwargs`.
@@ -16,7 +63,7 @@ from collections.abc import Mapping, Sequence, Iterable
 class ThingConfig(BaseModel):  # type: ignore[no-redef]
     r"""The information needed to add a `.Thing` to a `.ThingServer`\ ."""
 
-    cls: ImportString = Field(
+    cls: ThingImportString = Field(
         validation_alias=AliasChoices("cls", "class"),
         description="The Thing subclass to add to the server.",
     )
@@ -51,7 +98,7 @@ ThingName = Annotated[
 ]
 
 
-ThingsConfig: TypeAlias = Mapping[ThingName, ThingConfig | ImportString]
+ThingsConfig: TypeAlias = Mapping[ThingName, ThingConfig | ThingImportString]
 
 
 class ThingServerConfig(BaseModel):
