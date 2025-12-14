@@ -116,6 +116,8 @@ class ThingServerInterface:
         block the current thread while it calls the provided async function in the
         server's event loop.
 
+        Do not call this from the event loop or it may lead to a deadlock.
+
         :param async_function: the asynchronous function to call.
         :param \*args: positional arguments to be provided to the function.
 
