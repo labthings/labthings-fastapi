@@ -133,6 +133,28 @@ def test_start_async_task_soon(server, interface):
     assert mutable[0] is True
 
 
+def test_call_async_task(server, interface):
+    """Check async tasks may be run in a blocking fashion."""
+
+    async def async_shout(input: str):
+        """A function that shouts back at you.
+
+        This is only async to check it can be called.
+        """
+        return input.upper()
+
+    with pytest.raises(ServerNotRunningError):
+        # You can't run async code unless the server
+        # is running: this should raise a helpful
+        # error.
+        interface.call_async_task(async_shout, "foobar")
+
+    with TestClient(server.app) as _:
+        # TestClient starts an event loop in the background
+        # so this should work
+        assert interface.call_async_task(async_shout, "foobar") == "FOOBAR"
+
+
 def test_settings_folder(server, interface):
     """Check the interface returns the right settings folder."""
     assert interface.settings_folder == os.path.join(server.settings_folder, NAME)

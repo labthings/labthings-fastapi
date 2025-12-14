@@ -106,6 +106,29 @@ class ThingServerInterface:
             raise ServerNotRunningError("Can't run async code without an event loop.")
         return portal.start_task_soon(async_function, *args)
 
+    def call_async_task(
+        self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
+    ) -> ReturnType:
+        r"""Run an asynchronous task in the server's event loop in a blocking manner.
+
+        This function wraps `anyio.from_thread.BlockingPortal.call` to
+        provide a way of calling asynchronous code from threaded code. It will
+        block the current thread while it calls the provided async function in the
+        server's event loop.
+
+        :param async_function: the asynchronous function to call.
+        :param \*args: positional arguments to be provided to the function.
+
+        :returns: The return value from the asynchronous function.
+
+        :raises ServerNotRunningError: if the server is not running
+            (i.e. there is no event loop).
+        """
+        portal = self._get_server().blocking_portal
+        if portal is None:
+            raise ServerNotRunningError("Can't run async code without an event loop.")
+        return portal.call(async_function, *args)
+
     @property
     def settings_folder(self) -> str:
         """The path to a folder where persistent files may be saved."""
