@@ -301,8 +301,8 @@ class ThingServer:
                 dictionaries.
             """
             return {
-                path: thing.thing_description(path, base=str(request.base_url))
-                for path, thing in thing_server.things.items()
+                name: thing.thing_description(name + "/", base=str(request.base_url))
+                for name, thing in thing_server.things.items()
             }
 
         @self.app.get("/things/")
