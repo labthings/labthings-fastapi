@@ -80,7 +80,7 @@ target-version = "py310"
 docstring-code-format = true
 
 [tool.ruff.lint]
-external = ["DOC401", "F824", "DOC101", "DOC103"]  # used via flake8/pydoclint
+external = ["DOC401", "F824", "DOC101", "DOC103", "DOC503"]  # used via flake8/pydoclint
 select = [
   "ANN",   # type annotations (ensuring they are present, complements mypy)
   "ASYNC", # flake8 async rules

@@ -6,9 +6,81 @@ with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
 """
 
-from pydantic import BaseModel, Field, ImportString, AliasChoices, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    ImportString,
+    AliasChoices,
+    field_validator,
+    ValidatorFunctionWrapHandler,
+    WrapValidator,
+    ValidationError,
+)
 from typing import Any, Annotated, TypeAlias
 from collections.abc import Mapping, Sequence, Iterable
+
+
+class ThingImportFailure(BaseException):
+    """Failed to import Thing. Raise with import traceback."""
+
+
+# Disabling DOC503 as it is incorrectly complaining that `exc.with_traceback` isn't
+# documentented.
+
+
+def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:  # noqa: DOC503
+    """Prevent errors during import from causing odd validation errors.
+
+    This is used to wrap the pydantic ImportString validator, and ensures that any
+    module that won't import shows up with a single clear error.
+
+    :param value: The value being validated.
+    :param handler: The validator handler.
+
+    :return: The validated value.
+
+    :raises ThingImportFailure: if an import error occurs, with the stack trace from
+        retrying the import.
+    :raises Exception: In the unlikely event that the import error cannot be reproduced
+    """
+    try:
+        return handler(value)
+    except Exception as validation_err:
+        # TypeError and ValueErrors are turned into validation errors. Other errors
+        # are passed through.
+        # First reraise other errors directly from None to improve the trace.
+        if not isinstance(validation_err, ValidationError):
+            exc = ThingImportFailure(
+                f"[{type(validation_err).__name__}] {validation_err}"
+            )
+            raise exc.with_traceback(validation_err.__traceback__) from None
+        # If it is a validation error but we we can't find the source then just raise.
+        errors = validation_err.errors()
+
+        # This should always have at least 1 error, and "ctx,error" keys. In the case
+        # that it doesn't raise the original error. No coverage as this is just a
+        # fallback.
+        if not (
+            len(errors) > 0 and "ctx" in errors[0] and "error" in errors[0]["ctx"]
+        ):  # pragma: no cover
+            raise
+
+        # Finally raise the original error during import if it triggered a validation
+        # error
+        orig_err = errors[0]["ctx"]["error"]
+        if isinstance(orig_err, str):
+            # If the import failed due to the module/class not being found then it is
+            # a string so raise it.
+            raise ThingImportFailure(f"{orig_err}") from None
+        exc = ThingImportFailure(f"[{type(orig_err).__name__}] {orig_err}")
+        # Raise from None so the traceback is just the clear import traceback.
+        raise exc.with_traceback(orig_err.__traceback__) from None
+
+
+ThingImportString = Annotated[
+    ImportString,
+    WrapValidator(contain_import_errors),
+]
 
 
 # The type: ignore below is a spurious warning about `kwargs`.
@@ -16,7 +88,7 @@ from collections.abc import Mapping, Sequence, Iterable
 class ThingConfig(BaseModel):  # type: ignore[no-redef]
     r"""The information needed to add a `.Thing` to a `.ThingServer`\ ."""
 
-    cls: ImportString = Field(
+    cls: ThingImportString = Field(
         validation_alias=AliasChoices("cls", "class"),
         description="The Thing subclass to add to the server.",
     )
@@ -51,7 +123,7 @@ ThingName = Annotated[
 ]
 
 
-ThingsConfig: TypeAlias = Mapping[ThingName, ThingConfig | ImportString]
+ThingsConfig: TypeAlias = Mapping[ThingName, ThingConfig | ThingImportString]
 
 
 class ThingServerConfig(BaseModel):
