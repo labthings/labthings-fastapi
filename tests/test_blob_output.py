@@ -100,7 +100,7 @@ def test_blobdata_protocol():
         _ = bad_blob.content
 
 
-@pytest.mark.filterwarnings("ignore:.*removed in v0.0.13.*:DeprecationWarning")
+@pytest.mark.filterwarnings("ignore:.*removed in v0.1.0.*:DeprecationWarning")
 def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
     with pytest.raises(ValueError):

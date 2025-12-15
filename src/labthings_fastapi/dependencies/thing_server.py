@@ -61,7 +61,7 @@ def find_thing_server(app: FastAPI) -> ThingServer:
     """
     warn(
         "`find_thing_server` and `thing_server_from_request` are deprecated "
-        "and will be removed in v0.0.13. Use `Thing.thing_server_interface` "
+        "and will be removed in v0.1.0. Use `Thing.thing_server_interface` "
         "instead.",
         DeprecationWarning,
         stacklevel=2,

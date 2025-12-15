@@ -14,7 +14,7 @@ from labthings_fastapi.utilities.introspection import fastapi_dependency_params
 
 
 pytestmark = pytest.mark.filterwarnings(
-    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+    "ignore:.*removed in v0.1.0.*:DeprecationWarning"
 )
 
 

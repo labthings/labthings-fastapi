@@ -71,7 +71,7 @@ class DirectThingClient:
             such as access to other `.Things`.
         """
         warn(
-            "`DirectThingClient` is deprecated and will be removed in v0.0.13. Use "
+            "`DirectThingClient` is deprecated and will be removed in v0.1.0. Use "
             "`lt.thing_slot` instead.",
             DeprecationWarning,
             stacklevel=2,
@@ -282,7 +282,7 @@ def direct_thing_client_class(
         This class may be used as a FastAPI dependency: see :ref:`things_from_things`.
     """
     warn(
-        "`direct_thing_client_class` is deprecated and will be removed in v0.0.13. "
+        "`direct_thing_client_class` is deprecated and will be removed in v0.1.0. "
         "Use `lt.thing_slot` instead.",
         DeprecationWarning,
         stacklevel=3,  # This is called from `direct_thing_client_dependency` so we
