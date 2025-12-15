@@ -593,7 +593,7 @@ def blob_type(media_type: str) -> type[Blob]:
     :raise ValueError: if the media type contains ``'`` or ``\``.
     """
     warn(
-        "`blob_type` is deprecated and will be removed in v0.0.13. "
+        "`blob_type` is deprecated and will be removed in v0.1.0. "
         "Create a subclass of `Blob` instead.",
         DeprecationWarning,
         stacklevel=2,

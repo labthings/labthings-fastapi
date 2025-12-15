@@ -57,7 +57,7 @@ def thing_states_getter(request: Request) -> Callable[[], Mapping[str, Any]]:
     :return: a function that returns a dictionary of metadata.
     """
     warn(
-        "The `GetThingStates` dependency is deprecated and will be removed in v0.0.13. "
+        "The `GetThingStates` dependency is deprecated and will be removed in v0.1.0. "
         "Use `Thing.thing_server_interface.get_thing_states` instead.",
         DeprecationWarning,
         stacklevel=2,

@@ -14,7 +14,7 @@ from ..temp_client import poll_task
 
 
 pytestmark = pytest.mark.filterwarnings(
-    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+    "ignore:.*removed in v0.1.0.*:DeprecationWarning"
 )
 
 

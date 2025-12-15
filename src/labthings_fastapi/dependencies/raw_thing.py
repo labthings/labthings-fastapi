@@ -67,7 +67,7 @@ def find_raw_thing_by_class(
             dependency was created.
         """
         warn(
-            "`find_raw_thing` is deprecated and will be removed in v0.0.13. "
+            "`find_raw_thing` is deprecated and will be removed in v0.1.0. "
             "Use `lt.thing_slot` instead.",
             DeprecationWarning,
             stacklevel=2,
@@ -120,7 +120,7 @@ def raw_thing_dependency(cls: type[ThingInstance]) -> type[ThingInstance]:
         instance of ``cls`` at runtime.
     """
     warn(
-        "`raw_thing_dependency` is deprecated and will be removed in v0.0.13. "
+        "`raw_thing_dependency` is deprecated and will be removed in v0.1.0. "
         "Use `lt.thing_slot` instead.",
         DeprecationWarning,
         stacklevel=2,

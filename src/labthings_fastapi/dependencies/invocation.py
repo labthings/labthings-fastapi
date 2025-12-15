@@ -85,7 +85,7 @@ def invocation_id(id: NonWarningInvocationID) -> uuid.UUID:
     :return: The same invocation ID.
     """
     warn(
-        "The invocation ID dependency is deprecated and will be removed in v0.0.13. "
+        "The invocation ID dependency is deprecated and will be removed in v0.1.0. "
         "Use `Thing.invocation_id` instead.",
         DeprecationWarning,
         stacklevel=3,
@@ -117,7 +117,7 @@ def invocation_logger(id: NonWarningInvocationID) -> logging.Logger:
     """
     warn(
         "The invocation logger dependency is deprecated and will be removed in "
-        "v0.0.13. Use `Thing.logger` instead.",
+        "v0.1.0. Use `Thing.logger` instead.",
         DeprecationWarning,
         stacklevel=3,
     )
@@ -143,7 +143,7 @@ def invocation_cancel_hook(id: NonWarningInvocationID) -> CancelHook:
     :return: a `.CancelHook` event.
     """
     warn(
-        "The cancel hook dependency is deprecated and will be removed in v0.0.13. "
+        "The cancel hook dependency is deprecated and will be removed in v0.1.0. "
         "Use `lt.cancellable_sleep` or `lt.raise_if_cancelled` instead.",
         DeprecationWarning,
         stacklevel=3,

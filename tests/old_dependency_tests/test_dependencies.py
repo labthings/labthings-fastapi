@@ -14,7 +14,7 @@ from .module_with_deps import FancyIDDep
 
 
 pytestmark = pytest.mark.filterwarnings(
-    "ignore:.*removed in v0.0.13.*:DeprecationWarning"
+    "ignore:.*removed in v0.1.0.*:DeprecationWarning"
 )
 
 

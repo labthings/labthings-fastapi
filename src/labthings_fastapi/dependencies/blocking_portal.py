@@ -49,7 +49,7 @@ def blocking_portal_from_thing_server(request: Request) -> RealBlockingPortal:
         are only evaluated while the server is running.
     """
     warn(
-        "The blocking portal dependency is deprecated and will be removed in v0.0.13. "
+        "The blocking portal dependency is deprecated and will be removed in v0.1.0. "
         "Use `Thing.thing_server_interface` instead.",
         DeprecationWarning,
         stacklevel=2,
