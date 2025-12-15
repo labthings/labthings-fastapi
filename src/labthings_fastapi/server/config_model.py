@@ -56,7 +56,13 @@ def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> 
             raise exc.with_traceback(validation_err.__traceback__) from None
         # If it is a validation error but we we can't find the source then just raise.
         errors = validation_err.errors()
-        if not (len(errors) > 0 and "ctx" in errors[0] and "error" in errors[0]["ctx"]):
+
+        # This should always have at least 1 error, and "ctx,error" keys. In the case
+        # that it doesn't raise the original error. No coverage as this is just a
+        # fallback.
+        if not (
+            len(errors) > 0 and "ctx" in errors[0] and "error" in errors[0]["ctx"]
+        ):  # pragma: no cover
             raise
 
         # Finally raise the original error during import if it triggered a validation
