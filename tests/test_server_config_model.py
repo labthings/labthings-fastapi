@@ -24,7 +24,7 @@ def test_ThingConfig():
     assert direct.kwargs == {}
     assert direct.thing_slots == {}
 
-    with pytest.raises(ValidationError, match="No module named"):
+    with pytest.raises(ThingImportFailure, match="No module named 'missing.module'"):
         ThingConfig(cls="missing.module")
 
 
@@ -104,9 +104,7 @@ def test_ThingServerConfig():
 def test_unimportable_modules():
     """Test that unimportable modules raise errors as expected."""
 
-    with pytest.raises(
-        ThingImportFailure, match="\[ModuleNotFoundError\] No module named 'missing'"
-    ):
+    with pytest.raises(ThingImportFailure, match="No module named 'missing.module'"):
         ThingConfig(cls="missing.module:object")
 
     with pytest.raises(
@@ -126,17 +124,14 @@ def test_unimportable_modules():
 
     with pytest.raises(
         ThingImportFailure,
-        match="\[ModuleNotFoundError\] No module named 'tests.unimportable.missing'",
+        match="No module named 'tests.unimportable.missing'",
     ):
         # This checks normal ImportErrors get reported as usual
         ThingConfig(cls="tests.unimportable.missing:SomeClass")
 
     with pytest.raises(
         ThingImportFailure,
-        match=(
-            "\[ImportError\] cannot import name 'MissingClass' from "
-            "'tests.unimportable'"
-        ),
+        match=("cannot import name 'MissingClass' from 'tests.unimportable'"),
     ):
         # This checks normal ImportErrors get reported as usual
         ThingConfig(cls="tests.unimportable:MissingClass")

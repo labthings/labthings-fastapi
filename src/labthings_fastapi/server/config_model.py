@@ -6,8 +6,6 @@ with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
 """
 
-from importlib import import_module
-import re
 from pydantic import (
     BaseModel,
     Field,
@@ -16,14 +14,10 @@ from pydantic import (
     field_validator,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    ValidationError,
 )
 from typing import Any, Annotated, TypeAlias
 from collections.abc import Mapping, Sequence, Iterable
-
-PYTHON_EL_RE_STR = r"[a-zA-Z_][a-zA-Z0-9_]*"
-IMPORT_REGEX = re.compile(
-    rf"^{PYTHON_EL_RE_STR}(?:\.{PYTHON_EL_RE_STR})*:{PYTHON_EL_RE_STR}$"
-)
 
 
 class ThingImportFailure(BaseException):
@@ -51,35 +45,30 @@ def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> 
     """
     try:
         return handler(value)
-    except Exception:
-        # In the case where this is a matching import rule.
-        if isinstance(value, str) and IMPORT_REGEX.match(value):
-            # Try to import the module again
-            module_name = value.split(":")[0]
-            thing_name = value.split(":")[1]
-            try:
-                module = import_module(module_name)
-            except Exception as import_err:  # noqa: BLE001
-                # Capture the import exception and raise as a ThingImportFailure which
-                # is a subclass of BaseException.
-                msg = f"[{type(import_err).__name__}] {import_err}"
-                exc = ThingImportFailure(msg)
-                # Raise from None so the traceback is just the clear import traceback.
-                raise exc.with_traceback(import_err.__traceback__) from None
+    except Exception as validation_err:
+        # TypeError and ValueErrors are turned into validation errors. Other errors
+        # are passed through.
+        # First reraise other errors directly from None to improve the trace.
+        if not isinstance(validation_err, ValidationError):
+            exc = ThingImportFailure(
+                f"[{type(validation_err).__name__}] {validation_err}"
+            )
+            raise exc.with_traceback(validation_err.__traceback__) from None
+        # If it is a validation error but we we can't find the source then just raise.
+        errors = validation_err.errors()
+        if not (len(errors) > 0 and "ctx" in errors[0] and "error" in errors[0]["ctx"]):
+            raise
 
-            # If check the Thing is there and if not raise the ThingImportFailure
-            # wrapping an ImportError.
-            if not hasattr(module, thing_name):
-                msg = (
-                    f"[ImportError] cannot import name '{thing_name}' from "
-                    f"'{module_name}'"
-                )
-                # Raise from None so the traceback is just the clear import traceback.
-                raise ThingImportFailure(msg) from None
-
-        # If this was the wrong type, didn't match the regex, or somehow imported fine
-        # then re-raise the original error.
-        raise
+        # Finally raise the original error during import if it triggered a validation
+        # error
+        orig_err = errors[0]["ctx"]["error"]
+        if isinstance(orig_err, str):
+            # If the import failed due to the module/class not being found then it is
+            # a string so raise it.
+            raise ThingImportFailure(f"{orig_err}") from None
+        exc = ThingImportFailure(f"[{type(orig_err).__name__}] {orig_err}")
+        # Raise from None so the traceback is just the clear import traceback.
+        raise exc.with_traceback(orig_err.__traceback__) from None
 
 
 ThingImportString = Annotated[
