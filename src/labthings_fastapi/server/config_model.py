@@ -30,7 +30,11 @@ class ThingImportFailure(BaseException):
     """Failed to import Thing. Raise with import traceback."""
 
 
-def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:
+# Disabling DOC503 as it is incorrectly complaining that `exc.with_traceback` isn't
+# documentented.
+
+
+def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:  # noqa: DOC503
     """Prevent errors during import from causing odd validation errors.
 
     This is used to wrap the pydantic ImportString validator, and ensures that any
