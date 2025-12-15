@@ -6,19 +6,28 @@ with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
 """
 
+from importlib import import_module
+import re
 from pydantic import (
     BaseModel,
     Field,
     ImportString,
     AliasChoices,
     field_validator,
-    ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
 )
-from pydantic_core import PydanticCustomError
 from typing import Any, Annotated, TypeAlias
 from collections.abc import Mapping, Sequence, Iterable
+
+PYTHON_EL_RE_STR = r"[a-zA-Z_][a-zA-Z0-9_]*"
+IMPORT_REGEX = re.compile(
+    rf"^{PYTHON_EL_RE_STR}(?:\.{PYTHON_EL_RE_STR})*:{PYTHON_EL_RE_STR}$"
+)
+
+
+class ThingImportFailure(BaseException):
+    """Failed to import Thing. Raise with import traceback."""
 
 
 def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> Any:
@@ -32,24 +41,41 @@ def contain_import_errors(value: Any, handler: ValidatorFunctionWrapHandler) -> 
 
     :return: The validated value.
 
-    :raises PydanticCustomError: if an import error occurs.
-    :raises Exception: if the ImportString logic raises a ValidationError
-        containing only import errors, this will be re-raised. All other
-        exceptions are wrapped in a PydanticCustomError.
+    :raises ThingImportFailure: if an import error occurs, with the stack trace from
+        retrying the import.
+    :raises Exception: In the unlikely event that the import error cannot be reproduced
     """
     try:
         return handler(value)
-    except Exception as e:
-        # ImportErrors get wrapped as ValidationErrors, and that's fine:
-        # it results in a sensible error message.
-        if isinstance(e, ValidationError):
-            if all(err["type"] == "import_error" for err in e.errors()):
-                raise
-        raise PydanticCustomError(
-            "import_error",
-            "An exception was raised when importing '{name}'.",
-            {"name": str(value), "error": e},
-        ) from e
+    except Exception:
+        # In the case where this is a matching import rule.
+        if isinstance(value, str) and IMPORT_REGEX.match(value):
+            # Try to import the module again
+            module_name = value.split(":")[0]
+            thing_name = value.split(":")[1]
+            try:
+                module = import_module(module_name)
+            except Exception as import_err:  # noqa: BLE001
+                # Capture the import exception and raise as a ThingImportFailure which
+                # is a subclass of BaseException.
+                msg = f"[{type(import_err).__name__}] {import_err}"
+                exc = ThingImportFailure(msg)
+                # Raise from None so the traceback is just the clear import traceback.
+                raise exc.with_traceback(import_err.__traceback__) from None
+
+            # If check the Thing is there and if not raise the ThingImportFailure
+            # wrapping an ImportError.
+            if not hasattr(module, thing_name):
+                msg = (
+                    f"[ImportError] cannot import name '{thing_name}' from "
+                    f"'{module_name}'"
+                )
+                # Raise from None so the traceback is just the clear import traceback.
+                raise ThingImportFailure(msg) from None
+
+        # If this was the wrong type, didn't match the regex, or somehow imported fine
+        # then re-raise the original error.
+        raise
 
 
 ThingImportString = Annotated[

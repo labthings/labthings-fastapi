@@ -2,7 +2,11 @@ r"""Test code for `.server.config_model`\ ."""
 
 from pydantic import ValidationError
 import pytest
-from labthings_fastapi.server.config_model import ThingConfig, ThingServerConfig
+from labthings_fastapi.server.config_model import (
+    ThingConfig,
+    ThingServerConfig,
+    ThingImportFailure,
+)
 import labthings_fastapi.example_things
 from labthings_fastapi.example_things import MyThing
 
@@ -40,7 +44,6 @@ INVALID_THING_CONFIGS = [
     {},
     {"foo": "bar"},
     {"class": MyThing, "kwargs": 1},
-    "missing.module:object",
     4,
     None,
     False,
@@ -98,22 +101,42 @@ def test_ThingServerConfig():
             ThingServerConfig(things={name: MyThing})
 
 
-def test_unimportable_module():
+def test_unimportable_modules():
     """Test that unimportable modules raise errors as expected."""
-    expected_message = "exception was raised when importing 'tests.unimportable"
-    with pytest.raises(ValidationError, match=expected_message):
+
+    with pytest.raises(
+        ThingImportFailure, match="\[ModuleNotFoundError\] No module named 'missing'"
+    ):
+        ThingConfig(cls="missing.module:object")
+
+    with pytest.raises(
+        ThingImportFailure,
+        match="\[RuntimeError\] This module should not be importable!",
+    ):
         # This checks RuntimErrors get reported with a single error
         ThingConfig(cls="tests.unimportable.runtimeerror:SomeClass")
-    with pytest.raises(ValidationError, match=expected_message):
+
+    with pytest.raises(
+        ThingImportFailure,
+        match="\[ValueError\] This module should not be importable due to ValueError!",
+    ):
         # This checks ValueErrors get reported with a single error
         # rather than getting swallowed by a ValidationError
         ThingConfig(cls="tests.unimportable.valueerror:SomeClass")
+
     with pytest.raises(
-        ValidationError,
-        match="No module named 'tests.unimportable.missing'",
+        ThingImportFailure,
+        match="\[ModuleNotFoundError\] No module named 'tests.unimportable.missing'",
     ):
         # This checks normal ImportErrors get reported as usual
         ThingConfig(cls="tests.unimportable.missing:SomeClass")
-    with pytest.raises(ValidationError, match="cannot import name 'MissingClass'"):
+
+    with pytest.raises(
+        ThingImportFailure,
+        match=(
+            "\[ImportError\] cannot import name 'MissingClass' from "
+            "'tests.unimportable'"
+        ),
+    ):
         # This checks normal ImportErrors get reported as usual
         ThingConfig(cls="tests.unimportable:MissingClass")

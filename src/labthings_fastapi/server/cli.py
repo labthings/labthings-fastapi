@@ -27,7 +27,7 @@ import uvicorn
 
 from . import ThingServer
 from . import fallback
-from .config_model import ThingServerConfig
+from .config_model import ThingServerConfig, ThingImportFailure
 
 
 def get_default_parser() -> ArgumentParser:
@@ -156,7 +156,7 @@ def serve_from_cli(
             app.labthings_error = e
             uvicorn.run(app, host=args.host, port=args.port)
         else:
-            if isinstance(e, ValidationError):
+            if isinstance(e, (ValidationError, ThingImportFailure)):
                 print(f"Error reading LabThings configuration:\n{e}")
                 sys.exit(3)
             else:
