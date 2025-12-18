@@ -16,6 +16,9 @@ from inspect import Parameter, signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.main import create_model
 from fastapi.dependencies.utils import analyze_param, get_typed_signature
+import numpy as np
+
+from ..types.numpy import ArrayModel
 
 
 class EmptyObject(BaseModel):
@@ -178,6 +181,9 @@ def return_type(func: Callable) -> Type:
     else:
         # We use `get_type_hints` rather than just `sig.return_annotation`
         # because it resolves forward references, etc.
+        rtype = get_type_hints(func)["return"]
+        if isinstance(rtype, type) and issubclass(rtype, np.ndarray):
+            return ArrayModel
         type_hints = get_type_hints(func, include_extras=True)
         return type_hints["return"]
 

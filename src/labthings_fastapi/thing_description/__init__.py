@@ -300,9 +300,12 @@ def type_to_dataschema(t: type, **kwargs: Any) -> DataSchema:
     :raise ValidationError: if the datatype cannot be represented
         by a `.DataSchema`.
     """
+    data_format = None
     if hasattr(t, "model_json_schema"):
         # The input should be a `BaseModel` subclass, in which case this works:
         json_schema = t.model_json_schema()
+        if "_labthings_typehint" in t.__private_attributes__:
+            data_format = t.__private_attributes__["_labthings_typehint"].default
     else:
         # In principle, the below should work for any type, though some
         # deferred annotations can go wrong.
@@ -319,6 +322,8 @@ def type_to_dataschema(t: type, **kwargs: Any) -> DataSchema:
         if k in schema_dict:
             del schema_dict[k]
     schema_dict.update(kwargs)
+    if data_format is not None:
+        schema_dict["format"] = data_format
     try:
         return DataSchema(**schema_dict)
     except ValidationError as ve:

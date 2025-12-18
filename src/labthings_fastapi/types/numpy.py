@@ -147,3 +147,15 @@ class DenumpifyingDict(RootModel):
 
     root: Annotated[Mapping, WrapSerializer(denumpify_serializer)]
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class ArrayModel(RootModel):
+    """A model automatically used by actions as the return type for a numpy array.
+
+    This models is passed to FastAPI as the return model for any action that returns
+    a numpy array. The private typehint is saved as format information to allow
+    a ThingClient to reconstruct the array from the list sent over HTTP.
+    """
+
+    root: NDArray
+    _labthings_typehint: str = "ndarray"
