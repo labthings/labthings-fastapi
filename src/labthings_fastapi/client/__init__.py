@@ -13,6 +13,7 @@ from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
 
+import numpy as np
 from pydantic import BaseModel
 
 from .outputs import ClientBlobOutput
@@ -159,7 +160,9 @@ class ThingClient:
         r = self.client.put(urljoin(self.path, path), json=value)
         r.raise_for_status()
 
-    def invoke_action(self, path: str, **kwargs: Any) -> Any:
+    def invoke_action(
+        self, path: str, labthings_typehint: str | None, **kwargs: Any
+    ) -> Any:
         r"""Invoke an action on the Thing.
 
         This method will make the initial POST request to invoke an action,
@@ -205,7 +208,7 @@ class ThingClient:
                     href=invocation["output"]["href"],
                     client=self.client,
                 )
-            return invocation["output"]
+            return _adjust_type(invocation["output"], labthings_typehint)
         else:
             raise RuntimeError(f"Action did not complete successfully: {invocation}")
 
@@ -274,6 +277,15 @@ class ThingClient:
         for name, a in thing_description["actions"].items():
             add_action(Client, name, a)
         return Client
+
+
+def _adjust_type(value: Any, labthings_typehint: str | None) -> Any:
+    """Adjust the return type based on labthings_typehint."""
+    if labthings_typehint is None:
+        return value
+    if labthings_typehint == "ndarray":
+        return np.array(value)
+    raise ValueError(f"No type of {labthings_typehint} known")
 
 
 class PropertyClientDescriptor:
@@ -361,9 +373,12 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
     :param action: a dictionary representing the action, in :ref:`wot_td`
         format.
     """
+    labthings_typehint = action["output"].get("format", None)
 
     def action_method(self: ThingClient, **kwargs: Any) -> Any:
-        return self.invoke_action(action_name, **kwargs)
+        return self.invoke_action(
+            action_name, labthings_typehint=labthings_typehint, **kwargs
+        )
 
     if "output" in action and "type" in action["output"]:
         action_method.__annotations__["return"] = action["output"]["type"]

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 import numpy as np
 from fastapi.testclient import TestClient
 
 from labthings_fastapi.testing import create_thing_without_server
-from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
+from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict, ArrayModel
 import labthings_fastapi as lt
-
-
-class ArrayModel(RootModel):
-    root: NDArray
 
 
 def check_field_works_with_list(data):
