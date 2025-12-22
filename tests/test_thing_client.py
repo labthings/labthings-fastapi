@@ -2,7 +2,6 @@
 
 import re
 
-from httpx import HTTPStatusError
 import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
@@ -81,6 +80,19 @@ def test_reading_and_setting_properties(thing_client):
     assert thing_client.float_prop == 0.2
     assert thing_client.str_prop == "foo2"
 
+    # Set a property that doesn't exist.
+    err = "Failed to get property foobar: Not Found"
+    with pytest.raises(lt.exceptions.ClientPropertyError, match=err):
+        thing_client.get_property("foobar")
+
+    # Set a property with bad data type.
+    err = (
+        "Failed to get property int_prop: Input should be a valid integer, unable to "
+        "parse string as an integer"
+    )
+    with pytest.raises(lt.exceptions.ClientPropertyError, match=err):
+        thing_client.int_prop = "Bad value!"
+
 
 def test_reading_and_not_setting_read_only_properties(thing_client):
     """Test reading read_only properties, but failing to set."""
@@ -88,11 +100,11 @@ def test_reading_and_not_setting_read_only_properties(thing_client):
     assert thing_client.float_prop_read_only == 0.1
     assert thing_client.str_prop_read_only == "foo"
 
-    with pytest.raises(HTTPStatusError, match="405 Method Not Allowed"):
+    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
         thing_client.int_prop_read_only = 2
-    with pytest.raises(HTTPStatusError, match="405 Method Not Allowed"):
+    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
         thing_client.float_prop_read_only = 0.2
-    with pytest.raises(HTTPStatusError, match="405 Method Not Allowed"):
+    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
         thing_client.str_prop_read_only = "foo2"
 
     assert thing_client.int_prop_read_only == 1

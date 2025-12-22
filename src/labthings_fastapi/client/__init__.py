@@ -16,7 +16,11 @@ from urllib.parse import urlparse, urljoin
 from pydantic import BaseModel
 
 from .outputs import ClientBlobOutput
-from ..exceptions import FailedToInvokeActionError, ServerActionError
+from ..exceptions import (
+    FailedToInvokeActionError,
+    ServerActionError,
+    ClientPropertyError,
+)
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
@@ -145,9 +149,15 @@ class ThingClient:
 
         :return: the property's value, as deserialised from JSON.
         """
-        r = self.client.get(urljoin(self.path, path))
-        r.raise_for_status()
-        return r.json()
+        response = self.client.get(urljoin(self.path, path))
+        if response.is_error:
+            detail = response.json().get("detail")
+            err_msg = "Unknown error"
+            if isinstance(detail, str):
+                err_msg = detail
+            raise ClientPropertyError(f"Failed to get property {path}: {err_msg}")
+
+        return response.json()
 
     def set_property(self, path: str, value: Any) -> None:
         """Make a PUT request to set the value of a property.
@@ -157,8 +167,18 @@ class ThingClient:
         :param value: the property's value. Currently this must be
             serialisable to JSON.
         """
-        r = self.client.put(urljoin(self.path, path), json=value)
-        r.raise_for_status()
+        response = self.client.put(urljoin(self.path, path), json=value)
+        if response.is_error:
+            detail = response.json().get("detail")
+            err_msg = "Unknown error"
+            if isinstance(detail, str):
+                err_msg = detail
+            elif (
+                isinstance(detail, list) and len(detail) and isinstance(detail[0], dict)
+            ):
+                err_msg = detail[0].get("msg", "Unknown error")
+
+            raise ClientPropertyError(f"Failed to get property {path}: {err_msg}")
 
     def invoke_action(self, path: str, **kwargs: Any) -> Any:
         r"""Invoke an action on the Thing.

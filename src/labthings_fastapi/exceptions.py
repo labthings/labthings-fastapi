@@ -166,4 +166,8 @@ class FailedToInvokeActionError(RuntimeError):
 
 
 class ServerActionError(RuntimeError):
-    """The the action ended with an error on the server."""
+    """The action ended with an error on the server."""
+
+
+class ClientPropertyError(RuntimeError):
+    """Setting or getting a property via a ThingClient failed."""
