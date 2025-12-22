@@ -16,6 +16,7 @@ from urllib.parse import urlparse, urljoin
 from pydantic import BaseModel
 
 from .outputs import ClientBlobOutput
+from ..exceptions import FailedToInvokeActionError, ServerActionError
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
@@ -191,9 +192,12 @@ class ThingClient:
                 # Note that the blob will not be uploaded: we rely on the blob
                 # still existing on the server.
                 kwargs[k] = {"href": value.href, "media_type": value.media_type}
-        r = self.client.post(urljoin(self.path, path), json=kwargs)
-        r.raise_for_status()
-        invocation = poll_invocation(self.client, r.json())
+        response = self.client.post(urljoin(self.path, path), json=kwargs)
+        if response.is_error:
+            message = _construct_failed_to_invoke_message(path, response)
+            raise FailedToInvokeActionError(message)
+
+        invocation = poll_invocation(self.client, response.json())
         if invocation["status"] == "completed":
             if (
                 isinstance(invocation["output"], Mapping)
@@ -206,8 +210,8 @@ class ThingClient:
                     client=self.client,
                 )
             return invocation["output"]
-        else:
-            raise RuntimeError(f"Action did not complete successfully: {invocation}")
+        message = _construct_invocation_error_message(invocation)
+        raise ServerActionError(message)
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
         """Follow a link in a response object, by its `rel` attribute.
@@ -398,3 +402,52 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
             readable=not property.get("writeOnly", False),
         ),
     )
+
+
+def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> str:
+    """Format an error for ThingClient to raise if an invocation fails to start.
+
+    :param path: The path of the action
+    :param response: The response object from the POST request to start the action.
+    :return: The message for the raised error
+    """
+    # Default message if we can't process return
+    message = f"Unknown error when invoking action {path}"
+    details = response.json().get("detail", [])
+
+    if isinstance(details, str):
+        message = f"Error when invoking action {path}: {details}"
+    if isinstance(details, list) and len(details) and isinstance(details[0], dict):
+        loc = details[0].get("loc", [])
+        loc_str = "" if len(loc) < 2 else f"'{loc[1]}' - "
+        err_msg = details[0].get("msg", "Unknown Error")
+        message = f"Error when invoking action {path}: {loc_str}{err_msg}"
+    return message
+
+
+def _construct_invocation_error_message(invocation: Mapping[str, Any]) -> str:
+    """Format an error for ThingClient to raise if an invocation ends in and error.
+
+    :param invocation: The invocation dictionary returned.
+    :return: The message for the raised error
+    """
+    inv_id = invocation["id"]
+    action_name = invocation["action"].split("/")[-1]
+
+    err_message = "Unknown error"
+
+    if len(invocation.get("log", [])) > 0:
+        last_log = invocation["log"][-1]
+        err_message = last_log.get("message", err_message)
+
+        exception_type = last_log.get("exception_type")
+        if exception_type is not None:
+            err_message = f"[{exception_type}]: {err_message}"
+
+        traceback = last_log.get("traceback")
+        if traceback is not None:
+            err_message += "\n\nSERVER TRACEBACK START:\n\n"
+            err_message += traceback
+            err_message += "\n\nSERVER TRACEBACK END\n\n"
+
+    return f"Action {action_name} (ID: {inv_id}) failed with error:\n{err_message}"

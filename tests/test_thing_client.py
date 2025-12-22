@@ -1,5 +1,7 @@
 """Test that Thing Client's can call actions and read properties."""
 
+import re
+
 from httpx import HTTPStatusError
 import pytest
 import labthings_fastapi as lt
@@ -35,7 +37,7 @@ class ThingToTest(lt.Thing):
         return self.int_prop
 
     @lt.action
-    def increment_by_input(self, value: int = 1) -> None:
+    def increment_by_input(self, value: int) -> None:
         """Increment the counter by input value.
 
         An action with an argument but no return.
@@ -43,13 +45,18 @@ class ThingToTest(lt.Thing):
         self.int_prop += value
 
     @lt.action
-    def increment_by_input_and_return(self, value: int = 1) -> int:
+    def increment_by_input_and_return(self, value: int) -> int:
         """Increment the counter by input value and return the new value.
 
         An action with and argument and a return value.
         """
         self.int_prop += value
         return self.int_prop
+
+    @lt.action
+    def throw_value_error(self) -> None:
+        """Throw a value error."""
+        raise ValueError("This never works!")
 
 
 @pytest.fixture
@@ -121,3 +128,37 @@ def test_call_action_with_args_and_return(thing_client):
     new_value = thing_client.increment_by_input_and_return(value=5)
     assert new_value == 6
     assert thing_client.int_prop == 6
+
+
+def test_call_action_wrong_arg(thing_client):
+    """Test calling an action with wrong argument."""
+    err = "Error when invoking action increment_by_input: 'value' - Field required"
+
+    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=err):
+        thing_client.increment_by_input(input=5)
+
+
+def test_call_action_wrong_type(thing_client):
+    """Test calling an action with wrong argument."""
+    err = (
+        "Error when invoking action increment_by_input: 'value' - Input should be a "
+        "valid integer, unable to parse string as an integer"
+    )
+    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=err):
+        thing_client.increment_by_input(value="foo")
+
+
+def test_call_that_errors(thing_client):
+    """Test calling an action with wrong argument."""
+    regex = r"Action throw_value_error \(ID: [0-9a-f\-]*\) failed with error:"
+    with pytest.raises(lt.exceptions.ServerActionError, match=regex) as exc_info:
+        thing_client.throw_value_error()
+
+    full_message = str(exc_info.value)
+    assert "[ValueError]: This never works!" in full_message
+    assert "SERVER TRACEBACK START:" in full_message
+    assert "SERVER TRACEBACK END" in full_message
+    assert re.search(
+        r'File ".*test_thing_client\.py", line \d+, in throw_value_error',
+        full_message,
+    )

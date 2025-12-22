@@ -7,7 +7,6 @@ from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from httpx import HTTPStatusError
 from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
@@ -229,7 +228,9 @@ def test_blob_input(client):
     bad_blob = ClientBlobOutput(
         media_type="text/plain", href="http://nonexistent.local/totally_bogus"
     )
-    with pytest.raises(HTTPStatusError, match="404 Not Found"):
+
+    msg = "Error when invoking action passthrough_blob: Could not find blob ID in href"
+    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=msg):
         tc.passthrough_blob(blob=bad_blob)
 
     # Check that the same thing works on the server side

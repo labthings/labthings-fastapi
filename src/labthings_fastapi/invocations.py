@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 import logging
+import traceback
 from typing import Optional, Any, Sequence, TypeVar, Generic
 import uuid
 
@@ -42,6 +43,10 @@ class LogRecordModel(BaseModel):
     filename: str
     created: datetime
 
+    # Optional exception info
+    exception_type: Optional[str] = None
+    traceback: Optional[str] = None
+
     @model_validator(mode="before")
     @classmethod
     def generate_message(cls, data: Any) -> Any:
@@ -62,6 +67,11 @@ class LogRecordModel(BaseModel):
                     # the invocation.
                     # This way, you can find and fix the source.
                     data.message = f"Error constructing message ({e}) from {data!r}."
+
+        if data.exc_info:
+            data.exception_type = data.exc_info[0].__name__
+            data.traceback = "\n".join(traceback.format_exception(*data.exc_info))
+
         return data
 
 
