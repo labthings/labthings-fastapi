@@ -148,6 +148,7 @@ class ThingClient:
             to the ``base_url``.
 
         :return: the property's value, as deserialised from JSON.
+        :raise ClientPropertyError: is raised the property cannot be read.
         """
         response = self.client.get(urljoin(self.path, path))
         if response.is_error:
@@ -166,6 +167,7 @@ class ThingClient:
             to the ``base_url``.
         :param value: the property's value. Currently this must be
             serialisable to JSON.
+        :raise ClientPropertyError: is raised the property cannot be set.
         """
         response = self.client.put(urljoin(self.path, path), json=value)
         if response.is_error:
@@ -198,7 +200,9 @@ class ThingClient:
 
         :return: the output value of the action.
 
-        :raise RuntimeError: is raised if the action does not complete successfully.
+        :raise FailedToInvokeActionError: if the action fails to start.
+        :raise ServerActionError: is raised if the action does not complete
+            successfully.
         """
         for k in kwargs.keys():
             value = kwargs[k]
