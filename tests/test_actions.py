@@ -161,7 +161,7 @@ def example_decorator(func):
     return action_wrapper
 
 
-def assert_input_models_equivalent(model_a, model_b):
+def assert_models_equivalent(model_a, model_b):
     """Check two basemodels are equivalent."""
     keys = list(model_a.model_fields.keys())
     assert list(model_b.model_fields.keys()) == keys
@@ -198,11 +198,10 @@ def test_wrapped_action():
             """An example decorated action with type annotations."""
             return 0.5
 
-    assert_input_models_equivalent(
-        Example.action.input_model, Example.decorated.input_model
+    assert_models_equivalent(Example.action.input_model, Example.decorated.input_model)
+    assert_models_equivalent(
+        Example.action.output_model, Example.decorated.output_model
     )
-    assert Example.action.output_model == Example.decorated.output_model
-
     # Check we can make the thing and it has a valid TD
     example = create_thing_without_server(Example)
     example.validate_thing_description()
