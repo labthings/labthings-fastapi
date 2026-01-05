@@ -41,7 +41,7 @@ from pydantic import BaseModel, create_model
 
 from .base_descriptor import BaseDescriptor
 from .logs import add_thing_log_destination
-from .utilities import model_to_dict
+from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus, LogRecordModel
 from .dependencies.invocation import NonWarningInvocationID
 from .exceptions import (
@@ -477,7 +477,6 @@ class ActionManager:
 
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}",
-            response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}},
         )
         def action_invocation(
@@ -683,7 +682,7 @@ class ActionDescriptor(
             remove_first_positional_arg=True,
             ignore=[p.name for p in self.dependency_params],
         )
-        self.output_model = return_type(func)
+        self.output_model = wrap_plain_types_in_rootmodel(return_type(func))
         self.invocation_model = create_model(
             f"{name}_invocation",
             __base__=InvocationModel,
