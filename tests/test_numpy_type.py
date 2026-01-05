@@ -75,6 +75,10 @@ class MyNumpyThing(lt.Thing):
     def read_array(self) -> NDArray:
         return np.array([1, 2])
 
+    @lt.property
+    def array_property(self) -> NDArray:
+        return np.array([3, 4, 5])
+
 
 def test_thing_description():
     """Make sure the TD validates when numpy types are used."""
@@ -115,6 +119,8 @@ def test_numpy_over_http():
     with TestClient(server.app) as client:
         np_thing_client = lt.ThingClient.from_url("/np_thing/", client=client)
 
+        arrayprop = np_thing_client.array_property
+        assert np.array_equal(np.asarray(arrayprop), np.array([3, 4, 5]))
+
         array = np_thing_client.read_array()
-        assert isinstance(array, np.ndarray)
-        assert np.array_equal(array, np.array([1, 2]))
+        assert np.array_equal(np.asarray(array), np.array([1, 2]))
