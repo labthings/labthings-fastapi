@@ -156,3 +156,25 @@ class UnsupportedConstraintError(ValueError):
     supported arguments. Their meaning is described in the `pydantic.Field`
     documentation.
     """
+
+
+class FailedToInvokeActionError(RuntimeError):
+    """The action could not be started.
+
+    This error is raised by a `.ThingClient` instance if an action could not be started.
+    It most commonly occurs because the input to the action could not be converted
+    to the required type: the error message should give more detail on what's wrong.
+    """
+
+
+class ServerActionError(RuntimeError):
+    """The action ended with an error on the server.
+
+    This error is raised by a `ThingClient` when an action is successfully invoked on
+    the server, but does not complete. The error message should include more information
+    on why this happened.
+    """
+
+
+class ClientPropertyError(RuntimeError):
+    """Setting or getting a property via a ThingClient failed."""
