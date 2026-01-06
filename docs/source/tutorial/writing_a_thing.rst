@@ -21,7 +21,7 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
         brightness: int = lt.property(default=100, ge=0, le=100)
         """The brightness of the light, in % of maximum."""
 
-        is_on: bool = lt.property(default=False, readonly=true)
+        is_on: bool = lt.property(default=False, readonly=True)
         """Whether the light is currently on."""
 
         @lt.action
