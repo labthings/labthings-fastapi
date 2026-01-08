@@ -7,16 +7,34 @@ expected URL, which is helpful if LabThings is running as a service, or
 on embedded hardware.
 """
 
+from __future__ import annotations
 import json
+from dataclasses import dataclass
+from pathlib import Path
 from traceback import format_exception
 from typing import Any, TYPE_CHECKING
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
+from jinja2 import Environment, BaseLoader, select_autoescape
 from starlette.responses import RedirectResponse
+
 from .config_model import ThingServerConfig
 
 if TYPE_CHECKING:
     from . import ThingServer
+
+_TEMPLATE_PATH = Path(__file__).with_name("fallback.html.jinja")
+
+
+@dataclass(slots=True)
+class FallbackContext:
+    """A dataclass to provide the context of the server failing to load."""
+
+    error: BaseException | None
+    server: ThingServer | None
+    config: ThingServerConfig | dict[str, Any] | None
+    log_history: str | None
 
 
 class FallbackApp(FastAPI):
@@ -33,45 +51,54 @@ class FallbackApp(FastAPI):
         """
         super().__init__(*args, **kwargs)
         # Handle dictionary config here for legacy reasons.
-        self.labthings_config: ThingServerConfig | dict | None = None
-        self.labthings_server: ThingServer | None = None
-        self.labthings_error: BaseException | None = None
-        self.log_history = None
+        self._context: FallbackContext | None = None
+        self._env = Environment(
+            loader=BaseLoader(),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        self.set_template_str(_TEMPLATE_PATH.read_text(encoding="utf-8"))
         self.html_code = 500
+
+    def set_context(self, context: FallbackContext) -> None:
+        """Set the fallback runtime context.
+
+        This should be called exactly once during failure handling.
+        """
+        self._context = context
+
+    def set_template_str(self, template_str: str) -> None:
+        """Compile and set a Jinja template from a string."""
+        self._template = self._env.from_string(template_str)
+
+    def fallback_page(self) -> HTMLResponse:
+        """Generate the fallback page and return it as an HTMLResponse.
+
+        :return: The HTMLResponse for the fallback page.
+        :raises RuntimeError: if the fallback context was never set.
+        """
+        if self._context is None:
+            raise RuntimeError("Not context set for fallback server.")
+
+        error_message, error_w_trace = _format_error_and_traceback(self._context)
+        things = list(self._context.server.things) if self._context.server else []
+
+        if isinstance(self._context.config, ThingServerConfig):
+            conf_str = self._context.config.model_dump_json(indent=2)
+        else:
+            conf_str = json.dumps(self._context.config, indent=2)
+
+        content = app._template.render(
+            error_message=error_message,
+            things=things,
+            config=conf_str,
+            traceback=error_w_trace,
+            logginginfo=self._context.log_history,
+        )
+
+        return HTMLResponse(content=content, status_code=app.html_code)
 
 
 app = FallbackApp()
-
-ERROR_PAGE = """
-<!DOCTYPE html>
-<html>
-<head lang="en">
-    <title>LabThings</title>
-    <style>
-    pre {
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-    }
-    </style>
-</head>
-<body>
-    <h1>LabThings Couldn't Load</h1>
-    <p>Something went wrong when setting up your LabThings server.</p>
-    <p>Please check your configuration and try again.</p>
-    <p>More details may be shown below:</p>
-    <pre>{{error}}</pre>
-    <p>The following Things loaded successfully:</p>
-    <ul>
-        {{things}}
-    </ul>
-    <p>Your configuration:</p>
-    <pre>{{config}}</pre>
-    <p>Traceback</p>
-    <pre>{{traceback}}</pre>
-    {{logginginfo}}
-</body>
-</html>
-"""
 
 
 @app.get("/")
@@ -80,34 +107,10 @@ async def root() -> HTMLResponse:
 
     :return: a response that serves the error as an HTML page.
     """
-    error_message, error_w_trace = _format_error_and_traceback()
-    things = ""
-    if app.labthings_server:
-        for path, thing in app.labthings_server.things.items():
-            things += f"<li>{path}: {thing!r}</li>"
-
-    config = app.labthings_config
-    if isinstance(config, ThingServerConfig):
-        conf_str = config.model_dump_json(indent=2)
-    else:
-        conf_str = json.dumps(config, indent=2)
-
-    content = ERROR_PAGE
-    content = content.replace("{{error}}", error_message)
-    content = content.replace("{{things}}", things)
-    content = content.replace("{{config}}", conf_str)
-    content = content.replace("{{traceback}}", error_w_trace)
-
-    if app.log_history is None:
-        logging_info = "    <p>No logging info available</p>"
-    else:
-        logging_info = f"    <p>Logging info</p>\n    <pre>{app.log_history}</pre>"
-
-    content = content.replace("{{logginginfo}}", logging_info)
-    return HTMLResponse(content=content, status_code=app.html_code)
+    return app.fallback_page()
 
 
-def _format_error_and_traceback() -> tuple[str, str]:
+def _format_error_and_traceback(context: FallbackContext) -> tuple[str, str]:
     """Format the error and traceback.
 
     If the error was in lifespan causing Uvicorn to raise SystemExit(3) without a
@@ -115,8 +118,8 @@ def _format_error_and_traceback() -> tuple[str, str]:
 
     :return: A tuple of error message and error traceback.
     """
-    err = app.labthings_error
-    server = app.labthings_server
+    err = context.error
+    server = context.server
     error_message = f"{err}"
 
     if (

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LabThings</title>
+    <style>
+        pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+<body>
+    <h1>LabThings Couldn't Load</h1>
+    <p>Something went wrong when setting up your LabThings server.</p>
+    <p>Please check your configuration and try again.</p>
+    <p>{{ error_message }}</p>
+
+    <p>The following Things loaded successfully:</p>
+    {% if things %}
+    <ul>
+        {% for name in things %}
+        <li>{{ name }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <p>Your configuration:</p>
+    <pre>{{config}}</pre>
+
+    <pre>{{ traceback }}</pre>
+    {% if logginginfo %}
+    <p>Logging info:</p>
+    <pre>{{ logginginfo }}</pre>
+    {% else %}
+    <p>No logging info available</p>
+    {% endif %}
+</body>
+</html>
