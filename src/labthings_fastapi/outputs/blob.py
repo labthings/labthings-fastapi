@@ -39,27 +39,22 @@ with `.Blob.from_temporary_directory` is the safest way to deal with this.
 """
 
 from __future__ import annotations
-from contextvars import ContextVar
 import io
 import os
 import re
 import shutil
 from typing import (
-    Annotated,
     Any,
-    AsyncGenerator,
-    Callable,
     Literal,
     Mapping,
     Optional,
 )
 from warnings import warn
 from weakref import WeakValueDictionary
-from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
 import uuid
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, Response
 from pydantic import (
     BaseModel,
@@ -67,8 +62,8 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from starlette.exceptions import HTTPException
 from typing_extensions import Self, Protocol, runtime_checkable
+from labthings_fastapi.middleware.url_for import url_for
 
 
 @runtime_checkable
@@ -87,13 +82,8 @@ class BlobData(Protocol):
     which adds a `response()` method and `id` property.
     """
 
-    @property
-    def media_type(self) -> str:
-        """The MIME type of the data, e.g. 'image/png' or 'application/json'.
-
-        :raises NotImplementedError: always, as this must be implemented by subclasses.
-        """
-        raise NotImplementedError("media_type property must be implemented.")
+    media_type: str
+    """The MIME type of the data, e.g. 'image/png' or 'application/json'."""
 
     @property
     def content(self) -> bytes:
@@ -129,12 +119,25 @@ class ServerSideBlobData(BlobData, Protocol):
     See `.BlobBytes` or `.BlobFile` for concrete implementations.
     """
 
-    id: Optional[uuid.UUID] = None
-    """A unique identifier for this BlobData object.
+    def __init__(self, media_type: str) -> None:
+        """Initialise the ServerSideBlobData object.
 
-    The ID is set when the BlobData object is added to the BlobDataManager.
-    It is used to retrieve the BlobData object from the manager.
-    """
+        :param media_type: the MIME type of the data.
+        """
+        self._id = blob_data_manager.add_blob(self)
+        self.media_type = media_type
+
+    _id: uuid.UUID
+    media_type: str
+
+    @property
+    def id(self) -> uuid.UUID:
+        """A unique identifier for this BlobData object.
+
+        The ID is set when the BlobData object is added to the `BlobDataManager`
+        during initialisation.
+        """
+        return self._id
 
     def response(self) -> Response:
         """Return a`fastapi.Response` object that sends binary data.
@@ -144,7 +147,7 @@ class ServerSideBlobData(BlobData, Protocol):
         ...  # pragma: no cover
 
 
-class BlobBytes:
+class BlobBytes(ServerSideBlobData):
     """A `.Blob` that holds its data in memory as a `bytes` object.
 
     `.Blob` objects use objects conforming to the `.BlobData` protocol to
@@ -157,8 +160,7 @@ class BlobBytes:
         `.Blob.from_bytes` on a `.Blob` subclass.
     """
 
-    id: Optional[uuid.UUID] = None
-    """A unique ID to identify the data in a `.BlobManager`."""
+    _id: uuid.UUID
 
     def __init__(self, data: bytes, media_type: str) -> None:
         """Create a `.BlobBytes` object.
@@ -169,8 +171,8 @@ class BlobBytes:
         :param data: is the data to be wrapped.
         :param media_type: is the MIME type of the data.
         """
+        super().__init__(media_type=media_type)
         self._bytes = data
-        self.media_type = media_type
 
     @property
     def content(self) -> bytes:
@@ -202,7 +204,7 @@ class BlobBytes:
         return Response(content=self._bytes, media_type=self.media_type)
 
 
-class BlobFile:
+class BlobFile(ServerSideBlobData):
     """A `.Blob` that holds its data in a file.
 
     `.Blob` objects use objects conforming to the `.BlobData` protocol to
@@ -219,8 +221,7 @@ class BlobFile:
         `.Blob.from_temporary_directory` on a `.Blob` subclass.
     """
 
-    id: Optional[uuid.UUID] = None
-    """A unique ID to identify the data in a `.BlobManager`."""
+    _id: uuid.UUID
 
     def __init__(self, file_path: str, media_type: str, **kwargs: Any) -> None:
         r"""Create a `.BlobFile` to wrap data stored on disk.
@@ -237,6 +238,7 @@ class BlobFile:
 
         :raise IOError: if the file specified does not exist.
         """
+        super().__init__(media_type=media_type)
         if not os.path.exists(file_path):
             raise IOError("Tried to return a file that doesn't exist.")
         self._file_path = file_path
@@ -347,69 +349,47 @@ class Blob(BaseModel):
         `.Blob` that already exists on this server, and any other URL will
         cause a `LookupError`.
 
-        This validator will only work if the function to resolve URLs to
-        `.BlobData` objects
-        has been set in the context variable `.blob.url_to_blobdata_ctx`\ .
-        This is done when actions are being invoked over HTTP by the
-        `.BlobIOContextDep` dependency.
-
         :return: the `.Blob` object (i.e. ``self``), after retrieving the data.
 
         :raise ValueError: if the ``href`` is set as ``"blob://local"`` but
             the ``_data`` attribute has not been set. This happens when the
             `.Blob` is being constructed using `.Blob.from_bytes` or similar.
-        :raise LookupError: if the `.Blob` is being constructed from a URL
-            and the URL does not correspond to a `.BlobData` instance that
-            exists on this server (i.e. one that has been previously created
-            and added to the `.BlobManager` as the result of a previous action).
         """
         if self.href == "blob://local":
             if self._data:
                 return self
             raise ValueError("Blob objects must have data if the href is blob://local")
+        id = url_to_id(self.href)
+        if not id:
+            raise ValueError("Blob URLs must contain a Blob ID.")
         try:
-            url_to_blobdata = url_to_blobdata_ctx.get()
-            self._data = url_to_blobdata(self.href)
+            self._data = blob_data_manager.get_blob(id)
             self.href = "blob://local"
-        except LookupError as e:
-            raise LookupError(
-                "Blobs may only be created from URLs passed in over HTTP."
-                f"The URL in question was {self.href}."
-            ) from e
-        return self
+            return self
+        except KeyError as error:
+            raise ValueError(f"Blob ID {id} wasn't found on this server.") from error
 
     @model_serializer(mode="plain", when_used="always")
     def to_dict(self) -> Mapping[str, str]:
         r"""Serialise the Blob to a dictionary and make it downloadable.
 
         When `pydantic` serialises this object,
-        it will call this method to convert it to a dictionary. There is a
-        significant side-effect, which is that we will add the blob to the
-        `.BlobDataManager` so it can be downloaded.
-
-        This serialiser will only work if the function to assign URLs to
-        `.BlobData` objects has been set in the context variable
-        `.blobdata_to_url_ctx`\ .
-        This is done when actions are being returned over HTTP by the
-        `.BlobIOContextDep` dependency.
+        it will call this method to convert it to a dictionary. We use
+        `.from_url.from_url` to generate the URL, so this will error if
+        it is serialised anywhere other than a request handler with the
+        middleware from `.middleware.url_for` enabled.
 
         :return: a JSON-serialisable dictionary with a URL that allows
             the `.Blob` to be downloaded from the `.BlobManager`.
-
-        :raise LookupError: if the context variable providing access to the
-            `.BlobManager` is not available. This usually means the `.Blob` is
-            being serialised somewhere other than the output of an action.
+        :raises TypeError: if the blob data ID is missing. This should
+            never happen, and if it does it's probably a bug in the
+            `.BlobData` class.
         """
         if self.href == "blob://local":
-            try:
-                blobdata_to_url = blobdata_to_url_ctx.get()
-                # MyPy seems to miss that `self.data` is a property, hence the ignore
-                href = blobdata_to_url(self.data)  # type: ignore[arg-type]
-            except LookupError as e:
-                raise LookupError(
-                    "Blobs may only be serialised inside the "
-                    "context created by BlobIOContextDep."
-                ) from e
+            id = getattr(self._data, "id", None)
+            if not isinstance(id, uuid.UUID):
+                raise TypeError("A BlobData id is missing. This is a LabThings Bug.")
+            href = str(url_for("download_blob", blob_id=id))
         else:
             href = self.href
         return {
@@ -653,17 +633,14 @@ class BlobDataManager:
             data. This suggests the object has been added to another
             `.BlobDataManager`, which should never happen.
         """
-        if hasattr(blob, "id") and blob.id is not None:
-            if blob.id in self._blobs:
-                return blob.id
-            else:
-                raise ValueError(
-                    f"BlobData already has an ID {blob.id} "
-                    "but was not found in this BlobDataManager"
-                )
-        blob.id = uuid.uuid4()
-        self._blobs[blob.id] = blob
-        return blob.id
+        if blob in self._blobs.values():
+            raise ValueError(
+                "BlobData objects may only be added to the manager once! "
+                "This is a LabThings bug."
+            )
+        id = uuid.uuid4()
+        self._blobs[id] = blob
+        return id
 
     def get_blob(self, blob_id: uuid.UUID) -> ServerSideBlobData:
         """Retrieve a `.Blob` from the manager.
@@ -699,89 +676,26 @@ class BlobDataManager:
         :param app: the `fastapi.FastAPI` application to which we are adding
             the endpoint.
         """
-        app.get("/blob/{blob_id}")(self.download_blob)
+        app.get(
+            "/blob/{blob_id}",
+            name="download_blob",
+        )(self.download_blob)
 
 
 blob_data_manager = BlobDataManager()
 """A global register of all BlobData objects."""
 
 
-blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
-"""This context variable gives access to a function that makes BlobData objects
-downloadable, by assigning a URL and adding them to the
-[`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
+def url_to_id(url: str) -> uuid.UUID | None:
+    """Extract the blob ID from a URL.
 
-It is only available within a
-[`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
-because it requires access to the `BlobDataManager` and the `url_for` function
-from the FastAPI app.
-"""
+    Currently, this checks for a UUID at the end of a URL. In the future,
+    it might check if the URL refers to this server.
 
-url_to_blobdata_ctx = ContextVar[Callable[[str], ServerSideBlobData]]("url_to_blobdata")
-"""This context variable gives access to a function that makes BlobData objects
-from a URL, by retrieving them from the
-[`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
-
-It is only available within a
-[`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
-because it requires access to the `BlobDataManager`.
-"""
-
-
-async def blob_serialisation_context_manager(
-    request: Request,
-) -> AsyncGenerator[BlobDataManager, None]:
-    r"""Set context variables to allow blobs to be [de]serialised.
-
-    In order to serialise a `.Blob` to a JSON-serialisable dictionary, we must
-    add it to the `.BlobDataManager` and use that to generate a URL. This
-    requires that the serialisation code (which may be nested deep within a
-    `pydantic.BaseModel`) has access to the `.BlobDataManager` and also the
-    `fastapi.Request.url_for` method. At time of writing, there was not an
-    obvious way to pass these functions in to the serialisation code.
-
-    Similar problems exist for blobs used as input: the validator needs to
-    retrieve the data from the `.BlobDataManager` but does not have access.
-
-    This async context manager yields the `.BlobDataManager`, but more
-    importantly it sets the `.url_to_blobdata_ctx` and `blobdata_to_url_ctx`
-    context variables, which may be accessed by the code within `.Blob` to
-    correctly add and retrieve `.ServerSideBlobData` objects to and from the
-    `.BlobDataManager`\ .
-
-    This function will usually be called from a FastAPI dependency. See
-    :ref:`dependencies` for more on that mechanism.
-
-    :param request: the `fastapi.Request` object, used to access the server
-        and ``url_for`` method.
-
-    :yield: the `.BlobDataManager`. This is usually ignored.
+    :param url: a URL previously generated by `blobdata_to_url`.
+    :return: the UUID blob ID extracted from the URL.
     """
-    url_for = request.url_for
-
-    def blobdata_to_url(blob: ServerSideBlobData) -> str:
-        blob_id = blob_data_manager.add_blob(blob)
-        return str(url_for("download_blob", blob_id=blob_id))
-
-    def url_to_blobdata(url: str) -> ServerSideBlobData:
-        m = re.search(r"blob/([0-9a-z\-]+)", url)
-        if not m:
-            raise HTTPException(
-                status_code=404, detail="Could not find blob ID in href"
-            )
-        invocation_id = uuid.UUID(m.group(1))
-        return blob_data_manager.get_blob(invocation_id)
-
-    t1 = blobdata_to_url_ctx.set(blobdata_to_url)
-    t2 = url_to_blobdata_ctx.set(url_to_blobdata)
-    try:
-        yield blob_data_manager
-    finally:
-        blobdata_to_url_ctx.reset(t1)
-        url_to_blobdata_ctx.reset(t2)
-
-
-BlobIOContextDep: TypeAlias = Annotated[
-    BlobDataManager, Depends(blob_serialisation_context_manager)
-]
-"""A dependency that enables `.Blob` to be serialised and deserialised."""
+    m = re.search(r"blob/([0-9a-z\-]+)", url)
+    if not m:
+        return None
+    return uuid.UUID(m.group(1))
