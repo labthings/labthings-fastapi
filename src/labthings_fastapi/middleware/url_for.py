@@ -23,7 +23,8 @@ serialisation time.
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Self
+from typing import Any
+from typing_extensions import Self
 from fastapi import Request, Response
 from pydantic import GetCoreSchemaHandler
 from pydantic.networks import AnyUrl
