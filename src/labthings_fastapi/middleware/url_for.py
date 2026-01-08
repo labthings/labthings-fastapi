@@ -146,7 +146,9 @@ class URLFor:
         return core_schema.no_info_wrap_validator_function(
             cls._validate,
             AnyUrl.__get_pydantic_core_schema__(AnyUrl, handler),
-            serialization=core_schema.to_string_ser_schema(when_used="always"),
+            serialization=core_schema.to_string_ser_schema(  # codespell:ignore ser
+                when_used="always"
+            ),
         )
 
     @classmethod
