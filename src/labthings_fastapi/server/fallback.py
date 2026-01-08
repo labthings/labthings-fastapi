@@ -13,10 +13,10 @@ from typing import Any, TYPE_CHECKING
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
+from .config_model import ThingServerConfig
 
 if TYPE_CHECKING:
     from . import ThingServer
-    from .config_model import ThingServerConfig
 
 
 class FallbackApp(FastAPI):
@@ -32,7 +32,8 @@ class FallbackApp(FastAPI):
         :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
         """
         super().__init__(*args, **kwargs)
-        self.labthings_config: ThingServerConfig | None = None
+        # Handle dictionary config here for legacy reasons.
+        self.labthings_config: ThingServerConfig | dict | None = None
         self.labthings_server: ThingServer | None = None
         self.labthings_error: BaseException | None = None
         self.log_history = None
@@ -88,10 +89,16 @@ async def root() -> HTMLResponse:
         for path, thing in app.labthings_server.things.items():
             things += f"<li>{path}: {thing!r}</li>"
 
+    config = app.labthings_config
+    if isinstance(config, ThingServerConfig):
+        conf_str = config.model_dump_json(indent=2)
+    else:
+        conf_str = json.dumps(config, indent=2)
+
     content = ERROR_PAGE
     content = content.replace("{{error}}", error_message)
     content = content.replace("{{things}}", things)
-    content = content.replace("{{config}}", json.dumps(app.labthings_config, indent=2))
+    content = content.replace("{{config}}", conf_str)
     content = content.replace("{{traceback}}", error_w_trace)
 
     if app.log_history is None:
