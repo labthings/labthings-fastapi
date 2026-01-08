@@ -80,10 +80,7 @@ async def root() -> HTMLResponse:
 
     :return: a response that serves the error as an HTML page.
     """
-    error_message = f"{app.labthings_error}"
-    # use traceback.format_exception to get full traceback as list
-    # this ends in newlines, but needs joining to be a single string
-    error_w_trace = "".join(format_exception(app.labthings_error))
+    error_message, error_w_trace = _format_error_and_traceback()
     things = ""
     if app.labthings_server:
         for path, thing in app.labthings_server.things.items():
@@ -108,6 +105,32 @@ async def root() -> HTMLResponse:
 
     content = content.replace("{{logginginfo}}", logging_info)
     return HTMLResponse(content=content, status_code=app.html_code)
+
+
+def _format_error_and_traceback() -> tuple[str, str]:
+    """Format the error and traceback.
+
+    If the error was in lifespan causing Uvicorn to raise SystemExit(3) without a
+    traceback. Try to extract the saved exception from the server.
+    """
+    err = app.labthings_error
+    server = app.labthings_server
+    error_message = f"{err}"
+
+    if (
+        isinstance(err, SystemExit)
+        and server is not None
+        and isinstance(server.startup_failure, dict)
+    ):
+        # It is a uvicorn SystemExit, so replace err with the saved error in the server.
+        err = server.startup_failure.get("exception", err)
+        thing = server.startup_failure.get("thing", "Unknown")
+        error_message = f"Failed to enter '{thing}' Thing: {err}"
+
+    # use traceback.format_exception to get full traceback as list
+    # this ends in newlines, but needs joining to be a single string
+    error_w_trace = "".join(format_exception(err))
+    return error_message, error_w_trace
 
 
 @app.get("/{path:path}")

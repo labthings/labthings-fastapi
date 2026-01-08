@@ -81,6 +81,7 @@ class ThingServer:
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
         """
+        self.startup_failure: dict | None = None
         configure_thing_logger()  # Note: this is safe to call multiple times.
         self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
         self.app = FastAPI(lifespan=self.lifespan)
@@ -271,7 +272,14 @@ class ThingServer:
             # is present when this happens, in case we are dealing with threads.
             async with AsyncExitStack() as stack:
                 for thing in self.things.values():
-                    await stack.enter_async_context(thing)
+                    try:
+                        await stack.enter_async_context(thing)
+                    except BaseException as e:
+                        self.startup_failure = {
+                            "thing": thing.name,
+                            "exception": e,
+                        }
+                        raise
                 yield
 
         self.blocking_portal = None
