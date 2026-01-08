@@ -102,6 +102,9 @@ class BlobData:
         The implementation of this method for local blobs will need
         `.url_for.url_for` and thus it should only be called in a response
         handler when the `.middeware.url_for` middleware is enabled.
+
+        :return: the URL as a string.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
         raise NotImplementedError("get_href must be implemented.")
 
@@ -117,6 +120,7 @@ class BlobData:
         """Save the data to a file.
 
         :param filename: the path where the file should be saved.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
         raise NotImplementedError("save must be implemented.")
 
@@ -124,6 +128,7 @@ class BlobData:
         """Return a file-like object that may be read from.
 
         :return: an open file-like object.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
         raise NotImplementedError("open must be implemented.")
 
@@ -158,7 +163,10 @@ class RemoteBlobData(BlobData):
         self._client = client or httpx.Client()
 
     def get_href(self) -> str:
-        """Return the URL to download the data."""
+        """Return the URL to download the data.
+
+        :return: the URL as a string.
+        """
         return self._href
 
     @property
@@ -225,6 +233,8 @@ class LocalBlobData(BlobData):
 
         Note that this should only be called in a response handler, as it
         relies on `.url_for.url_for`\ .
+
+        :return: the URL as a string.
         """
         return str(url_for("download_blob", blob_id=self.id))
 
@@ -232,6 +242,7 @@ class LocalBlobData(BlobData):
         """Return a`fastapi.Response` object that sends binary data.
 
         :return: a response that streams the data from disk or memory.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
         raise NotImplementedError
 
@@ -397,6 +408,54 @@ class BlobModel(BaseModel):
     """This description is added to the serialised `.Blob`."""
 
 
+def parse_media_type(media_type: str) -> tuple[str | None, str | None]:
+    """Parse a media type string into its type and subtype.
+
+    :param media_type: the media type string to parse.
+
+    :return: a tuple of (type, subtype) where each is a string or None.
+    :raises ValueError: if the media type is invalid.
+    """
+    if not media_type:
+        return None, None
+    # Ignore leading whitespace and parameters (after a ;)
+    media_type = media_type.strip().split(";")[0]
+    # We expect a type and subtype separated with a /
+    parts = media_type.split("/")
+    if len(parts) != 2:
+        raise ValueError(
+            f"Invalid media type: {media_type} must contain exactly one '/'."
+        )
+    for i in range(2):
+        part = parts[i].strip()
+        if part == "*":
+            parts[i] = None
+    if not parts[0] and parts[1]:
+        raise ValueError(
+            f"Invalid media type: {media_type} has no type but has a subtype."
+        )
+    return parts[0], parts[1]
+
+
+def match_media_types(media_type: str, pattern: str) -> bool:
+    """Check if a media type matches a pattern.
+
+    The pattern may include wildcards, e.g. ``image/*`` or ``*/*``.
+
+    :param media_type: the media type to check.
+    :param pattern: the pattern to match against.
+
+    :return: True if the media type matches the pattern, False otherwise.
+    """
+    type_a, subtype_a = parse_media_type(media_type)
+    type_b, subtype_b = parse_media_type(pattern)
+    if type_b is not None and type_a != type_b:
+        return False
+    if subtype_b is not None and subtype_a != subtype_b:
+        return False
+    return True
+
+
 class Blob:
     r"""A container for binary data that may be retrieved over HTTP.
 
@@ -404,18 +463,21 @@ class Blob:
 
     A `.Blob` may be created to hold data using the class methods
     `.Blob.from_bytes`, `.Blob.from_file` or `.Blob.from_temporary_directory`\ .
-    It may also reference remote data, using `.Blob.from_url`\ .
+    It may also reference remote data, using `.Blob.from_url`\ , though this
+    is currently only used on the client side.
     The constructor requires a `.BlobData` instance, so the methods mentioned
-    previously are likely more convenient.
+    previously are likely a more convenient way to instantiate a `.Blob`\ .
 
     You are strongly advised to use a subclass of this class that specifies the
     `.Blob.media_type` attribute, as this will propagate to the auto-generated
-    documentation.
+    documentation and make the return type of your action clearer.
 
     This class is `pydantic` compatible, in that it provides a schema, validator
     and serialiser. However, it may use `.url_for.url_for` during serialisation,
     so it should only be serialised in a request handler function. This
     functionality is intended for use by LabThings library functions only.
+    Validation and serialisation behaviour is described in the docstrings of
+    `.Blob._validate` and `.Blob._serialize`.
     """
 
     media_type: str = "*/*"
@@ -430,11 +492,22 @@ class Blob:
 
         :param data: the `.BlobData` object that stores the data.
         :param description: an optional description of the blob.
+
+        :raise ValueError: if the media_type of the data does not match
+            the media_type of the `.Blob` subclass.
         """
         super().__init__()
         self._data = data
         if description is not None:
             self.description = description
+        if not match_media_types(data.media_type, self.media_type):
+            raise ValueError(
+                f"Blob data media_type '{data.media_type}' does not match "
+                f"Blob media_type '{self.media_type}'."
+            )
+        # The data may have a more specific media_type, so we use that
+        # in preference to the default defined by the class.
+        self.media_type = data.media_type
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -446,28 +519,13 @@ class Blob:
         instances, and generate a JSONSchema for them.
 
         We tell `pydantic` to base its handling of `Blob` on the
-        `.BlobModel` schema, but to use our custom validator and
-        serialiser, defined later as class methods.
+        `.BlobModel` schema, with custom validation and serialisation.
+        Validation and serialisation behaviour is described in the docstrings
+        of `.Blob._validate` and `.Blob._serialize`.
 
-        We will tweak the generated JSONSchema in `__get_pydantic_json_schema__`
-        to include the media_type and description defaults.
-
-        The representation of a `.Blob` in JSON is described by
-        `.BlobModel` and includes the ``href`` and ``media_type`` properties
-        as well as a description.
-
-        When a `.Blob` is serialised, we will generate a download URL that
-        matches the request to which we are responding. This means we may
-        only serialise a `.Blob` in the context of a request handler, and
-        it's required that the `.middleware.url_for` middleware is in use.
-
-        When a `.Blob` is validated, we will check to see if the URL given
-        as its ``href`` looks like a `.Blob` download URL on this server. If
-        it does, the returned object will hold a reference to the local data.
-        If we can't match the URL to a `.Blob` on this server, we will raise
-        an error. Handling of `.Blob` input is currently experimental, and
-        limited to passing the output of one Action as input to a subsequent
-        one.
+        The JSONSchema is generated for `.BlobModel` but is then refined
+        in `__get_pydantic_json_schema__` to include the ``media_type``
+        and ``description`` defaults.
 
         :param source: The source type being converted.
         :param handler: The pydantic core schema handler.
@@ -513,20 +571,25 @@ class Blob:
     def _validate(cls, value: Any, handler: Callable[[Any], BlobModel]) -> Self:
         r"""Validate and convert a value to a `.Blob` instance.
 
-        :param value: The value to validate.
-        :param handler: The handler to convert the value if needed.
+        :param value: The input value, as passed in or loaded from JSON.
+        :param handler: A function that runs the validation logic of BlobModel.
 
-        When a `.Blob` is created from a dictionary, LabThings
-        will attempt to deserialise it by retrieving the data from the URL
-        specified in `.Blob.href`. Currently, this must be a URL pointing to a
-        `.Blob` that already exists on this server, and any other URL will
-        cause a `LookupError`.
+        If the value is already a `.Blob`, it will be returned directly.
+        Otherwise, we first validate the input using the `.BlobModel` schema.
 
-        :return: the `.Blob` object (i.e. ``self``), after retrieving the data.
+        When a `.Blob` is validated, we check to see if the URL given
+        as its ``href`` looks like a `.Blob` download URL on this server. If
+        it does, the returned object will hold a reference to the local data.
 
-        :raise ValueError: if the ``href`` is set as ``"blob://local"`` but
-            the ``_data`` attribute has not been set. This happens when the
-            `.Blob` is being constructed using `.Blob.from_bytes` or similar.
+        If we can't match the URL to a `.Blob` on this server, we will raise
+        an error. Handling of `.Blob` input is currently experimental, and
+        limited to passing the output of one Action as input to a subsequent
+        one.
+
+        :return: a `.Blob` object pointing to the data.
+
+        :raise ValueError: if the ``href`` does not contain a valid Blob ID, or
+            if the Blob ID is not found on this server.
         """
         # If the value is already a Blob, return it directly
         if isinstance(value, cls):
@@ -549,7 +612,12 @@ class Blob:
     ) -> Mapping[str, str]:
         """Serialise the Blob to a dictionary.
 
+        See `.Blob.to_blobmodel` for a description of how we serialise.
+
         :param obj: the `.Blob` instance to serialise.
+        :param handler: the handler (provided by pydantic) takes a BlobModel
+            and converts it to a dictionary. The handler runs the serialiser of
+            the core schema we've wrapped, in this case the BlobModel serialiser.
         :return: a JSON-serialisable dictionary with a URL that allows
             the `.Blob` to be downloaded from the `.BlobManager`.
         """
@@ -566,9 +634,6 @@ class Blob:
 
         :return: a JSON-serialisable dictionary with a URL that allows
             the `.Blob` to be downloaded from the `.BlobManager`.
-        :raises TypeError: if the blob data ID is missing. This should
-            never happen, and if it does it's probably a bug in the
-            `.BlobData` class.
         """
         data = {
             "href": self.data.get_href(),
@@ -722,6 +787,8 @@ class Blob:
         that returns the data over HTTP.
 
         :return: an HTTP response that streams data from memory or file.
+        :raise NotImplementedError: if the data is not local. It's not currently
+            possible to serve remote data via the `.BlobManager`.
         """
         data = self.data
         if isinstance(data, LocalBlobData):
