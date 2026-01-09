@@ -31,18 +31,18 @@ _TEMPLATE_PATH = Path(__file__).with_name("fallback.html.jinja")
 class FallbackContext:
     """A dataclass to provide the context of the server failing to load."""
 
-    error: BaseException | None
+    error: BaseException | None = None
     """The error caught when running uvicorn.run."""
 
-    server: ThingServer | None
+    server: ThingServer | None = None
     """The ThingServer that failed to start."""
 
-    config: ThingServerConfig | dict[str, Any] | None
+    config: ThingServerConfig | dict[str, Any] | None = None
     """The config used to set up the server.
 
     This can be the ThingServerConfig, or the dict read from the JSON file."""
 
-    log_history: str | None
+    log_history: str | None = None
     """Any logging history to show."""
 
 
