@@ -112,6 +112,8 @@ def _format_error_and_traceback() -> tuple[str, str]:
 
     If the error was in lifespan causing Uvicorn to raise SystemExit(3) without a
     traceback. Try to extract the saved exception from the server.
+
+    :return: A tuple of error message and error traceback.
     """
     err = app.labthings_error
     server = app.labthings_server

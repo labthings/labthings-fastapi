@@ -260,6 +260,10 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
+        :raises BaseException: Reraises any errors that are caught when calling
+            ``__enter__`` on each Thing. The error is also saved to
+            ``self.startup_failure`` for post mortem, as otherwise uvicorn will swallow
+            it and replace it with SystemExit(3) and no traceback.
         """
         async with BlockingPortal() as portal:
             # We create a blocking portal to allow threaded code to call async code
