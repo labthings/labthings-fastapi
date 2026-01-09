@@ -56,10 +56,10 @@ build-backend = "hatchling.build"
 include = [
     "src"
 ]
-artifacts = ["src/*.json"]
+artifacts = ["src/*.json", "src/*.jinja"]
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["src/*.json"]
+artifacts = ["src/*.json", "src/*.jinja"]
 
 [tool.pytest.ini_options]
 addopts = [

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>LabThings — Server Failed to Start</title>
+    <meta name="description" content="LabThings failed to start due to a configuration or runtime error. Diagnostic information is shown below." />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <style>
+        :root {
+
+            /* UI colours */
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --text: #1f2933;
+            --muted: #6b7280;
+            --border: #e5e7eb;
+            --code-bg: #f1f5f9;
+            --error-bg: #fee2e2;
+            --error-border: #fecaca;
+            --error-text: #7f1d1d;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont,
+                         "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.75rem;
+        }
+
+        h2 {
+            margin-top: 2rem;
+            font-size: 1.25rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.25rem;
+        }
+
+        p {
+            margin: 0.5rem 0 1rem;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .error-message {
+            padding: 1rem;
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            border-radius: 6px;
+            color: var(--error-text);
+            margin: 1.5rem 0;
+            font-weight: 500;
+        }
+
+        ul {
+            padding-left: 1.25rem;
+        }
+
+        li {
+            margin: 0.25rem 0;
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.875rem;
+        }
+
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+        <section class="panel">
+
+            <div class="header">
+                <!-- Inline LabThings logo -->
+                <svg class="logo" height="100%" viewBox="0 0 114 114" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"><g><path d="M85.039,113.386l28.347,0l0,-113.386l-70.866,0l0,28.346l42.519,0l0,85.04Z" style="fill:url(#_Linear1);"/><path d="M0,8.504l0,-8.504l28.346,0l0,85.039l42.52,0l0,28.347l-70.866,0l0,-8.504l14.173,0l0,-5.669l-14.173,0l0,-5.67l5.578,0l0,-5.669l-5.578,0l0,-5.669l14.173,0l0,-5.67l-14.173,0l0,-5.669l5.578,0l0,-5.669l-5.578,0l0,-5.669l14.173,0l0,-5.67l-14.173,0l0,-5.669l5.578,0l0,-5.669l-5.578,0l0,-5.67l14.173,0l0,-5.669l-14.173,0l0,-5.669l5.578,0l0,-5.669l-5.578,0l0,-5.67l14.173,0l0,-5.669l-14.173,0Z" style="fill:url(#_Linear2);"/></g><defs><linearGradient id="_Linear1" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(113.386,113.386,-113.386,113.386,0,0)"><stop offset="0" style="stop-color:#00d677;stop-opacity:1"/><stop offset="1" style="stop-color:#009855;stop-opacity:1"/></linearGradient><linearGradient id="_Linear2" x1="0" y1="0" x2="1" y2="0" gradientUnits="userSpaceOnUse" gradientTransform="matrix(113.386,113.386,-113.386,113.386,-5.32724,10.5931)"><stop offset="0" style="stop-color:#a535ff;stop-opacity:1"/><stop offset="1" style="stop-color:#57009b;stop-opacity:1"/></linearGradient></defs></svg>
+
+                <h1>LabThings couldn't start</h1>
+            </div>
+
+            <p class="muted">
+                The LabThings server failed during startup. This is usually caused by
+                an invalid configuration, missing dependency, or a runtime exception.
+            </p>
+
+            {% if error_message %}
+            <div class="error-message">
+                {{ error_message }}
+            </div>
+            {% endif %}
+
+            {% if things %}
+            <h2>The following Things loaded successfully:</h2>
+            <ul>
+                {% for name in things %}
+                <li>{{ name }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            <h2>Configuration</h2>
+            <pre>{{ config }}</pre>
+
+            <h2>Traceback</h2>
+            <pre>{{ traceback }}</pre>
+
+            <h2>Logging</h2>
+            {% if logginginfo %}
+                <pre>{{ logginginfo }}</pre>
+            {% else %}
+                <p class="muted">No logging information available.</p>
+            {% endif %}
+        </section>
+
+        <footer>
+            LabThings fallback server
+        </footer>
+    </main>
+</body>
+</html>

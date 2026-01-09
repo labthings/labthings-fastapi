@@ -5,14 +5,16 @@ we start a lightweight fallback server to show an error message. This test
 verifies that it works as expected.
 """
 
+import logging
 import re
+from html import unescape
 
 import pytest
 import uvicorn
 
 from fastapi.testclient import TestClient
 import labthings_fastapi as lt
-from labthings_fastapi.server.fallback import app
+from labthings_fastapi.server.fallback import app, FallbackApp, FallbackContext
 from labthings_fastapi.example_things import ThingThatCantStart
 
 CONFIG_DICT = {
@@ -29,21 +31,46 @@ CONFIG_DICT = {
 @pytest.fixture(autouse=True)
 def reset_app_state():
     """Reset the fallback app state before each fallback test."""
-    app.labthings_config = None
-    app.labthings_server = None
-    app.labthings_error = None
-    app.log_history = None
+    app._context = None
+
+
+def test_fallback_carries_on_even_with_init_error(mocker, caplog):
+    """Ensure fallback is created even if there is and error in __init__.
+
+    The exception should be raised.
+    """
+    # Force set_template_str to fail
+    mocker.patch.object(
+        FallbackApp,
+        "set_template_str",
+        side_effect=RuntimeError("Mocked failure"),
+    )
+    with caplog.at_level(logging.ERROR):
+        FallbackApp()
+    assert len(caplog.records) == 1
+    assert "Mocked failure" in caplog.records[0].message
+    assert caplog.records[0].exc_info is not None
+
+
+def test_fallback_without_context():
+    """Test fallback server errors if context is not set at all."""
+    with TestClient(app) as client:
+        response = client.get("/")
+        html = response.text
+        assert "LabThings Internal Error" in html
 
 
 def test_fallback_redirect():
     """Test that the redirect works."""
+    # Need to set a context even if everything in it is empty.
+    app.set_context(FallbackContext())
     with TestClient(app) as client:
         response = client.get("/")
         # No history as no redirect
         assert len(response.history) == 0
         html = response.text
-        # test that something when wrong is shown
-        assert "Something went wrong" in html
+        # Check that the basic failure message is shown
+        assert "The LabThings server failed during startup." in html
 
         # Now try another url
         response = client.get("/foo/bar")
@@ -53,77 +80,80 @@ def test_fallback_redirect():
 
         # Redirects to error page.
         html = response.text
-        # test that something when wrong is shown
-        assert "Something went wrong" in html
+        # Check that the basic failure message is shown
+        assert "The LabThings server failed during startup." in html
 
 
 def test_fallback_empty():
+    # Need to set a context even if everything in it is empty.
+    app.set_context(FallbackContext())
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        # test that something when wrong is shown
-        assert "Something went wrong" in html
-        assert "No logging info available" in html
+        # Check that the basic failure message is shown
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." in html
 
 
 def test_fallback_with_config_dict():
     """Check that fallback server prints a config dictionary as JSON."""
-    app.labthings_config = CONFIG_DICT
+    app.set_context(FallbackContext(config=CONFIG_DICT))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
-        assert "No logging info available" in html
-        assert '"thing1": "labthings_fastapi.example_things:MyThing"' in html
-        assert '"class": "labthings_fastapi.example_things:MyThing"' in html
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." in html
+        assert '"thing1": "labthings_fastapi.example_things:MyThing"' in unescape(html)
+        assert '"class": "labthings_fastapi.example_things:MyThing"' in unescape(html)
 
 
 def test_fallback_with_config_obj():
     """Check that fallback server prints the config object as JSON."""
     config = lt.ThingServerConfig.model_validate(CONFIG_DICT)
-    app.labthings_config = config
+    app.set_context(FallbackContext(config=config))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
-        assert "No logging info available" in html
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." in html
         assert "thing1" in html
         assert "thing2" in html
         cls_regex = re.compile(r'"cls": "labthings_fastapi\.example_things\.MyThing"')
-        assert len(cls_regex.findall(html)) == 2
+        assert len(cls_regex.findall(unescape(html))) == 2
 
 
 def test_fallback_with_error():
-    app.labthings_error = RuntimeError("Custom error message")
+    app.set_context(FallbackContext(error=RuntimeError("Custom error message")))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
-        assert "No logging info available" in html
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." in html
         assert "RuntimeError" in html
         assert "Custom error message" in html
 
 
 def test_fallback_with_server():
     config = lt.ThingServerConfig.model_validate(CONFIG_DICT)
-    app.labthings_server = lt.ThingServer.from_config(config)
+    server = lt.ThingServer.from_config(config)
+    app.set_context(FallbackContext(server=server))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
-        assert "No logging info available" in html
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." in html
         assert "thing1" in html
         assert "thing2" in html
 
 
 def test_fallback_with_log():
-    app.log_history = "Fake log content"
+    app.set_context(FallbackContext(log_history="Fake log content"))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
-        assert "No logging info available" not in html
-        assert "<p>Logging info</p>" in html
+        assert "The LabThings server failed during startup." in html
+        assert "No logging information available." not in html
+        assert "<h2>Logging</h2>" in html
         assert "Fake log content" in html
 
 
@@ -146,17 +176,16 @@ def test_actual_server_fallback():
     thing_error = server.startup_failure["exception"]
     assert isinstance(thing_error, RuntimeError)
 
-    app.labthings_server = server
-    app.labthings_error = server_error
+    app.set_context(FallbackContext(server=server, error=server_error))
     with TestClient(app) as client:
         response = client.get("/")
         html = response.text
-        assert "Something went wrong" in html
+        assert "The LabThings server failed during startup." in html
         # Shouldn't be displaying the meaningless SystemExit
         assert "SystemExit" not in html
 
         # The message from when the Thing errored should be displayed
-        assert str(thing_error) in html
+        assert str(thing_error) in unescape(html)
         # With the traceback
-        assert 'labthings_fastapi/example_things/__init__.py", line' in html
-        assert f'RuntimeError("{thing_error}")' in html
+        assert 'labthings_fastapi/example_things/__init__.py", line' in unescape(html)
+        assert f'RuntimeError("{thing_error}")' in unescape(html)

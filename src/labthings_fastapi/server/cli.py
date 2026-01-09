@@ -20,7 +20,7 @@ the tutorial page :ref:`tutorial_running`.
 
 from argparse import ArgumentParser, Namespace
 import sys
-from typing import Optional
+from typing import Literal, Optional, overload
 
 from pydantic import ValidationError
 import uvicorn
@@ -108,6 +108,16 @@ def config_from_args(args: Namespace) -> ThingServerConfig:
         raise RuntimeError("No configuration (or empty configuration) provided")
 
 
+@overload
+def serve_from_cli(
+    argv: Optional[list[str]], dry_run: Literal[True]
+) -> ThingServer: ...
+
+
+@overload
+def serve_from_cli(argv: Optional[list[str]], dry_run: Literal[False]) -> None: ...
+
+
 def serve_from_cli(
     argv: Optional[list[str]] = None, dry_run: bool = False
 ) -> ThingServer | None:
@@ -150,10 +160,14 @@ def serve_from_cli(
         if args.fallback:
             print(f"Error: {e}")
             print("Starting fallback server.")
+
             app = fallback.app
-            app.labthings_config = config
-            app.labthings_server = server
-            app.labthings_error = e
+            app.set_context(
+                fallback.FallbackContext(
+                    config=config, server=server, error=e, log_history=None
+                )
+            )
+
             uvicorn.run(app, host=args.host, port=args.port)
         else:
             if isinstance(e, (ValidationError, ThingImportFailure)):
