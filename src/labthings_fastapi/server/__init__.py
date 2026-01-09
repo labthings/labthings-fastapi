@@ -81,6 +81,7 @@ class ThingServer:
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
         """
+        self.startup_failure: dict | None = None
         configure_thing_logger()  # Note: this is safe to call multiple times.
         self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
         self.app = FastAPI(lifespan=self.lifespan)
@@ -259,6 +260,10 @@ class ThingServer:
         :param app: The FastAPI application wrapped by the server.
         :yield: no value. The FastAPI application will serve requests while this
             function yields.
+        :raises BaseException: Reraises any errors that are caught when calling
+            ``__enter__`` on each Thing. The error is also saved to
+            ``self.startup_failure`` for post mortem, as otherwise uvicorn will swallow
+            it and replace it with SystemExit(3) and no traceback.
         """
         async with BlockingPortal() as portal:
             # We create a blocking portal to allow threaded code to call async code
@@ -271,7 +276,14 @@ class ThingServer:
             # is present when this happens, in case we are dealing with threads.
             async with AsyncExitStack() as stack:
                 for thing in self.things.values():
-                    await stack.enter_async_context(thing)
+                    try:
+                        await stack.enter_async_context(thing)
+                    except BaseException as e:
+                        self.startup_failure = {
+                            "thing": thing.name,
+                            "exception": e,
+                        }
+                        raise
                 yield
 
         self.blocking_portal = None

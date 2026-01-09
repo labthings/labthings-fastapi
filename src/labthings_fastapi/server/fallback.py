@@ -13,10 +13,10 @@ from typing import Any, TYPE_CHECKING
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from starlette.responses import RedirectResponse
+from .config_model import ThingServerConfig
 
 if TYPE_CHECKING:
     from . import ThingServer
-    from .config_model import ThingServerConfig
 
 
 class FallbackApp(FastAPI):
@@ -32,7 +32,8 @@ class FallbackApp(FastAPI):
         :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
         """
         super().__init__(*args, **kwargs)
-        self.labthings_config: ThingServerConfig | None = None
+        # Handle dictionary config here for legacy reasons.
+        self.labthings_config: ThingServerConfig | dict | None = None
         self.labthings_server: ThingServer | None = None
         self.labthings_error: BaseException | None = None
         self.log_history = None
@@ -79,19 +80,22 @@ async def root() -> HTMLResponse:
 
     :return: a response that serves the error as an HTML page.
     """
-    error_message = f"{app.labthings_error}"
-    # use traceback.format_exception to get full traceback as list
-    # this ends in newlines, but needs joining to be a single string
-    error_w_trace = "".join(format_exception(app.labthings_error))
+    error_message, error_w_trace = _format_error_and_traceback()
     things = ""
     if app.labthings_server:
         for path, thing in app.labthings_server.things.items():
             things += f"<li>{path}: {thing!r}</li>"
 
+    config = app.labthings_config
+    if isinstance(config, ThingServerConfig):
+        conf_str = config.model_dump_json(indent=2)
+    else:
+        conf_str = json.dumps(config, indent=2)
+
     content = ERROR_PAGE
     content = content.replace("{{error}}", error_message)
     content = content.replace("{{things}}", things)
-    content = content.replace("{{config}}", json.dumps(app.labthings_config, indent=2))
+    content = content.replace("{{config}}", conf_str)
     content = content.replace("{{traceback}}", error_w_trace)
 
     if app.log_history is None:
@@ -101,6 +105,34 @@ async def root() -> HTMLResponse:
 
     content = content.replace("{{logginginfo}}", logging_info)
     return HTMLResponse(content=content, status_code=app.html_code)
+
+
+def _format_error_and_traceback() -> tuple[str, str]:
+    """Format the error and traceback.
+
+    If the error was in lifespan causing Uvicorn to raise SystemExit(3) without a
+    traceback. Try to extract the saved exception from the server.
+
+    :return: A tuple of error message and error traceback.
+    """
+    err = app.labthings_error
+    server = app.labthings_server
+    error_message = f"{err}"
+
+    if (
+        isinstance(err, SystemExit)
+        and server is not None
+        and isinstance(server.startup_failure, dict)
+    ):
+        # It is a uvicorn SystemExit, so replace err with the saved error in the server.
+        err = server.startup_failure.get("exception", err)
+        thing = server.startup_failure.get("thing", "Unknown")
+        error_message = f"Failed to enter '{thing}' Thing: {err}"
+
+    # use traceback.format_exception to get full traceback as list
+    # this ends in newlines, but needs joining to be a single string
+    error_w_trace = "".join(format_exception(err))
+    return error_message, error_w_trace
 
 
 @app.get("/{path:path}")
