@@ -5,6 +5,7 @@ we start a lightweight fallback server to show an error message. This test
 verifies that it works as expected.
 """
 
+import logging
 import re
 from html import unescape
 
@@ -13,7 +14,7 @@ import uvicorn
 
 from fastapi.testclient import TestClient
 import labthings_fastapi as lt
-from labthings_fastapi.server.fallback import app, FallbackContext
+from labthings_fastapi.server.fallback import app, FallbackApp, FallbackContext
 from labthings_fastapi.example_things import ThingThatCantStart
 
 CONFIG_DICT = {
@@ -31,6 +32,32 @@ CONFIG_DICT = {
 def reset_app_state():
     """Reset the fallback app state before each fallback test."""
     app._context = None
+
+
+def test_fallback_carries_on_even_with_init_error(mocker, caplog):
+    """Ensure fallback is created even if there is and error in __init__.
+
+    The exception should be raised.
+    """
+    # Force set_template_str to fail
+    mocker.patch.object(
+        FallbackApp,
+        "set_template_str",
+        side_effect=RuntimeError("Mocked failure"),
+    )
+    with caplog.at_level(logging.ERROR):
+        FallbackApp()
+    assert len(caplog.records) == 1
+    assert "Mocked failure" in caplog.records[0].message
+    assert caplog.records[0].exc_info is not None
+
+
+def test_fallback_without_context():
+    """Test fallback server errors if context is not set at all."""
+    with TestClient(app) as client:
+        response = client.get("/")
+        html = response.text
+        assert "LabThings Internal Error" in html
 
 
 def test_fallback_redirect():

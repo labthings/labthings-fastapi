@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 from traceback import format_exception
 from typing import Any, TYPE_CHECKING
 
@@ -23,6 +24,8 @@ from .config_model import ThingServerConfig
 
 if TYPE_CHECKING:
     from . import ThingServer
+
+LOGGER = logging.getLogger(__name__)
 
 _TEMPLATE_PATH = Path(__file__).with_name("fallback.html.jinja")
 
@@ -46,6 +49,19 @@ class FallbackContext:
     """Any logging history to show."""
 
 
+LAST_RESORT_PAGE = """
+<html>
+<head lang="en">
+  <title>LabThings Internal Error</title>
+</head>
+<body>
+  <h1>LabThings Internal Error</h1>
+  <p>Couldn't start LabThings Server.</p>
+  <p>A further error occurred when gathering context.</p>
+</body>
+"""
+
+
 class FallbackApp(FastAPI):
     """A basic FastAPI application to serve a LabThings error page."""
 
@@ -59,13 +75,17 @@ class FallbackApp(FastAPI):
         :param \**kwargs: is passed to `fastapi.FastAPI.__init__`\ .
         """
         super().__init__(*args, **kwargs)
-        # Handle dictionary config here for legacy reasons.
-        self._context: FallbackContext | None = None
-        self._env = Environment(
-            loader=BaseLoader(),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        self.set_template_str(_TEMPLATE_PATH.read_text(encoding="utf-8"))
+        try:
+            # Handle dictionary config here for legacy reasons.
+            self._context: FallbackContext | None = None
+            self._env = Environment(
+                loader=BaseLoader(),
+                autoescape=select_autoescape(["html", "xml"]),
+            )
+            self.set_template_str(_TEMPLATE_PATH.read_text(encoding="utf-8"))
+        except BaseException as e:
+            # Catch any error and continue or there is no fallback server
+            LOGGER.exception(e)
         self.html_code = 500
 
     def set_context(self, context: FallbackContext) -> None:
@@ -101,26 +121,30 @@ class FallbackApp(FastAPI):
         :return: The HTMLResponse for the fallback page.
         :raises RuntimeError: if the fallback context was never set.
         """
-        if self._context is None:
-            raise RuntimeError("Not context set for fallback server.")
+        try:
+            if self._context is None:
+                raise RuntimeError("Not context set for fallback server.")
+            error_message, error_w_trace = _format_error_and_traceback(self._context)
+            things = list(self._context.server.things) if self._context.server else []
 
-        error_message, error_w_trace = _format_error_and_traceback(self._context)
-        things = list(self._context.server.things) if self._context.server else []
+            if isinstance(self._context.config, ThingServerConfig):
+                conf_str = self._context.config.model_dump_json(indent=2)
+            else:
+                conf_str = json.dumps(self._context.config, indent=2)
 
-        if isinstance(self._context.config, ThingServerConfig):
-            conf_str = self._context.config.model_dump_json(indent=2)
-        else:
-            conf_str = json.dumps(self._context.config, indent=2)
+            content = app._template.render(
+                error_message=error_message,
+                things=things,
+                config=conf_str,
+                traceback=error_w_trace,
+                logginginfo=self._context.log_history,
+            )
 
-        content = app._template.render(
-            error_message=error_message,
-            things=things,
-            config=conf_str,
-            traceback=error_w_trace,
-            logginginfo=self._context.log_history,
-        )
-
-        return HTMLResponse(content=content, status_code=app.html_code)
+            return HTMLResponse(content=content, status_code=app.html_code)
+        except BaseException as e:
+            # Catch any error and continue or there is no fallback server
+            LOGGER.exception(e)
+            return HTMLResponse(content=LAST_RESORT_PAGE, status_code=500)
 
 
 app = FallbackApp()
