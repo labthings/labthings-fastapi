@@ -32,9 +32,18 @@ class FallbackContext:
     """A dataclass to provide the context of the server failing to load."""
 
     error: BaseException | None
+    """The error caught when running uvicorn.run."""
+
     server: ThingServer | None
+    """The ThingServer that failed to start."""
+
     config: ThingServerConfig | dict[str, Any] | None
+    """The config used to set up the server.
+
+    This can be the ThingServerConfig, or the dict read from the JSON file."""
+
     log_history: str | None
+    """Any logging history to show."""
 
 
 class FallbackApp(FastAPI):
@@ -63,11 +72,27 @@ class FallbackApp(FastAPI):
         """Set the fallback runtime context.
 
         This should be called exactly once during failure handling.
+
+        :param context: A FallbackContext object with the server, the captured error,
+            the configuration, and log history.
         """
         self._context = context
 
     def set_template_str(self, template_str: str) -> None:
-        """Compile and set a Jinja template from a string."""
+        """Compile and set a Jinja template from a string.
+
+        :param template_str: A Jinja2 template string. The template should be
+            self-contained and must not extend or include other templates. If
+            customised, the template must handle the following template context
+            variables (each may be ``None``):
+
+            - ``error_message`` (``str`` | ``None``): Error message to display, if any.
+            - ``things`` (``list[str]`` | ``None``): Names of successfully loaded
+                things.
+            - ``config`` (``str`` | ``None``): The server configuration.
+            - ``traceback`` (``str`` | ``None``): Formatted error traceback.
+            - ``logginginfo`` (``str`` | ``None``): Captured logging output.
+        """
         self._template = self._env.from_string(template_str)
 
     def fallback_page(self) -> HTMLResponse:
@@ -115,6 +140,8 @@ def _format_error_and_traceback(context: FallbackContext) -> tuple[str, str]:
 
     If the error was in lifespan causing Uvicorn to raise SystemExit(3) without a
     traceback. Try to extract the saved exception from the server.
+
+    :param context:The FallbackContext object with all fallback information.
 
     :return: A tuple of error message and error traceback.
     """
