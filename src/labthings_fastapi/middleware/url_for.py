@@ -164,4 +164,4 @@ class URLFor:
         if isinstance(value, cls):
             return value
         else:
-            raise TypeError("URLFor instances may not be created from strings.")
+            raise ValueError("URLFor instances may not be created from strings.")
