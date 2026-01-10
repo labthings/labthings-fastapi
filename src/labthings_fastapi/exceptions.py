@@ -147,6 +147,17 @@ class NoBlobManagerError(RuntimeError):
     """
 
 
+class NoUrlForContextError(RuntimeError):
+    """Raised if URLFor is serialised without a url_for context variable being set.
+
+    This usually indicates that URLFor is being serialised somewhere other than in
+    an HTTP response,
+    for example in test code or in a background task. In these cases, you should
+    set up the url_for context variable manually, for example using the
+    `.testing.use_dummy_url_for` context manager.
+    """
+
+
 class UnsupportedConstraintError(ValueError):
     """A constraint argument is not supported.
 
