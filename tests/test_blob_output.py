@@ -102,8 +102,8 @@ def test_blob_type():
     [
         ("text/plain", ("text", "plain")),
         ("text/plain; charset=utf-8", ("text", "plain")),
-        ("text/*", ("text", None)),
-        ("*/*", (None, None)),
+        ("text/*", ("text", "*")),
+        ("*/*", ("*", "*")),
     ],
 )
 def test_media_type_parsing(media_type, expected):
