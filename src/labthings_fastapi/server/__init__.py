@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
+from ..middleware.url_for import url_for_middleware
 from ..thing_slots import ThingSlot
 from ..utilities import class_attributes
 
@@ -86,6 +87,7 @@ class ThingServer:
         self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
         self.app = FastAPI(lifespan=self.lifespan)
         self._set_cors_middleware()
+        self._set_url_for_middleware()
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
@@ -128,6 +130,15 @@ class ThingServer:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    def _set_url_for_middleware(self) -> None:
+        """Add middleware to support `url_for` in Pydantic models.
+
+        This middleware adds a request state variable that allows
+        `labthings_fastapi.server.URLFor` instances to be serialised
+        using FastAPI's `url_for` function.
+        """
+        self.app.middleware("http")(url_for_middleware)
 
     @property
     def things(self) -> Mapping[str, Thing]:
