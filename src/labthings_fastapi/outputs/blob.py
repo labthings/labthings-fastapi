@@ -426,15 +426,17 @@ def parse_media_type(media_type: str) -> tuple[str | None, str | None]:
         raise ValueError(
             f"Invalid media type: {media_type} must contain exactly one '/'."
         )
-    for i in range(2):
-        part = parts[i].strip()
-        if part == "*":
-            parts[i] = None
-    if not parts[0] and parts[1]:
+    main_type = parts[0].strip()
+    sub_type = parts[1].strip()
+    if len(main_type) == 0 or len(sub_type) == 0:
+        raise ValueError(
+            f"Invalid media type: {media_type} must have both type and subtype."
+        )
+    if main_type == "*" and sub_type != "*":
         raise ValueError(
             f"Invalid media type: {media_type} has no type but has a subtype."
         )
-    return parts[0], parts[1]
+    return main_type, sub_type
 
 
 def match_media_types(media_type: str, pattern: str) -> bool:
@@ -449,9 +451,9 @@ def match_media_types(media_type: str, pattern: str) -> bool:
     """
     type_a, subtype_a = parse_media_type(media_type)
     type_b, subtype_b = parse_media_type(pattern)
-    if type_b is not None and type_a != type_b:
+    if type_b != "*" and type_a != type_b:
         return False
-    if subtype_b is not None and subtype_a != subtype_b:
+    if subtype_b != "*" and subtype_a != subtype_b:
         return False
     return True
 
@@ -539,7 +541,7 @@ class Blob:
                 is_field_serializer=False,
                 info_arg=False,
                 when_used="always",
-            ),
+            ),  # codespell:ignore ser
         )
 
     @classmethod
@@ -627,7 +629,7 @@ class Blob:
         r"""Represent the `.Blob` as a `.BlobModel` to get ready to serialise.
 
         When `pydantic` serialises this object, we first generate a `.BlobModel`
-        witht just the information to be serialised.
+        with just the information to be serialised.
         We use `.from_url.from_url` to generate the URL, so this will error if
         it is serialised anywhere other than a request handler with the
         middleware from `.middleware.url_for` enabled.

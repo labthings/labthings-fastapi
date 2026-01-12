@@ -2,7 +2,7 @@
 
 import threading
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticSerializationError
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -64,11 +64,12 @@ def test_validation():
     assert m.url is u
 
     # Trying to initialise with anything else should raise an error
-    with pytest.raises(TypeError):
+    msg = "URLFor instances may not be created from strings"
+    with pytest.raises(ValidationError, match=msg):
         _ = ModelWithURL(url="https://example.com")
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         _ = ModelWithURL(url="endpoint_name")
-    with pytest.raises(TypeError):
+    with pytest.raises(ValidationError):
         _ = ModelWithURL(url=None)
 
 
