@@ -11,7 +11,6 @@ from pydantic import TypeAdapter
 from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
-from labthings_fastapi.client.outputs import ClientBlobOutput
 from labthings_fastapi.exceptions import FailedToInvokeActionError
 from labthings_fastapi.testing import create_thing_without_server, use_dummy_url_for
 
@@ -98,6 +97,45 @@ def test_blob_type():
     assert M.from_bytes(b"").media_type == "text/plain"
 
 
+@pytest.mark.parametrize(
+    ("media_type", "expected"),
+    [
+        ("text/plain", ("text", "plain")),
+        ("text/plain; charset=utf-8", ("text", "plain")),
+        ("text/*", ("text", None)),
+        ("*/*", (None, None)),
+    ],
+)
+def test_media_type_parsing(media_type, expected):
+    """Check that media type parsing works as expected."""
+    assert lt.blob.parse_media_type(media_type) == expected
+
+
+@pytest.mark.parametrize("media_type", ["too/many/slashes", "noslash", "*/plain"])
+def test_invalid_media_type_parsing(media_type):
+    """Check that invalid media types raise an error."""
+    with pytest.raises(ValueError):
+        lt.blob.parse_media_type(media_type)
+
+
+@pytest.mark.parametrize(
+    ("data_media_type", "blob_media_type", "expected"),
+    [
+        ("text/plain", "text/plain", True),
+        ("text/html", "text/*", True),
+        ("image/png", "image/*", True),
+        ("application/json", "*/*", True),
+        ("text/plain", "text/html", False),
+        ("image/jpeg", "image/png", False),
+        ("application/xml", "application/json", False),
+        ("text/plain", "image/*", False),
+    ],
+)
+def test_media_type_matching(data_media_type, blob_media_type, expected):
+    """Check that media type matching works as expected."""
+    assert lt.blob.match_media_types(data_media_type, blob_media_type) is expected
+
+
 def test_blob_schema():
     """Check that the Blob schema is as expected."""
     schema = TypeAdapter(TextBlob).json_schema()
@@ -113,6 +151,26 @@ def test_blob_schema():
     # This is because multiple media types are valid - it ends with *
     schema = TypeAdapter(VagueTextBlob).json_schema()
     assert "const" not in schema["properties"]["media_type"]
+
+
+def test_blob_initialisation():
+    """Check that blobs can be initialised correctly."""
+    data = lt.blob.BlobBytes(b"Test data", media_type="text/plain")
+    blob = TextBlob(data, description="A test blob")
+    assert blob.content == b"Test data"
+    assert blob.media_type == "text/plain"
+    assert blob.description == "A test blob"
+
+    # Check that the media type is refined if the data is more
+    # specific than the Blob class
+    vague_blob = VagueTextBlob(data)
+    assert vague_blob.content == b"Test data"
+    assert vague_blob.media_type == "text/plain"
+
+    # Check we get an error if the media type doesn't match
+    data_bad = lt.blob.BlobBytes(b"Bad data", media_type="image/png")
+    with pytest.raises(ValueError):
+        _ = TextBlob(data_bad)
 
 
 def test_blob_creation():
@@ -224,16 +282,19 @@ def test_blob_input(client):
     # Check that a bad URL results in an error.
     # This URL is not totally bad - it follows the right form, but the
     # UUID is not found on the server.
-    bad_blob = ClientBlobOutput(
-        media_type="text/plain", href=f"http://nonexistent.local/blob/{uuid4()}"
+    bad_blob = lt.blob.Blob(
+        lt.blob.RemoteBlobData(
+            media_type="text/plain", href=f"http://nonexistent.local/blob/{uuid4()}"
+        )
     )
     with pytest.raises(FailedToInvokeActionError, match="wasn't found"):
         tc.passthrough_blob(blob=bad_blob)
     # Try again with a totally bogus URL
-    bad_blob = ClientBlobOutput(
-        media_type="text/plain", href="http://nonexistent.local/totally_bogus"
+    bad_blob = lt.blob.Blob(
+        lt.blob.RemoteBlobData(
+            media_type="text/plain", href="http://nonexistent.local/totally_bogus"
+        )
     )
-
     msg = "must contain a Blob ID"
     with pytest.raises(FailedToInvokeActionError, match=msg):
         tc.passthrough_blob(blob=bad_blob)

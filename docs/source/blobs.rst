@@ -7,14 +7,14 @@ Blob input/output
 
 If interactions require only simple data types that can easily be represented in JSON, very little thought needs to be given to data types - strings and numbers will be converted to and from JSON automatically, and your Python code should only ever see native Python datatypes whether it's running on the server or a remote client. However, if you want to transfer larger data objects such as images, large arrays or other binary data, you will need to use a `.Blob` object.
 
-`.Blob` objects are not part of the Web of Things specification, which doesn't give much consideration to returning large or complicated datatypes. In LabThings-FastAPI, the `.Blob` mechanism is intended to provide an efficient way to work with arbitrary binary data. If it's used to transfer data between two Things on the same server, the data should not be copied or otherwise iterated over - and when it must be transferred over the network it can be done using a binary transfer, rather than embedding in JSON with base64 encoding.
+`.Blob` objects are not part of the Web of Things specification, which doesn't give much consideration to returning large or complicated datatypes. In LabThings-FastAPI, the `.Blob` mechanism is intended to provide an efficient way to work with arbitrary binary data. If a `.Blob` is passed between two Things on the same server, the data will not be copied - and when it must be transferred over the network it can be done using a binary transfer, rather than embedding in JSON with base64 encoding.
 
-A `.Blob` consists of some data and a MIME type, which sets how the data should be interpreted. It is best to create a subclass of `.Blob` with the content type set: this makes it clear what kind of data is in the `.Blob`. In the future, it might be possible to add functionality to `.Blob` subclasses, for example to make it simple to obtain an image object from a `.Blob` containing JPEG data. However, this will not currently work across both client and server code.
+A `.Blob` consists of some data and a MIME type, which sets how the data should be interpreted. It is best to create a subclass of `.Blob` with the ``media_type`` set: this makes it clear what kind of data is in the `.Blob`. In the future, it might be possible to add functionality to `.Blob` subclasses, for example to make it simple to obtain an image object from a `.Blob` containing JPEG data. However, this will not currently work across both client and server code.
 
 Creating and using `.Blob` objects
 ------------------------------------------------
 
-Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes`, on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`), or using a URL as a placeholder. The intention is that the code that uses a `.Blob` should not need to know which of these is the case, and should be able to use the same code regardless of how the data is stored. 
+Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes`, on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`). A `.Blob` may also point to remote data (see `.Blob.from_url`). Code that uses a `.Blob` should not need to know how the data is stored, as the interface is the same in each case.
 
 Blobs offer three ways to access their data:
 
@@ -122,7 +122,7 @@ On the client, we can use the `capture_image` action directly (as before), or we
 HTTP interface and serialization
 --------------------------------
 
-`.Blob` objects are subclasses of `pydantic.BaseModel`, which means they can be serialized to JSON and deserialized from JSON. When this happens, the `.Blob` is represented as a JSON object with `.Blob.url` and `.Blob.content_type` fields. The `.Blob.url` field is a link to the data. The `.Blob.content_type` field is a string representing the MIME type of the data. It is worth noting that models may be nested: this means an action may return many `.Blob` objects in its output, either as a list or as fields in a `pydantic.BaseModel` subclass. Each `.Blob` in the output will be serialized to JSON with its URL and content type, and the client can then download the data from the URL, one download per `.Blob` object.
+`.Blob` objects can be serialized to JSON and deserialized from JSON. When this happens, the `.Blob` is represented as a JSON object with ``href`` and ``content_type`` fields. The ``href`` field is a link to the data. The ``content_type`` field is a string representing the MIME type of the data. It is worth noting that models may be nested: this means an action may return many `.Blob` objects in its output, either as a list or as fields in a `pydantic.BaseModel` subclass. Each `.Blob` in the output will be serialized to JSON with its URL and content type, and the client can then download the data from the URL, one download per `.Blob` object.
 
 When a `.Blob` is serialized, the URL is generated with a unique ID to allow it to be downloaded. The URL is not guaranteed to be permanent, and should not be used as a long-term reference to the data. For `.Blob` objects that are part of the output of an action, the URL will expire after 5 minutes (or the retention time set for the action), and the data will no longer be available for download after that time.
 
@@ -136,7 +136,7 @@ It may be possible to have actions return binary data directly in the future, bu
 
 .. note::
 
-    Serialising or deserialising `.Blob` objects requires access to the `.BlobDataManager`\ . As there is no way to pass this in to the relevant methods at serialisation/deserialisation time, we use context variables to access them. This means that a `.blob_serialisation_context_manager` should be used to set (and then clear) those context variables. This is done by the `.BlobIOContextDep` dependency on the relevant endpoints (currently any endpoint that may return the output of an action).
+    Serialising or deserialising `.Blob` objects generates URLs, which are specific to the HTTP request. This means that `.Blob` objects cannot be serialised or deserialised outside the context of an HTTP request handler, so if code in an Action or Property attempts to turn a `.Blob` into JSON, it is likely to raise exceptions. For more detail on this mechanism, see `.middleware.url_for`\ .
 
 
 Memory management and retention
