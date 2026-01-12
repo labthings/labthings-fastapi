@@ -6,6 +6,7 @@ verifies that it works as expected.
 """
 
 import logging
+import os
 import re
 from html import unescape
 
@@ -186,6 +187,7 @@ def test_actual_server_fallback():
 
         # The message from when the Thing errored should be displayed
         assert str(thing_error) in unescape(html)
-        # With the traceback
-        assert 'labthings_fastapi/example_things/__init__.py", line' in unescape(html)
+        # With the traceback (NB we need os.path.join to get correct slashes on Windows)
+        fpath = os.path.join("labthings_fastapi", "example_things", "__init__.py")
+        assert fpath in unescape(html)
         assert f'RuntimeError("{thing_error}")' in unescape(html)
