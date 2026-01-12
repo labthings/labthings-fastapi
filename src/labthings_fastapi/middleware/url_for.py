@@ -1,5 +1,17 @@
 r"""Middleware to make url_for available as a context variable.
 
+This module is intended mostly for internal use within LabThings. The short
+summary is that, if you need to refer to other endpoints in the LabThings
+server, you should not return hard-coded URLs, but instead use a `URLFor`
+object. This will be converted to a URL when it's serialised by FastAPI, using
+the correct ``url_for`` function for the current request.
+
+Under the hood, this module defines a `url_for` function that performs the
+conversion. This function may only be run in certain places in the code, as
+it relies on a context variable. As a rule of thumb, it's OK to call
+`url_for` from a serializer of a `pydantic` model, but you should not call
+it from within an Action or Property.
+
 There are several places in LabThings where we need to be able to include URLs
 to other endpoints in the LabThings server, most notably in the output of
 Actions. For example, if an Action outputs a `.Blob`\ , the URL to download
@@ -72,6 +84,16 @@ def url_for(endpoint_name: str, **params: Any) -> URL:
     to convert endpoint names and parameters to URLs. It is intended to have
     the same signature as `fastapi.Request.url_for`\ .
 
+    This function will raise a `NoUrlForContextError` if there is no
+    ``url_for`` function in the context variable. This will be the case if
+    the function is called outside of a request handler. As a rule, this
+    function should not be called from within Actions or Properties.
+
+    `URLFor` is provided as a safe way to return URLs: it ensures that the
+    URL is only generated at serialisation time, when there is a valid
+    ``url_for`` function in the context. This also means the URL is always
+    correct for the request being handled.
+
     :param endpoint_name: The name of the endpoint to generate a URL for.
     :param \**params: The path parameters to use in the URL.
     :return: The generated URL.
@@ -106,7 +128,25 @@ async def url_for_middleware(
 
 
 class URLFor:
-    """A pydantic-compatible type that converts endpoint names to URLs."""
+    """A pydantic-compatible type that converts endpoint names to URLs.
+
+    This class is intended to be used as a field type in `pydantic` models
+    or as a return type from actions or properties. It does not convert
+    endpoint names to URLs immediately, but instead stores the endpoint name
+    and parameters, and only generates the URL when it is serialised by
+    FastAPI.
+
+    It is safe to *create* a `URLFor` instance anywhere, but converting it
+    to a string (i.e. generating the URL) requires a valid `url_for` function
+    and should generally be left for FastAPI.
+
+    Fields or return values annotated as `.URLFor` will only accept a `.URLFor`
+    instance, but will be serialised to JSON as a string, and will show up in
+    the JSONSchema as a string.
+
+    Validating a string, i.e. converting a string to a `.URLFor` instance, is
+    not supported, and will raise a `TypeError`.
+    """
 
     def __init__(self, endpoint_name: str, **params: Any) -> None:
         r"""Create a URLFor instance.
