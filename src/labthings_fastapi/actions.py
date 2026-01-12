@@ -47,10 +47,8 @@ from .dependencies.invocation import NonWarningInvocationID
 from .exceptions import (
     InvocationCancelledError,
     InvocationError,
-    NoBlobManagerError,
     NotConnectedToServerError,
 )
-from .outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
 from . import invocation_contexts
 from .utilities.introspection import (
     EmptyInput,
@@ -149,23 +147,7 @@ class Invocation(Thread):
 
     @property
     def output(self) -> Any:
-        """Return value of the Action. If the Action is still running, returns None.
-
-        :raise NoBlobManagerError: If this is called in a context where the blob
-            manager context variables are not available. This stops errors being raised
-            later once the blob is returned and tries to serialise. If the errors
-            happen during serialisation the stack-trace will not clearly identify
-            the route with the missing dependency.
-        """
-        try:
-            blobdata_to_url_ctx.get()
-        except LookupError as e:
-            raise NoBlobManagerError(
-                "An invocation output has been requested from a api route that "
-                "doesn't have a BlobIOContextDep dependency. This dependency is needed "
-                " for blobs to identify their url."
-            ) from e
-
+        """Return value of the Action. If the Action is still running, returns None."""
         with self._status_lock:
             return self._return_value
 
@@ -467,25 +449,19 @@ class ActionManager:
         """
 
         @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
-        def list_all_invocations(
-            request: Request, _blob_manager: BlobIOContextDep
-        ) -> list[InvocationModel]:
+        def list_all_invocations(request: Request) -> list[InvocationModel]:
             return self.list_invocations(request=request)
 
         @app.get(
             ACTION_INVOCATIONS_PATH + "/{id}",
             responses={404: {"description": "Invocation ID not found"}},
         )
-        def action_invocation(
-            id: uuid.UUID, request: Request, _blob_manager: BlobIOContextDep
-        ) -> InvocationModel:
+        def action_invocation(id: uuid.UUID, request: Request) -> InvocationModel:
             """Return a description of a specific action.
 
             :param id: The action's ID (from the path).
             :param request: FastAPI dependency for the request object, used to
                 find URLs via ``url_for``.
-            :param _blob_manager: FastAPI dependency that enables `.Blob` objects
-                to be serialised.
 
             :return: Details of the invocation.
 
@@ -515,17 +491,13 @@ class ActionManager:
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_output(
-            id: uuid.UUID, _blob_manager: BlobIOContextDep
-        ) -> Any:
+        def action_invocation_output(id: uuid.UUID) -> Any:
             """Get the output of an action invocation.
 
             This returns just the "output" component of the action invocation. If the
             output is a file, it will return the file.
 
             :param id: The action's ID (from the path).
-            :param _blob_manager: FastAPI dependency that enables `.Blob` objects
-                to be serialised.
 
             :return: The output of the invocation, as a `pydantic.BaseModel`
                 instance. If this is a `.Blob`, it may be returned directly.
@@ -800,7 +772,6 @@ class ActionDescriptor(
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
-            _blob_manager: BlobIOContextDep,
             request: Request,
             body: Any,  # This annotation will be overwritten below.
             id: NonWarningInvocationID,
@@ -878,7 +849,7 @@ class ActionDescriptor(
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations(_blob_manager: BlobIOContextDep) -> list[InvocationModel]:
+        def list_invocations() -> list[InvocationModel]:
             action_manager = thing._thing_server_interface._action_manager
             return action_manager.list_invocations(self, thing)
 

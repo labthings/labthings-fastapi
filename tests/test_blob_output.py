@@ -11,7 +11,8 @@ from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.client.outputs import ClientBlobOutput
-from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.exceptions import FailedToInvokeActionError
+from labthings_fastapi.testing import create_thing_without_server, use_dummy_url_for
 
 
 class TextBlob(lt.blob.Blob):
@@ -94,8 +95,6 @@ def test_blobdata_protocol():
     assert not isinstance(bad_blob, lt.blob.ServerSideBlobData)
 
     with pytest.raises(NotImplementedError):
-        _ = bad_blob.media_type
-    with pytest.raises(NotImplementedError):
         _ = bad_blob.content
 
 
@@ -142,13 +141,10 @@ def test_blob_serialisation():
     with pytest.raises(PydanticSerializationError):
         blob.model_dump()
     # Fake the required context variable, and it should work
-    try:
-        token = lt.outputs.blob.blobdata_to_url_ctx.set(lambda b: "https://example/")
+    with use_dummy_url_for():
         data = blob.model_dump()
-        assert data["href"] == "https://example/"
-        assert data["media_type"] == "text/plain"
-    finally:
-        lt.outputs.blob.blobdata_to_url_ctx.reset(token)
+    assert data["href"].startswith("urlfor://download_blob/?blob_id=")
+    assert data["media_type"] == "text/plain"
 
     # Blobs that already refer to a remote URL should serialise without error
     # though there's currently no way to create one on the server.
@@ -222,15 +218,15 @@ def test_blob_input(client):
     bad_blob = ClientBlobOutput(
         media_type="text/plain", href=f"http://nonexistent.local/blob/{uuid4()}"
     )
-    with pytest.raises(LookupError):
+    with pytest.raises(FailedToInvokeActionError, match="wasn't found"):
         tc.passthrough_blob(blob=bad_blob)
     # Try again with a totally bogus URL
     bad_blob = ClientBlobOutput(
         media_type="text/plain", href="http://nonexistent.local/totally_bogus"
     )
 
-    msg = "Error when invoking action passthrough_blob: Could not find blob ID in href"
-    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=msg):
+    msg = "must contain a Blob ID"
+    with pytest.raises(FailedToInvokeActionError, match=msg):
         tc.passthrough_blob(blob=bad_blob)
 
     # Check that the same thing works on the server side
