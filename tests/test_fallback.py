@@ -187,5 +187,8 @@ def test_actual_server_fallback():
         # The message from when the Thing errored should be displayed
         assert str(thing_error) in unescape(html)
         # With the traceback
-        assert 'labthings_fastapi/example_things/__init__.py", line' in unescape(html)
+        assert (  # The first line is true on *nix, the second is for Windows
+            'labthings_fastapi/example_things/__init__.py", line' in unescape(html)
+            or 'labthings_fastapi\\example_things\\__init__.py", line' in unescape(html)
+        )
         assert f'RuntimeError("{thing_error}")' in unescape(html)
