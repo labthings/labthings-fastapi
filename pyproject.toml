@@ -41,6 +41,7 @@ dev = [
   "sphinx>=7.2",
   "sphinx-autoapi",
   "sphinx-toolbox",
+  "tomli; python_version < '3.11'",
   "codespell",
 ]
 
@@ -170,6 +171,9 @@ show-filenames-in-every-violation-message = true
 check-return-types = false
 check-class-attributes = false  # prefer docstrings on the attributes
 check-yield-types = false  # use type annotations instead
+
+[tool.codespell]
+ignore-words-list = ["ser"]
 
 [project.scripts]
 labthings-server = "labthings_fastapi.server.cli:serve_from_cli"
