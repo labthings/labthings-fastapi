@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from pydantic import TypeAdapter
 from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
@@ -84,20 +85,6 @@ def client():
         yield client
 
 
-def test_blobdata_protocol():
-    """Check the definition of the blobdata protocol, and the implementations."""
-
-    class BadBlob(lt.blob.BlobData):
-        pass
-
-    bad_blob = BadBlob()
-
-    assert not isinstance(bad_blob, lt.blob.ServerSideBlobData)
-
-    with pytest.raises(NotImplementedError):
-        _ = bad_blob.content
-
-
 @pytest.mark.filterwarnings("ignore:.*removed in v0.1.0.*:DeprecationWarning")
 def test_blob_type():
     """Check we can't put dodgy values into a blob output model"""
@@ -108,7 +95,7 @@ def test_blob_type():
 
 
 def test_blob_creation():
-    """Check that blobs can be created in three ways"""
+    """Check that blobs can be created in four ways"""
     TEXT = b"Test input"
     # Create a blob from a file in a temporary directory
     td = TemporaryDirectory()
@@ -129,9 +116,12 @@ def test_blob_creation():
     with pytest.raises(IOError):
         _ = TextBlob.from_temporary_directory(td, "nonexistent")
 
-    # Finally, check we can make a blob from a bytes object, no file.
+    # Check we can make a blob from a bytes object, no file.
     blob = TextBlob.from_bytes(TEXT)
     assert blob.content == TEXT
+    # Check we can make a blob from a URL
+    blob = TextBlob.from_url(href="https://example.com/blob")
+    assert blob.to_blobmodel().href == "https://example.com/blob"
 
 
 def test_blob_serialisation():
@@ -139,20 +129,18 @@ def test_blob_serialisation():
     blob = TextBlob.from_bytes(b"Some data")
     # Can't serialise a blob (with data) without a BlobDataManager
     with pytest.raises(PydanticSerializationError):
-        blob.model_dump()
+        TypeAdapter(TextBlob).dump_python(blob)
     # Fake the required context variable, and it should work
     with use_dummy_url_for():
-        data = blob.model_dump()
+        data = TypeAdapter(TextBlob).dump_python(blob)
     assert data["href"].startswith("urlfor://download_blob/?blob_id=")
     assert data["media_type"] == "text/plain"
 
-    # Blobs that already refer to a remote URL should serialise without error
-    # though there's currently no way to create one on the server.
-    remoteblob = TextBlob.model_construct(
-        media_type="text/plain",
+    # Blobs that already refer to a remote URL should serialise without error.
+    remoteblob = TextBlob.from_url(
         href="https://example/",
     )
-    data = remoteblob.model_dump()
+    data = TypeAdapter(TextBlob).dump_python(remoteblob)
     assert data["href"] == "https://example/"
     assert data["media_type"] == "text/plain"
 
