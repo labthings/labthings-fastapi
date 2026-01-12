@@ -541,7 +541,7 @@ class Blob:
                 is_field_serializer=False,
                 info_arg=False,
                 when_used="always",
-            ),  # codespell:ignore ser
+            ),
         )
 
     @classmethod
