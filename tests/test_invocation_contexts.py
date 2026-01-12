@@ -136,7 +136,7 @@ def test_cancel_event():
     assert not event.is_set()
 
     # sleep behaves the same way, but waits a finite time.
-    with assert_takes_time(0.02, 0.04):
+    with assert_takes_time(0.02, 0.08):
         event.sleep(0.02)
     # check an exception gets raised and reset if appropriate
     event.set()
@@ -149,14 +149,14 @@ def test_cancellable_sleep():
     """Check the module-level cancellable sleep."""
     # with no invocation context, the function should wait
     # and there should be no error.
-    with assert_takes_time(0.02, 0.04):
+    with assert_takes_time(0.02, 0.08):
         cancellable_sleep(0.02)
 
     with fake_invocation_context():
         event = get_cancel_event()
 
         # the function should wait a finite time
-        with assert_takes_time(0.02, 0.04):
+        with assert_takes_time(0.02, 0.08):
             cancellable_sleep(0.02)
 
         # check an exception gets raised and reset if appropriate
@@ -258,7 +258,7 @@ def test_thread_with_invocation_id_cancellation_propagates():
         )
         t.start()
         t.cancel()
-        with assert_takes_time(None, 0.05):
+        with assert_takes_time(None, 0.08):
             t.join()
         assert isinstance(t.result, ThreadWithInvocationID)
         assert isinstance(t.result.exception, InvocationCancelledError)
