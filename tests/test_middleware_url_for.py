@@ -1,5 +1,6 @@
 """Test the URLFor class and associated supporting code."""
 
+import threading
 import pytest
 from pydantic import BaseModel
 from pydantic_core import PydanticSerializationError
@@ -77,29 +78,80 @@ def test_middleware():
     app.middleware("http")(url_for_middleware)
 
     class Model(BaseModel):
-        url: str
+        url: URLFor
 
     @app.get("/test-endpoint/{item_id}/", name="test-endpoint")
     async def test_endpoint(item_id: int) -> URLFor:
+        """An async endpoint that returns a URLFor instance."""
         return URLFor("test-endpoint", item_id=item_id)
 
-    @app.get("/sync-endpoint/{item_id}/", name="sync-endpoint")
-    async def sync_endpoint(item_id: int) -> URLFor:
-        return URLFor("sync-endpoint", item_id=item_id)
+    @app.get("/sync-endpoint/{item_id}/")
+    def sync_endpoint(item_id: int) -> URLFor:
+        """A sync endpoint that returns a URLFor instance."""
+        return URLFor("test-endpoint", item_id=item_id)
 
-    @app.get("/model-endpoint/{item_id}/", name="model-endpoint")
-    async def model_endpoint(item_id: int) -> URLFor:
-        return URLFor("model-endpoint", item_id=item_id)
+    @app.get("/model-endpoint/{item_id}/")
+    async def model_endpoint(item_id: int) -> Model:
+        """An async endpoint that returns a model containing a URLFor."""
+        return Model(url=URLFor("test-endpoint", item_id=item_id))
+
+    @app.get("/direct-async-endpoint/{item_id}/")
+    async def direct_async_endpoint(item_id: int) -> str:
+        """An async endpoint that calls `url_for` directly."""
+        return str(url_for.url_for("test-endpoint", item_id=item_id))
+
+    @app.get("/direct_sync-endpoint/{item_id}/")
+    def direct_sync_endpoint(item_id: int) -> str:
+        """A sync endpoint that calls `url_for` directly."""
+        return str(url_for.url_for("test-endpoint", item_id=item_id))
+
+    def assert_url_for_fails(item_id: int):
+        with pytest.raises(NoUrlForContextError):
+            _ = url_for.url_for("test-endpoint", item_id=item_id)
+
+    def append_from_thread(item_id: int, output: list) -> None:
+        output.append(URLFor("test-endpoint", item_id=item_id))
+
+    @app.get("/assert_fails_in_thread/{item_id}/")
+    async def assert_fails_in_thread(item_id: int) -> bool:
+        t = threading.Thread(target=assert_url_for_fails, args=(item_id,))
+        t.start()
+        t.join()
+        return True
+
+    @app.get("/return_from_thread/{item_id}/")
+    async def return_from_thread(item_id: int) -> URLFor:
+        output = []
+        append_from_thread(item_id, output)
+        return output[0]
+
+    URL = "http://testserver/test-endpoint/42/"
 
     with TestClient(app) as client:
         response = client.get("/test-endpoint/42/")
         assert response.status_code == 200
-        assert response.json() == "http://testserver/test-endpoint/42/"
+        assert response.json() == URL
 
         response = client.get("/sync-endpoint/42/")
         assert response.status_code == 200
-        assert response.json() == "http://testserver/sync-endpoint/42/"
+        assert response.json() == URL
 
         response = client.get("/model-endpoint/42/")
         assert response.status_code == 200
-        assert response.json() == "http://testserver/model-endpoint/42/"
+        assert response.json() == {"url": URL}
+
+        response = client.get("/direct-async-endpoint/42/")
+        assert response.status_code == 200
+        assert response.json() == URL
+
+        response = client.get("/direct_sync-endpoint/42/")
+        assert response.status_code == 200
+        assert response.json() == URL
+
+        response = client.get("/assert_fails_in_thread/42/")
+        assert response.status_code == 200
+        assert response.json() is True
+
+        response = client.get("/return_from_thread/42/")
+        assert response.status_code == 200
+        assert response.json() == URL
