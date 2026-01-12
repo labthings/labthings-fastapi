@@ -39,6 +39,8 @@ from typing import (
 )
 from pydantic import AnyUrl, BaseModel, Field, ConfigDict, AfterValidator
 
+from labthings_fastapi.middleware.url_for import URLFor
+
 
 class Version(BaseModel):
     """Version info for a Thing.
@@ -240,7 +242,7 @@ class Form(BaseModel, Generic[OpT]):
 
     model_config = ConfigDict(extra="allow")
 
-    href: AnyUri
+    href: URLFor | AnyUri
     op: Optional[Union[OpT, List[OpT]]] = None
     contentType: Optional[str] = None
     contentCoding: Optional[str] = None
@@ -296,7 +298,7 @@ class LinkElement(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    href: AnyUri
+    href: URLFor | AnyUri
     type: Optional[str] = None
     rel: Optional[str] = None
     anchor: Optional[AnyUri] = None
@@ -439,7 +441,7 @@ class WotTdSchema16October2019(BaseModel):
     version: Optional[Version] = None
     links: Links = None
     forms: Optional[List[Form[RootOp]]] = Field(None, min_length=1)
-    base: Optional[AnyUri] = None
+    base: Optional[URLFor | AnyUri] = None
     securityDefinitions: Dict[str, SecurityScheme]
     support: Optional[AnyUri] = None
     created: Optional[datetime] = None

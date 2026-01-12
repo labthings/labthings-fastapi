@@ -39,6 +39,8 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
 
+from labthings_fastapi.middleware.url_for import URLFor
+
 from .base_descriptor import BaseDescriptor
 from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
@@ -207,7 +209,7 @@ class Invocation(Thread):
         """
         self.cancel_hook.set()
 
-    def response(self, request: Optional[Request] = None) -> InvocationModel:
+    def response(self) -> InvocationModel:
         """Generate a representation of the invocation suitable for HTTP.
 
         When an invocation is polled, we return a JSON object that includes
@@ -219,21 +221,19 @@ class Invocation(Thread):
 
         :return: an `.InvocationModel` representing this `.Invocation`.
         """
-        if request:
-            href = str(request.url_for("action_invocation", id=self.id))
-        else:
-            href = f"{ACTION_INVOCATIONS_PATH}/{self.id}"
         links = [
-            LinkElement(rel="self", href=href),
-            LinkElement(rel="output", href=href + "/output"),
+            LinkElement(rel="self", href=URLFor("action_invocation", id=self.id)),
+            LinkElement(
+                rel="output", href=URLFor("action_invocation_output", id=self.id)
+            ),
         ]
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
         return self.action.invocation_model(  # type: ignore[attr-defined]
             status=self.status,
             id=self.id,
-            action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
-            href=href,
+            action=self.thing.path + self.action.name,  # type: ignore[call-overload]
+            href=URLFor("action_invocation", id=self.id),
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
@@ -424,7 +424,7 @@ class ActionManager:
         :return: A list of invocations, optionally filtered by Thing and/or Action.
         """
         return [
-            i.response(request=request)
+            i.response()
             for i in self.invocations
             if thing is None or i.thing == thing
             if action is None or i.action == action
@@ -470,7 +470,7 @@ class ActionManager:
             """
             try:
                 with self._invocations_lock:
-                    return self._invocations[id].response(request=request)
+                    return self._invocations[id].response()
             except KeyError as e:
                 raise HTTPException(
                     status_code=404,
@@ -772,7 +772,6 @@ class ActionDescriptor(
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
         def start_action(
-            request: Request,
             body: Any,  # This annotation will be overwritten below.
             id: NonWarningInvocationID,
             background_tasks: BackgroundTasks,
@@ -787,7 +786,7 @@ class ActionDescriptor(
                 id=id,
             )
             background_tasks.add_task(action_manager.expire_invocations)
-            return action.response(request=request)
+            return action.response()
 
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)

@@ -245,7 +245,6 @@ def test_blob_output_inserver(client):
 
 def check_blob(output, expected_content: bytes):
     """Test that a BlobOutput can be retrieved in three ways"""
-    print(f"Testing blob output {output} which has attributes {output.__dict__}")
     assert output.content == expected_content
     with TemporaryDirectory() as dir:
         output.save(os.path.join(dir, "test_output"))
