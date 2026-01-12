@@ -17,7 +17,11 @@ from labthings_fastapi.testing import create_thing_without_server, use_dummy_url
 
 
 class TextBlob(lt.blob.Blob):
-    media_type: str = "text/plain"
+    media_type = "text/plain"
+
+
+class VagueTextBlob(lt.blob.Blob):
+    media_type = "text/*"
 
 
 class ThingOne(lt.Thing):
@@ -92,6 +96,23 @@ def test_blob_type():
         lt.blob.blob_type(media_type="text/plain\\'DROP TABLES")
     M = lt.blob.blob_type(media_type="text/plain")
     assert M.from_bytes(b"").media_type == "text/plain"
+
+
+def test_blob_schema():
+    """Check that the Blob schema is as expected."""
+    schema = TypeAdapter(TextBlob).json_schema()
+    assert schema["title"] == "TextBlob"
+    assert schema["type"] == "object"
+    assert "href" in schema["properties"]
+    assert "media_type" in schema["properties"]
+    assert schema["properties"]["media_type"]["default"] == "text/plain"
+    # Since media_type is specific, it should have a const constraint
+    assert schema["properties"]["media_type"]["const"] == ["text/plain"]
+
+    # Check that a vague blob type has no const constraint
+    # This is because multiple media types are valid - it ends with *
+    schema = TypeAdapter(VagueTextBlob).json_schema()
+    assert "const" not in schema["properties"]["media_type"]
 
 
 def test_blob_creation():

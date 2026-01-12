@@ -60,7 +60,9 @@ import httpx
 from pydantic import (
     BaseModel,
     GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
 )
+from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Self
 from labthings_fastapi.middleware.url_for import url_for
@@ -443,6 +445,13 @@ class Blob:
         This magic method allows `pydantic` to serialise `.Blob`
         instances, and generate a JSONSchema for them.
 
+        We tell `pydantic` to base its handling of `Blob` on the
+        `.BlobModel` schema, but to use our custom validator and
+        serialiser, defined later as class methods.
+
+        We will tweak the generated JSONSchema in `__get_pydantic_json_schema__`
+        to include the media_type and description defaults.
+
         The representation of a `.Blob` in JSON is described by
         `.BlobModel` and includes the ``href`` and ``media_type`` properties
         as well as a description.
@@ -474,6 +483,31 @@ class Blob:
                 when_used="always",
             ),
         )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Customise the JSON Schema to include the media_type.
+
+        :param core_schema: The core schema for the Blob type.
+        :param handler: The pydantic JSON schema handler.
+        :return: The JSON schema for the Blob type, with media_type included.
+        """
+        json_schema = handler(core_schema)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        # Set the title to the class name, not BlobModel
+        json_schema["title"] = cls.__name__
+        # Add the media_type default value from this class
+        json_schema["properties"]["media_type"]["default"] = cls.media_type
+        # If the media_type is specific, add a const constraint
+        # This shows that only this media_type is valid
+        if "*" not in cls.media_type:
+            json_schema["properties"]["media_type"]["const"] = [cls.media_type]
+        # Add the default description
+        if cls.description is not None:
+            json_schema["properties"]["description"]["default"] = cls.description
+        return json_schema
 
     @classmethod
     def _validate(cls, value: Any, handler: Callable[[Any], BlobModel]) -> Self:
