@@ -217,7 +217,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop2.setter
-    def set_intprop2(self, value: int) -> None:
+    def _set_intprop2(self, value: int) -> None:
         """Setter for intprop2."""
         pass
 
@@ -232,7 +232,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop3.setter
-    def set_intprop3(self, value: str) -> None:
+    def _set_intprop3(self, value: str) -> None:
         """Setter for intprop3. It's got the wrong type so should fail."""
         pass
 
@@ -246,7 +246,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @fprop.setter
-    def set_fprop(self, value: int) -> None:
+    def _set_fprop(self, value: int) -> None:
         """Setter for fprop. Type checking should pass."""
         pass
 

@@ -36,7 +36,7 @@ class ThingWithSettings(lt.Thing):
         return self._floatsetting
 
     @floatsetting.setter
-    def floatsetting(self, value: float):
+    def _set_floatsetting(self, value: float):
         self._floatsetting = value
 
     @lt.setting
@@ -50,7 +50,7 @@ class ThingWithSettings(lt.Thing):
         return self._localonlysetting
 
     @localonlysetting.setter
-    def localonlysetting(self, value: str):
+    def _set_localonlysetting(self, value: str):
         self._localonlysetting = value
 
     localonlysetting.readonly = True

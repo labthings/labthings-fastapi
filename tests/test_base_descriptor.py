@@ -266,13 +266,13 @@ def test_decorator_different_names():
                 return False
 
             @prop1.setter
-            def set_prop1(self, val):
+            def _set_prop1(self, val):
                 pass
 
     # The exception occurs at the end of the class definition, so check we include
     # the property names.
     assert "prop1" in str(excinfo.value)
-    assert "set_prop1" in str(excinfo.value)
+    assert "_set_prop1" in str(excinfo.value)
 
     # For good measure, check reuse across classes is also prevented.
     class FirstExampleClass:

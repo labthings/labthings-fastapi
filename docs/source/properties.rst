@@ -83,11 +83,15 @@ Functional properties may also have a "setter" method, which is called when the 
             return self.my_property * 2
 
         @twice_my_property.setter
-        def twice_my_property(self, value: int):
+        def _set_twice_my_property(self, value: int):
             """Set the value of twice_my_property."""
             self.my_property = value // 2
 
-Adding a setter makes the property read-write (if only a getter is present, it must be read-only). 
+Adding a setter makes the property read-write (if only a getter is present, it must be read-only).
+
+.. note::
+
+    The setter method for regular Python properties is usually named the same as the property itself (e.g. ``def twice_my_property(self, value: int)``). Unfortunately, doing this with LabThings properties causes problems for static type checkers such as `mypy`\ . We therefore recommend you prefix setters with ``_set_`` (e.g. ``def _set_twice_my_property(self, value: int)``). This is optional, and doesn't change the way the property works - but it is useful if you need `mypy` to work on your code, and don't want to ignore every property setter.
 
 It is possible to make a property read-only for clients by setting its ``readonly`` attribute: this has the same behaviour as for data properties.
 
@@ -105,7 +109,7 @@ It is possible to make a property read-only for clients by setting its ``readonl
             return self.my_property * 2
 
         @twice_my_property.setter
-        def twice_my_property(self, value: int):
+        def _set_twice_my_property(self, value: int):
             """Set the value of twice_my_property."""
             self.my_property = value // 2
 
@@ -143,7 +147,7 @@ We can modify the previous example to show how to add constraints to both data a
             return self._humidity
 
         @humidity.setter
-        def humidity(self, value: float):
+        def _set_humidity(self, value: float):
             """Set the current humidity percentage."""
             self._humidity = value
 

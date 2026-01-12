@@ -124,7 +124,7 @@ class DescriptorAddedToClassTwiceError(RuntimeError):
                 return True
 
             @prop4.setter
-            def set_prop4(self, val):
+            def _set_prop4(self, val):
                 "A setter for prop4 that is not named prop4."
                 pass
 

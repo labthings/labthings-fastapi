@@ -271,14 +271,14 @@ def test_decorator_exception():
             """An example getter."""
 
         @prop.setter
-        def set_prop(self, val: bool) -> None:
+        def _set_prop(self, val: bool) -> None:
             """A setter named differently."""
             pass
 
     assert isinstance(Example.prop, FunctionalProperty)
     assert Example.prop.name == "prop"
-    assert not isinstance(Example.set_prop, FunctionalProperty)
-    assert callable(Example.set_prop)
+    assert not isinstance(Example._set_prop, FunctionalProperty)
+    assert callable(Example._set_prop)
 
 
 def test_premature_api_and_affordance(mocker):
