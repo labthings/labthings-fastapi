@@ -25,7 +25,7 @@ class ThingOne(lt.Thing):
         return self._a
 
     @a.setter
-    def a(self, value):
+    def _set_a(self, value):
         self._a = value
 
     @property

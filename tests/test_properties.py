@@ -44,7 +44,7 @@ class PropertyTestThing(lt.Thing):
         return self._float
 
     @floatprop.setter
-    def floatprop(self, value: float):
+    def _set_floatprop(self, value: float):
         self._float = value
 
     @lt.action
@@ -82,7 +82,7 @@ class PropertyTestThing(lt.Thing):
         return self._constrained_functional_int
 
     @constrained_functional_int.setter
-    def set_constrained_functional_int(self, value: int):
+    def _set_constrained_functional_int(self, value: int):
         self._constrained_functional_int = value
 
     constrained_functional_int.constraints = {"ge": 0, "le": 10}
@@ -92,7 +92,7 @@ class PropertyTestThing(lt.Thing):
         return self._constrained_functional_str_setting
 
     @constrained_functional_str_setting.setter
-    def set_constrained_functional_str_setting(self, value: str):
+    def _set_constrained_functional_str_setting(self, value: str):
         self._constrained_functional_str_setting = value
 
     constrained_functional_str_setting.constraints = {

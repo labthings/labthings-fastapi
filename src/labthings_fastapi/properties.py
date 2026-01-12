@@ -27,7 +27,7 @@ Properties can be defined in two ways as shown below:
             return self.target - self.count
 
         @remaining.setter
-        def remaining(self, value: int) -> None:
+        def _set_remaining(self, value: int) -> None:
             self.target = self.count + value
 
 The first two properties are simple variables: they may be read and assigned
@@ -740,7 +740,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
                     return self._myprop
 
                 @myprop.setter
-                def set_myprop(self, val: int) -> None:
+                def _set_myprop(self, val: int) -> None:
                     self._myprop = val
 
                 myprop.readonly = True  # Prevent client code from setting it
@@ -753,7 +753,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
             ``mypy`` raising an error that the getter has been redefined with a
             different type. The behaviour is identical whether the setter and getter
             have the same name or not. The only difference is that the `.Thing`
-            will have an additional method called ``set_myprop`` in the example
+            will have an additional method called ``_set_myprop`` in the example
             above.
 
         :param fset: The new setter function.

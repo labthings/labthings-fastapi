@@ -31,7 +31,7 @@ class ThingWithProperties(lt.Thing):
         return 0
 
     @funcprop.setter
-    def set_funcprop(self, val: int) -> None:
+    def _set_funcprop(self, val: int) -> None:
         pass
 
     @lt.action

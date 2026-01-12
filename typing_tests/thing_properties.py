@@ -217,7 +217,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop2.setter
-    def set_intprop2(self, value: int) -> None:
+    def _set_intprop2(self, value: int) -> None:
         """Setter for intprop2."""
         pass
 
@@ -232,7 +232,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @intprop3.setter
-    def set_intprop3(self, value: str) -> None:
+    def _set_intprop3(self, value: str) -> None:
         """Setter for intprop3. It's got the wrong type so should fail."""
         pass
 
@@ -246,7 +246,7 @@ class TestFunctionalProperty(lt.Thing):
         return 0
 
     @fprop.setter
-    def set_fprop(self, value: int) -> None:
+    def _set_fprop(self, value: int) -> None:
         """Setter for fprop. Type checking should pass."""
         pass
 
@@ -256,7 +256,7 @@ class TestFunctionalProperty(lt.Thing):
         return "Hello world!"
 
     @strprop.setter  # type: ignore[no-redef]
-    def strprop(self, val: str) -> None:
+    def _set_strprop(self, val: str) -> None:
         """A setter with the same name as the getter.
 
         This is the convention for `builtins.property` but `mypy` does not
