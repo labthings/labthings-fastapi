@@ -1,7 +1,9 @@
 """Test harnesses to help with writitng tests for things.."""
 
 from __future__ import annotations
+from collections.abc import Iterator
 from concurrent.futures import Future
+from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,6 +20,7 @@ from unittest.mock import Mock
 from .utilities import class_attributes
 from .thing_slots import ThingSlot
 from .thing_server_interface import ThingServerInterface
+from .middleware.url_for import set_url_for_context, dummy_url_for
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -217,3 +220,10 @@ def _mock_slots(thing: Thing) -> None:
     for _attr_name, attr in class_attributes(thing):
         if isinstance(attr, ThingSlot):
             attr.connect(thing, mocks, ...)
+
+
+@contextmanager
+def use_dummy_url_for() -> Iterator[None]:
+    """Use the dummy URL for function in the context variable."""
+    with set_url_for_context(dummy_url_for):
+        yield
