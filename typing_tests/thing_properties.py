@@ -256,7 +256,7 @@ class TestFunctionalProperty(lt.Thing):
         return "Hello world!"
 
     @strprop.setter  # type: ignore[no-redef]
-    def _set_strprop(self, val: str) -> None:
+    def strprop(self, val: str) -> None:
         """A setter with the same name as the getter.
 
         This is the convention for `builtins.property` but `mypy` does not
