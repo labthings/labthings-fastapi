@@ -6,6 +6,7 @@ import os
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
+import fastapi
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
 from pydantic_core import PydanticSerializationError
@@ -21,6 +22,7 @@ class TextBlob(lt.blob.Blob):
 
 class VagueTextBlob(lt.blob.Blob):
     media_type = "text/*"
+    description = "This URL will download some vague text data."
 
 
 class ThingOne(lt.Thing):
@@ -111,10 +113,17 @@ def test_media_type_parsing(media_type, expected):
     assert lt.blob.parse_media_type(media_type) == expected
 
 
-@pytest.mark.parametrize("media_type", ["too/many/slashes", "noslash", "*/plain"])
-def test_invalid_media_type_parsing(media_type):
+@pytest.mark.parametrize(
+    ("media_type", "msg"),
+    [
+        ("too/many/slashes", "exactly one '/'"),
+        ("/leadingslash", "both type and subtype"),
+        ("*/plain", "has no type"),
+    ],
+)
+def test_invalid_media_type_parsing(media_type, msg):
     """Check that invalid media types raise an error."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=msg):
         lt.blob.parse_media_type(media_type)
 
 
@@ -136,6 +145,29 @@ def test_media_type_matching(data_media_type, blob_media_type, expected):
     assert lt.blob.match_media_types(data_media_type, blob_media_type) is expected
 
 
+def test_blobdata_base_class():
+    """Check that BlobData/LocalBlobData abstract methods raise the right error."""
+    bd = lt.blob.BlobData("*/*")
+    with pytest.raises(NotImplementedError):
+        _ = bd.content
+    with pytest.raises(NotImplementedError):
+        _ = bd.open()
+    with pytest.raises(NotImplementedError):
+        bd.save("somefile")
+    with pytest.raises(NotImplementedError):
+        _ = bd.get_href()
+
+    lbd = lt.blob.LocalBlobData(media_type="text/plain")
+    with pytest.raises(NotImplementedError):
+        _ = lbd.content
+    with pytest.raises(NotImplementedError):
+        _ = lbd.open()
+    with pytest.raises(NotImplementedError):
+        lbd.save("somefile")
+    with pytest.raises(NotImplementedError):
+        _ = lbd.response()
+
+
 def test_blob_schema():
     """Check that the Blob schema is as expected."""
     schema = TypeAdapter(TextBlob).json_schema()
@@ -151,6 +183,9 @@ def test_blob_schema():
     # This is because multiple media types are valid - it ends with *
     schema = TypeAdapter(VagueTextBlob).json_schema()
     assert "const" not in schema["properties"]["media_type"]
+    assert schema["properties"]["description"]["default"] == (
+        "This URL will download some vague text data."
+    )
 
 
 def test_blob_initialisation():
@@ -203,10 +238,26 @@ def test_blob_creation():
     assert blob.to_blobmodel().href == "https://example.com/blob"
 
 
+def test_blob_data_manager():
+    """Check blobs appear in the data manager."""
+    blob = TextBlob.from_bytes(b"Some Data")
+    data = blob.data
+    assert isinstance(data, lt.blob.LocalBlobData)
+    id = data.id
+    assert lt.blob.blob_data_manager.get_blob(id) is data
+    with pytest.raises(ValueError):
+        lt.blob.blob_data_manager.add_blob(data)
+    del data
+    del blob
+    # Check that the blob doesn't linger due to references
+    with pytest.raises(KeyError):
+        lt.blob.blob_data_manager.get_blob(id)
+
+
 def test_blob_serialisation():
     """Check that blobs may be serialised."""
     blob = TextBlob.from_bytes(b"Some data")
-    # Can't serialise a blob (with data) without a BlobDataManager
+    # Can't serialise a blob (with data) without url_for in the context
     with pytest.raises(PydanticSerializationError):
         TypeAdapter(TextBlob).dump_python(blob)
     # Fake the required context variable, and it should work
@@ -215,6 +266,14 @@ def test_blob_serialisation():
     assert data["href"].startswith("urlfor://download_blob/?blob_id=")
     assert data["media_type"] == "text/plain"
 
+    vagueblob = VagueTextBlob.from_bytes(b"Some data")
+    # VagueTextBlob has a customised description that should be included
+    with use_dummy_url_for():
+        data = TypeAdapter(VagueTextBlob).dump_python(vagueblob)
+    assert data["href"].startswith("urlfor://download_blob/?blob_id=")
+    assert data["media_type"] == "text/*"
+    assert data["description"] == "This URL will download some vague text data."
+
     # Blobs that already refer to a remote URL should serialise without error.
     remoteblob = TextBlob.from_url(
         href="https://example/",
@@ -222,6 +281,36 @@ def test_blob_serialisation():
     data = TypeAdapter(TextBlob).dump_python(remoteblob)
     assert data["href"] == "https://example/"
     assert data["media_type"] == "text/plain"
+
+
+def test_blob_download():
+    """Check that blob downloading works as expected."""
+    # We use a bare FastAPI app to do an isolated test
+    app = fastapi.FastAPI()
+    # # This is needed to generate download URLs
+    # app.middleware("http")(url_for.url_for_middleware)
+
+    # @app.get("/blob_json/")
+    # def blob_json() -> TextBlob:
+    #     return TextBlob.from_bytes(b"Blob JSON!")
+
+    @app.get("/download_blob/")
+    def download_blob():
+        blob = TextBlob.from_bytes(b"Download me!")
+        return blob.response()
+
+    with TestClient(app) as client:
+        response = client.get("/download_blob/")
+        assert response.status_code == 200
+        assert response.content == b"Download me!"
+        assert response.headers["content-type"].startswith("text/plain")
+
+    # Remote blobs can't be downloaded yet. There's no need to do this
+    # within a server, as the error is the same either way (and it's
+    # much easier to catch here).
+    remote = TextBlob.from_url(href="https://example.com/remote_blob")
+    with pytest.raises(NotImplementedError):
+        _ = remote.response()
 
 
 def test_blob_output_client(client):
