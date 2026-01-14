@@ -216,9 +216,6 @@ class Invocation(Thread):
         its status, any log entries, a return value (if completed), and a link
         to poll for updates.
 
-        :param request: is used to generate the ``href`` in the response, which
-            should retrieve an updated version of this response.
-
         :return: an `.InvocationModel` representing this `.Invocation`.
         """
         links = [

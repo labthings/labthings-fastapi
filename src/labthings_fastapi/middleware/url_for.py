@@ -197,7 +197,7 @@ class URLFor:
         :param value: The value to validate.
         :param handler: The handler to convert the value if needed.
         :return: The validated URLFor instance.
-        :raises TypeError: if the value is not a URLFor instance.
+        :raises ValueError: if the value is not a URLFor instance.
         """
         if isinstance(value, cls):
             return value
