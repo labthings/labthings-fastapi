@@ -1,4 +1,4 @@
-"""BLOB Output Module.
+r"""BLOB Output Module.
 
 The ``.Blob`` class is used when you need to return something file-like that can't
 easily (or efficiently) be converted to JSON. This is useful for returning large objects
@@ -36,6 +36,49 @@ and is not safe for concurrent use, which does not work well with the HTTP API:
 action outputs may be retrieved multiple times after the action has
 completed, possibly concurrently. Creating a temp folder and making a file inside it
 with `.Blob.from_temporary_directory` is the safest way to deal with this.
+
+**Serialisation**
+
+`.Blob` objects are serialised to a JSON representation that includes a download
+``href``\ . This is generated using `.middleware.url_for` which uses a context
+variable to pass the function that generates URLs to the serialiser code. That
+context variable is available in every response handler function in the FastAPI
+app - but it is not, in general, available in action or property code (because
+actions and properties run their code in separate threads). The sequence of events
+that leads to a `Blob` being downloaded as a result of an action is roughly:
+
+* A `POST` request invokes the action.
+    * `.middleware.url_for.url_for_middleware` makes `url_for` accessible via
+        a context variable
+    * A `201` response is returned that includes an ``href`` to poll the action.
+    * Action code is run in a separate thread (without `url_for` in the context):
+        * The action creates a `.Blob` object.
+        * The function that creates the `.Blob` object also creates a `.BlobData`
+            object as a property of the `.Blob`
+        * The `.BlobData` object's constructor adds it to the ``blob_manager`` and
+            sets its ``id`` property accordingly.
+        * The `.Blob` is returned by the action.
+    * The output value of the action is stored in the `.Invocation` thread.
+* A `GET` request polls the action. Once it has completed:
+    * `.middleware.url_for.url_for_middleware` makes `url_for` accessible via
+        a context variable
+    * The `.Invocation` model is returned, which includes the `.Blob` in the
+        ``output`` field.
+    * FastAPI serialises the invocation model, which in turn serialises the `.Blob`
+        and uses ``url_for`` to generate a valid download ``href`` including the ``id``
+        of the `.BlobData` object.
+* A further `GET` request actually downloads the `.Blob`\ .
+
+This slightly complicated sequence ensures that we only ever send URLs back to the
+client using `url_for` from the current `.fastapi.Request` object. That means the
+URL used should be consistent with the URL of the request - so if an action is
+started by a client using one IP address or DNS name, and polled by a different
+client, each client will get a download ``href`` that matches the address they are
+already using.
+
+In the future, it may be possible to respond directly with the `.Blob` data to
+the original `POST` request, however this only works for quick actions so for now
+we use the sequence above, which will work for both quick and slow actions.
 """
 
 from __future__ import annotations
