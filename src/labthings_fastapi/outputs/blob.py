@@ -408,7 +408,7 @@ class BlobModel(BaseModel):
     """This description is added to the serialised `.Blob`."""
 
 
-def parse_media_type(media_type: str) -> tuple[str | None, str | None]:
+def parse_media_type(media_type: str) -> tuple[str, str]:
     """Parse a media type string into its type and subtype.
 
     :param media_type: the media type string to parse.
@@ -416,8 +416,6 @@ def parse_media_type(media_type: str) -> tuple[str | None, str | None]:
     :return: a tuple of (type, subtype) where each is a string or None.
     :raises ValueError: if the media type is invalid.
     """
-    if not media_type:
-        return None, None
     # Ignore leading whitespace and parameters (after a ;)
     media_type = media_type.strip().split(";")[0]
     # We expect a type and subtype separated with a /
