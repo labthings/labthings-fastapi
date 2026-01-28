@@ -445,10 +445,7 @@ class ActionManager:
             i.response(request=request)
             for i in self.invocations
             if thing is None or i.thing == thing
-            if action is None or i.action == action  # type: ignore[call-overload]
-            # i.action evaluates to an ActionDescriptor, which confuses mypy - it
-            # thinks we are calling ActionDescriptor.__get__ but this isn't ever
-            # called.
+            if action is None or i.action == action
         ]
 
     def expire_invocations(self) -> None:
@@ -691,7 +688,7 @@ class ActionDescriptor(
         )
         self.invocation_model.__name__ = f"{name}_invocation"
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[OwnerT], name: str) -> None:
         """Ensure the action name matches the function name.
 
         It's assumed in a few places that the function name and the
@@ -709,7 +706,7 @@ class ActionDescriptor(
                 f"'{self.func.__name__}'",
             )
 
-    def instance_get(self, obj: Thing) -> Callable[ActionParams, ActionReturn]:
+    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
         """Return the function, bound to an object as for a normal method.
 
         This currently doesn't validate the arguments, though it may do so
@@ -721,10 +718,7 @@ class ActionDescriptor(
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        # `obj` should be of type `OwnerT`, but `BaseDescriptor` currently
-        # isn't generic in the type of the owning Thing, so we can't express
-        # that here.
-        return partial(self.func, obj)  # type: ignore[arg-type]
+        return partial(self.func, obj)
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.
