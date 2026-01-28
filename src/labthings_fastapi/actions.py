@@ -247,10 +247,10 @@ class Invocation(Thread):
         ]
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
-        return self.action.invocation_model(  # type: ignore[call-overload]
+        return self.action.invocation_model(  # type: ignore[attr-defined]
             status=self.status,
             id=self.id,
-            action=self.thing.path + self.action.name,  # type: ignore[call-overload]
+            action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
             href=href,
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
@@ -290,7 +290,7 @@ class Invocation(Thread):
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
-        action: ActionDescriptor = self.action  # type: ignore[call-overload]
+        action: ActionDescriptor = self.action  # type: ignore[assignment]
         logger = self.thing.logger
         # The line below saves records matching our ID to ``self._log``
         add_thing_log_destination(self.id, self._log)
@@ -626,7 +626,7 @@ OwnerT = TypeVar("OwnerT", bound="Thing")
 
 
 class ActionDescriptor(
-    BaseDescriptor[Callable[ActionParams, ActionReturn]],
+    BaseDescriptor[OwnerT, Callable[ActionParams, ActionReturn]],
     Generic[ActionParams, ActionReturn, OwnerT],
 ):
     """Wrap actions to enable them to be run over HTTP.

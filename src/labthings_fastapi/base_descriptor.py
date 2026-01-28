@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""
 
+Owner = TypeVar("Owner", bound="Thing")
+"""A Thing subclass that owns a descriptor."""
+
+Descriptor = TypeVar("Descriptor", bound="BaseDescriptor")
+"""The type of a descriptor that's referred to by a `BaseDescriptorInfo` object."""
+
 
 class DescriptorNotAddedToClassError(RuntimeError):
     """Descriptor has not yet been added to a class.
@@ -138,7 +144,7 @@ class DescriptorAddedToClassTwiceError(RuntimeError):
     """
 
 
-class BaseDescriptor(Generic[Value]):
+class BaseDescriptor(Generic[Owner, Value]):
     r"""A base class for descriptors in LabThings-FastAPI.
 
     This class implements several behaviours common to descriptors in LabThings:
@@ -306,12 +312,12 @@ class BaseDescriptor(Generic[Value]):
     # I have ignored D105 (missing docstrings) on the overloads - these should not
     # exist on @overload definitions.
     @overload
-    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...
+    def __get__(self, obj: Owner, type: type | None = None) -> Value: ...
 
     @overload
     def __get__(self, obj: None, type: type) -> Self: ...
 
-    def __get__(self, obj: Thing | None, type: type | None = None) -> Value | Self:
+    def __get__(self, obj: Owner | None, type: type | None = None) -> Value | Self:
         """Return the value or the descriptor, as per `property`.
 
         If ``obj`` is ``None`` (i.e. the descriptor is accessed as a class attribute),
@@ -331,7 +337,7 @@ class BaseDescriptor(Generic[Value]):
             return self.instance_get(obj)
         return self
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Return the value of the descriptor.
 
         This method is called from ``__get__`` if the descriptor is accessed as an
@@ -357,7 +363,7 @@ class BaseDescriptor(Generic[Value]):
         )
 
 
-class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
+class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Value]):
     """A BaseDescriptor that determines its type like a dataclass field."""
 
     def __init__(self) -> None:

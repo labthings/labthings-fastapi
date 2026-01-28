@@ -66,7 +66,7 @@ def strprop(self: typing.Any) -> str:
     return "foo"
 
 
-assert_type(strprop, FunctionalProperty[str])
+assert_type(strprop, FunctionalProperty[typing.Any, str])
 
 
 class TestPropertyDefaultsMatch(lt.Thing):
@@ -138,34 +138,38 @@ class TestExplicitDescriptor(lt.Thing):
     the underlying class as well.
     """
 
-    intprop1 = lt.DataProperty[int](default=0)
+    intprop1 = lt.DataProperty["TestExplicitDescriptor", int](default=0)
     """A DataProperty that should not cause mypy errors."""
 
-    intprop2 = lt.DataProperty[int](default_factory=int_factory)
+    intprop2 = lt.DataProperty["TestExplicitDescriptor", int](
+        default_factory=int_factory
+    )
     """The factory matches the type hint, so this should be OK."""
 
-    intprop3 = lt.DataProperty[int](default_factory=optional_int_factory)
-    """Uses a factory function that doesn't match the type hint.
-    
-    This ought to cause mypy to throw an error, as the factory function can
-    return None, but at time of writing this doesn't happen.
-    
-    This error is caught correctly when called via `lt.property`.
-    """
+    intprop3 = lt.DataProperty["TestExplicitDescriptor", int](
+        default_factory=optional_int_factory
+    )  # type: ignore[arg-type]
+    """Uses a factory function that doesn't match the type hint."""
 
-    intprop4 = lt.DataProperty[int](default="foo")  # type: ignore[call-overload]
+    intprop4 = lt.DataProperty["TestExplicitDescriptor", int](default="foo")  # type: ignore[call-overload]
     """This property should cause an error, as the default is a string."""
 
-    intprop5 = lt.DataProperty[int]()  # type: ignore[call-overload]
+    intprop5 = lt.DataProperty["TestExplicitDescriptor", int]()  # type: ignore[call-overload]
     """This property should cause mypy to throw an error, as it has no default."""
 
-    optionalintprop1 = lt.DataProperty[int | None](default=None)
+    optionalintprop1 = lt.DataProperty["TestExplicitDescriptor", int | None](
+        default=None
+    )
     """A DataProperty that should not cause mypy errors."""
 
-    optionalintprop2 = lt.DataProperty[int | None](default_factory=optional_int_factory)
+    optionalintprop2 = lt.DataProperty["TestExplicitDescriptor", int | None](
+        default_factory=optional_int_factory
+    )
     """This property should not cause mypy errors: the factory matches the type hint."""
 
-    optionalintprop3 = lt.DataProperty[int | None](default_factory=int_factory)
+    optionalintprop3 = lt.DataProperty["TestExplicitDescriptor", int | None](
+        default_factory=int_factory
+    )
     """Uses a factory function that is a subset of the type hint."""
 
 
@@ -181,19 +185,21 @@ assert_type(test_explicit_descriptor.optionalintprop2, int | None)
 assert_type(test_explicit_descriptor.optionalintprop3, int | None)
 
 # Check class attributes are typed correctly.
-assert_type(TestExplicitDescriptor.intprop1, lt.DataProperty[int])
-assert_type(TestExplicitDescriptor.intprop2, lt.DataProperty[int])
-assert_type(TestExplicitDescriptor.intprop3, lt.DataProperty[int])
+cls: typing.TypeAlias = TestExplicitDescriptor
+assert_type(cls.intprop1, lt.DataProperty[cls, int])
+assert_type(cls.intprop2, lt.DataProperty[cls, int])
+assert_type(cls.intprop3, lt.DataProperty[cls, int])
 
-assert_type(TestExplicitDescriptor.optionalintprop1, lt.DataProperty[int | None])
-assert_type(TestExplicitDescriptor.optionalintprop2, lt.DataProperty[int | None])
-assert_type(TestExplicitDescriptor.optionalintprop3, lt.DataProperty[int | None])
+assert_type(cls.optionalintprop1, lt.DataProperty[cls, int | None])
+assert_type(cls.optionalintprop2, lt.DataProperty[cls, int | None])
+assert_type(cls.optionalintprop3, lt.DataProperty[cls, int | None])
 
 
+Owner = typing.TypeVar("Owner", bound=lt.Thing)
 Val = typing.TypeVar("Val")
 
 
-def f_property(getter: typing.Callable[..., Val]) -> FunctionalProperty[Val]:
+def f_property(getter: typing.Callable[[Owner], Val]) -> FunctionalProperty[Owner, Val]:
     """A function that returns a FunctionalProperty with a getter."""
     return FunctionalProperty(getter)
 
@@ -231,7 +237,7 @@ class TestFunctionalProperty(lt.Thing):
         """This getter is fine, but the setter should fail type checking."""
         return 0
 
-    @intprop3.setter
+    @intprop3.setter  # type: ignore[arg-type]
     def _set_intprop3(self, value: str) -> None:
         """Setter for intprop3. It's got the wrong type so should fail."""
         pass
@@ -267,15 +273,16 @@ class TestFunctionalProperty(lt.Thing):
         pass
 
 
-assert_type(TestFunctionalProperty.intprop1, FunctionalProperty[int])
-assert_type(TestFunctionalProperty.intprop2, FunctionalProperty[int])
-assert_type(TestFunctionalProperty.intprop3, FunctionalProperty[int])
-assert_type(TestFunctionalProperty.fprop, FunctionalProperty[int])
+cls1: typing.TypeAlias = TestFunctionalProperty
+assert_type(cls1.intprop1, FunctionalProperty[cls1, int])
+assert_type(cls1.intprop2, FunctionalProperty[cls1, int])
+assert_type(cls1.intprop3, FunctionalProperty[cls1, int])
+assert_type(cls1.fprop, FunctionalProperty[cls1, int])
 # Don't check ``strprop`` because it caused an error and thus will
 # not have the right type, even though the error is ignored.
 
-test_functional_property = create_thing_without_server(TestFunctionalProperty)
-assert_type(test_functional_property, TestFunctionalProperty)
+test_functional_property = create_thing_without_server(cls1)
+assert_type(test_functional_property, cls1)
 assert_type(test_functional_property.intprop1, int)
 assert_type(test_functional_property.intprop2, int)
 assert_type(test_functional_property.intprop3, int)
