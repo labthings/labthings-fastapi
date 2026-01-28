@@ -190,7 +190,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         self._set_name_called: bool = False
         self._owner_name: str = ""
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
         r"""Take note of the name to which the descriptor is assigned.
 
         This is called when the descriptor is assigned to an attribute of a class.
@@ -385,7 +385,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         # the object on which they are defined, to provide the context for the
         # evaluation.
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
         r"""Take note of the name and type.
 
         This function is where we determine the type of the property. It may
