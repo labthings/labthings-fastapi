@@ -18,7 +18,7 @@ from weakref import WeakKeyDictionary, ref, ReferenceType
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
-from .exceptions import MissingTypeError, InconsistentTypeError
+from .exceptions import MissingTypeError, InconsistentTypeError, NotBoundToInstanceError
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -31,6 +31,9 @@ Owner = TypeVar("Owner", bound="Thing")
 
 Descriptor = TypeVar("Descriptor", bound="BaseDescriptor")
 """The type of a descriptor that's referred to by a `BaseDescriptorInfo` object."""
+
+DescriptorInfoT = TypeVar("DescriptorInfoT", bound="BaseDescriptorInfo")
+"""The type of `.BaseDescriptorInfo` returned by a descriptor"""
 
 
 class DescriptorNotAddedToClassError(RuntimeError):
@@ -144,6 +147,122 @@ class DescriptorAddedToClassTwiceError(RuntimeError):
     """
 
 
+class BaseDescriptorInfo(Generic[Descriptor, Owner, Value]):
+    r"""A class that describes a `BaseDescriptor`\ .
+
+    This class is used internally by LabThings to describe :ref:`properties`\ ,
+    :ref:`actions`\ , and other attributes of a `.Thing`\ . It's not usually
+    encountered directly by someone using LabThings, except as a base class for
+    `.Action`\ , `.Property` and others.
+
+    LabThings uses descriptors to represent the :ref:`affordances` of a `.Thing`\ .
+    However, passing descriptors around isn't very elegant for two reasons:
+
+    * Holding references to Descriptor objects can confuse static type checkers.
+    * Descriptors are attached to a *class* but do not know which *object* they
+        are defined on.
+
+    This class allows the attributes of a descriptor to be accessed, and holds
+    a reference to the underlying descriptor and its owning class. It may
+    optionally hold a reference to a `.Thing` instance, in which case it is
+    said to be "bound". This means there's no need to separately pass the `.Thing`
+    along with the descriptor, which should help keep things simple in several
+    places in the code.
+    """
+
+    @overload
+    def __init__(self, descriptor: Descriptor, obj: Owner) -> None: ...
+
+    @overload
+    def __init__(self, descriptor: Descriptor, obj: None, cls: type[Owner]) -> None: ...
+
+    def __init__(
+        self, descriptor: Descriptor, obj: Owner | None, cls: type[Owner] | None = None
+    ) -> None:
+        r"""Initialise a BaseDescriptorInfo object.
+
+        This sets up a BaseDescriptorInfo object, describing ``descriptor`` and
+        optionally bound to ``obj``\ .
+
+        :param descriptor: The descriptor that this object will describe.
+        :param obj: The object to which this `.BaseDescriptorInfo` is bound. If
+            it is `None` (default), the object will be unbound and will refer to
+            the descriptor as attached to the class. This may mean that some
+            methods are unavailable.
+        """
+        self._descriptor_ref = ref(descriptor)
+        if cls is None:
+            if obj is None:
+                raise ValueError("Either `obj` or `cls` must be supplied.")
+            cls = obj.__class__
+        self._descriptor_cls = cls
+        self._bound_to_obj = obj
+
+    @property
+    def owning_class(self) -> type[Owner]:
+        """Retrieve the class the descriptor is attached to."""
+        return self._descriptor_cls
+
+    @property
+    def owning_object(self) -> Owner | None:
+        """Retrieve the object on which the descriptor is being accessed."""
+        return self._bound_to_obj
+
+    @property
+    def is_bound(self) -> bool:
+        """Whether this `BaseDescriptorInfo` object is bound to an instance."""
+        return self._bound_to_obj is not None
+
+    def owning_object_or_error(self) -> Owner:
+        """Return the `.Thing` instance to which we are bound, or raise an error.
+
+        This is mostly a convenience function that saves type-checking boilerplate.
+
+        :raises NotBoundToInstanceError: if the descriptor is not bound.
+        """
+        obj = self._bound_to_obj
+        if obj is None:
+            raise NotBoundToInstanceError("Can't return the object, as we are unbound.")
+        return obj
+
+    def get_descriptor(self) -> Descriptor:
+        """Retrieve the descriptor object.
+
+        :return: The descriptor object
+        """
+        descriptor = self._descriptor_ref()
+        if descriptor is None:
+            msg = "A descriptor was deleted too early. This may be a LabThings Bug."
+            raise RuntimeError(msg)
+        return descriptor
+
+    @property
+    def name(self) -> str:
+        """The name of the descriptor.
+
+        This should be the same as the name of the attribute in Python.
+        """
+        return self.get_descriptor().name
+
+    @property
+    def title(self) -> str:
+        """The title of the descriptor."""
+        return self.get_descriptor().title
+
+    @property
+    def description(self) -> str | None:
+        """A description (usually the docstring) of the descriptor."""
+        return self.get_descriptor().description
+
+    def get(self) -> Value:
+        """Get the value of the descriptor."""
+        if not self.is_bound:
+            msg = "We can't get the value when called on a class."
+            raise NotBoundToInstanceError(msg)
+        descriptor = self.get_descriptor()
+        return descriptor.__get__(self.owning_object_or_error())
+
+
 class BaseDescriptor(Generic[Owner, Value]):
     r"""A base class for descriptors in LabThings-FastAPI.
 
@@ -219,6 +338,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         self._set_name_called = True
         self._name = name
         self._owner_name = owner.__qualname__
+        self._owner_ref = ref(owner)
 
         # Check for docstrings on the owning class, and retrieve the one for
         # this attribute (identified by `name`).
@@ -361,6 +481,49 @@ class BaseDescriptor(Generic[Owner, Value]):
             "__instance_get__ must be defined on BaseDescriptor subclasses. \n\n"
             "See BaseDescriptor.__instance_get__ for details."
         )
+
+    def _descriptor_info(
+        self, info_class: type[DescriptorInfoT], owner: Owner | None = None
+    ) -> DescriptorInfoT:
+        """Return a `BaseDescriptorInfo` object for this descriptor.
+
+        The return value of this function is an object that may be passed around
+        without confusing type checkers, but still allows access to all of its
+        functionality. Essentially, it just misses out ``__get__`` so that it
+        is no longer a Descriptor.
+
+        If ``owner`` is supplied, the returned object is bound to a particular
+        object, and if not it is unbound, i.e. knows only about the class.
+
+        :param info_class: the `.BaseDescriptorInfo` subclass to return.
+        :param owner: The `.Thing` instance to which the return value is bound.
+        :return: An object that may be used to refer to this descriptor.
+        """
+        if owner:
+            return info_class(self, owner)
+        else:
+            self.assert_set_name_called()
+            owning_class = self._owner_ref()
+            if owning_class is None:
+                raise RuntimeError("Class was unexpetedly deleted")
+            return info_class(self, None, owning_class)
+
+    def descriptor_info(
+        self, owner: Owner | None = None
+    ) -> BaseDescriptorInfo[Self, Owner, Value]:
+        """Return a `BaseDescriptorInfo` object for this descriptor.
+
+        This generates an object that refers to the descriptor, optionally
+        bound to a particular object. It's intended to make it easier to pass
+        around references to particular affordances, without needing to retrieve
+        and store Descriptor objects directly (which gets confusing).
+        If ``owner`` is supplied, the returned object is bound to a particular
+        object, and if not it is unbound, i.e. knows only about the class.
+
+        :param owner: The `.Thing` instance to which the return value is bound.
+        :return: An object that may be used to refer to this descriptor.
+        """
+        return self._descriptor_info(BaseDescriptorInfo, owner)
 
 
 class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Value]):
