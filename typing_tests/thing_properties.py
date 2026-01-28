@@ -147,8 +147,8 @@ class TestExplicitDescriptor(lt.Thing):
     """The factory matches the type hint, so this should be OK."""
 
     intprop3 = lt.DataProperty["TestExplicitDescriptor", int](
-        default_factory=optional_int_factory
-    )  # type: ignore[arg-type]
+        default_factory=optional_int_factory,  # type: ignore[arg-type]
+    )
     """Uses a factory function that doesn't match the type hint."""
 
     intprop4 = lt.DataProperty["TestExplicitDescriptor", int](default="foo")  # type: ignore[call-overload]
