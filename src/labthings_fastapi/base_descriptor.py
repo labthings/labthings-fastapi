@@ -437,7 +437,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
             # __orig_class__ is set on generic classes when they are instantiated
             # with a subscripted type. It is not available during __init__, which
             # is why we check for it here.
-            self._type = typing.get_args(self.__orig_class__)[0]
+            self._type = typing.get_args(self.__orig_class__)[1]
             if isinstance(self._type, typing.ForwardRef):
                 raise MissingTypeError(
                     f"{owner}.{name} is a subscripted descriptor, where the "
