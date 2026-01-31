@@ -262,6 +262,14 @@ class BaseDescriptorInfo(Generic[Descriptor, Owner, Value]):
         descriptor = self.get_descriptor()
         return descriptor.__get__(self.owning_object_or_error())
 
+    def set(self, value: Value) -> None:
+        """Set the value of the descriptor."""
+        if not self.is_bound:
+            msg = "We can't set the value when called on a class."
+            raise NotBoundToInstanceError(msg)
+        descriptor = self.get_descriptor()
+        descriptor.__set__(self.owning_object_or_error(), value)
+
 
 class BaseDescriptor(Generic[Owner, Value]):
     r"""A base class for descriptors in LabThings-FastAPI.
@@ -482,6 +490,17 @@ class BaseDescriptor(Generic[Owner, Value]):
             "See BaseDescriptor.__instance_get__ for details."
         )
 
+    def __set__(self, obj: Owner, value: Value) -> None:
+        """Mark the `BaseDescriptor` as a data descriptor.
+
+        Even for read-only descriptors, it's important to define a ``__set__`` method.
+        The presence of this method prevents Python overwriting the descriptor when
+        a value is assigned. This base implementation returns an `AttributeError` to
+        signal that the descriptor is read-only. Overriding it with a method that
+        does not raise an exception will allow the descriptor to be written to.
+        """
+        raise AttributeError("This attribute is read-only.")
+
     def _descriptor_info(
         self, info_class: type[DescriptorInfoT], owner: Owner | None = None
     ) -> DescriptorInfoT:
@@ -524,6 +543,25 @@ class BaseDescriptor(Generic[Owner, Value]):
         :return: An object that may be used to refer to this descriptor.
         """
         return self._descriptor_info(BaseDescriptorInfo, owner)
+
+
+FTDescriptorT = TypeVar("FTDescriptorT", bound="FieldTypedBaseDescriptor")
+
+
+class FieldTypedBaseDescriptorInfo(
+    BaseDescriptorInfo[FTDescriptorT, Owner, Value],
+    Generic[FTDescriptorT, Owner, Value],
+):
+    r"""A description of a `.FieldTypedBaseDescriptor`\ .
+
+    This adds `value_type` to `.BaseDescriptorInfo` so we can fully describe a
+    `.FieldTypedBaseDescriptor`\ .
+    """
+
+    @property
+    def value_type(self) -> type:
+        """The type of the descriptor's value."""
+        return self.get_descriptor().value_type
 
 
 class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Value]):
@@ -694,6 +732,23 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
             )
 
         return self._type
+
+    def descriptor_info(
+        self, owner: Owner | None = None
+    ) -> FieldTypedBaseDescriptorInfo[Self, Owner, Value]:
+        """Return a `BaseDescriptorInfo` object for this descriptor.
+
+        This generates an object that refers to the descriptor, optionally
+        bound to a particular object. It's intended to make it easier to pass
+        around references to particular affordances, without needing to retrieve
+        and store Descriptor objects directly (which gets confusing).
+        If ``owner`` is supplied, the returned object is bound to a particular
+        object, and if not it is unbound, i.e. knows only about the class.
+
+        :param owner: The `.Thing` instance to which the return value is bound.
+        :return: An object that may be used to refer to this descriptor.
+        """
+        return self._descriptor_info(FieldTypedBaseDescriptorInfo, owner)
 
 
 # get_class_attribute_docstrings is a relatively expensive function that
