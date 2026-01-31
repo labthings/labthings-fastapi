@@ -8,7 +8,11 @@ from labthings_fastapi.base_descriptor import (
     get_class_attribute_docstrings,
 )
 from .utilities import raises_or_is_caused_by
-from labthings_fastapi.exceptions import MissingTypeError, InconsistentTypeError
+from labthings_fastapi.exceptions import (
+    MissingTypeError,
+    InconsistentTypeError,
+    NotBoundToInstanceError,
+)
 import labthings_fastapi as lt
 
 
@@ -450,3 +454,56 @@ def test_stringified_vs_unstringified_mismatch():
 
         class Example5:
             field: "int" = FieldTypedBaseDescriptor[lt.Thing, int]()
+
+
+def test_descriptorinfo():
+    """Test that the DescriptorInfo object works as expected."""
+
+    class Example6:
+        intfield: int = FieldTypedBaseDescriptor()
+        """The descriptor's title.
+        
+        A description from a multiline docstring.
+        """
+
+        strprop = BaseDescriptor["Example6", str]()
+
+    intfield_descriptor = Example6.intfield
+    assert isinstance(intfield_descriptor, FieldTypedBaseDescriptor)
+
+    # First, make an unbound info object
+    intfield_info = intfield_descriptor.descriptor_info()
+    assert intfield_info.is_bound is False
+    assert intfield_info.name == "intfield"
+    assert intfield_info.title == "The descriptor's title."
+    assert intfield_info.description == "A description from a multiline docstring."
+    with pytest.raises(NotBoundToInstanceError):
+        intfield_info.get()
+
+    # Next, check the bound version
+    example6 = Example6()
+    intfield_info = intfield_descriptor.descriptor_info(example6)
+    assert intfield_info.is_bound is True
+    assert intfield_info.name == "intfield"
+    assert intfield_info.title == "The descriptor's title."
+    assert intfield_info.description == "A description from a multiline docstring."
+    with pytest.raises(NotImplementedError):
+        # As we're now calling on a bound info object, we should just get the
+        # exception from `BaseDescriptor.instance_get()`, not the unbound error.
+        intfield_info.get()
+    with pytest.raises(AttributeError, match="read-only"):
+        # As we're now calling on a bound info object, we should just get the
+        # exception from `BaseDescriptor.__set__(value)`, not the unbound error.
+        intfield_info.set(10)
+    assert intfield_info.value_type is int
+
+    # Check strprop, which is missing most of the documentation properties and
+    # should not have a value_type.
+    strprop_descriptor = Example6.strprop
+    assert isinstance(strprop_descriptor, BaseDescriptor)
+    strprop_info = strprop_descriptor.descriptor_info()
+    assert strprop_info.name == "strprop"
+    assert strprop_info.title.lower() == "strprop"
+    assert strprop_info.description is None
+    with pytest.raises(AttributeError):
+        _ = strprop_info.value_type

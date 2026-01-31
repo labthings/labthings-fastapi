@@ -164,16 +164,6 @@ class ThingSlot(
         """The name of the Thing that will be connected by default, if any."""
         return self._default
 
-    def __set__(self, obj: "Thing", value: ThingSubclass) -> None:
-        """Raise an error as this is a read-only descriptor.
-
-        :param obj: the `.Thing` on which the descriptor is defined.
-        :param value: the value being assigned.
-
-        :raises AttributeError: this descriptor is not writeable.
-        """
-        raise AttributeError("This descriptor is read-only.")
-
     def _pick_things(
         self,
         things: "Mapping[str, Thing]",
