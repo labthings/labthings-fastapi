@@ -602,6 +602,7 @@ def test_descriptorinfocollection():
     assert collection.is_bound is False
 
     intfield_info = collection["intfield"]
+    assert isinstance(intfield_info, FieldTypedBaseDescriptorInfo)
     assert intfield_info.name == "intfield"
     assert intfield_info.title == "An integer field."
     assert intfield_info.value_type is int
@@ -611,7 +612,7 @@ def test_descriptorinfocollection():
     assert strprop_info.name == "strprop"
     assert strprop_info.title == "A string property."
     with pytest.raises(AttributeError):
-        _ = strprop_info.value_type
+        _ = strprop_info.value_type  # type: ignore
     assert strprop_info.is_bound is False
 
     # A more specific descriptor info type should narrow the collection
@@ -621,10 +622,8 @@ def test_descriptorinfocollection():
     assert set(names) == {"intfield", "another_intfield"}
     assert len(field_typed_collection) == 2
 
-    intfield_info = field_typed_collection["intfield"]
-    assert intfield_info.name == "intfield"
-    assert intfield_info.title == "An integer field."
-    assert intfield_info.value_type is int
+    assert field_typed_collection["intfield"] is intfield_info
+    assert field_typed_collection["another_intfield"] is collection["another_intfield"]
 
     example8 = create_thing_without_server(Example8)
     bound_collection = example8.base_descriptors
@@ -635,3 +634,7 @@ def test_descriptorinfocollection():
 
     bound_intfield_info = bound_collection["intfield"]
     assert bound_intfield_info.is_bound is True
+
+    assert "spurious_name" not in collection
+    assert "spurious_name" not in bound_collection
+    assert "spurious_name" not in field_typed_collection

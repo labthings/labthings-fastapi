@@ -33,7 +33,7 @@ import textwrap
 from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
 from types import MappingProxyType
 import typing
-from weakref import WeakKeyDictionary, ref, ReferenceType
+from weakref import WeakKeyDictionary, ref
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
@@ -637,10 +637,6 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         self._unevaluated_type_hint: str | None = None  # Set in `__set_name__`
         # Type hints are not un-stringized in `__set_name__` but we remember them
         # for later evaluation in `value_type`.
-        self._owner: ReferenceType[type] | None = None  # For forward-reference types
-        # When we evaluate the type hints in `value_type` we need a reference to
-        # the object on which they are defined, to provide the context for the
-        # evaluation.
 
     def __set_name__(self, owner: type[Owner], name: str) -> None:
         r"""Take note of the name and type.
@@ -717,7 +713,6 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
                     f"with the inferred type of {self._type}."
                 )
             self._unevaluated_type_hint = field_annotation
-            self._owner = ref(owner)
 
         # Ensure a type is specified.
         # If we've not set _type by now, we are not going to set it, and the
@@ -748,13 +743,14 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         self.assert_set_name_called()
         if self._type is None and self._unevaluated_type_hint is not None:
             # We have a forward reference, so we need to resolve it.
-            if self._owner is None:
+            if self._owner_ref is None:
                 raise MissingTypeError(
                     f"Can't resolve forward reference for type of {self.name} because "
                     "the class on which it was defined wasn't saved. This is a "
                     "LabThings bug - please report it."
                 )
-            owner = self._owner()
+            # `self._owner_ref` is set in `BaseDescriptor.__set_name__`.
+            owner = self._owner_ref()
             if owner is None:
                 raise MissingTypeError(
                     f"Can't resolve forward reference for type of {self.name} because "
@@ -865,7 +861,14 @@ class DescriptorInfoCollection(
         :param key: The name of the descriptor whose info object is required.
         :return: The DescriptorInfo object for the named descriptor.
         """
-        return getattr(self.owning_class, key).descriptor_info(self.owning_object)
+        attr = getattr(self.owning_class, key, None)
+        if isinstance(attr, BaseDescriptor):
+            info = attr.descriptor_info(self.owning_object)
+            if isinstance(info, self.descriptorinfo_class):
+                return info
+        # Attributes that are missing or of the wrong type are not present in
+        # the mapping, so they raise KeyError.
+        raise KeyError(key)
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over the names of the descriptors of the specified type.
