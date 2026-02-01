@@ -20,8 +20,16 @@ from anyio.to_thread import run_sync
 
 from pydantic import BaseModel
 
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
+
 from .logs import THING_LOGGER
-from .properties import BaseProperty, DataProperty, BaseSetting
+from .properties import (
+    BaseProperty,
+    DataProperty,
+    BaseSetting,
+    PropertyCollection,
+    SettingCollection,
+)
 from .actions import ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
@@ -262,6 +270,25 @@ class Thing:
             path = self._thing_server_interface.settings_file_path
             with open(path, "w", encoding="utf-8") as file_obj:
                 file_obj.write(setting_json)
+
+    properties: OptionallyBoundDescriptor[Self, PropertyCollection] = (
+        OptionallyBoundDescriptor(PropertyCollection)
+    )
+    r"""Access to metadata and functions of this `.Thing`\ 's properties.
+    
+    `.Thing.properties` is a mapping of names to `.PropertyInfo` objects, which
+    allows convenient access to the metadata related to its properties. Note that
+    this includes settings, as they are a subclass of properties.
+    """
+
+    settings: OptionallyBoundDescriptor[Self, SettingCollection] = (
+        OptionallyBoundDescriptor(SettingCollection)
+    )
+    r"""Access to settings-related metadata and functions.
+    
+    `.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
+    convenient access to metadata of the settings of this `.Thing`\ .
+    """
 
     _labthings_thing_state: Optional[dict] = None
 

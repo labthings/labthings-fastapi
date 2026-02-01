@@ -62,7 +62,7 @@ from typing_extensions import Self
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, create_model
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -73,7 +73,11 @@ from .thing_description._model import (
 )
 from .utilities import labthings_data, wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
-from .base_descriptor import FieldTypedBaseDescriptor
+from .base_descriptor import (
+    DescriptorInfoCollection,
+    FieldTypedBaseDescriptor,
+    FieldTypedBaseDescriptorInfo,
+)
 from .exceptions import (
     NotConnectedToServerError,
     ReadOnlyPropertyError,
@@ -136,6 +140,9 @@ Value = TypeVar("Value")
 
 Owner = TypeVar("Owner", bound="Thing")
 """The `.Thing` instance on which a property is bound."""
+
+BasePropertyT = TypeVar("BasePropertyT", bound="BaseProperty")
+"""An instance of (a subclass of) BaseProperty."""
 
 
 def default_factory_from_arguments(
@@ -486,6 +493,12 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             "__set__ must be overridden by property implementations."
         )
 
+    def descriptor_info(
+        self, owner: Owner | None = None
+    ) -> PropertyInfo[Self, Owner, Value]:
+        """Return an object that allows access to this descriptor's metadata."""
+        return PropertyInfo(self, owner, self._owner_ref())
+
 
 class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A Property descriptor that acts like a regular variable.
@@ -797,6 +810,34 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         self.fset(obj, value)
 
 
+class PropertyInfo(
+    FieldTypedBaseDescriptorInfo[BasePropertyT, Owner, Value],
+    Generic[BasePropertyT, Owner, Value],
+):
+    """Access to the metadata of a Property.
+
+    This class provides a way to access the metadata of a Property, without
+    needing to retrieve the Descriptor object directly. It may be bound to a
+    `.Thing` instance, or may be accessed from the class.
+    """
+
+    @builtins.property
+    def model(self) -> type[BaseModel]:
+        """A `pydantic.BaseModel` describing this property's value."""
+        return self.get_descriptor().model
+
+
+class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
+    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+
+    This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
+    each Property of a `.Thing` by name. This allows easy access to metadata like
+    their description and model.
+    """
+
+    _descriptorinfo_class = PropertyInfo
+
+
 @overload  # use as a decorator  @setting
 def setting(
     getter: Callable[[Owner], Value],
@@ -928,6 +969,10 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 
+    def descriptor_info(self, owner: Owner | None = None) -> SettingInfo[Owner, Value]:
+        """Return an object that allows access to this descriptor's metadata."""
+        return SettingInfo(self, owner, self._owner_ref())
+
 
 class DataSetting(
     DataProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
@@ -1019,3 +1064,33 @@ class FunctionalSetting(
         # FunctionalProperty does not emit changed events, so no special
         # behaviour is needed.
         super().__set__(obj, value)
+
+
+class SettingInfo(
+    PropertyInfo[BaseSetting[Owner, Value], Owner, Value], Generic[Owner, Value]
+):
+    """Access to the metadata of a setting."""
+
+
+class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):
+    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+
+    This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
+    each Property of a `.Thing` by name. This allows easy access to metadata like
+    their description and model.
+    """
+
+    _descriptorinfo_class = SettingInfo
+
+    @builtins.property
+    def model(self) -> type[BaseModel]:
+        """A `pydantic.BaseModel` representing all the settings.
+
+        This `pydantic.BaseModel` is used to load and save the settings to a file.
+        """
+        name = self.owning_object.name if self.owning_object else self.owning_class.name
+        fields = {key: (value.model, None) for key, value in self.items()}
+        return create_model(  # type: ignore[call-overload]
+            f"{name}_settings_model",
+            **fields,
+        )
