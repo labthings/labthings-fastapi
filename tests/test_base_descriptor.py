@@ -2,16 +2,27 @@ import gc
 import pytest
 from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
+    BaseDescriptorInfo,
+    DescriptorInfoCollection,
     FieldTypedBaseDescriptor,
     DescriptorNotAddedToClassError,
     DescriptorAddedToClassTwiceError,
+    FieldTypedBaseDescriptorInfo,
+    OptionallyBoundDescriptor,
+    OptionallyBoundInfo,
     get_class_attribute_docstrings,
 )
+from labthings_fastapi.testing import create_thing_without_server
 from .utilities import raises_or_is_caused_by
-from labthings_fastapi.exceptions import MissingTypeError, InconsistentTypeError
+from labthings_fastapi.exceptions import (
+    MissingTypeError,
+    InconsistentTypeError,
+    NotBoundToInstanceError,
+)
+import labthings_fastapi as lt
 
 
-class MockProperty(BaseDescriptor[str]):
+class MockProperty(BaseDescriptor[lt.Thing, str]):
     """A mock property class."""
 
     # The line below isn't defined on a `Thing`, so mypy
@@ -299,10 +310,10 @@ class FieldTypedExample:
     """An example with field-typed descriptors."""
 
     int_or_str_prop: int | str = FieldTypedBaseDescriptor()
-    int_or_str_subscript = FieldTypedBaseDescriptor[int | str]()
+    int_or_str_subscript = FieldTypedBaseDescriptor[lt.Thing, int | str]()
     int_or_str_stringified: "int | str" = FieldTypedBaseDescriptor()
     customprop: CustomType = FieldTypedBaseDescriptor()
-    customprop_subscript = FieldTypedBaseDescriptor[CustomType]()
+    customprop_subscript = FieldTypedBaseDescriptor[lt.Thing, CustomType]()
     futureprop: "FutureType" = FieldTypedBaseDescriptor()
 
 
@@ -408,7 +419,7 @@ def test_fieldtyped_missingtype():
     with raises_or_is_caused_by(MissingTypeError) as excinfo:
 
         class Example4:
-            field6 = FieldTypedBaseDescriptor["str"]()
+            field6 = FieldTypedBaseDescriptor[lt.Thing, "str"]()
 
     msg = str(excinfo.value)
     assert "forward reference" in msg
@@ -421,7 +432,7 @@ def test_mismatched_types():
     with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example3:
-            field: int = FieldTypedBaseDescriptor[str]()
+            field: int = FieldTypedBaseDescriptor[lt.Thing, str]()
 
 
 def test_double_specified_types():
@@ -432,7 +443,7 @@ def test_double_specified_types():
     """
 
     class Example4:
-        field: int | None = FieldTypedBaseDescriptor[int | None]()
+        field: int | None = FieldTypedBaseDescriptor[lt.Thing, int | None]()
 
     assert Example4.field.value_type == int | None
 
@@ -448,4 +459,182 @@ def test_stringified_vs_unstringified_mismatch():
     with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example5:
-            field: "int" = FieldTypedBaseDescriptor[int]()
+            field: "int" = FieldTypedBaseDescriptor[lt.Thing, int]()
+
+
+def test_optionally_bound_info():
+    """Test the OptionallyBoundInfo base class."""
+
+    class Example6(lt.Thing):
+        pass
+
+    class Example6a(lt.Thing):
+        pass
+
+    example6 = create_thing_without_server(Example6)
+
+    bound_info = OptionallyBoundInfo(example6)
+    assert bound_info.owning_object is example6
+    assert bound_info.owning_object_or_error() is example6
+    assert bound_info.owning_class is Example6
+    assert bound_info.is_bound is True
+
+    unbound_info = OptionallyBoundInfo(None, Example6)
+    assert unbound_info.owning_object is None
+    with pytest.raises(NotBoundToInstanceError):
+        unbound_info.owning_object_or_error()
+    assert unbound_info.owning_class is Example6
+    assert unbound_info.is_bound is False
+
+    # Check that we can't create it with a bad class
+    with pytest.raises(TypeError):
+        _ = OptionallyBoundInfo(example6, Example6a)
+
+    # Check that we can't create it with no class or object
+    with pytest.raises(ValueError):
+        _ = OptionallyBoundInfo(None, None)  # type: ignore
+
+
+def test_descriptorinfo():
+    """Test that the DescriptorInfo object works as expected."""
+
+    class Example7:
+        intfield: int = FieldTypedBaseDescriptor()
+        """The descriptor's title.
+        
+        A description from a multiline docstring.
+        """
+
+        strprop = BaseDescriptor["Example7", str]()
+
+    intfield_descriptor = Example7.intfield
+    assert isinstance(intfield_descriptor, FieldTypedBaseDescriptor)
+
+    # First, make an unbound info object
+    intfield_info = intfield_descriptor.descriptor_info()
+    assert intfield_info.is_bound is False
+    assert intfield_info.name == "intfield"
+    assert intfield_info.title == "The descriptor's title."
+    assert intfield_info.description == "A description from a multiline docstring."
+    with pytest.raises(NotBoundToInstanceError):
+        intfield_info.get()
+
+    # Next, check the bound version
+    example6 = Example7()
+    intfield_info = intfield_descriptor.descriptor_info(example6)
+    assert intfield_info.is_bound is True
+    assert intfield_info.name == "intfield"
+    assert intfield_info.title == "The descriptor's title."
+    assert intfield_info.description == "A description from a multiline docstring."
+    with pytest.raises(NotImplementedError):
+        # As we're now calling on a bound info object, we should just get the
+        # exception from `BaseDescriptor.instance_get()`, not the unbound error.
+        intfield_info.get()
+    with pytest.raises(AttributeError, match="read-only"):
+        # As we're now calling on a bound info object, we should just get the
+        # exception from `BaseDescriptor.__set__(value)`, not the unbound error.
+        intfield_info.set(10)
+    assert intfield_info.value_type is int
+
+    # Check strprop, which is missing most of the documentation properties and
+    # should not have a value_type.
+    strprop_descriptor = Example7.strprop
+    assert isinstance(strprop_descriptor, BaseDescriptor)
+    strprop_info = strprop_descriptor.descriptor_info()
+    assert strprop_info.name == "strprop"
+    assert strprop_info.title.lower() == "strprop"
+    assert strprop_info.description is None
+    with pytest.raises(AttributeError):
+        _ = strprop_info.value_type
+
+
+def test_descriptorinfocollection():
+    """Test the DescriptorInfoCollection class.
+
+    This test checks that:
+    * We can get a collection of all descriptors on a Thing subclass.
+    * The collection contains the right names (is filtered by type).
+    * The individual DescriptorInfo objects in the collection have the
+      right properties.
+    * The `OptionallyBoundDescriptor` returns a collection on either the
+      class or the instance, bound or unbound as appropriate.
+    """
+
+    class BaseDescriptorInfoCollection(
+        DescriptorInfoCollection[lt.Thing, BaseDescriptorInfo]
+    ):
+        """A collection of BaseDescriptorInfo objects."""
+
+        _descriptorinfo_class = BaseDescriptorInfo
+
+    class FieldTypedBaseDescriptorInfoCollection(
+        DescriptorInfoCollection[lt.Thing, FieldTypedBaseDescriptorInfo]
+    ):
+        """A collection of FieldTypedBaseDescriptorInfo objects."""
+
+        _descriptorinfo_class = FieldTypedBaseDescriptorInfo
+
+    class Example8(lt.Thing):
+        intfield: int = FieldTypedBaseDescriptor()
+        """An integer field."""
+
+        strprop = BaseDescriptor["Example8", str]()
+        """A string property."""
+
+        another_intfield: int = FieldTypedBaseDescriptor()
+        """Another integer field."""
+
+        base_descriptors = OptionallyBoundDescriptor(BaseDescriptorInfoCollection)
+        """A mapping of all base descriptors."""
+
+        field_typed_descriptors = OptionallyBoundDescriptor(
+            FieldTypedBaseDescriptorInfoCollection
+        )
+        """A mapping of all field-typed descriptors."""
+
+    # The property should return a mapping of names to descriptor info objects
+    collection = Example8.base_descriptors
+    assert isinstance(collection, DescriptorInfoCollection)
+
+    names = list(collection)
+    assert set(names) == {"intfield", "strprop", "another_intfield"}
+    assert len(collection) == 3
+    assert collection.is_bound is False
+
+    intfield_info = collection["intfield"]
+    assert isinstance(intfield_info, FieldTypedBaseDescriptorInfo)
+    assert intfield_info.name == "intfield"
+    assert intfield_info.title == "An integer field."
+    assert intfield_info.value_type is int
+    assert intfield_info.is_bound is False
+
+    strprop_info = collection["strprop"]
+    assert strprop_info.name == "strprop"
+    assert strprop_info.title == "A string property."
+    with pytest.raises(AttributeError):
+        _ = strprop_info.value_type  # type: ignore
+    assert strprop_info.is_bound is False
+
+    # A more specific descriptor info type should narrow the collection
+    field_typed_collection = Example8.field_typed_descriptors
+    assert isinstance(field_typed_collection, DescriptorInfoCollection)
+    names = list(field_typed_collection)
+    assert set(names) == {"intfield", "another_intfield"}
+    assert len(field_typed_collection) == 2
+
+    assert field_typed_collection["intfield"] is intfield_info
+    assert field_typed_collection["another_intfield"] is collection["another_intfield"]
+
+    example8 = create_thing_without_server(Example8)
+    bound_collection = example8.base_descriptors
+    assert bound_collection.is_bound is True
+    bound_names = list(bound_collection)
+    assert set(bound_names) == {"intfield", "strprop", "another_intfield"}
+    assert len(bound_collection) == 3
+
+    bound_intfield_info = bound_collection["intfield"]
+    assert bound_intfield_info.is_bound is True
+
+    assert "spurious_name" not in collection
+    assert "spurious_name" not in bound_collection
+    assert "spurious_name" not in field_typed_collection

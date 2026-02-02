@@ -59,7 +59,9 @@ ConnectedThings = TypeVar(
 )
 
 
-class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThings]):
+class ThingSlot(
+    Generic[ConnectedThings], FieldTypedBaseDescriptor["Thing", ConnectedThings]
+):
     r"""Descriptor that instructs the server to supply other Things.
 
     A `.ThingSlot` provides either one or several
@@ -161,16 +163,6 @@ class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThin
     def default(self) -> str | Iterable[str] | None | EllipsisType:
         """The name of the Thing that will be connected by default, if any."""
         return self._default
-
-    def __set__(self, obj: "Thing", value: ThingSubclass) -> None:
-        """Raise an error as this is a read-only descriptor.
-
-        :param obj: the `.Thing` on which the descriptor is defined.
-        :param value: the value being assigned.
-
-        :raises AttributeError: this descriptor is not writeable.
-        """
-        raise AttributeError("This descriptor is read-only.")
 
     def _pick_things(
         self,

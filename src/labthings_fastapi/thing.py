@@ -11,24 +11,25 @@ from typing_extensions import Self
 from collections.abc import Mapping
 import logging
 import os
-import json
 from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request, WebSocket
-from anyio.abc import ObjectSendStream
 from anyio.to_thread import run_sync
 
-from pydantic import BaseModel
+
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
 
 from .logs import THING_LOGGER
-from .properties import BaseProperty, DataProperty, BaseSetting
-from .actions import ActionDescriptor
+from .properties import (
+    PropertyCollection,
+    SettingCollection,
+)
+from .actions import ActionCollection
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
-from .exceptions import PropertyNotObservableError
 from .thing_server_interface import ThingServerInterface
 
 
@@ -175,6 +176,7 @@ class Thing:
             description=get_docstring(self.thing_description),
             response_model_exclude_none=True,
             response_model_by_alias=True,
+            name=f"things.{self.name}",
         )
         def thing_description(request: Request) -> ThingDescription:
             return self.thing_description(base=str(request.base_url))
@@ -182,28 +184,6 @@ class Thing:
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket) -> None:
             await websocket_endpoint(self, ws)
-
-    # A private variable to hold the list of settings so it doesn't need to be
-    # iterated through each time it is read
-    _settings_store: Optional[dict[str, BaseSetting]] = None
-
-    @property
-    def _settings(self) -> dict[str, BaseSetting]:
-        """A private property that returns a dict of all settings for this Thing.
-
-        Each dict key is the name of the setting, the corresponding value is the
-        BaseSetting class (a descriptor). This can be used to directly get the
-        descriptor so that the value can be set without emitting signals, such
-        as on startup.
-        """
-        if self._settings_store is not None:
-            return self._settings_store
-
-        self._settings_store = {}
-        for name, attr in class_attributes(self):
-            if isinstance(attr, BaseSetting):
-                self._settings_store[name] = attr
-        return self._settings_store
 
     def load_settings(self) -> None:
         """Load settings from json.
@@ -220,27 +200,27 @@ class Thing:
         """
         setting_storage_path = self._thing_server_interface.settings_file_path
         thing_name = type(self).__name__
-        if os.path.exists(setting_storage_path):
-            self._disable_saving_settings = True
-            try:
-                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
-                    setting_dict = json.load(file_obj)
-                for key, value in setting_dict.items():
-                    if key in self._settings:
-                        self._settings[key].set_without_emit(self, value)
-                    else:
-                        _LOGGER.warning(
-                            (
-                                "Cannot set %s from persistent storage as %s "
-                                "has no matching setting."
-                            ),
-                            key,
-                            thing_name,
-                        )
-            except (FileNotFoundError, JSONDecodeError, PermissionError):
-                _LOGGER.warning("Error loading settings for %s", thing_name)
-            finally:
-                self._disable_saving_settings = False
+        if not os.path.exists(setting_storage_path):
+            # If the settings file doesn't exist, we have nothing to do - the settings
+            # are already initialised to their default values.
+            return
+
+        # Stop recursion by not allowing settings to be saved as we're reading them.
+        self._disable_saving_settings = True
+
+        try:
+            with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                settings_model = self.settings.model.model_validate_json(
+                    file_obj.read()
+                )
+            for key, value in settings_model:
+                if value is None:
+                    continue  # `None` means the key was missing
+                self.settings[key].set_without_emit_from_model(value)
+        except (FileNotFoundError, JSONDecodeError, PermissionError):
+            _LOGGER.warning("Error loading settings for %s", thing_name)
+        finally:
+            self._disable_saving_settings = False
 
     def save_settings(self) -> None:
         """Save settings to JSON.
@@ -250,18 +230,39 @@ class Thing:
         """
         if self._disable_saving_settings:
             return
-        if self._settings is not None:
-            setting_dict = {}
-            for name in self._settings.keys():
-                value = getattr(self, name)
-                if isinstance(value, BaseModel):
-                    value = value.model_dump()
-                setting_dict[name] = value
-            # Dumpy to string before writing so if this fails the file isn't overwritten
-            setting_json = json.dumps(setting_dict, indent=4)
-            path = self._thing_server_interface.settings_file_path
-            with open(path, "w", encoding="utf-8") as file_obj:
-                file_obj.write(setting_json)
+        # We dump to a string first, to avoid corrupting the file if it fails
+        setting_json = self.settings.model_instance.model_dump_json(indent=4)
+        path = self._thing_server_interface.settings_file_path
+        with open(path, "w", encoding="utf-8") as file_obj:
+            file_obj.write(setting_json)
+
+    properties: OptionallyBoundDescriptor["Thing", PropertyCollection] = (
+        OptionallyBoundDescriptor(PropertyCollection)
+    )
+    r"""Access to metadata and functions of this `.Thing`\ 's properties.
+
+    `.Thing.properties` is a mapping of names to `.PropertyInfo` objects, which
+    allows convenient access to the metadata related to its properties. Note that
+    this includes settings, as they are a subclass of properties.
+    """
+
+    settings: OptionallyBoundDescriptor["Thing", SettingCollection] = (
+        OptionallyBoundDescriptor(SettingCollection)
+    )
+    r"""Access to settings-related metadata and functions.
+
+    `.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
+    convenient access to metadata of the settings of this `.Thing`\ .
+    """
+
+    actions: OptionallyBoundDescriptor["Thing", ActionCollection] = (
+        OptionallyBoundDescriptor(ActionCollection)
+    )
+    r"""Access to metadata for the actions of this `.Thing`\ .
+
+    `.Thing.actions` is a mapping of names to `.ActionInfo` objects that allows
+    convenient access to metadata of each action.
+    """
 
     _labthings_thing_state: Optional[dict] = None
 
@@ -353,33 +354,3 @@ class Thing:
         td: ThingDescription = self.thing_description(path=path, base=base)
         td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
-
-    def observe_property(self, property_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive property change notifications.
-
-        :param property_name: the property to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        :raise PropertyNotObservableError: if the property is not observable.
-        """
-        prop = getattr(self.__class__, property_name, None)
-        if not isinstance(prop, BaseProperty):
-            raise KeyError(f"{property_name} is not a LabThings Property")
-        if not isinstance(prop, DataProperty):
-            raise PropertyNotObservableError(f"{property_name} is not observable.")
-        prop._observers_set(self).add(stream)
-
-    def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive action status change notifications.
-
-        :param action_name: the action to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        """
-        action = getattr(self.__class__, action_name, None)
-        if not isinstance(action, ActionDescriptor):
-            raise KeyError(f"{action_name} is not an LabThings Action")
-        observers = action._observers_set(self)
-        observers.add(stream)

@@ -179,6 +179,12 @@ def test_baseproperty_type_and_model():
     assert str(Example.prop.value_type) == "str | None"
     assert issubclass(Example.prop.model, pydantic.RootModel)
     assert str(Example.prop.model.model_fields["root"].annotation) == "str | None"
+    testmodel = Example.prop.value_to_model("test")
+    assert isinstance(testmodel, pydantic.RootModel)
+    assert testmodel.root == "test"
+    nonemodel = Example.prop.value_to_model(None)
+    assert isinstance(nonemodel, pydantic.RootModel)
+    assert nonemodel.root is None
 
 
 def test_baseproperty_type_and_model_pydantic():
@@ -197,6 +203,10 @@ def test_baseproperty_type_and_model_pydantic():
 
     assert Example.prop.value_type is MyModel
     assert Example.prop.model is MyModel
+
+    value = MyModel(foo="test", bar=42)
+    assert isinstance(value, Example.prop.value_type)
+    assert Example.prop.value_to_model(value) is value
 
 
 def test_baseproperty_add_to_fastapi():

@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from concurrent.futures import Future
 from contextlib import contextmanager
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,6 +17,8 @@ from typing import (
 )
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock
+
+from labthings_fastapi.events import MessageBroker
 
 from .utilities import class_attributes
 from .thing_slots import ThingSlot
@@ -120,6 +123,11 @@ class MockThingServerInterface(ThingServerInterface):
         :raises NotImplementedError: always.
         """
         raise NotImplementedError("MockThingServerInterface has no ActionManager.")
+
+    @cached_property
+    def _message_broker(self) -> MessageBroker:
+        """A message broker."""
+        return MessageBroker()
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")

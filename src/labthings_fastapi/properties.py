@@ -54,16 +54,15 @@ from typing import (
     Any,
     Callable,
     Generic,
-    TypeAlias,
     TypeVar,
     overload,
     TYPE_CHECKING,
 )
 from typing_extensions import Self
-from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, ConfigDict, RootModel, create_model
+from anyio.abc import ObjectSendStream
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -72,11 +71,18 @@ from .thing_description._model import (
     PropertyAffordance,
     PropertyOp,
 )
-from .utilities import labthings_data, wrap_plain_types_in_rootmodel
+from .utilities import wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
-from .base_descriptor import FieldTypedBaseDescriptor
+from .base_descriptor import (
+    DescriptorInfoCollection,
+    FieldTypedBaseDescriptor,
+    FieldTypedBaseDescriptorInfo,
+)
+from .events import Message
 from .exceptions import (
+    NotBoundToInstanceError,
     NotConnectedToServerError,
+    PropertyNotObservableError,
     ReadOnlyPropertyError,
     MissingTypeError,
     UnsupportedConstraintError,
@@ -133,29 +139,19 @@ class MissingDefaultError(ValueError):
 
 
 Value = TypeVar("Value")
-if TYPE_CHECKING:
-    # It's hard to type check methods, because the type of ``self``
-    # will be a subclass of `.Thing`, and `Callable` types are
-    # contravariant in their arguments (i.e.
-    # ``Callable[[SpecificThing,], Value])`` is not a subtype of
-    # ``Callable[[Thing,], Value]``.
-    # It is probably not particularly important for us to check th
-    # type of ``self`` when decorating methods, so it is left as
-    # ``Any`` to avoid the major confusion that would result from
-    # trying to type it more tightly.
-    #
-    # Note: in ``@overload`` definitions, it's sometimes necessary
-    # to avoid the use of these aliases, as ``mypy`` can't
-    # pick which variant is in use without the explicit `Callable`.
-    ValueFactory: TypeAlias = Callable[[], Value]
-    ValueGetter: TypeAlias = Callable[[Any], Value]
-    ValueSetter: TypeAlias = Callable[[Any, Value], None]
+"""The value returned by a property."""
+
+Owner = TypeVar("Owner", bound="Thing")
+"""The `.Thing` instance on which a property is bound."""
+
+BasePropertyT = TypeVar("BasePropertyT", bound="BaseProperty")
+"""An instance of (a subclass of) BaseProperty."""
 
 
 def default_factory_from_arguments(
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
-) -> ValueFactory:
+    default_factory: Callable[[], Value] | None = None,
+) -> Callable[[], Value]:
     """Process default arguments to get a default factory function.
 
     This function takes the ``default`` and ``default_factory`` arguments
@@ -198,8 +194,10 @@ def default_factory_from_arguments(
         raise OverspecifiedDefaultError()
     if default is not ...:
 
-        def default_factory() -> Value:
+        def dummy_default_factory() -> Value:
             return default
+
+        default_factory = dummy_default_factory
 
     if not callable(default_factory):
         raise MissingDefaultError("The default_factory must be callable.")
@@ -209,8 +207,8 @@ def default_factory_from_arguments(
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
 def property(
-    getter: Callable[[Any], Value],
-) -> FunctionalProperty[Value]: ...
+    getter: Callable[[Owner], Value],
+) -> FunctionalProperty[Owner, Value]: ...
 
 
 @overload  # use as `field: int = property(default=0)`
@@ -226,13 +224,13 @@ def property(
 
 
 def property(
-    getter: ValueGetter | EllipsisType = ...,
+    getter: Callable[[Owner], Value] | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
+    default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
     **constraints: Any,
-) -> Value | FunctionalProperty[Value]:
+) -> Value | FunctionalProperty[Owner, Value]:
     r"""Define a Property on a `.Thing`\ .
 
     This function may be used to define :ref:`properties` in
@@ -328,7 +326,7 @@ def property(
     )
 
 
-class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
+class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]):
     """A descriptor that marks Properties on Things.
 
     This class is used to determine whether an attribute of a `.Thing` should
@@ -396,7 +394,40 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
             )
         return self._model
 
-    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
+    def value_to_model(self, value: Value) -> BaseModel:
+        """Convert a property value to its Pydantic model representation.
+
+        :param value: the property value.
+        :return: the property value wrapped in its Pydantic model.
+        """
+        if isinstance(value, BaseModel):
+            return value
+        else:
+            # If the return value isn't a model, we need to wrap it in a RootModel
+            # which we do using the model in self.model
+            cls = self.model
+            if not issubclass(cls, RootModel):
+                msg = (
+                    f"LabThings couldn't wrap the return value of {self.name} in "
+                    f"a model. This either means your property has an incorrect "
+                    f"type, or there is a bug in LabThings.\n\n"
+                    f"Value: {value}\n"
+                    f"Expected type: {self.value_type}\n"
+                    f"Actual type: {type(value)}\n"
+                    f"Model: {self.model}\n"
+                )
+                raise TypeError(msg)
+            return cls(root=value)
+
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable.
+
+        :raises NotImplementedError: as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("observable must be implemented by subclasses.")
+
+    def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
         :param app: The FastAPI application we are adding endpoints to.
@@ -487,7 +518,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
             }
         )
 
-    def __set__(self, obj: Thing, value: Any) -> None:
+    def __set__(self, obj: Owner, value: Any) -> None:
         """Set the property (stub method).
 
         This is a stub ``__set__`` method to mark this as a data descriptor.
@@ -500,8 +531,19 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
             "__set__ must be overridden by property implementations."
         )
 
+    def descriptor_info(
+        self, owner: Owner | None = None
+    ) -> PropertyInfo[Self, Owner, Value]:
+        r"""Return an object that allows access to this descriptor's metadata.
 
-class DataProperty(BaseProperty[Value], Generic[Value]):
+        :param owner: An instance to bind the descriptor info to. If `None`\ ,
+            the returned object will be unbound and will only refer to the class.
+        :return: A `PropertyInfo` instance describing this property.
+        """
+        return PropertyInfo(self, owner, self._owner_ref())
+
+
+class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A Property descriptor that acts like a regular variable.
 
     `.DataProperty` descriptors remember their value, and can be read and
@@ -521,7 +563,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     def __init__(  # noqa: DOC101,DOC103
         self,
         *,
-        default_factory: ValueFactory,
+        default_factory: Callable[[], Value],
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
     ) -> None: ...
@@ -530,7 +572,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         self,
         default: Value | EllipsisType = ...,
         *,
-        default_factory: ValueFactory | None = None,
+        default_factory: Callable[[], Value] | None = None,
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
     ) -> None:
@@ -573,7 +615,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         )
         self.readonly = readonly
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Return the property's value.
 
         This will supply a default if the property has not yet been set.
@@ -588,7 +630,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         return obj.__dict__[self.name]
 
     def __set__(
-        self, obj: Thing, value: Value, emit_changed_event: bool = True
+        self, obj: Owner, value: Value, emit_changed_event: bool = True
     ) -> None:
         """Set the property's value.
 
@@ -600,24 +642,9 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         """
         obj.__dict__[self.name] = value
         if emit_changed_event:
-            self.emit_changed_event(obj, value)
+            self.publish_change(obj, self.value_to_model(value))
 
-    def _observers_set(self, obj: Thing) -> WeakSet:
-        """Return the observers of this property.
-
-        Each observer in this set will be notified when the property is changed.
-        See ``.DataProperty.emit_changed_event``
-
-        :param obj: the `.Thing` to which we are attached.
-
-        :return: the set of observers corresponding to ``obj``.
-        """
-        ld = labthings_data(obj)
-        if self.name not in ld.property_observers:
-            ld.property_observers[self.name] = WeakSet()
-        return ld.property_observers[self.name]
-
-    def emit_changed_event(self, obj: Thing, value: Value) -> None:
+    def publish_change(self, obj: Thing, value: BaseModel) -> None:
         """Notify subscribers that the property has changed.
 
         This function is run when properties are updated. It must be run from
@@ -626,34 +653,27 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         thread as it is communicating with the event loop via an `asyncio` blocking
         portal and can cause deadlock if run in the event loop.
 
-        This method will raise a `.ServerNotRunningError` if the event loop is not
-        running, and should only be called after the server has started.
+        This method will silently do nothing if the event loop is not running.
 
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
         """
-        obj._thing_server_interface.start_async_task_soon(
-            self.emit_changed_event_async,
-            obj,
-            value,
+        obj._thing_server_interface.publish(
+            Message(
+                thing=obj.name,
+                affordance=self.name,
+                message_type="property",
+                payload=value,
+            )
         )
 
-    async def emit_changed_event_async(self, obj: Thing, value: Value) -> None:
-        """Notify subscribers that the property has changed.
-
-        This function may only be run in the `anyio` event loop. See
-        `.DataProperty.emit_changed_event`.
-
-        :param obj: the `.Thing` to which we are attached.
-        :param value: the new property value, to be sent to observers.
-        """
-        for observer in self._observers_set(obj):
-            await observer.send(
-                {"messageType": "propertyStatus", "data": {self._name: value}}
-            )
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable. Always True for DataProperty."""
+        return True
 
 
-class FunctionalProperty(BaseProperty[Value], Generic[Value]):
+class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A property that uses a getter and a setter.
 
     For properties that should work like variables, use `.DataProperty`. For
@@ -665,7 +685,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
     def __init__(
         self,
-        fget: ValueGetter,
+        fget: Callable[[Owner], Value],
         constraints: Mapping[str, Any] | None = None,
     ) -> None:
         """Set up a FunctionalProperty.
@@ -683,7 +703,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__(constraints=constraints)
-        self._fget: ValueGetter = fget
+        self._fget = fget
         self._type = return_type(self._fget)
         if self._type is None:
             msg = (
@@ -691,20 +711,20 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
                 "Return type annotations are required for property getters."
             )
             raise MissingTypeError(msg)
-        self._fset: ValueSetter | None = None
+        self._fset: Callable[[Owner, Value], None] | None = None
         self.readonly: bool = True
 
     @builtins.property
-    def fget(self) -> ValueGetter:  # noqa: DOC201
+    def fget(self) -> Callable[[Owner], Value]:  # noqa: DOC201
         """The getter function."""
         return self._fget
 
     @builtins.property
-    def fset(self) -> ValueSetter | None:  # noqa: DOC201
+    def fset(self) -> Callable[[Owner, Value], None] | None:  # noqa: DOC201
         """The setter function."""
         return self._fset
 
-    def getter(self, fget: ValueGetter) -> Self:
+    def getter(self, fget: Callable[[Owner], Value]) -> Self:
         """Set the getter function of the property.
 
         This function returns the descriptor, so it may be used as a decorator.
@@ -718,7 +738,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self.__doc__ = fget.__doc__
         return self
 
-    def setter(self, fset: ValueSetter) -> Self:
+    def setter(self, fset: Callable[[Owner, Value], None]) -> Self:
         r"""Set the setter function of the property.
 
         This function returns the descriptor, so it may be used as a decorator.
@@ -790,7 +810,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
             return fset  # type: ignore[return-value]
         return self
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Get the value of the property.
 
         :param obj: the `.Thing` on which the attribute is accessed.
@@ -798,7 +818,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         """
         return self.fget(obj)
 
-    def __set__(self, obj: Thing, value: Value) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the value of the property.
 
         :param obj: the `.Thing` on which the attribute is accessed.
@@ -810,11 +830,104 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
         self.fset(obj, value)
 
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable. Always False for FunctionalProperty."""
+        return False
+
+
+class PropertyInfo(
+    FieldTypedBaseDescriptorInfo[BasePropertyT, Owner, Value],
+    Generic[BasePropertyT, Owner, Value],
+):
+    """Access to the metadata of a Property.
+
+    This class provides a way to access the metadata of a Property, without
+    needing to retrieve the Descriptor object directly. It may be bound to a
+    `.Thing` instance, or may be accessed from the class.
+    """
+
+    @builtins.property
+    def model(self) -> type[BaseModel]:  # noqa: DOC201
+        """A `pydantic.BaseModel` describing this property's value."""
+        return self.get_descriptor().model
+
+    @builtins.property
+    def model_instance(self) -> BaseModel:  # noqa: DOC201
+        """An instance of ``self.model`` populated with the current value.
+
+        :raises TypeError: if the return value can't be wrapped in a model.
+        """
+        return self.get_descriptor().value_to_model(self.get())
+
+    def model_to_value(self, value: BaseModel) -> Value:
+        r"""Convert a model to a value for this property.
+
+        Even properties with plain types are sometimes converted to or from a
+        `pydantic.BaseModel` to allow conversion to/from JSON. This is a convenience
+        method that accepts a model (which should be an instance of ``self.model``\ )
+        and unwraps it when necessary to get the plain Python value.
+
+        :param value: A `.BaseModel` instance to convert.
+        :return: the value, with `.RootModel` unwrapped so it matches the descriptor's
+            type.
+        :raises TypeError: if the supplied value cannot be converted to the right type.
+        """
+        if isinstance(value, self.value_type):
+            return value
+        elif isinstance(value, RootModel):
+            root = value.root
+            if isinstance(root, self.value_type):
+                return root
+        msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
+        raise TypeError(msg)
+
+    @builtins.property
+    def observable(self) -> bool:  # noqa: DOC201
+        """Whether this property is observable.
+
+        Observable properties may be observed for changes using the
+        `.PropertyInfo.observe` method.
+
+        :return: `True` if the property is observable, `False` otherwise.
+        """
+        return isinstance(self.get_descriptor(), DataProperty)
+
+    def observe(self, stream: ObjectSendStream[Message]) -> None:
+        """Observe changes to this property.
+
+        Changes to this property will be sent to the supplied stream.
+
+        :param stream: The stream to which updated values should be sent.
+
+        :raises NotBoundToInstanceError: if this `.PropertyInfo` is not
+            bound to a `.Thing` instance.
+        :raises PropertyNotObservableError: if this property is not observable.
+        """
+        if self.owning_object is None:
+            msg = "Can't observe property changes from an unbound PropertyInfo."
+            raise NotBoundToInstanceError(msg)
+        if not self.observable:
+            msg = f"Property {self.name} is not observable."
+            raise PropertyNotObservableError(msg)
+        self.owning_object._thing_server_interface.subscribe(self.name, stream)
+
+
+class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
+    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+
+    This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
+    each Property of a `.Thing` by name. This allows easy access to metadata like
+    their description and model.
+    """
+
+    _descriptorinfo_class = PropertyInfo
+
 
 @overload  # use as a decorator  @setting
 def setting(
-    getter: Callable[[Any], Value],
-) -> FunctionalSetting[Value]: ...
+    getter: Callable[[Owner], Value],
+) -> FunctionalSetting[Owner, Value]: ...
 
 
 @overload  # use as `field: int = setting(default=0)``
@@ -828,13 +941,13 @@ def setting(
 
 
 def setting(
-    getter: ValueGetter | EllipsisType = ...,
+    getter: Callable[[Owner], Value] | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
+    default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
     **constraints: Any,
-) -> FunctionalSetting[Value] | Value:
+) -> FunctionalSetting[Owner, Value] | Value:
     r"""Define a Setting on a `.Thing`\ .
 
     A setting is a property that is saved to disk.
@@ -920,7 +1033,7 @@ def setting(
     )
 
 
-class BaseSetting(BaseProperty[Value], Generic[Value]):
+class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
     r"""A base class for settings.
 
     This is a subclass of `.BaseProperty` that is used to define settings.
@@ -928,7 +1041,7 @@ class BaseSetting(BaseProperty[Value], Generic[Value]):
     two concrete implementations: `.DataSetting` and `.FunctionalSetting`\ .
     """
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the setting's value without emitting an event.
 
         This is used to set the setting's value without notifying observers.
@@ -942,8 +1055,19 @@ class BaseSetting(BaseProperty[Value], Generic[Value]):
         """
         raise NotImplementedError("This method should be implemented in subclasses.")
 
+    def descriptor_info(self, owner: Owner | None = None) -> SettingInfo[Owner, Value]:
+        r"""Return an object that allows access to this descriptor's metadata.
 
-class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
+        :param owner: An instance to bind the descriptor info to. If `None`\ ,
+            the returned object will be unbound and will only refer to the class.
+        :return: A `SettingInfo` instance describing this setting.
+        """
+        return SettingInfo(self, owner, self._owner_ref())
+
+
+class DataSetting(
+    DataProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
+):
     """A `.DataProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
@@ -961,7 +1085,7 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
     """
 
     def __set__(
-        self, obj: Thing, value: Value, emit_changed_event: bool = True
+        self, obj: Owner, value: Value, emit_changed_event: bool = True
     ) -> None:
         """Set the setting's value.
 
@@ -974,7 +1098,7 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
         super().__set__(obj, value, emit_changed_event)
         obj.save_settings()
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the property's value, but do not emit event to notify the server.
 
         This function is not expected to be used externally. It is called during
@@ -987,7 +1111,9 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
         super().__set__(obj, value, emit_changed_event=False)
 
 
-class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[Value]):
+class FunctionalSetting(
+    FunctionalProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
+):
     """A `.FunctionalProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
@@ -1005,7 +1131,7 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
     getter and a setter function.
     """
 
-    def __set__(self, obj: Thing, value: Value) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the setting's value.
 
         This will cause the settings to be saved to disk.
@@ -1016,7 +1142,7 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
         super().__set__(obj, value)
         obj.save_settings()
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the property's value, but do not emit event to notify the server.
 
         This function is not expected to be used externally. It is called during
@@ -1029,3 +1155,64 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
         # FunctionalProperty does not emit changed events, so no special
         # behaviour is needed.
         super().__set__(obj, value)
+
+
+class SettingInfo(
+    PropertyInfo[BaseSetting[Owner, Value], Owner, Value], Generic[Owner, Value]
+):
+    """Access to the metadata of a setting."""
+
+    def set_without_emit(self, value: Value) -> None:
+        """Set the value of the setting, but don't emit a notification.
+
+        :param value: the new value for the setting.
+        """
+        obj = self.owning_object_or_error()
+        self.get_descriptor().set_without_emit(obj, value)
+
+    def set_without_emit_from_model(self, value: BaseModel) -> None:
+        """Set the value from a model instance, unwrapping RootModels as needed.
+
+        :param value: the model to extract the value from.
+        """
+        self.set_without_emit(self.model_to_value(value))
+
+
+class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):
+    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+
+    This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
+    each Property of a `.Thing` by name. This allows easy access to metadata like
+    their description and model.
+    """
+
+    _descriptorinfo_class = SettingInfo
+
+    @builtins.property
+    def model(self) -> type[BaseModel]:  # noqa: DOC201
+        """A `pydantic.BaseModel` representing all the settings.
+
+        This `pydantic.BaseModel` is used to load and save the settings to a file.
+        Note that it uses the ``model`` of each setting, so every field in this model
+        will be either a `BaseModel` or a `RootModel` instance, unless it is missing.
+
+        Wrapping plain types in a `RootModel` makes no difference to the JSON, but it
+        means that constraints will be applied and it makes it easier to distinguish
+        between missing fields and fields that are set to `None`.
+        """
+        name = self.owning_object.name if self.owning_object else self.owning_class.name
+        fields = {key: (value.model | None, None) for key, value in self.items()}
+        return create_model(  # type: ignore[call-overload]
+            f"{name}_settings_model", **fields, __config__=ConfigDict(extra="forbid")
+        )
+
+    @builtins.property
+    def model_instance(self) -> BaseModel:  # noqa: DOC201
+        """An instance of ``self.model`` populated with the current setting values."""
+        models = {
+            # Note that we need to populate it with models, not the bare types.
+            # This doesn't make a difference to the JSON.
+            name: setting.model_instance
+            for name, setting in self.items()
+        }
+        return self.model(**models)
