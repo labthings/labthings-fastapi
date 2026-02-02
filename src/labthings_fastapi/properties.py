@@ -183,12 +183,10 @@ def default_factory_from_arguments(
         # If both default and default_factory are set, we raise an error.
         raise OverspecifiedDefaultError()
     if default is not ...:
-
-        def dummy_default_factory() -> Value:
-            return default
-
-        default_factory = dummy_default_factory
-
+        # We return a function that returns the static default value.
+        # This means we always have a factory function, which simplifies
+        # the rest of the code.
+        return lambda: default
     if not callable(default_factory):
         raise MissingDefaultError("The default_factory must be callable.")
     return default_factory
