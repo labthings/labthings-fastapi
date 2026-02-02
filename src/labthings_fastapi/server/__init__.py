@@ -35,7 +35,7 @@ from .config_model import (
 )
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
-from ..outputs.blob import blob_data_manager
+from labthings_fastapi.outputs import blob
 
 __all__ = ["ThingServer"]
 
@@ -91,7 +91,7 @@ class ThingServer:
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.action_manager.attach_to_app(self.app)
-        blob_data_manager.attach_to_app(self.app)
+        self.app.include_router(blob.router)  # include blob download endpoint
         self._add_things_view_to_app()
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}

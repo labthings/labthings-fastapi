@@ -238,20 +238,18 @@ def test_blob_creation():
     assert blob.to_blobmodel().href == "https://example.com/blob"
 
 
-def test_blob_data_manager():
+def test_blob_from_id():
     """Check blobs appear in the data manager."""
     blob = TextBlob.from_bytes(b"Some Data")
     data = blob.data
     assert isinstance(data, lt.blob.LocalBlobData)
     id = data.id
-    assert lt.blob.blob_data_manager.get_blob(id) is data
-    with pytest.raises(ValueError):
-        lt.blob.blob_data_manager.add_blob(data)
+    assert lt.blob.LocalBlobData.from_id(id) is data
     del data
     del blob
     # Check that the blob doesn't linger due to references
     with pytest.raises(KeyError):
-        lt.blob.blob_data_manager.get_blob(id)
+        lt.blob.LocalBlobData.from_id(id)
 
 
 def test_blob_serialisation():

@@ -89,6 +89,7 @@ import re
 import shutil
 from typing import (
     Any,
+    ClassVar,
     Literal,
     Mapping,
 )
@@ -97,7 +98,7 @@ from weakref import WeakValueDictionary
 from tempfile import TemporaryDirectory
 import uuid
 
-from fastapi import FastAPI
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 import httpx
 from pydantic import (
@@ -254,13 +255,51 @@ class LocalBlobData(BlobData):
     See `.BlobBytes` or `.BlobFile` for concrete implementations.
     """
 
+    _all_blobdata: ClassVar[WeakValueDictionary[uuid.UUID, "LocalBlobData"]] = (
+        WeakValueDictionary()
+    )
+    """A way to retrieve `.LocalBlobData` objects by their ID.
+    
+    Note that this does not interfere with garbage collection, as it only
+    holds weak references to the `.LocalBlobData` objects.
+    """
+
     def __init__(self, media_type: str) -> None:
-        """Initialise the LocalBlobData object.
+        """Initialise the `.LocalBlobData` object.
 
         :param media_type: the MIME type of the data.
         """
         super().__init__(media_type=media_type)
-        self._id = blob_data_manager.add_blob(self)
+        self._id = uuid.uuid4()
+        # Note that _all_blobdata holds weak references, so this does not
+        # prevent garbage collection.
+        self._all_blobdata[self._id] = self
+
+    @classmethod
+    def from_id(cls, id: uuid.UUID) -> "LocalBlobData":
+        """Retrieve a `.LocalBlobData` object by its ID.
+
+        Note that this does not imply `.LocalBlobData` objects are
+        permanently stored: if there are no strong references to the object,
+        it may have been garbage collected and will no longer be available.
+
+        :param id: the UUID of the desired `.LocalBlobData` object.
+
+        :return: the corresponding `.LocalBlobData` object.
+        :raise KeyError: if no such object exists.
+        """
+        try:
+            return cls._all_blobdata[id]
+        except KeyError as error:
+            raise KeyError(f"BlobData with ID {id} not found.") from error
+
+    @classmethod
+    def all_ids(cls) -> list[uuid.UUID]:
+        """Return a list of all currently registered BlobData IDs.
+
+        :return: a list of UUIDs for all registered `.LocalBlobData` objects.
+        """
+        return list(cls._all_blobdata.keys())
 
     @property
     def id(self) -> uuid.UUID:
@@ -644,7 +683,7 @@ class Blob:
         if not id:
             raise ValueError("Blob URLs must contain a Blob ID.")
         try:
-            data = blob_data_manager.get_blob(id)
+            data = LocalBlobData.from_id(id)
             return cls(data)
         except KeyError as error:
             raise ValueError(f"Blob ID {id} wasn't found on this server.") from error
@@ -876,99 +915,27 @@ def blob_type(media_type: str) -> type[Blob]:
     )
 
 
-class BlobDataManager:
-    r"""A class to manage BlobData objects.
+router = APIRouter()
+"""A FastAPI router for BlobData download endpoints."""
 
-    The `.BlobManager` is responsible for serving `.Blob` objects to clients. It
-    holds weak references: it will not retain `.Blob`\ s that are no longer in use.
-    Most `.Blob`\ s will be retained by the output of an action: this holds a strong
-    reference, and will be expired by the `.ActionManager`.
 
-    Note that the `.BlobDataManager` does not work with `.Blob` objects directly,
-    it holds only the `.LocalBlobData` object, which is where the data is
-    stored. This means you should not rely on any custom attributes of a `.Blob`
-    subclass being preserved when the `.Blob` is passed from one action to another.
+@router.get("/blob/{blob_id}", name="download_blob")
+def download_blob(blob_id: uuid.UUID) -> Response:
+    """Download a `.Blob`.
 
-    See :ref:`blobs` for an overview of how `.Blob` objects should be used.
+    This function returns a `fastapi.Response` allowing the data to be
+    downloaded, using the `.LocalBlobData.response` method.
+
+    :param blob_id: the unique ID of the blob data.
+
+    :return: a `fastapi.Response` object that will send the content of
+        the blob over HTTP.
     """
-
-    def __init__(self) -> None:
-        """Initialise a BlobDataManager object."""
-        self._blobs: WeakValueDictionary[uuid.UUID, LocalBlobData] = (
-            WeakValueDictionary()
-        )
-
-    def add_blob(self, blob: LocalBlobData) -> uuid.UUID:
-        """Add a `.Blob` to the manager, generating a unique ID.
-
-        This function adds a `.LocalBlobData` object to the
-        `.BlobDataManager`. It will retain a weak reference to the
-        `.LocalBlobData` object: you are responsible for ensuring
-        the data is not garbage collected, for example by including the
-        parent `.Blob` in the output of an action.
-
-        :param blob: a `.LocalBlobData` object that holds the data
-            being added.
-
-        :return: a unique ID identifying the data. This forms part of
-            the URL to download the data.
-
-        :raise ValueError: if the `.LocalBlobData` object already
-            has an ``id`` attribute but is not in the dictionary of
-            data. This suggests the object has been added to another
-            `.BlobDataManager`, which should never happen.
-        """
-        if blob in self._blobs.values():
-            raise ValueError(
-                "BlobData objects may only be added to the manager once! "
-                "This is a LabThings bug."
-            )
-        id = uuid.uuid4()
-        self._blobs[id] = blob
-        return id
-
-    def get_blob(self, blob_id: uuid.UUID) -> LocalBlobData:
-        """Retrieve a `.Blob` from the manager.
-
-        :param blob_id: the unique ID assigned when the data was added to
-            this `.BlobDataManager`.
-
-        :return: the `.LocalBlobData` object holding the data.
-        """
-        return self._blobs[blob_id]
-
-    def download_blob(self, blob_id: uuid.UUID) -> Response:
-        """Download a `.Blob`.
-
-        This function returns a `fastapi.Response` allowing the data to be
-        downloaded, using the `.LocalBlobData.response` method.
-
-        :param blob_id: the unique ID assigned when the data was added to
-            this `.BlobDataManager`.
-
-        :return: a `fastapi.Response` object that will send the content of
-            the blob over HTTP.
-        """
-        blob = self.get_blob(blob_id)
+    try:
+        blob = LocalBlobData.from_id(blob_id)
         return blob.response()
-
-    def attach_to_app(self, app: FastAPI) -> None:
-        """Attach the BlobDataManager to a FastAPI app.
-
-        Add an endpoint to a FastAPI application that will serve the content of
-        the `.LocalBlobData` objects in response to ``GET`` requests.
-
-        :param app: the `fastapi.FastAPI` application to which we are adding
-            the endpoint.
-        """
-        app.get(
-            "/blob/{blob_id}",
-            name="download_blob",
-        )(self.download_blob)
-
-
-blob_data_manager = BlobDataManager()
-"""A global register of all BlobData objects."""
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail="Blob not found") from e
 
 
 def url_to_id(url: str) -> uuid.UUID | None:
