@@ -227,6 +227,7 @@ class OptionallyBoundInfo(Generic[Owner]):
 
         This is mostly a convenience function that saves type-checking boilerplate.
 
+        :return: the owning object.
         :raises NotBoundToInstanceError: if this object is not bound.
         """
         obj = self._bound_to_obj
@@ -274,6 +275,10 @@ class BaseDescriptorInfo(
             it is `None` (default), the object will be unbound and will refer to
             the descriptor as attached to the class. This may mean that some
             methods are unavailable.
+        :param cls: The class to which we are bound. Only required if ``obj`` is
+            `None`\ .
+
+        :raises ValueError: if both ``obj`` and ``cls`` are `None`\ .
         """
         super().__init__(obj, cls)
         self._descriptor_ref = ref(descriptor)
@@ -288,6 +293,8 @@ class BaseDescriptorInfo(
         """Retrieve the descriptor object.
 
         :return: The descriptor object
+        :raises RuntimeError: if the descriptor was garbage collected. This should
+            never happen.
         """
         descriptor = self._descriptor_ref()
         if descriptor is None:
@@ -314,17 +321,32 @@ class BaseDescriptorInfo(
         return self.get_descriptor().description
 
     def get(self) -> Value:
-        """Get the value of the descriptor."""
+        """Get the value of the descriptor.
+
+        This method only works on a bound info object, it will raise an error
+        if called via a class rather than a `.Thing` instance.
+
+        :return: the value of the descriptor.
+        :raises NotBoundToInstanceError: if called on an unbound object.
+        """
         if not self.is_bound:
-            msg = "We can't get the value when called on a class."
+            msg = f"We can't get the value of {self.name} when called on a class."
             raise NotBoundToInstanceError(msg)
         descriptor = self.get_descriptor()
         return descriptor.__get__(self.owning_object_or_error())
 
     def set(self, value: Value) -> None:
-        """Set the value of the descriptor."""
+        """Set the value of the descriptor.
+
+        This method may only be called if the DescriptorInfo object is bound to a
+        `.Thing` instance. It will raise an error if called on a class.
+
+        :param value: the new value.
+
+        :raises NotBoundToInstanceError: if called on an unbound info object.
+        """
         if not self.is_bound:
-            msg = "We can't set the value when called on a class."
+            msg = f"We can't set the value of {self.name} when called on a class."
             raise NotBoundToInstanceError(msg)
         descriptor = self.get_descriptor()
         descriptor.__set__(self.owning_object_or_error(), value)
@@ -557,6 +579,10 @@ class BaseDescriptor(Generic[Owner, Value]):
         a value is assigned. This base implementation returns an `AttributeError` to
         signal that the descriptor is read-only. Overriding it with a method that
         does not raise an exception will allow the descriptor to be written to.
+
+        :param obj: The object on which to set the value.
+        :param value: The value to set the descriptor to.
+        :raises AttributeError: always, as this is read-only by default.
         """
         raise AttributeError("This attribute is read-only.")
 
@@ -576,6 +602,8 @@ class BaseDescriptor(Generic[Owner, Value]):
         :param info_class: the `.BaseDescriptorInfo` subclass to return.
         :param obj: The `.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
+        :raises RuntimeError: if garbage collection occurs unexpectedly. This
+            should not happen and would indicate a LabThings bug.
         """
         if obj:
             return info_class(self, obj)
@@ -615,7 +643,7 @@ class FieldTypedBaseDescriptorInfo(
     """
 
     @property
-    def value_type(self) -> type:
+    def value_type(self) -> type[Value]:
         """The type of the descriptor's value."""
         return self.get_descriptor().value_type
 
@@ -846,7 +874,7 @@ class DescriptorInfoCollection(
 
     _descriptorinfo_class: type[DescriptorInfoT]
     """The class of DescriptorInfo objects contained in this collection.
-    
+
     This class attribute must be set in subclasses.
     """
 
@@ -860,6 +888,8 @@ class DescriptorInfoCollection(
 
         :param key: The name of the descriptor whose info object is required.
         :return: The DescriptorInfo object for the named descriptor.
+        :raises KeyError: if the key does not refer to a descriptor of the right
+            type.
         """
         attr = getattr(self.owning_class, key, None)
         if isinstance(attr, BaseDescriptor):
@@ -873,7 +903,7 @@ class DescriptorInfoCollection(
     def __iter__(self) -> Iterator[str]:
         """Iterate over the names of the descriptors of the specified type.
 
-        :return: An iterator over the names of the descriptors.
+        :yield: The names of the descriptors.
         """
         for name, member in inspect.getmembers(self.owning_class):
             if isinstance(member, BaseDescriptor):
@@ -916,7 +946,7 @@ class OptionallyBoundDescriptor(Generic[Owner, OptionallyBoundInfoT]):
 
         :param obj: The object to which the info is bound, or `None`
             if unbound.
-        :param type: The class on which the info is defined.
+        :param cls: The class on which the info is defined.
 
         :return: An `OptionallyBoundInfo` object.
         """
