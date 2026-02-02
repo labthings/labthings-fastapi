@@ -39,9 +39,12 @@ import weakref
 from fastapi import FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
 
-from labthings_fastapi.middleware.url_for import URLFor
-
-from .base_descriptor import BaseDescriptor
+from .middleware.url_for import URLFor
+from .base_descriptor import (
+    BaseDescriptor,
+    BaseDescriptorInfo,
+    DescriptorInfoCollection,
+)
 from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus, LogRecordModel
@@ -591,6 +594,54 @@ ActionReturn = TypeVar("ActionReturn")
 OwnerT = TypeVar("OwnerT", bound="Thing")
 
 
+class ActionInfo(
+    BaseDescriptorInfo[
+        "ActionDescriptor", OwnerT, Callable[ActionParams, ActionReturn]
+    ],
+    Generic[OwnerT, ActionParams, ActionReturn],
+):
+    """Convenient access to the metadata of an action."""
+
+    @property
+    def response_timeout(self) -> float:
+        """The time to wait before replying to the HTTP request initiating an action."""
+        return self.get_descriptor().response_timeout
+
+    @property
+    def retention_time(self) -> float:
+        """How long to retain the action's output for, in seconds."""
+        return self.get_descriptor().retention_time
+
+    @property
+    def input_model(self) -> type[BaseModel]:
+        """A Pydantic model for the input parameters of an Action."""
+        return self.get_descriptor().input_model
+
+    @property
+    def output_model(self) -> type[BaseModel]:
+        """A Pydantic model for the output parameters of an Action."""
+        return self.get_descriptor().output_model
+
+    @property
+    def invocation_model(self) -> type[BaseModel]:
+        """A Pydantic model for an invocation of this action."""
+        return self.get_descriptor().invocation_model
+
+    @property
+    def func(self) -> Callable[Concatenate[OwnerT, ActionParams], ActionReturn]:
+        """The function that runs the action."""
+        return self.get_descriptor().func
+
+
+class ActionCollection(
+    DescriptorInfoCollection[OwnerT, ActionInfo],
+    Generic[OwnerT],
+):
+    """Access to the metadata of each Action."""
+
+    _descriptorinfo_class = ActionInfo
+
+
 class ActionDescriptor(
     BaseDescriptor[OwnerT, Callable[ActionParams, ActionReturn]],
     Generic[ActionParams, ActionReturn, OwnerT],
@@ -880,6 +931,15 @@ class ActionDescriptor(
             input=type_to_dataschema(self.input_model, title=f"{self.name}_input"),
             output=type_to_dataschema(self.output_model, title=f"{self.name}_output"),
         )
+
+    def descriptor_info(self, owner: OwnerT | None = None) -> ActionInfo:
+        """Return an `.ActionInfo` object describing this action.
+
+        The returned object will either refer to the class, or be bound to a particular
+        instance. If it is bound, more properties will be available - e.g. we will be
+        able to get the bound function.
+        """
+        return self._descriptor_info(ActionInfo, owner)
 
 
 @overload

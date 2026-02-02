@@ -27,7 +27,7 @@ from .properties import (
     PropertyCollection,
     SettingCollection,
 )
-from .actions import ActionDescriptor
+from .actions import ActionCollection, ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -256,6 +256,15 @@ class Thing:
 
     `.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
     convenient access to metadata of the settings of this `.Thing`\ .
+    """
+
+    actions: OptionallyBoundDescriptor["Thing", ActionCollection] = (
+        OptionallyBoundDescriptor(ActionCollection)
+    )
+    r"""Access to metadata for the actions of this `.Thing`\ .
+
+    `.Thing.actions` is a mapping of names to `.ActionInfo` objects that allows
+    convenient access to metadata of each action.
     """
 
     _labthings_thing_state: Optional[dict] = None
