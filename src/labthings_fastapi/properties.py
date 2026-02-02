@@ -62,7 +62,7 @@ from typing_extensions import Self
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, RootModel, create_model
+from pydantic import BaseModel, ConfigDict, RootModel, create_model
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -498,7 +498,12 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     def descriptor_info(
         self, owner: Owner | None = None
     ) -> PropertyInfo[Self, Owner, Value]:
-        """Return an object that allows access to this descriptor's metadata."""
+        r"""Return an object that allows access to this descriptor's metadata.
+
+        :param owner: An instance to bind the descriptor info to. If `None`\ ,
+            the returned object will be unbound and will only refer to the class.
+        :return: A `PropertyInfo` instance describing this property.
+        """
         return PropertyInfo(self, owner, self._owner_ref())
 
 
@@ -824,9 +829,64 @@ class PropertyInfo(
     """
 
     @builtins.property
-    def model(self) -> type[BaseModel]:
+    def model(self) -> type[BaseModel]:  # noqa: DOC201
         """A `pydantic.BaseModel` describing this property's value."""
         return self.get_descriptor().model
+
+    @builtins.property
+    def model_instance(self) -> BaseModel:  # noqa: DOC201
+        """An instance of ``self.model`` populated with the current value.
+
+        :raises TypeError: if the return value can't be wrapped in a model.
+        """
+        value = self.get()
+        if isinstance(value, BaseModel):
+            return value
+        else:
+            # If the return value isn't a model, we need to wrap it in a RootModel
+            # which we do using the model in self.model
+            cls = self.model
+            if not issubclass(cls, RootModel):
+                msg = (
+                    f"LabThings couldn't wrap the return value of {self.name} in "
+                    f"a model. This either means your property has an incorrect "
+                    f"type, or there is a bug in LabThings.\n\n"
+                    f"Value: {value}\n"
+                    f"Expected type: {self.value_type}\n"
+                    f"Actual type: {type(value)}\n"
+                    f"Model: {self.model}\n"
+                )
+                raise TypeError(msg)
+            return cls(root=value)
+
+    def model_to_value(self, value: BaseModel) -> Value:
+        r"""Convert a model to a value for this property.
+
+        Even properties with plain types are sometimes converted to or from a
+        `pydantic.BaseModel` to allow conversion to/from JSON. This is a convenience
+        method that accepts a model (which should be an instance of ``self.model``\ )
+        and unwraps it when necessary to get the plain Python value.
+
+        :param value: A `.BaseModel` instance to convert.
+        :return: the value, with `.RootModel` unwrapped so it matches the descriptor's
+            type.
+        :raises TypeError: if the supplied value cannot be converted to the right type.
+        """
+        if isinstance(value, self.value_type):
+            return value
+        elif isinstance(value, RootModel):
+            root = value.root
+            if isinstance(root, self.value_type):
+                return root
+        msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
+        raise TypeError(msg)
+
+    def set_without_emit_from_model(self, value: BaseModel) -> None:
+        """Set the value from a model instance, unwrapping RootModels as needed.
+
+        :param value: the model to extract the value from.
+        """
+        self.set_without_emit(self.model_to_value(value))
 
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
@@ -972,7 +1032,12 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
         raise NotImplementedError("This method should be implemented in subclasses.")
 
     def descriptor_info(self, owner: Owner | None = None) -> SettingInfo[Owner, Value]:
-        """Return an object that allows access to this descriptor's metadata."""
+        r"""Return an object that allows access to this descriptor's metadata.
+
+        :param owner: An instance to bind the descriptor info to. If `None`\ ,
+            the returned object will be unbound and will only refer to the class.
+        :return: A `SettingInfo` instance describing this setting.
+        """
         return SettingInfo(self, owner, self._owner_ref())
 
 
@@ -1073,6 +1138,14 @@ class SettingInfo(
 ):
     """Access to the metadata of a setting."""
 
+    def set_without_emit(self, value: Value) -> None:
+        """Set the value of the setting, but don't emit a notification.
+
+        :param value: the new value for the setting.
+        """
+        obj = self.owning_object_or_error()
+        self.get_descriptor().set_without_emit(obj, value)
+
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):
     """Access to metadata on all the properties of a `.Thing` instance or subclass.
@@ -1085,14 +1158,30 @@ class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Ow
     _descriptorinfo_class = SettingInfo
 
     @builtins.property
-    def model(self) -> type[BaseModel]:
+    def model(self) -> type[BaseModel]:  # noqa: DOC201
         """A `pydantic.BaseModel` representing all the settings.
 
         This `pydantic.BaseModel` is used to load and save the settings to a file.
+        Note that it uses the ``model`` of each setting, so every field in this model
+        will be either a `BaseModel` or a `RootModel` instance, unless it is missing.
+
+        Wrapping plain types in a `RootModel` makes no difference to the JSON, but it
+        means that constraints will be applied and it makes it easier to distinguish
+        between missing fields and fields that are set to `None`.
         """
         name = self.owning_object.name if self.owning_object else self.owning_class.name
-        fields = {key: (value.model, None) for key, value in self.items()}
+        fields = {key: (value.model | None, None) for key, value in self.items()}
         return create_model(  # type: ignore[call-overload]
-            f"{name}_settings_model",
-            **fields,
+            f"{name}_settings_model", **fields, __config__=ConfigDict(extra="forbid")
         )
+
+    @builtins.property
+    def model_instance(self) -> BaseModel:  # noqa: DOC201
+        """An instance of ``self.model`` populated with the current setting values."""
+        models = {
+            # Note that we need to populate it with models, not the bare types.
+            # This doesn't make a difference to the JSON.
+            name: setting.model_instance
+            for name, setting in self.items()
+        }
+        return self.model(**models)
