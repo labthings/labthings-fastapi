@@ -59,10 +59,10 @@ from typing import (
     TYPE_CHECKING,
 )
 from typing_extensions import Self
-from weakref import WeakSet
 
 from fastapi import Body, FastAPI
 from pydantic import BaseModel, ConfigDict, RootModel, create_model
+from anyio.abc import ObjectSendStream
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -71,15 +71,18 @@ from .thing_description._model import (
     PropertyAffordance,
     PropertyOp,
 )
-from .utilities import labthings_data, wrap_plain_types_in_rootmodel
+from .utilities import wrap_plain_types_in_rootmodel
 from .utilities.introspection import return_type
 from .base_descriptor import (
     DescriptorInfoCollection,
     FieldTypedBaseDescriptor,
     FieldTypedBaseDescriptorInfo,
 )
+from .events import Message
 from .exceptions import (
+    NotBoundToInstanceError,
     NotConnectedToServerError,
+    PropertyNotObservableError,
     ReadOnlyPropertyError,
     MissingTypeError,
     UnsupportedConstraintError,
@@ -391,6 +394,39 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             )
         return self._model
 
+    def value_to_model(self, value: Value) -> BaseModel:
+        """Convert a property value to its Pydantic model representation.
+
+        :param value: the property value.
+        :return: the property value wrapped in its Pydantic model.
+        """
+        if isinstance(value, BaseModel):
+            return value
+        else:
+            # If the return value isn't a model, we need to wrap it in a RootModel
+            # which we do using the model in self.model
+            cls = self.model
+            if not issubclass(cls, RootModel):
+                msg = (
+                    f"LabThings couldn't wrap the return value of {self.name} in "
+                    f"a model. This either means your property has an incorrect "
+                    f"type, or there is a bug in LabThings.\n\n"
+                    f"Value: {value}\n"
+                    f"Expected type: {self.value_type}\n"
+                    f"Actual type: {type(value)}\n"
+                    f"Model: {self.model}\n"
+                )
+                raise TypeError(msg)
+            return cls(root=value)
+
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable.
+
+        :raises NotImplementedError: as this must be implemented by subclasses.
+        """
+        raise NotImplementedError("observable must be implemented by subclasses.")
+
     def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
@@ -606,24 +642,9 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """
         obj.__dict__[self.name] = value
         if emit_changed_event:
-            self.emit_changed_event(obj, value)
+            self.publish_change(obj, self.value_to_model(value))
 
-    def _observers_set(self, obj: Thing) -> WeakSet:
-        """Return the observers of this property.
-
-        Each observer in this set will be notified when the property is changed.
-        See ``.DataProperty.emit_changed_event``
-
-        :param obj: the `.Thing` to which we are attached.
-
-        :return: the set of observers corresponding to ``obj``.
-        """
-        ld = labthings_data(obj)
-        if self.name not in ld.property_observers:
-            ld.property_observers[self.name] = WeakSet()
-        return ld.property_observers[self.name]
-
-    def emit_changed_event(self, obj: Thing, value: Value) -> None:
+    def publish_change(self, obj: Thing, value: BaseModel) -> None:
         """Notify subscribers that the property has changed.
 
         This function is run when properties are updated. It must be run from
@@ -632,31 +653,24 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         thread as it is communicating with the event loop via an `asyncio` blocking
         portal and can cause deadlock if run in the event loop.
 
-        This method will raise a `.ServerNotRunningError` if the event loop is not
-        running, and should only be called after the server has started.
+        This method will silently do nothing if the event loop is not running.
 
         :param obj: the `.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
         """
-        obj._thing_server_interface.start_async_task_soon(
-            self.emit_changed_event_async,
-            obj,
-            value,
+        obj._thing_server_interface.publish(
+            Message(
+                thing=obj.name,
+                affordance=self.name,
+                message_type="property",
+                payload=value,
+            )
         )
 
-    async def emit_changed_event_async(self, obj: Thing, value: Value) -> None:
-        """Notify subscribers that the property has changed.
-
-        This function may only be run in the `anyio` event loop. See
-        `.DataProperty.emit_changed_event`.
-
-        :param obj: the `.Thing` to which we are attached.
-        :param value: the new property value, to be sent to observers.
-        """
-        for observer in self._observers_set(obj):
-            await observer.send(
-                {"messageType": "propertyStatus", "data": {self._name: value}}
-            )
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable. Always True for DataProperty."""
+        return True
 
 
 class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
@@ -816,6 +830,11 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
         self.fset(obj, value)
 
+    @builtins.property
+    def observable(self) -> bool:
+        """Whether this property is observable. Always False for FunctionalProperty."""
+        return False
+
 
 class PropertyInfo(
     FieldTypedBaseDescriptorInfo[BasePropertyT, Owner, Value],
@@ -839,25 +858,7 @@ class PropertyInfo(
 
         :raises TypeError: if the return value can't be wrapped in a model.
         """
-        value = self.get()
-        if isinstance(value, BaseModel):
-            return value
-        else:
-            # If the return value isn't a model, we need to wrap it in a RootModel
-            # which we do using the model in self.model
-            cls = self.model
-            if not issubclass(cls, RootModel):
-                msg = (
-                    f"LabThings couldn't wrap the return value of {self.name} in "
-                    f"a model. This either means your property has an incorrect "
-                    f"type, or there is a bug in LabThings.\n\n"
-                    f"Value: {value}\n"
-                    f"Expected type: {self.value_type}\n"
-                    f"Actual type: {type(value)}\n"
-                    f"Model: {self.model}\n"
-                )
-                raise TypeError(msg)
-            return cls(root=value)
+        return self.get_descriptor().value_to_model(self.get())
 
     def model_to_value(self, value: BaseModel) -> Value:
         r"""Convert a model to a value for this property.
@@ -880,6 +881,36 @@ class PropertyInfo(
                 return root
         msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
         raise TypeError(msg)
+
+    @builtins.property
+    def observable(self) -> bool:  # noqa: DOC201
+        """Whether this property is observable.
+
+        Observable properties may be observed for changes using the
+        `.PropertyInfo.observe` method.
+
+        :return: `True` if the property is observable, `False` otherwise.
+        """
+        return isinstance(self.get_descriptor(), DataProperty)
+
+    def observe(self, stream: ObjectSendStream[Message]) -> None:
+        """Observe changes to this property.
+
+        Changes to this property will be sent to the supplied stream.
+
+        :param stream: The stream to which updated values should be sent.
+
+        :raises NotBoundToInstanceError: if this `.PropertyInfo` is not
+            bound to a `.Thing` instance.
+        :raises PropertyNotObservableError: if this property is not observable.
+        """
+        if self.owning_object is None:
+            msg = "Can't observe property changes from an unbound PropertyInfo."
+            raise NotBoundToInstanceError(msg)
+        if not self.observable:
+            msg = f"Property {self.name} is not observable."
+            raise PropertyNotObservableError(msg)
+        self.owning_object._thing_server_interface.subscribe(self.name, stream)
 
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):

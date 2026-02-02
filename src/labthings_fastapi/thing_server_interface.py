@@ -14,11 +14,14 @@ from typing import (
 )
 from weakref import ref, ReferenceType
 
+from anyio.abc import ObjectSendStream
+
 from .exceptions import ServerNotRunningError
 
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
+    from .events import MessageBroker, Message
 
 
 Params = ParamSpec("Params")
@@ -131,6 +134,33 @@ class ThingServerInterface:
             raise ServerNotRunningError("Can't run async code without an event loop.")
         return portal.call(async_function, *args)
 
+    def publish(self, message: Message) -> None:
+        """Publish an event.
+
+        Use the async event loop to notify websocket subscribers that something has
+        happened.
+
+        Note that this function will do nothing if the event loop is not yet running.
+
+        :param affordance: the name of the affordance publishing the event.
+        :param message: the message being published.
+        """
+        try:
+            self.start_async_task_soon(self._message_broker.publish, message)
+        except ServerNotRunningError:
+            pass  # If the server isn't running yet, we can't publish events.
+
+    def subscribe(self, affordance: str, stream: ObjectSendStream[Message]) -> None:
+        """Subscribe to events from an affordance.
+
+        Use the async event loop to register a stream to receive events
+        from a particular affordance on this Thing.
+
+        :param affordance: the name of the affordance to subscribe to.
+        :param stream: the stream to which events should be sent.
+        """
+        self._message_broker.subscribe(self.name, affordance, stream)
+
     @property
     def settings_folder(self) -> str:
         """The path to a folder where persistent files may be saved."""
@@ -175,3 +205,11 @@ class ThingServerInterface:
         This property may be removed in future, and is for internal use only.
         """
         return self._get_server().action_manager
+
+    @property
+    def _message_broker(self) -> MessageBroker:
+        """The message broker attached to the server.
+
+        This property may be removed in the future, and is for internal use.
+        """
+        return self._get_server().message_broker

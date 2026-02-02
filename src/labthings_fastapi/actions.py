@@ -34,10 +34,10 @@ from typing import (
     TypeVar,
     overload,
 )
-from weakref import WeakSet
 import weakref
 from fastapi import FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
+from anyio.abc import ObjectSendStream
 
 from .base_descriptor import (
     BaseDescriptor,
@@ -48,10 +48,12 @@ from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus, LogRecordModel
 from .dependencies.invocation import NonWarningInvocationID
+from .events import Message
 from .exceptions import (
     InvocationCancelledError,
     InvocationError,
     NoBlobManagerError,
+    NotBoundToInstanceError,
     NotConnectedToServerError,
 )
 from .outputs.blob import BlobIOContextDep, blobdata_to_url_ctx
@@ -65,7 +67,6 @@ from .utilities.introspection import (
 )
 from .thing_description import type_to_dataschema
 from .thing_description._model import ActionAffordance, ActionOp, Form, LinkElement
-from .utilities import labthings_data
 
 
 if TYPE_CHECKING:
@@ -664,6 +665,18 @@ class ActionInfo(
         """The function that runs the action."""
         return self.get_descriptor().func
 
+    def observe(self, stream: ObjectSendStream[Message]) -> None:
+        """Observe changes to this property.
+
+        Changes to this property will be sent to the supplied stream.
+
+        :param stream: The stream to which updated values should be sent.
+        """
+        if self.owning_object is None:
+            msg = "Can't observe action status from an unbound ActionInfo."
+            raise NotBoundToInstanceError(msg)
+        self.owning_object._thing_server_interface.subscribe(self.name, stream)
+
 
 class ActionCollection(
     DescriptorInfoCollection[OwnerT, ActionInfo],
@@ -771,23 +784,6 @@ class ActionDescriptor(
         :return: the action function, bound to ``obj``.
         """
         return partial(self.func, obj)
-
-    def _observers_set(self, obj: Thing) -> WeakSet:
-        """Return a set used to notify changes.
-
-        Note that we need to supply the `.Thing` we are looking at, as in
-        general there may be more than one object of the same type, and
-        descriptor instances are shared between all instances of their class.
-
-        :param obj: The `.Thing` on which the action is being observed.
-
-        :return: a weak set of callables to notify on changes to the action.
-            This is used by websocket endpoints.
-        """
-        ld = labthings_data(obj)
-        if self.name not in ld.action_observers:
-            ld.action_observers[self.name] = WeakSet()
-        return ld.action_observers[self.name]
 
     def emit_changed_event(self, obj: Thing, status: str) -> None:
         """Notify subscribers that the action status has changed.

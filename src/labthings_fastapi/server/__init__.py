@@ -27,6 +27,7 @@ from ..thing import Thing
 from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
 from ..dependencies.thing_server import _thing_servers  # noqa: F401
+from ..events import MessageBroker
 from .config_model import (
     ThingsConfig,
     ThingServerConfig,
@@ -92,6 +93,7 @@ class ThingServer:
         blob_data_manager.attach_to_app(self.app)
         self._add_things_view_to_app()
         self.blocking_portal: Optional[BlockingPortal] = None
+        self.message_broker = MessageBroker()
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
         _thing_servers.add(self)

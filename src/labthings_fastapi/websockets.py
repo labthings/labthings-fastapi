@@ -1,21 +1,14 @@
-"""Handle notification of events, property, and action status changes.
+r"""Handle notification of events, property, and action status changes via web sockets.
 
-There are several kinds of "event" in the WoT vocabulary, not all of which
-are called Event, which is why this module is called `notifications`.
-In all cases, these are events that happen on an exposed Thing, and
-may need to be relayed to one or more listeners (currently via a
-WebSocket connection, though long polling may also be an option in the
-future).
-
-The aim at this stage (July 2023) is for a minimal working example that
-enables property changes to be fed via a websocket. Events proper should
-not be a big step thereafter.
+This module implements a websocket endpoint for a `.Thing`\ . It follows the
+subprotocol set out at https://w3c.github.io/web-thing-protocol/ though compliance
+with this protocol is not yet verified.
 
 The W3C standard does not define a way for one websocket to handle
 multiple Things, so for now the websocket endpoint will be associated
 with a single Thing instance. This may change in the future.
 
-(c) Richard Bowman July 2023, released under GNU-LGPL-3.0
+(c) Richard Bowman July 2023, released under MIT license
 """
 
 from __future__ import annotations
@@ -23,9 +16,12 @@ from anyio import create_memory_object_stream, create_task_group
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
 import logging
 from fastapi import WebSocket, WebSocketDisconnect
-from fastapi.encoders import jsonable_encoder
 from typing import TYPE_CHECKING, Literal
+
+from labthings_fastapi.middleware.url_for import URLFor
 from .exceptions import PropertyNotObservableError
+from .events import Message
+from . import webthing_subprotocol
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -35,8 +31,11 @@ WEBTHING_ERROR_URL = "https://w3c.github.io/web-thing-protocol/errors"
 
 
 def observation_error_response(
-    name: str, affordance_type: Literal["action", "property"], exception: Exception
-) -> dict[str, str | dict]:
+    thing: Thing,
+    affordance: str,
+    affordance_type: Literal["action", "property"],
+    exception: Exception,
+) -> webthing_subprotocol.ObservationErrorResponse:
     r"""Generate a websocket error response for observing an action or property.
 
     When a websocket client asks to observe a property or action that either
@@ -52,31 +51,39 @@ def observation_error_response(
         or `.PropertyNotObservableError`\ .
     """
     if isinstance(exception, KeyError):
-        error = {
-            "status": "404",
-            "type": f"{WEBTHING_ERROR_URL}#not-found",
-            "title": "Not Found",
-            "detail": f"No {affordance_type} found with the name '{name}'.",
-        }
+        error = webthing_subprotocol.ProblemDetails(
+            status=404,
+            type=f"{WEBTHING_ERROR_URL}#not-found",
+            title="Not Found",
+            detail=f"No {affordance_type} found with the name '{affordance}'.",
+        )
     elif isinstance(exception, PropertyNotObservableError):
-        error = {
-            "status": "403",
-            "type": f"{WEBTHING_ERROR_URL}#not-observable",
-            "title": "Not Observable",
-            "detail": f"Property '{name}' is not observable.",
-        }
+        error = webthing_subprotocol.ProblemDetails(
+            status=403,
+            type=f"{WEBTHING_ERROR_URL}#not-observable",
+            title="Not Observable",
+            detail=f"Property '{affordance}' is not observable.",
+        )
     else:
         raise TypeError(f"Can't generate an error response for {exception}.")
-    return {
-        "messageType": "response",
-        "operation": f"observe{affordance_type}",
-        "name": name,
-        "error": error,
-    }
+    return webthing_subprotocol.ObservationErrorResponse(
+        thingID=URLFor(f"things.{thing.name}"),
+        messageType="response",
+        operation="observeaction" if affordance_type == "action" else "observeproperty",
+        name=affordance,
+        error=error,
+    )
+
+
+NOTIFICATION_MODELS = {
+    "property": webthing_subprotocol.ObservePropertyNotification,
+    "action": webthing_subprotocol.ObserveActionNotification,
+    "event": webthing_subprotocol.ObserveEventNotification,
+}
 
 
 async def relay_notifications_to_websocket(
-    websocket: WebSocket, receive_stream: ObjectReceiveStream
+    websocket: WebSocket, receive_stream: ObjectReceiveStream[Message]
 ) -> None:
     """Relay objects from a stream to a websocket as JSON.
 
@@ -90,11 +97,11 @@ async def relay_notifications_to_websocket(
     """
     async with receive_stream:
         async for item in receive_stream:
-            await websocket.send_json(jsonable_encoder(item))
+            await websocket.send_text(item.model_dump_json())
 
 
 async def process_messages_from_websocket(
-    websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
+    websocket: WebSocket, send_stream: ObjectSendStream[Message], thing: Thing
 ) -> None:
     r"""Process messages received from a websocket.
 
@@ -114,20 +121,26 @@ async def process_messages_from_websocket(
         except WebSocketDisconnect:
             await send_stream.aclose()
             return
-        if data["messageType"] == "addPropertyObservation":
+        if data["messageType"] == "request" and data["operation"] == "observeproperty":
             try:
-                for k in data["data"].keys():
-                    thing.observe_property(k, send_stream)
+                k = data.get("name", default="")  # The empty string will raise KeyError
+                thing.properties[k].observe(send_stream)
             except (KeyError, PropertyNotObservableError) as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
                 await send_stream.send(observation_error_response(k, "property", e))
-        if data["messageType"] == "addActionObservation":
+        if data["messageType"] == "request" and data["operation"] == "observeaction":
             try:
-                for k in data["data"].keys():
-                    thing.observe_action(k, send_stream)
+                k = data.get("name", default="")  # The empty string will raise KeyError
+                thing.actions[k].observe(send_stream)
             except KeyError as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
                 await send_stream.send(observation_error_response(k, "action", e))
+        else:
+            logging.error(f"Got an unknown websocket message: {data}.")
+            # Close the stream rather than ignoring bad messages. This will
+            # cause the websocket client to error out rather than hanging.
+            await send_stream.aclose()
+            return
 
 
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
@@ -141,7 +154,7 @@ async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
     :param websocket: the web socket that has been created.
     """
     await websocket.accept()
-    send_stream, receive_stream = create_memory_object_stream[dict]()
+    send_stream, receive_stream = create_memory_object_stream[Message]()
     async with create_task_group() as tg:
         tg.start_soon(relay_notifications_to_websocket, websocket, receive_stream)
         tg.start_soon(process_messages_from_websocket, websocket, send_stream, thing)

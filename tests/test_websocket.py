@@ -1,4 +1,6 @@
+from anyio import create_memory_object_stream
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
@@ -86,17 +88,18 @@ def thing():
     return create_thing_without_server(ThingWithProperties)
 
 
-def test_observing_dataprop(thing, mocker):
+def test_observing_dataprop(thing):
     """Check `observe_property` is OK on a data property.
 
     This checks that something is added to the set of observers.
     We don't check for events, as there's no event loop: this is
     tested in `test_observing_dataprop_with_ws` below.
     """
-    observers_set = ThingWithProperties.dataprop._observers_set(thing)
-    fake_observer = mocker.Mock()
-    thing.observe_property("dataprop", fake_observer)
-    assert fake_observer in observers_set
+    send_stream, receive_stream = create_memory_object_stream[BaseModel]()
+    thing.properties["dataprop"].observe(send_stream)
+    event_broker = thing._thing_server_interface._event_broker
+    observers_set = event_broker._subscriptions[thing.name]["dataprop"]
+    assert send_stream in observers_set
 
 
 @pytest.mark.parametrize(
@@ -113,7 +116,7 @@ def test_observing_dataprop(thing, mocker):
 def test_observing_errors(thing, mocker, name, exception):
     """Check errors are raised if we observe an unsuitable property."""
     with pytest.raises(exception):
-        thing.observe_property(name, mocker.Mock())
+        thing.properties[name].observe(mocker.Mock())
 
 
 def test_observing_dataprop_with_ws(client, ws):
@@ -125,8 +128,9 @@ def test_observing_dataprop_with_ws(client, ws):
     # Observe the property.
     ws.send_json(
         {
-            "messageType": "addPropertyObservation",
-            "data": {"dataprop": True},
+            "messageType": "request",
+            "operation": "observeproperty",
+            "name": "dataprop",
         }
     )
     for val in [1, 10, 0]:
@@ -134,24 +138,28 @@ def test_observing_dataprop_with_ws(client, ws):
         client.put("/thing/dataprop", json=val)
         # Receive the message and check it's as expected.
         message = ws.receive_json(mode="text")
-        assert message["messageType"] == "propertyStatus"
-        assert message["data"]["dataprop"] == val
+        assert message["messageType"] == "notification"
+        assert message["operation"] == "observeproperty"
+        assert message["name"] == "dataprop"
+        assert message["value"] == val
     # Increment the value with an action
     client.post("/thing/increment_dataprop")
     message = ws.receive_json(mode="text")
-    assert message["messageType"] == "propertyStatus"
-    assert message["data"]["dataprop"] == 1
+    assert message["messageType"] == "notification"
+    assert message["operation"] == "observeproperty"
+    assert message["name"] == "dataprop"
+    assert message["value"] == 1
 
 
 @pytest.mark.parametrize(
     argnames=["name", "title", "status"],
     argvalues=[
-        ("funcprop", "Not Observable", "403"),
-        ("non_property", "Not Found", "404"),
-        ("python_property", "Not Found", "404"),
-        ("undecorated", "Not Found", "404"),
-        ("increment_dataprop", "Not Found", "404"),
-        ("missing", "Not Found", "404"),
+        ("funcprop", "Not Observable", 403),
+        ("non_property", "Not Found", 404),
+        ("python_property", "Not Found", 404),
+        ("undecorated", "Not Found", 404),
+        ("increment_dataprop", "Not Found", 404),
+        ("missing", "Not Found", 404),
     ],
 )
 def test_observing_dataprop_error_with_ws(ws, name, title, status):
@@ -162,8 +170,9 @@ def test_observing_dataprop_error_with_ws(ws, name, title, status):
     # Observe the property.
     ws.send_json(
         {
-            "messageType": "addPropertyObservation",
-            "data": {name: True},
+            "messageType": "request",
+            "operation": "observeproperty",
+            "name": name,
         }
     )
     # Receive the message and check for the error.
@@ -178,9 +187,10 @@ def test_observing_action(thing, mocker):
     This verifies we've added an observer to the set, but doesn't test for
     notifications: that would require an event loop.
     """
-    observers_set = ThingWithProperties.increment_dataprop._observers_set(thing)
     fake_observer = mocker.Mock()
-    thing.observe_action("increment_dataprop", fake_observer)
+    thing.actions["increment_dataprop"].observe(fake_observer)
+    event_broker = thing._thing_server_interface._event_broker
+    observers_set = event_broker._subscriptions[thing.name]["increment_dataprop"]
     assert fake_observer in observers_set
 
 
@@ -190,7 +200,7 @@ def test_observing_action(thing, mocker):
 def test_observing_action_error(thing, mocker, name):
     """Check observing an attribute that's not an action raises an error."""
     with pytest.raises(KeyError):
-        thing.observe_action(name, mocker.Mock())
+        thing.actions[name].observe(mocker.Mock())
 
 
 @pytest.mark.parametrize(
@@ -206,8 +216,9 @@ def test_observing_action_with_ws(client, ws, name, final_status):
     # Observe the property.
     ws.send_json(
         {
-            "messageType": "addActionObservation",
-            "data": {name: True},
+            "messageType": "request",
+            "operation": "observeaction",
+            "name": name,
         }
     )
     # Invoke the action (via HTTP)
@@ -215,8 +226,10 @@ def test_observing_action_with_ws(client, ws, name, final_status):
     # We should see the status go through the expected sequence
     for expected_status in ["pending", "running", final_status]:
         message = ws.receive_json(mode="text")
-        assert message["messageType"] == "actionStatus"
-        assert message["data"]["status"] == expected_status
+        assert message["messageType"] == "notification"
+        assert message["operation"] == "observeaction"
+        assert message["name"] == name
+        assert message["status"] == expected_status
 
 
 @pytest.mark.parametrize(
@@ -230,11 +243,12 @@ def test_observing_action_error_with_ws(ws, name):
     # Observe the property.
     ws.send_json(
         {
-            "messageType": "addActionObservation",
-            "data": {name: True},
+            "messageType": "request",
+            "operation": "observeaction",
+            "name": name,
         }
     )
     # Receive the message and check for the error.
     message = ws.receive_json(mode="text")
     assert message["error"]["title"] == "Not Found"
-    assert message["error"]["status"] == "404"
+    assert message["error"]["status"] == 404
