@@ -247,10 +247,10 @@ class Invocation(Thread):
         ]
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
-        return self.action.invocation_model(  # type: ignore[call-overload]
+        return self.action.invocation_model(  # type: ignore[attr-defined]
             status=self.status,
             id=self.id,
-            action=self.thing.path + self.action.name,  # type: ignore[call-overload]
+            action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
             href=href,
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
@@ -290,7 +290,7 @@ class Invocation(Thread):
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
-        action: ActionDescriptor = self.action  # type: ignore[call-overload]
+        action: ActionDescriptor = self.action  # type: ignore[assignment]
         logger = self.thing.logger
         # The line below saves records matching our ID to ``self._log``
         add_thing_log_destination(self.id, self._log)
@@ -445,10 +445,7 @@ class ActionManager:
             i.response(request=request)
             for i in self.invocations
             if thing is None or i.thing == thing
-            if action is None or i.action == action  # type: ignore[call-overload]
-            # i.action evaluates to an ActionDescriptor, which confuses mypy - it
-            # thinks we are calling ActionDescriptor.__get__ but this isn't ever
-            # called.
+            if action is None or i.action == action
         ]
 
     def expire_invocations(self) -> None:
@@ -626,7 +623,7 @@ OwnerT = TypeVar("OwnerT", bound="Thing")
 
 
 class ActionDescriptor(
-    BaseDescriptor[Callable[ActionParams, ActionReturn]],
+    BaseDescriptor[OwnerT, Callable[ActionParams, ActionReturn]],
     Generic[ActionParams, ActionReturn, OwnerT],
 ):
     """Wrap actions to enable them to be run over HTTP.
@@ -691,7 +688,7 @@ class ActionDescriptor(
         )
         self.invocation_model.__name__ = f"{name}_invocation"
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[OwnerT], name: str) -> None:
         """Ensure the action name matches the function name.
 
         It's assumed in a few places that the function name and the
@@ -709,7 +706,7 @@ class ActionDescriptor(
                 f"'{self.func.__name__}'",
             )
 
-    def instance_get(self, obj: Thing) -> Callable[ActionParams, ActionReturn]:
+    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
         """Return the function, bound to an object as for a normal method.
 
         This currently doesn't validate the arguments, though it may do so
@@ -721,10 +718,7 @@ class ActionDescriptor(
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        # `obj` should be of type `OwnerT`, but `BaseDescriptor` currently
-        # isn't generic in the type of the owning Thing, so we can't express
-        # that here.
-        return partial(self.func, obj)  # type: ignore[arg-type]
+        return partial(self.func, obj)
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.

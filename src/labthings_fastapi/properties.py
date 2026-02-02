@@ -54,7 +54,6 @@ from typing import (
     Any,
     Callable,
     Generic,
-    TypeAlias,
     TypeVar,
     overload,
     TYPE_CHECKING,
@@ -133,29 +132,16 @@ class MissingDefaultError(ValueError):
 
 
 Value = TypeVar("Value")
-if TYPE_CHECKING:
-    # It's hard to type check methods, because the type of ``self``
-    # will be a subclass of `.Thing`, and `Callable` types are
-    # contravariant in their arguments (i.e.
-    # ``Callable[[SpecificThing,], Value])`` is not a subtype of
-    # ``Callable[[Thing,], Value]``.
-    # It is probably not particularly important for us to check th
-    # type of ``self`` when decorating methods, so it is left as
-    # ``Any`` to avoid the major confusion that would result from
-    # trying to type it more tightly.
-    #
-    # Note: in ``@overload`` definitions, it's sometimes necessary
-    # to avoid the use of these aliases, as ``mypy`` can't
-    # pick which variant is in use without the explicit `Callable`.
-    ValueFactory: TypeAlias = Callable[[], Value]
-    ValueGetter: TypeAlias = Callable[[Any], Value]
-    ValueSetter: TypeAlias = Callable[[Any, Value], None]
+"""The value returned by a property."""
+
+Owner = TypeVar("Owner", bound="Thing")
+"""The `.Thing` instance on which a property is bound."""
 
 
 def default_factory_from_arguments(
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
-) -> ValueFactory:
+    default_factory: Callable[[], Value] | None = None,
+) -> Callable[[], Value]:
     """Process default arguments to get a default factory function.
 
     This function takes the ``default`` and ``default_factory`` arguments
@@ -197,10 +183,10 @@ def default_factory_from_arguments(
         # If both default and default_factory are set, we raise an error.
         raise OverspecifiedDefaultError()
     if default is not ...:
-
-        def default_factory() -> Value:
-            return default
-
+        # We return a function that returns the static default value.
+        # This means we always have a factory function, which simplifies
+        # the rest of the code.
+        return lambda: default
     if not callable(default_factory):
         raise MissingDefaultError("The default_factory must be callable.")
     return default_factory
@@ -209,8 +195,8 @@ def default_factory_from_arguments(
 # See comment at the top of the file regarding ignored linter rules.
 @overload  # use as a decorator  @property
 def property(
-    getter: Callable[[Any], Value],
-) -> FunctionalProperty[Value]: ...
+    getter: Callable[[Owner], Value],
+) -> FunctionalProperty[Owner, Value]: ...
 
 
 @overload  # use as `field: int = property(default=0)`
@@ -226,13 +212,13 @@ def property(
 
 
 def property(
-    getter: ValueGetter | EllipsisType = ...,
+    getter: Callable[[Owner], Value] | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
+    default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
     **constraints: Any,
-) -> Value | FunctionalProperty[Value]:
+) -> Value | FunctionalProperty[Owner, Value]:
     r"""Define a Property on a `.Thing`\ .
 
     This function may be used to define :ref:`properties` in
@@ -328,7 +314,7 @@ def property(
     )
 
 
-class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
+class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]):
     """A descriptor that marks Properties on Things.
 
     This class is used to determine whether an attribute of a `.Thing` should
@@ -396,7 +382,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
             )
         return self._model
 
-    def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
+    def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
         :param app: The FastAPI application we are adding endpoints to.
@@ -487,7 +473,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
             }
         )
 
-    def __set__(self, obj: Thing, value: Any) -> None:
+    def __set__(self, obj: Owner, value: Any) -> None:
         """Set the property (stub method).
 
         This is a stub ``__set__`` method to mark this as a data descriptor.
@@ -501,7 +487,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Value], Generic[Value]):
         )
 
 
-class DataProperty(BaseProperty[Value], Generic[Value]):
+class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A Property descriptor that acts like a regular variable.
 
     `.DataProperty` descriptors remember their value, and can be read and
@@ -521,7 +507,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
     def __init__(  # noqa: DOC101,DOC103
         self,
         *,
-        default_factory: ValueFactory,
+        default_factory: Callable[[], Value],
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
     ) -> None: ...
@@ -530,7 +516,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         self,
         default: Value | EllipsisType = ...,
         *,
-        default_factory: ValueFactory | None = None,
+        default_factory: Callable[[], Value] | None = None,
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
     ) -> None:
@@ -573,7 +559,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         )
         self.readonly = readonly
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Return the property's value.
 
         This will supply a default if the property has not yet been set.
@@ -588,7 +574,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
         return obj.__dict__[self.name]
 
     def __set__(
-        self, obj: Thing, value: Value, emit_changed_event: bool = True
+        self, obj: Owner, value: Value, emit_changed_event: bool = True
     ) -> None:
         """Set the property's value.
 
@@ -653,7 +639,7 @@ class DataProperty(BaseProperty[Value], Generic[Value]):
             )
 
 
-class FunctionalProperty(BaseProperty[Value], Generic[Value]):
+class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A property that uses a getter and a setter.
 
     For properties that should work like variables, use `.DataProperty`. For
@@ -665,7 +651,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
     def __init__(
         self,
-        fget: ValueGetter,
+        fget: Callable[[Owner], Value],
         constraints: Mapping[str, Any] | None = None,
     ) -> None:
         """Set up a FunctionalProperty.
@@ -683,7 +669,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__(constraints=constraints)
-        self._fget: ValueGetter = fget
+        self._fget = fget
         self._type = return_type(self._fget)
         if self._type is None:
             msg = (
@@ -691,20 +677,20 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
                 "Return type annotations are required for property getters."
             )
             raise MissingTypeError(msg)
-        self._fset: ValueSetter | None = None
+        self._fset: Callable[[Owner, Value], None] | None = None
         self.readonly: bool = True
 
     @builtins.property
-    def fget(self) -> ValueGetter:  # noqa: DOC201
+    def fget(self) -> Callable[[Owner], Value]:  # noqa: DOC201
         """The getter function."""
         return self._fget
 
     @builtins.property
-    def fset(self) -> ValueSetter | None:  # noqa: DOC201
+    def fset(self) -> Callable[[Owner, Value], None] | None:  # noqa: DOC201
         """The setter function."""
         return self._fset
 
-    def getter(self, fget: ValueGetter) -> Self:
+    def getter(self, fget: Callable[[Owner], Value]) -> Self:
         """Set the getter function of the property.
 
         This function returns the descriptor, so it may be used as a decorator.
@@ -718,7 +704,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         self.__doc__ = fget.__doc__
         return self
 
-    def setter(self, fset: ValueSetter) -> Self:
+    def setter(self, fset: Callable[[Owner, Value], None]) -> Self:
         r"""Set the setter function of the property.
 
         This function returns the descriptor, so it may be used as a decorator.
@@ -790,7 +776,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
             return fset  # type: ignore[return-value]
         return self
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Get the value of the property.
 
         :param obj: the `.Thing` on which the attribute is accessed.
@@ -798,7 +784,7 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
         """
         return self.fget(obj)
 
-    def __set__(self, obj: Thing, value: Value) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the value of the property.
 
         :param obj: the `.Thing` on which the attribute is accessed.
@@ -813,8 +799,8 @@ class FunctionalProperty(BaseProperty[Value], Generic[Value]):
 
 @overload  # use as a decorator  @setting
 def setting(
-    getter: Callable[[Any], Value],
-) -> FunctionalSetting[Value]: ...
+    getter: Callable[[Owner], Value],
+) -> FunctionalSetting[Owner, Value]: ...
 
 
 @overload  # use as `field: int = setting(default=0)``
@@ -828,13 +814,13 @@ def setting(
 
 
 def setting(
-    getter: ValueGetter | EllipsisType = ...,
+    getter: Callable[[Owner], Value] | EllipsisType = ...,
     *,
     default: Value | EllipsisType = ...,
-    default_factory: ValueFactory | None = None,
+    default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
     **constraints: Any,
-) -> FunctionalSetting[Value] | Value:
+) -> FunctionalSetting[Owner, Value] | Value:
     r"""Define a Setting on a `.Thing`\ .
 
     A setting is a property that is saved to disk.
@@ -920,7 +906,7 @@ def setting(
     )
 
 
-class BaseSetting(BaseProperty[Value], Generic[Value]):
+class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
     r"""A base class for settings.
 
     This is a subclass of `.BaseProperty` that is used to define settings.
@@ -928,7 +914,7 @@ class BaseSetting(BaseProperty[Value], Generic[Value]):
     two concrete implementations: `.DataSetting` and `.FunctionalSetting`\ .
     """
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the setting's value without emitting an event.
 
         This is used to set the setting's value without notifying observers.
@@ -943,7 +929,9 @@ class BaseSetting(BaseProperty[Value], Generic[Value]):
         raise NotImplementedError("This method should be implemented in subclasses.")
 
 
-class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
+class DataSetting(
+    DataProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
+):
     """A `.DataProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
@@ -961,7 +949,7 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
     """
 
     def __set__(
-        self, obj: Thing, value: Value, emit_changed_event: bool = True
+        self, obj: Owner, value: Value, emit_changed_event: bool = True
     ) -> None:
         """Set the setting's value.
 
@@ -974,7 +962,7 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
         super().__set__(obj, value, emit_changed_event)
         obj.save_settings()
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the property's value, but do not emit event to notify the server.
 
         This function is not expected to be used externally. It is called during
@@ -987,7 +975,9 @@ class DataSetting(DataProperty[Value], BaseSetting[Value], Generic[Value]):
         super().__set__(obj, value, emit_changed_event=False)
 
 
-class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[Value]):
+class FunctionalSetting(
+    FunctionalProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
+):
     """A `.FunctionalProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
@@ -1005,7 +995,7 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
     getter and a setter function.
     """
 
-    def __set__(self, obj: Thing, value: Value) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the setting's value.
 
         This will cause the settings to be saved to disk.
@@ -1016,7 +1006,7 @@ class FunctionalSetting(FunctionalProperty[Value], BaseSetting[Value], Generic[V
         super().__set__(obj, value)
         obj.save_settings()
 
-    def set_without_emit(self, obj: Thing, value: Value) -> None:
+    def set_without_emit(self, obj: Owner, value: Value) -> None:
         """Set the property's value, but do not emit event to notify the server.
 
         This function is not expected to be used externally. It is called during

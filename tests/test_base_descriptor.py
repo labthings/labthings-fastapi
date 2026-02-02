@@ -9,9 +9,10 @@ from labthings_fastapi.base_descriptor import (
 )
 from .utilities import raises_or_is_caused_by
 from labthings_fastapi.exceptions import MissingTypeError, InconsistentTypeError
+import labthings_fastapi as lt
 
 
-class MockProperty(BaseDescriptor[str]):
+class MockProperty(BaseDescriptor[lt.Thing, str]):
     """A mock property class."""
 
     # The line below isn't defined on a `Thing`, so mypy
@@ -299,10 +300,10 @@ class FieldTypedExample:
     """An example with field-typed descriptors."""
 
     int_or_str_prop: int | str = FieldTypedBaseDescriptor()
-    int_or_str_subscript = FieldTypedBaseDescriptor[int | str]()
+    int_or_str_subscript = FieldTypedBaseDescriptor[lt.Thing, int | str]()
     int_or_str_stringified: "int | str" = FieldTypedBaseDescriptor()
     customprop: CustomType = FieldTypedBaseDescriptor()
-    customprop_subscript = FieldTypedBaseDescriptor[CustomType]()
+    customprop_subscript = FieldTypedBaseDescriptor[lt.Thing, CustomType]()
     futureprop: "FutureType" = FieldTypedBaseDescriptor()
 
 
@@ -408,7 +409,7 @@ def test_fieldtyped_missingtype():
     with raises_or_is_caused_by(MissingTypeError) as excinfo:
 
         class Example4:
-            field6 = FieldTypedBaseDescriptor["str"]()
+            field6 = FieldTypedBaseDescriptor[lt.Thing, "str"]()
 
     msg = str(excinfo.value)
     assert "forward reference" in msg
@@ -421,7 +422,7 @@ def test_mismatched_types():
     with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example3:
-            field: int = FieldTypedBaseDescriptor[str]()
+            field: int = FieldTypedBaseDescriptor[lt.Thing, str]()
 
 
 def test_double_specified_types():
@@ -432,7 +433,7 @@ def test_double_specified_types():
     """
 
     class Example4:
-        field: int | None = FieldTypedBaseDescriptor[int | None]()
+        field: int | None = FieldTypedBaseDescriptor[lt.Thing, int | None]()
 
     assert Example4.field.value_type == int | None
 
@@ -448,4 +449,4 @@ def test_stringified_vs_unstringified_mismatch():
     with raises_or_is_caused_by(InconsistentTypeError):
 
         class Example5:
-            field: "int" = FieldTypedBaseDescriptor[int]()
+            field: "int" = FieldTypedBaseDescriptor[lt.Thing, int]()

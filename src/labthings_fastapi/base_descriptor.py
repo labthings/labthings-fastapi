@@ -26,6 +26,12 @@ if TYPE_CHECKING:
 Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""
 
+Owner = TypeVar("Owner", bound="Thing")
+"""A Thing subclass that owns a descriptor."""
+
+Descriptor = TypeVar("Descriptor", bound="BaseDescriptor")
+"""The type of a descriptor that's referred to by a `BaseDescriptorInfo` object."""
+
 
 class DescriptorNotAddedToClassError(RuntimeError):
     """Descriptor has not yet been added to a class.
@@ -138,7 +144,7 @@ class DescriptorAddedToClassTwiceError(RuntimeError):
     """
 
 
-class BaseDescriptor(Generic[Value]):
+class BaseDescriptor(Generic[Owner, Value]):
     r"""A base class for descriptors in LabThings-FastAPI.
 
     This class implements several behaviours common to descriptors in LabThings:
@@ -184,7 +190,7 @@ class BaseDescriptor(Generic[Value]):
         self._set_name_called: bool = False
         self._owner_name: str = ""
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
         r"""Take note of the name to which the descriptor is assigned.
 
         This is called when the descriptor is assigned to an attribute of a class.
@@ -306,12 +312,12 @@ class BaseDescriptor(Generic[Value]):
     # I have ignored D105 (missing docstrings) on the overloads - these should not
     # exist on @overload definitions.
     @overload
-    def __get__(self, obj: Thing, type: type | None = None) -> Value: ...
+    def __get__(self, obj: Owner, type: type | None = None) -> Value: ...
 
     @overload
     def __get__(self, obj: None, type: type) -> Self: ...
 
-    def __get__(self, obj: Thing | None, type: type | None = None) -> Value | Self:
+    def __get__(self, obj: Owner | None, type: type | None = None) -> Value | Self:
         """Return the value or the descriptor, as per `property`.
 
         If ``obj`` is ``None`` (i.e. the descriptor is accessed as a class attribute),
@@ -331,7 +337,7 @@ class BaseDescriptor(Generic[Value]):
             return self.instance_get(obj)
         return self
 
-    def instance_get(self, obj: Thing) -> Value:
+    def instance_get(self, obj: Owner) -> Value:
         """Return the value of the descriptor.
 
         This method is called from ``__get__`` if the descriptor is accessed as an
@@ -357,7 +363,7 @@ class BaseDescriptor(Generic[Value]):
         )
 
 
-class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
+class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Value]):
     """A BaseDescriptor that determines its type like a dataclass field."""
 
     def __init__(self) -> None:
@@ -379,7 +385,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
         # the object on which they are defined, to provide the context for the
         # evaluation.
 
-    def __set_name__(self, owner: type[Thing], name: str) -> None:
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
         r"""Take note of the name and type.
 
         This function is where we determine the type of the property. It may
@@ -431,7 +437,7 @@ class FieldTypedBaseDescriptor(Generic[Value], BaseDescriptor[Value]):
             # __orig_class__ is set on generic classes when they are instantiated
             # with a subscripted type. It is not available during __init__, which
             # is why we check for it here.
-            self._type = typing.get_args(self.__orig_class__)[0]
+            self._type = typing.get_args(self.__orig_class__)[1]
             if isinstance(self._type, typing.ForwardRef):
                 raise MissingTypeError(
                     f"{owner}.{name} is a subscripted descriptor, where the "

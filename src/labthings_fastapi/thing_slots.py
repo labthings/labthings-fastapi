@@ -59,7 +59,9 @@ ConnectedThings = TypeVar(
 )
 
 
-class ThingSlot(Generic[ConnectedThings], FieldTypedBaseDescriptor[ConnectedThings]):
+class ThingSlot(
+    Generic[ConnectedThings], FieldTypedBaseDescriptor["Thing", ConnectedThings]
+):
     r"""Descriptor that instructs the server to supply other Things.
 
     A `.ThingSlot` provides either one or several
