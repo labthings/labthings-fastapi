@@ -881,13 +881,6 @@ class PropertyInfo(
         msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
         raise TypeError(msg)
 
-    def set_without_emit_from_model(self, value: BaseModel) -> None:
-        """Set the value from a model instance, unwrapping RootModels as needed.
-
-        :param value: the model to extract the value from.
-        """
-        self.set_without_emit(self.model_to_value(value))
-
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
     """Access to metadata on all the properties of a `.Thing` instance or subclass.
@@ -1145,6 +1138,13 @@ class SettingInfo(
         """
         obj = self.owning_object_or_error()
         self.get_descriptor().set_without_emit(obj, value)
+
+    def set_without_emit_from_model(self, value: BaseModel) -> None:
+        """Set the value from a model instance, unwrapping RootModels as needed.
+
+        :param value: the model to extract the value from.
+        """
+        self.set_without_emit(self.model_to_value(value))
 
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):
