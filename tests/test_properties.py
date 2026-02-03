@@ -10,10 +10,12 @@ import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
+    NotBoundToInstanceError,
     ServerNotRunningError,
     UnsupportedConstraintError,
 )
-from labthings_fastapi.properties import BaseProperty
+from labthings_fastapi.properties import BaseProperty, PropertyInfo
+from labthings_fastapi.testing import create_thing_without_server
 from .temp_client import poll_task
 
 
@@ -26,10 +28,10 @@ class PropertyTestThing(lt.Thing):
         self._constrained_functional_str_setting = "ddd"
 
     boolprop: bool = lt.property(default=False)
-    "A boolean property"
+    "A boolean property."
 
     stringprop: str = lt.property(default="foo")
-    "A string property"
+    "A string property."
 
     _undoc = None
 
@@ -64,18 +66,18 @@ class PropertyTestThing(lt.Thing):
         t.join()
 
     constrained_int: int = lt.property(default=5, ge=0, le=10, multiple_of=2)
-    "An integer property with constraints"
+    "An integer property with constraints."
 
     constrained_float: float = lt.property(default=5, gt=0, lt=10, allow_inf_nan=False)
-    "A float property with constraints"
+    "A float property with constraints."
 
     constrained_str: str = lt.property(
         default="hello", min_length=3, max_length=10, pattern="^[a-z]+$"
     )
-    "A string property with constraints"
+    "A string property with constraints."
 
     constrained_int_setting: int = lt.setting(default=5, ge=0, le=10, multiple_of=2)
-    "An integer setting with constraints"
+    "An integer setting with constraints."
 
     @lt.property
     def constrained_functional_int(self) -> int:
@@ -453,3 +455,34 @@ def test_bad_property_constraints():
     # Some inappropriate constraints (e.g. multiple_of on str) are passed through
     # as metadata if used on the wrong type. We don't currently raise errors
     # for these.
+
+
+def test_propertyinfo():
+    """Check the PropertyInfo class is generated correctly."""
+
+    # Create a PropertyInfo object and check it matches the property
+    info = PropertyTestThing.properties["stringprop"]
+    assert isinstance(info, PropertyInfo)
+    assert info.name == "stringprop"
+    assert info.description == "A string property."
+    assert info.value_type is str
+    assert issubclass(info.model, RootModel)
+    assert info.model.model_fields["root"].annotation is str
+    assert info.is_bound is False
+    with pytest.raises(NotBoundToInstanceError):
+        info.get()
+
+    # Try the same thing for an instance
+    thing = create_thing_without_server(PropertyTestThing)
+    binfo = thing.properties["stringprop"]
+    assert isinstance(binfo, PropertyInfo)
+    assert binfo.name == "stringprop"
+    assert binfo.description == "A string property."
+    assert binfo.value_type is str
+    assert issubclass(binfo.model, RootModel)
+    assert binfo.model.model_fields["root"].annotation is str
+    assert binfo.is_bound is True
+    assert binfo.get() == "foo"
+
+    assert "not a property" not in PropertyTestThing.properties
+    assert "not a property" not in thing.properties

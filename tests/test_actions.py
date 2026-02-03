@@ -1,12 +1,30 @@
 import uuid
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 import pytest
 import functools
 
+from labthings_fastapi.actions import ActionInfo
 from labthings_fastapi.testing import create_thing_without_server
 from .temp_client import poll_task, get_link
 from labthings_fastapi.example_things import MyThing
 import labthings_fastapi as lt
+
+
+class ActionMan(lt.Thing):
+    """A Thing with some actions"""
+
+    _direction: str = "centred"
+
+    @lt.action(response_timeout=0, retention_time=0)
+    def move_eyes(self, direction: str) -> None:
+        """Take one input and no outputs"""
+        self._direction = direction
+
+    @lt.action
+    def say_hello(self) -> str:
+        """Return a string."""
+        return "Hello World."
 
 
 @pytest.fixture
@@ -25,6 +43,38 @@ def action_partial(client: TestClient, url: str):
         return poll_task(client, r.json())
 
     return run
+
+
+def test_action_info():
+    """Test the .actions descriptor works as expected."""
+    actions = ActionMan.actions
+    assert len(actions) == 2
+    assert set(actions) == {"move_eyes", "say_hello"}
+    assert actions.is_bound is False
+
+    move_eyes = ActionMan.actions["move_eyes"]
+    assert isinstance(move_eyes, ActionInfo)
+    assert move_eyes.name == "move_eyes"
+    assert move_eyes.description == "Take one input and no outputs"
+    assert set(move_eyes.input_model.model_fields) == {"direction"}
+    assert set(move_eyes.output_model.model_fields) == {"root"}  # rootmodel for None
+    assert issubclass(move_eyes.invocation_model, BaseModel)
+    assert move_eyes.response_timeout == 0
+    assert move_eyes.retention_time == 0
+    assert move_eyes.is_bound is False
+    assert callable(move_eyes.func)
+
+    # Try again with a bound one
+    action_man = create_thing_without_server(ActionMan)
+    assert len(action_man.actions) == 2
+    assert set(action_man.actions) == {"move_eyes", "say_hello"}
+    assert action_man.actions.is_bound is True
+
+    move_eyes = action_man.actions["move_eyes"]
+    assert isinstance(move_eyes, ActionInfo)
+    assert move_eyes.name == "move_eyes"
+    assert move_eyes.description == "Take one input and no outputs"
+    assert move_eyes.is_bound is True
 
 
 def test_get_action_invocations(client):
