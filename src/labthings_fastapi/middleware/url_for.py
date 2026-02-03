@@ -187,9 +187,7 @@ class URLFor:
         return core_schema.no_info_wrap_validator_function(
             cls._validate,
             AnyUrl.__get_pydantic_core_schema__(AnyUrl, handler),
-            serialization=core_schema.to_string_ser_schema(  # codespell:ignore ser
-                when_used="always"
-            ),
+            serialization=core_schema.to_string_ser_schema(when_used="always"),
         )
 
     @classmethod
@@ -199,9 +197,9 @@ class URLFor:
         :param value: The value to validate.
         :param handler: The handler to convert the value if needed.
         :return: The validated URLFor instance.
-        :raises TypeError: if the value is not a URLFor instance.
+        :raises ValueError: if the value is not a URLFor instance.
         """
         if isinstance(value, cls):
             return value
         else:
-            raise TypeError("URLFor instances may not be created from strings.")
+            raise ValueError("URLFor instances may not be created from strings.")

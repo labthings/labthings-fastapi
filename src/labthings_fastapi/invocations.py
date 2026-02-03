@@ -13,6 +13,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from labthings_fastapi.middleware.url_for import URLFor
+
 from .thing_description._model import Links
 
 
@@ -91,7 +93,7 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     status: InvocationStatus
     id: uuid.UUID
     action: str
-    href: str
+    href: URLFor
     timeStarted: Optional[datetime]
     timeRequested: Optional[datetime]
     timeCompleted: Optional[datetime]
