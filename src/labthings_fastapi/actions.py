@@ -229,7 +229,7 @@ class Invocation(Thread):
         return self.action.invocation_model(  # type: ignore[attr-defined]
             status=self.status,
             id=self.id,
-            action=self.thing.path + self.action.name,  # type: ignore[call-overload]
+            action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
             href=URLFor("action_invocation", id=self.id),
             timeStarted=self._start_time,
             timeCompleted=self._end_time,
