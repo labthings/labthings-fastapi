@@ -65,7 +65,7 @@ class PropertyTestThing(lt.Thing):
         # Ensure the thread has finished before the action completes:
         t.join()
 
-    constrained_int: int = lt.property(default=5, ge=0, le=10, multiple_of=2)
+    constrained_int: int = lt.property(default=0, ge=0, le=10, multiple_of=2)
     "An integer property with constraints."
 
     constrained_float: float = lt.property(default=5, gt=0, lt=10, allow_inf_nan=False)
@@ -76,7 +76,7 @@ class PropertyTestThing(lt.Thing):
     )
     "A string property with constraints."
 
-    constrained_int_setting: int = lt.setting(default=5, ge=0, le=10, multiple_of=2)
+    constrained_int_setting: int = lt.setting(default=4, ge=0, le=10, multiple_of=2)
     "An integer setting with constraints."
 
     @lt.property

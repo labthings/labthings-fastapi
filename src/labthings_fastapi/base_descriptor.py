@@ -30,7 +30,7 @@ from collections.abc import Iterator
 import inspect
 from itertools import pairwise
 import textwrap
-from typing import overload, Generic, Mapping, TypeVar, TYPE_CHECKING
+from typing import Any, overload, Generic, Mapping, TypeVar, TYPE_CHECKING
 from types import MappingProxyType
 import typing
 from weakref import WeakKeyDictionary, ref
@@ -350,6 +350,25 @@ class BaseDescriptorInfo(
             raise NotBoundToInstanceError(msg)
         descriptor = self.get_descriptor()
         descriptor.__set__(self.owning_object_or_error(), value)
+
+    def __eq__(self, other: Any) -> bool:
+        """Determine if this object is equal to another one.
+
+        :param other: the object we're comparing to.
+        :return: whether the two objects are equal.
+        """
+        return (
+            self.__class__ == other.__class__
+            and self.name == other.name
+            and self.owning_class == other.owning_class
+            and self.owning_object == other.owning_object
+        )
+
+    def __repr__(self) -> str:
+        """Represent the DescriptorInfo object as a string."""
+        descriptor = f"{self.owning_class.__name__}.{self.name}"
+        bound = f" bound to {self.owning_object}>" if self.is_bound else ""
+        return f"<{self.__class__.__name__} for {descriptor}{bound}>"
 
 
 class BaseDescriptor(Generic[Owner, Value]):

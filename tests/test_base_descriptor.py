@@ -375,7 +375,7 @@ def test_fieldtyped_missingtype():
     # I don't see how this could happen in practice, _owner is always
     # set if we find a forward reference.
     # We force this error condition by manually setting _owner to None
-    Example3.field4._owner = None
+    Example3.field4._owner_ref = None
 
     with pytest.raises(MissingTypeError) as excinfo:
         _ = Example3.field4.value_type
@@ -512,6 +512,7 @@ def test_descriptorinfo():
 
     # First, make an unbound info object
     intfield_info = intfield_descriptor.descriptor_info()
+    assert repr(intfield_info) == "<FieldTypedBaseDescriptorInfo for Example7.intfield>"
     assert intfield_info.is_bound is False
     assert intfield_info.name == "intfield"
     assert intfield_info.title == "The descriptor's title."
@@ -522,6 +523,9 @@ def test_descriptorinfo():
     # Next, check the bound version
     example6 = Example7()
     intfield_info = intfield_descriptor.descriptor_info(example6)
+    assert repr(intfield_info).startswith(
+        "<FieldTypedBaseDescriptorInfo for Example7.intfield bound to <"
+    )
     assert intfield_info.is_bound is True
     assert intfield_info.name == "intfield"
     assert intfield_info.title == "The descriptor's title."
@@ -546,6 +550,9 @@ def test_descriptorinfo():
     assert strprop_info.description is None
     with pytest.raises(AttributeError):
         _ = strprop_info.value_type
+
+    assert intfield_info == intfield_info
+    assert intfield_info != strprop_info
 
 
 def test_descriptorinfocollection():
@@ -622,8 +629,8 @@ def test_descriptorinfocollection():
     assert set(names) == {"intfield", "another_intfield"}
     assert len(field_typed_collection) == 2
 
-    assert field_typed_collection["intfield"] is intfield_info
-    assert field_typed_collection["another_intfield"] is collection["another_intfield"]
+    assert field_typed_collection["intfield"] == intfield_info
+    assert field_typed_collection["another_intfield"] == collection["another_intfield"]
 
     example8 = create_thing_without_server(Example8)
     bound_collection = example8.base_descriptors
@@ -634,6 +641,8 @@ def test_descriptorinfocollection():
 
     bound_intfield_info = bound_collection["intfield"]
     assert bound_intfield_info.is_bound is True
+
+    assert bound_collection["intfield"] != collection["intfield"]
 
     assert "spurious_name" not in collection
     assert "spurious_name" not in bound_collection
