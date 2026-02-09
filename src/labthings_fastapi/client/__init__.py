@@ -13,9 +13,9 @@ from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
-from .outputs import ClientBlobOutput
+from ..outputs.blob import Blob, RemoteBlobData
 from ..exceptions import (
     FailedToInvokeActionError,
     ServerActionError,
@@ -206,16 +206,14 @@ class ThingClient:
         """
         for k in kwargs.keys():
             value = kwargs[k]
-            if isinstance(value, ClientBlobOutput):
-                # ClientBlobOutput objects may be used as input to a subsequent
-                # action. When this is done, they should be serialised to a dict
-                # with `href` and `media_type` keys, as done below.
-                # Ideally this should be replaced with `Blob` and the use of
-                # `pydantic` models to serialise action inputs.
+            if isinstance(value, Blob):
+                # Blob objects may be used as input to a subsequent
+                # action. When this is done, they should be serialised by
+                # pydantic, to a dictionary that includes href and media_type.
                 #
                 # Note that the blob will not be uploaded: we rely on the blob
                 # still existing on the server.
-                kwargs[k] = {"href": value.href, "media_type": value.media_type}
+                kwargs[k] = TypeAdapter(Blob).dump_python(value)
         response = self.client.post(urljoin(self.path, path), json=kwargs)
         if response.is_error:
             message = _construct_failed_to_invoke_message(path, response)
@@ -228,10 +226,12 @@ class ThingClient:
                 and "href" in invocation["output"]
                 and "media_type" in invocation["output"]
             ):
-                return ClientBlobOutput(
-                    media_type=invocation["output"]["media_type"],
-                    href=invocation["output"]["href"],
-                    client=self.client,
+                return Blob(
+                    RemoteBlobData(
+                        media_type=invocation["output"]["media_type"],
+                        href=invocation["output"]["href"],
+                        client=self.client,
+                    )
                 )
             return invocation["output"]
         message = _construct_invocation_error_message(invocation)

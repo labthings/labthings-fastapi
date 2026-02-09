@@ -1,4 +1,4 @@
-"""BLOB Output Module.
+r"""BLOB Output Module.
 
 The ``.Blob`` class is used when you need to return something file-like that can't
 easily (or efficiently) be converted to JSON. This is useful for returning large objects
@@ -36,64 +36,121 @@ and is not safe for concurrent use, which does not work well with the HTTP API:
 action outputs may be retrieved multiple times after the action has
 completed, possibly concurrently. Creating a temp folder and making a file inside it
 with `.Blob.from_temporary_directory` is the safest way to deal with this.
+
+**Serialisation**
+
+`.Blob` objects are serialised to a JSON representation that includes a download
+``href``\ . This is generated using `.middleware.url_for` which uses a context
+variable to pass the function that generates URLs to the serialiser code. That
+context variable is available in every response handler function in the FastAPI
+app - but it is not, in general, available in action or property code (because
+actions and properties run their code in separate threads). The sequence of events
+that leads to a `Blob` being downloaded as a result of an action is roughly:
+
+* A `POST` request invokes the action.
+    * `.middleware.url_for.url_for_middleware` makes `url_for` accessible via
+        a context variable
+    * A `201` response is returned that includes an ``href`` to poll the action.
+    * Action code is run in a separate thread (without `url_for` in the context):
+        * The action creates a `.Blob` object.
+        * The function that creates the `.Blob` object also creates a `.BlobData`
+            object as a property of the `.Blob`
+        * The `.BlobData` object's constructor adds it to the ``blob_manager`` and
+            sets its ``id`` property accordingly.
+        * The `.Blob` is returned by the action.
+    * The output value of the action is stored in the `.Invocation` thread.
+* A `GET` request polls the action. Once it has completed:
+    * `.middleware.url_for.url_for_middleware` makes `url_for` accessible via
+        a context variable
+    * The `.Invocation` model is returned, which includes the `.Blob` in the
+        ``output`` field.
+    * FastAPI serialises the invocation model, which in turn serialises the `.Blob`
+        and uses ``url_for`` to generate a valid download ``href`` including the ``id``
+        of the `.BlobData` object.
+* A further `GET` request actually downloads the `.Blob`\ .
+
+This slightly complicated sequence ensures that we only ever send URLs back to the
+client using `url_for` from the current `.fastapi.Request` object. That means the
+URL used should be consistent with the URL of the request - so if an action is
+started by a client using one IP address or DNS name, and polled by a different
+client, each client will get a download ``href`` that matches the address they are
+already using.
+
+In the future, it may be possible to respond directly with the `.Blob` data to
+the original `POST` request, however this only works for quick actions so for now
+we use the sequence above, which will work for both quick and slow actions.
 """
 
 from __future__ import annotations
-from contextvars import ContextVar
+from collections.abc import Callable
 import io
 import os
 import re
 import shutil
 from typing import (
-    Annotated,
     Any,
-    AsyncGenerator,
-    Callable,
+    ClassVar,
     Literal,
     Mapping,
-    Optional,
 )
 from warnings import warn
 from weakref import WeakValueDictionary
-from typing_extensions import TypeAlias
 from tempfile import TemporaryDirectory
 import uuid
 
-from fastapi import FastAPI, Depends, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
+import httpx
 from pydantic import (
     BaseModel,
-    create_model,
-    model_serializer,
-    model_validator,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
 )
-from starlette.exceptions import HTTPException
-from typing_extensions import Self, Protocol, runtime_checkable
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import core_schema
+from typing_extensions import Self
+from labthings_fastapi.middleware.url_for import url_for
 
 
-@runtime_checkable
-class BlobData(Protocol):
-    """The interface for the data store of a Blob.
+class BlobData:
+    """The data store of a Blob.
 
     `.Blob` objects can represent their data in various ways. Each of
     those options must provide three ways to access the data, which are the
     `content` property, the `save()` method, and the `open()` method.
 
-    This protocol defines the interface needed by any data store used by a
+    This base class defines the interface needed by any data store used by a
     `.Blob`.
 
-    Objects that are used on the server will additionally need to implement the
-    [`ServerSideBlobData`](#labthings_fastapi.outputs.blob.ServerSideBlobData) protocol,
-    which adds a `response()` method and `id` property.
+    Blobs that store their data locally should subclass `.LocalBlobData`
+    which adds a `response()` method and `id` property, appropriate for data
+    that would need to be downloaded from a server. It also takes care of
+    generating a download URL when it's needed.
     """
+
+    def __init__(self, media_type: str) -> None:
+        """Initialise a `.BlobData` object.
+
+        :param media_type: the MIME type of the data.
+        """
+        self._media_type = media_type
 
     @property
     def media_type(self) -> str:
-        """The MIME type of the data, e.g. 'image/png' or 'application/json'.
+        """The MIME type of the data, e.g. 'image/png' or 'application/json'."""
+        return self._media_type
 
+    def get_href(self) -> str:
+        """Return the URL to download the blob.
+
+        The implementation of this method for local blobs will need
+        `.url_for.url_for` and thus it should only be called in a response
+        handler when the `.middeware.url_for` middleware is enabled.
+
+        :return: the URL as a string.
         :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
-        raise NotImplementedError("media_type property must be implemented.")
+        raise NotImplementedError("get_href must be implemented.")
 
     @property
     def content(self) -> bytes:
@@ -107,44 +164,172 @@ class BlobData(Protocol):
         """Save the data to a file.
 
         :param filename: the path where the file should be saved.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
-        ...  # pragma: no cover
+        raise NotImplementedError("save must be implemented.")
 
     def open(self) -> io.IOBase:
         """Return a file-like object that may be read from.
 
         :return: an open file-like object.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
-        ...  # pragma: no cover
+        raise NotImplementedError("open must be implemented.")
 
 
-class ServerSideBlobData(BlobData, Protocol):
-    """A BlobData protocol for server-side use, i.e. including `response()`.
+class RemoteBlobData(BlobData):
+    r"""A BlobData subclass that references remote data via a URL.
 
-    `.Blob` objects returned by actions must use `.BlobData` objects
-    that can be downloaded. This protocol extends the `.BlobData` protocol to
-    include a `.ServerSideBlobData.response` method that returns a
-    `fastapi.Response` object.
+    This `.BlobData` implementation will download data lazily, and
+    provides it in the three ways defined by `.BlobData`\ . It
+    does not cache downloaded data: if the `.content` attribute is
+    accessed multiple times, the data will be downloaded again each
+    time.
+
+    .. note::
+
+        This class is rarely instantiated directly. It is usually best to use
+        `.Blob.from_url` on a `.Blob` subclass.
+    """
+
+    def __init__(
+        self, media_type: str, href: str, client: httpx.Client | None = None
+    ) -> None:
+        """Create a reference to remote `.Blob` data.
+
+        :param media_type: the MIME type of the data.
+        :param href: the URL where it may be downloaded.
+        :param client: if supplied, this `httpx.Client` will be used to
+            download the data.
+        """
+        super().__init__(media_type=media_type)
+        self._href = href
+        self._client = client or httpx.Client()
+
+    def get_href(self) -> str:
+        """Return the URL to download the data.
+
+        :return: the URL as a string.
+        """
+        return self._href
+
+    @property
+    def content(self) -> bytes:
+        """The binary data, as a `bytes` object."""
+        return self._client.get(self._href).content
+
+    def save(self, filepath: str) -> None:
+        """Save the output to a file.
+
+        Note that the current implementation retrieves the data into
+        memory in its entirety, and saves to file afterwards.
+
+        :param filepath: the file will be saved at this location.
+        """
+        with open(filepath, "wb") as f:
+            f.write(self.content)
+
+    def open(self) -> io.IOBase:
+        """Open the output as a binary file-like object.
+
+        Internally, this will download the file to memory, and wrap the
+        resulting `bytes` object in an `io.BytesIO` object to allow it to
+        function as a file-like object.
+
+        To work with the data on disk, use `save` instead.
+
+        :return: a file-like object containing the downloaded data.
+        """
+        return io.BytesIO(self.content)
+
+
+class LocalBlobData(BlobData):
+    """A BlobData subclass where the data is stored locally.
+
+    `.Blob` objects can reference data by a URL, or can wrap data
+    held in memory or on disk. For the non-URL options, we need to register the
+    data with the `.BlobManager` and allow it to be downloaded. This class takes
+    care of registering with the `.BlobManager` and adds the `.response` method
+    that must be overridden by subclasses to allow downloading.
 
     See `.BlobBytes` or `.BlobFile` for concrete implementations.
     """
 
-    id: Optional[uuid.UUID] = None
-    """A unique identifier for this BlobData object.
+    _all_blobdata: ClassVar[WeakValueDictionary[uuid.UUID, "LocalBlobData"]] = (
+        WeakValueDictionary()
+    )
+    """A way to retrieve `.LocalBlobData` objects by their ID.
 
-    The ID is set when the BlobData object is added to the BlobDataManager.
-    It is used to retrieve the BlobData object from the manager.
+    Note that this does not interfere with garbage collection, as it only
+    holds weak references to the `.LocalBlobData` objects.
     """
+
+    def __init__(self, media_type: str) -> None:
+        """Initialise the `.LocalBlobData` object.
+
+        :param media_type: the MIME type of the data.
+        """
+        super().__init__(media_type=media_type)
+        self._id = uuid.uuid4()
+        # Note that _all_blobdata holds weak references, so this does not
+        # prevent garbage collection.
+        self._all_blobdata[self._id] = self
+
+    @classmethod
+    def from_id(cls, id: uuid.UUID) -> "LocalBlobData":
+        """Retrieve a `.LocalBlobData` object by its ID.
+
+        Note that this does not imply `.LocalBlobData` objects are
+        permanently stored: if there are no strong references to the object,
+        it may have been garbage collected and will no longer be available.
+
+        :param id: the UUID of the desired `.LocalBlobData` object.
+
+        :return: the corresponding `.LocalBlobData` object.
+        :raise KeyError: if no such object exists.
+        """
+        try:
+            return cls._all_blobdata[id]
+        except KeyError as error:
+            raise KeyError(f"BlobData with ID {id} not found.") from error
+
+    @classmethod
+    def all_ids(cls) -> list[uuid.UUID]:
+        """Return a list of all currently registered BlobData IDs.
+
+        :return: a list of UUIDs for all registered `.LocalBlobData` objects.
+        """
+        return list(cls._all_blobdata.keys())
+
+    @property
+    def id(self) -> uuid.UUID:
+        """A unique identifier for this BlobData object.
+
+        The ID is set when the BlobData object is added to the `BlobDataManager`
+        during initialisation.
+        """
+        return self._id
+
+    def get_href(self) -> str:
+        r"""Return a URL where this data may be downloaded.
+
+        Note that this should only be called in a response handler, as it
+        relies on `.url_for.url_for`\ .
+
+        :return: the URL as a string.
+        """
+        return str(url_for("download_blob", blob_id=self.id))
 
     def response(self) -> Response:
         """Return a`fastapi.Response` object that sends binary data.
 
         :return: a response that streams the data from disk or memory.
+        :raises NotImplementedError: always, as this must be implemented by subclasses.
         """
-        ...  # pragma: no cover
+        raise NotImplementedError
 
 
-class BlobBytes:
+class BlobBytes(LocalBlobData):
     """A `.Blob` that holds its data in memory as a `bytes` object.
 
     `.Blob` objects use objects conforming to the `.BlobData` protocol to
@@ -157,20 +342,21 @@ class BlobBytes:
         `.Blob.from_bytes` on a `.Blob` subclass.
     """
 
-    id: Optional[uuid.UUID] = None
-    """A unique ID to identify the data in a `.BlobManager`."""
+    _id: uuid.UUID
 
     def __init__(self, data: bytes, media_type: str) -> None:
         """Create a `.BlobBytes` object.
 
-        `.BlobBytes` objects wrap data stored in memory as `bytes`. They
-        are not usually instantiated directly, but made using `.Blob.from_bytes`.
+        .. note::
+
+            This class is rarely instantiated directly. It is usually best to use
+            `.Blob.from_bytes` on a `.Blob` subclass.
 
         :param data: is the data to be wrapped.
         :param media_type: is the MIME type of the data.
         """
+        super().__init__(media_type=media_type)
         self._bytes = data
-        self.media_type = media_type
 
     @property
     def content(self) -> bytes:
@@ -202,12 +388,8 @@ class BlobBytes:
         return Response(content=self._bytes, media_type=self.media_type)
 
 
-class BlobFile:
-    """A `.Blob` that holds its data in a file.
-
-    `.Blob` objects use objects conforming to the `.BlobData` protocol to
-    store their data either on disk or in a file. This implements the protocol
-    using a file on disk.
+class BlobFile(LocalBlobData):
+    """A `.BlobData` backed by a file on disk.
 
     Only the filepath is retained by default. If you are using e.g. a temporary
     directory, you should add the `.TemporaryDirectory` as an instance attribute,
@@ -216,11 +398,8 @@ class BlobFile:
     .. note::
 
         This class is rarely instantiated directly. It is usually best to use
-        `.Blob.from_temporary_directory` on a `.Blob` subclass.
+        `.Blob.from_file` on a `.Blob` subclass.
     """
-
-    id: Optional[uuid.UUID] = None
-    """A unique ID to identify the data in a `.BlobManager`."""
 
     def __init__(self, file_path: str, media_type: str, **kwargs: Any) -> None:
         r"""Create a `.BlobFile` to wrap data stored on disk.
@@ -237,10 +416,10 @@ class BlobFile:
 
         :raise IOError: if the file specified does not exist.
         """
+        super().__init__(media_type=media_type)
         if not os.path.exists(file_path):
             raise IOError("Tried to return a file that doesn't exist.")
         self._file_path = file_path
-        self.media_type = media_type
         for key, val in kwargs.items():
             setattr(self, key, val)
 
@@ -287,36 +466,16 @@ class BlobFile:
         return FileResponse(self._file_path, media_type=self.media_type)
 
 
-class Blob(BaseModel):
-    """A container for binary data that may be retrieved over HTTP.
+class BlobModel(BaseModel):
+    """A model for JSON-serialised `.Blob` objects.
 
-    See :ref:`blobs` for more information on how to use this class.
-
-    A `.Blob` may be created to hold data using the class methods
-    `.Blob.from_bytes`, `.Blob.from_file` or `.Blob.from_temporary_directory`.
-    The constructor will attempt to deserialise a Blob from a URL
-    (see `__init__` method) and is unlikely to be used except in code
-    internal to LabThings.
-
-    You are strongly advised to use a subclass of this class that specifies the
-    `.Blob.media_type` attribute, as this will propagate to the auto-generated
-    documentation.
+    This model describes the JSON representation of a `.Blob`
+    and does not offer any useful functionality.
     """
 
     href: str
-    """The URL where the data may be retrieved.
-
-    `.Blob` objects on a `.ThingServer` are assigned a URL when they are
-    serialised to JSON. This allows them to be downloaded as binary data in a
-    separate HTTP request.
-
-    `.Blob` objects created by a `.ThingClient` contain a URL pointing to the
-    data, which will be downloaded when it is required.
-
-    `.Blob` objects that store their data in a file or in memory will have the
-    ``href`` attribute set to the special value `blob://local`.
-    """
-    media_type: str = "*/*"
+    """The URL where the data may be retrieved."""
+    media_type: str
     """The MIME type of the data. This should be overridden in subclasses."""
     rel: Literal["output"] = "output"
     """The relation of this link to the host object.
@@ -330,129 +489,252 @@ class Blob(BaseModel):
     )
     """This description is added to the serialised `.Blob`."""
 
-    _data: Optional[ServerSideBlobData] = None
-    """This object holds the data, either in memory or as a file.
 
-    If `_data` is `None`, then the Blob has not been deserialised yet, and the
-    `href` should point to a valid address where the data may be downloaded.
+def parse_media_type(media_type: str) -> tuple[str, str]:
+    """Parse a media type string into its type and subtype.
+
+    :param media_type: the media type string to parse.
+
+    :return: a tuple of (type, subtype) where each is a string or None.
+    :raises ValueError: if the media type is invalid.
+    """
+    # Ignore leading whitespace and parameters (after a ;)
+    media_type = media_type.strip().split(";")[0]
+    # We expect a type and subtype separated with a /
+    parts = media_type.split("/")
+    if len(parts) != 2:
+        raise ValueError(
+            f"Invalid media type: {media_type} must contain exactly one '/'."
+        )
+    main_type = parts[0].strip()
+    sub_type = parts[1].strip()
+    if len(main_type) == 0 or len(sub_type) == 0:
+        raise ValueError(
+            f"Invalid media type: {media_type} must have both type and subtype."
+        )
+    if main_type == "*" and sub_type != "*":
+        raise ValueError(
+            f"Invalid media type: {media_type} has no type but has a subtype."
+        )
+    return main_type, sub_type
+
+
+def match_media_types(media_type: str, pattern: str) -> bool:
+    """Check if a media type matches a pattern.
+
+    The pattern may include wildcards, e.g. ``image/*`` or ``*/*``.
+
+    :param media_type: the media type to check.
+    :param pattern: the pattern to match against.
+
+    :return: True if the media type matches the pattern, False otherwise.
+    """
+    type_a, subtype_a = parse_media_type(media_type)
+    type_b, subtype_b = parse_media_type(pattern)
+    if type_b != "*" and type_a != type_b:
+        return False
+    if subtype_b != "*" and subtype_a != subtype_b:
+        return False
+    return True
+
+
+class Blob:
+    r"""A container for binary data that may be retrieved over HTTP.
+
+    See :ref:`blobs` for more information on how to use this class.
+
+    A `.Blob` may be created to hold data using the class methods
+    `.Blob.from_bytes`, `.Blob.from_file` or `.Blob.from_temporary_directory`\ .
+    It may also reference remote data, using `.Blob.from_url`\ , though this
+    is currently only used on the client side.
+    The constructor requires a `.BlobData` instance, so the methods mentioned
+    previously are likely a more convenient way to instantiate a `.Blob`\ .
+
+    You are strongly advised to use a subclass of this class that specifies the
+    `.Blob.media_type` attribute, as this will propagate to the auto-generated
+    documentation and make the return type of your action clearer.
+
+    This class is `pydantic` compatible, in that it provides a schema, validator
+    and serialiser. However, it may use `.url_for.url_for` during serialisation,
+    so it should only be serialised in a request handler function. This
+    functionality is intended for use by LabThings library functions only.
+    Validation and serialisation behaviour is described in the docstrings of
+    `.Blob._validate` and `.Blob._serialize`.
     """
 
-    @model_validator(mode="after")
-    def retrieve_data(self) -> Self:
-        r"""Retrieve the data from the URL.
+    media_type: str = "*/*"
+    """The MIME type of the data. This should be overridden in subclasses."""
+    description: str | None = None
+    """An optional description that may be added to the serialised `.Blob`."""
+    _data: BlobData
+    """This object stores the data - in memory, on disk, or at a URL."""
 
-        When a `.Blob` is created using its constructor, `pydantic`
-        will attempt to deserialise it by retrieving the data from the URL
-        specified in `.Blob.href`. Currently, this must be a URL pointing to a
-        `.Blob` that already exists on this server, and any other URL will
-        cause a `LookupError`.
+    def __init__(self, data: BlobData, description: str | None = None) -> None:
+        """Create a `.Blob` object wrapping the given data.
 
-        This validator will only work if the function to resolve URLs to
-        `.BlobData` objects
-        has been set in the context variable `.blob.url_to_blobdata_ctx`\ .
-        This is done when actions are being invoked over HTTP by the
-        `.BlobIOContextDep` dependency.
+        :param data: the `.BlobData` object that stores the data.
+        :param description: an optional description of the blob.
 
-        :return: the `.Blob` object (i.e. ``self``), after retrieving the data.
-
-        :raise ValueError: if the ``href`` is set as ``"blob://local"`` but
-            the ``_data`` attribute has not been set. This happens when the
-            `.Blob` is being constructed using `.Blob.from_bytes` or similar.
-        :raise LookupError: if the `.Blob` is being constructed from a URL
-            and the URL does not correspond to a `.BlobData` instance that
-            exists on this server (i.e. one that has been previously created
-            and added to the `.BlobManager` as the result of a previous action).
+        :raise ValueError: if the media_type of the data does not match
+            the media_type of the `.Blob` subclass.
         """
-        if self.href == "blob://local":
-            if self._data:
-                return self
-            raise ValueError("Blob objects must have data if the href is blob://local")
+        super().__init__()
+        self._data = data
+        if description is not None:
+            self.description = description
+        if not match_media_types(data.media_type, self.media_type):
+            raise ValueError(
+                f"Blob data media_type '{data.media_type}' does not match "
+                f"Blob media_type '{self.media_type}'."
+            )
+        # The data may have a more specific media_type, so we use that
+        # in preference to the default defined by the class.
+        self.media_type = data.media_type
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """Get the pydantic core schema for this type.
+
+        This magic method allows `pydantic` to serialise `.Blob`
+        instances, and generate a JSONSchema for them.
+
+        We tell `pydantic` to base its handling of `Blob` on the
+        `.BlobModel` schema, with custom validation and serialisation.
+        Validation and serialisation behaviour is described in the docstrings
+        of `.Blob._validate` and `.Blob._serialize`.
+
+        The JSONSchema is generated for `.BlobModel` but is then refined
+        in `__get_pydantic_json_schema__` to include the ``media_type``
+        and ``description`` defaults.
+
+        :param source: The source type being converted.
+        :param handler: The pydantic core schema handler.
+        :return: The pydantic core schema for the URLFor type.
+        """
+        return core_schema.no_info_wrap_validator_function(
+            cls._validate,
+            BlobModel.__get_pydantic_core_schema__(BlobModel, handler),
+            serialization=core_schema.wrap_serializer_function_ser_schema(
+                cls._serialize,
+                is_field_serializer=False,
+                info_arg=False,
+                when_used="always",
+            ),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Customise the JSON Schema to include the media_type.
+
+        :param core_schema: The core schema for the Blob type.
+        :param handler: The pydantic JSON schema handler.
+        :return: The JSON schema for the Blob type, with media_type included.
+        """
+        json_schema = handler(core_schema)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        # Set the title to the class name, not BlobModel
+        json_schema["title"] = cls.__name__
+        # Add the media_type default value from this class
+        json_schema["properties"]["media_type"]["default"] = cls.media_type
+        # If the media_type is specific, add a const constraint
+        # This shows that only this media_type is valid
+        if "*" not in cls.media_type:
+            json_schema["properties"]["media_type"]["const"] = [cls.media_type]
+        # Add the default description
+        if cls.description is not None:
+            json_schema["properties"]["description"]["default"] = cls.description
+        return json_schema
+
+    @classmethod
+    def _validate(cls, value: Any, handler: Callable[[Any], BlobModel]) -> Self:
+        r"""Validate and convert a value to a `.Blob` instance.
+
+        :param value: The input value, as passed in or loaded from JSON.
+        :param handler: A function that runs the validation logic of BlobModel.
+
+        If the value is already a `.Blob`, it will be returned directly.
+        Otherwise, we first validate the input using the `.BlobModel` schema.
+
+        When a `.Blob` is validated, we check to see if the URL given
+        as its ``href`` looks like a `.Blob` download URL on this server. If
+        it does, the returned object will hold a reference to the local data.
+
+        If we can't match the URL to a `.Blob` on this server, we will raise
+        an error. Handling of `.Blob` input is currently experimental, and
+        limited to passing the output of one Action as input to a subsequent
+        one.
+
+        :return: a `.Blob` object pointing to the data.
+
+        :raise ValueError: if the ``href`` does not contain a valid Blob ID, or
+            if the Blob ID is not found on this server.
+        """
+        # If the value is already a Blob, return it directly
+        if isinstance(value, cls):
+            return value
+        # We start by validating the input, which should fit a `BlobModel`
+        # (this validator is wrapping the BlobModel schema)
+        model = handler(value)
+        id = url_to_id(model.href)
+        if not id:
+            raise ValueError("Blob URLs must contain a Blob ID.")
         try:
-            url_to_blobdata = url_to_blobdata_ctx.get()
-            self._data = url_to_blobdata(self.href)
-            self.href = "blob://local"
-        except LookupError as e:
-            raise LookupError(
-                "Blobs may only be created from URLs passed in over HTTP."
-                f"The URL in question was {self.href}."
-            ) from e
-        return self
+            data = LocalBlobData.from_id(id)
+            return cls(data)
+        except KeyError as error:
+            raise ValueError(f"Blob ID {id} wasn't found on this server.") from error
 
-    @model_serializer(mode="plain", when_used="always")
-    def to_dict(self) -> Mapping[str, str]:
-        r"""Serialise the Blob to a dictionary and make it downloadable.
+    @classmethod
+    def _serialize(
+        cls, obj: Self, handler: Callable[[BlobModel], Mapping[str, str]]
+    ) -> Mapping[str, str]:
+        """Serialise the Blob to a dictionary.
 
-        When `pydantic` serialises this object,
-        it will call this method to convert it to a dictionary. There is a
-        significant side-effect, which is that we will add the blob to the
-        `.BlobDataManager` so it can be downloaded.
+        See `.Blob.to_blobmodel` for a description of how we serialise.
 
-        This serialiser will only work if the function to assign URLs to
-        `.BlobData` objects has been set in the context variable
-        `.blobdata_to_url_ctx`\ .
-        This is done when actions are being returned over HTTP by the
-        `.BlobIOContextDep` dependency.
+        :param obj: the `.Blob` instance to serialise.
+        :param handler: the handler (provided by pydantic) takes a BlobModel
+            and converts it to a dictionary. The handler runs the serialiser of
+            the core schema we've wrapped, in this case the BlobModel serialiser.
+        :return: a JSON-serialisable dictionary with a URL that allows
+            the `.Blob` to be downloaded from the `.BlobManager`.
+        """
+        return handler(obj.to_blobmodel())
+
+    def to_blobmodel(self) -> BlobModel:
+        r"""Represent the `.Blob` as a `.BlobModel` to get ready to serialise.
+
+        When `pydantic` serialises this object, we first generate a `.BlobModel`
+        with just the information to be serialised.
+        We use `.from_url.from_url` to generate the URL, so this will error if
+        it is serialised anywhere other than a request handler with the
+        middleware from `.middleware.url_for` enabled.
 
         :return: a JSON-serialisable dictionary with a URL that allows
             the `.Blob` to be downloaded from the `.BlobManager`.
-
-        :raise LookupError: if the context variable providing access to the
-            `.BlobManager` is not available. This usually means the `.Blob` is
-            being serialised somewhere other than the output of an action.
         """
-        if self.href == "blob://local":
-            try:
-                blobdata_to_url = blobdata_to_url_ctx.get()
-                # MyPy seems to miss that `self.data` is a property, hence the ignore
-                href = blobdata_to_url(self.data)  # type: ignore[arg-type]
-            except LookupError as e:
-                raise LookupError(
-                    "Blobs may only be serialised inside the "
-                    "context created by BlobIOContextDep."
-                ) from e
-        else:
-            href = self.href
-        return {
-            "href": href,
+        data = {
+            "href": self.data.get_href(),
             "media_type": self.media_type,
-            "rel": self.rel,
-            "description": self.description,
         }
-
-    @classmethod
-    def default_media_type(cls) -> str:
-        """Return the default media type.
-
-        `.Blob` should generally be subclassed to define the default media type,
-        as this forms part of the auto-generated documentation. Using the
-        `.Blob` class directly will result in a media type of `*/*`, which makes
-        it unclear what format the output is in.
-
-        :return: the default media type as a MIME type string, e.g. ``image/png``.
-        """
-        return cls.model_fields["media_type"].get_default()
+        if self.description is not None:
+            data["description"] = self.description
+        return BlobModel(**data)
 
     @property
-    def data(self) -> ServerSideBlobData:
+    def data(self) -> BlobData:
         """The data store for this Blob.
-
-        `.Blob` objects may hold their data in various ways, defined by the
-        `.ServerSideBlobData` protocol. This property returns the data store
-        for this `.Blob`.
-
-        If the `.Blob` has not yet been downloaded, there may be no data
-        held locally, in which case this function will raise an exception.
 
         It is recommended to use the `.Blob.content` property or `.Blob.save`
         or `.Blob.open`
         methods rather than accessing this property directly.
 
         :return: the data store wrapping data on disk or in memory.
-
-        :raise  ValueError: if there is no data stored on disk or in memory.
         """
-        if self._data is None:
-            raise ValueError("This Blob has no data.")
         return self._data
 
     @property
@@ -504,10 +786,7 @@ class Blob(BaseModel):
 
         :return: a `.Blob` wrapping the supplied data.
         """
-        return cls.model_construct(  # type: ignore[return-value]
-            href="blob://local",
-            _data=BlobBytes(data, media_type=cls.default_media_type()),
-        )
+        return cls(BlobBytes(data, media_type=cls.media_type))
 
     @classmethod
     def from_temporary_directory(cls, folder: TemporaryDirectory, file: str) -> Self:
@@ -529,11 +808,10 @@ class Blob(BaseModel):
         :return: a `.Blob` wrapping the file.
         """
         file_path = os.path.join(folder.name, file)
-        return cls.model_construct(  # type: ignore[return-value]
-            href="blob://local",
-            _data=BlobFile(
+        return cls(
+            BlobFile(
                 file_path,
-                media_type=cls.default_media_type(),
+                media_type=cls.media_type,
                 # Prevent the temporary directory from being cleaned up
                 _temporary_directory=folder,
             ),
@@ -558,9 +836,30 @@ class Blob(BaseModel):
 
         :return: a `.Blob` object referencing the specified file.
         """
-        return cls.model_construct(  # type: ignore[return-value]
-            href="blob://local",
-            _data=BlobFile(file, media_type=cls.default_media_type()),
+        return cls(
+            BlobFile(file, media_type=cls.media_type),
+        )
+
+    @classmethod
+    def from_url(cls, href: str, client: httpx.Client | None = None) -> Self:
+        """Create a `.Blob` that references data at a URL.
+
+        This is the recommended way to create a `.Blob` that references
+        data held remotely. It should ideally be called on a subclass
+        of `.Blob` that has set ``media_type``.
+
+        :param href: the URL where the data may be downloaded.
+        :param client: if supplied, this `httpx.Client` will be used to
+            download the data.
+
+        :return: a `.Blob` object referencing the specified URL.
+        """
+        return cls(
+            RemoteBlobData(
+                media_type=cls.media_type,
+                href=href,
+                client=client,
+            ),
         )
 
     def response(self) -> Response:
@@ -570,8 +869,16 @@ class Blob(BaseModel):
         that returns the data over HTTP.
 
         :return: an HTTP response that streams data from memory or file.
+        :raise NotImplementedError: if the data is not local. It's not currently
+            possible to serve remote data via the `.BlobManager`.
         """
-        return self.data.response()
+        data = self.data
+        if isinstance(data, LocalBlobData):
+            return data.response()
+        else:
+            raise NotImplementedError(
+                "Currently, only local BlobData can be served over HTTP."
+            )
 
 
 def blob_type(media_type: str) -> type[Blob]:
@@ -585,10 +892,9 @@ def blob_type(media_type: str) -> type[Blob]:
         class MyImageBlob(Blob):
             media_type = "image/png"
 
-    :param media_type: will be the default value of the ``media_type`` property
-        on the `.Blob` subclass.
+    :param media_type: the media type that the new `.Blob` subclass will use.
 
-    :return: a subclass of `.Blob` with the specified default media type.
+    :return: a subclass of `.Blob` with the specified media type.
 
     :raise ValueError: if the media type contains ``'`` or ``\``.
     """
@@ -600,188 +906,50 @@ def blob_type(media_type: str) -> type[Blob]:
     )
     if "'" in media_type or "\\" in media_type:
         raise ValueError("media_type must not contain single quotes or backslashes")
-    return create_model(
+    return type(
         f"{media_type.replace('/', '_')}_blob",
-        __base__=Blob,
-        media_type=(eval(f"Literal[r'{media_type}']"), media_type),  # noqa: S307
-        # This can't be done with `literal_eval` as that does not support subscripts.
-        # Basic sanitisation is done above by removing backslashes and single quotes,
-        # and using a raw string. However, the long term solution is to remove this
-        # function in favour of subclassing Blob, as recommended in the docs.
+        (Blob,),
+        {
+            "media_type": media_type,
+        },
     )
 
 
-class BlobDataManager:
-    r"""A class to manage BlobData objects.
+router = APIRouter()
+"""A FastAPI router for BlobData download endpoints."""
 
-    The `.BlobManager` is responsible for serving `.Blob` objects to clients. It
-    holds weak references: it will not retain `.Blob`\ s that are no longer in use.
-    Most `.Blob`\ s will be retained by the output of an action: this holds a strong
-    reference, and will be expired by the `.ActionManager`.
 
-    Note that the `.BlobDataManager` does not work with `.Blob` objects directly,
-    it holds only the `.ServerSideBlobData` object, which is where the data is
-    stored. This means you should not rely on any custom attributes of a `.Blob`
-    subclass being preserved when the `.Blob` is passed from one action to another.
+@router.get("/blob/{blob_id}", name="download_blob")
+def download_blob(blob_id: uuid.UUID) -> Response:
+    """Download a `.Blob`.
 
-    See :ref:`blobs` for an overview of how `.Blob` objects should be used.
+    This function returns a `fastapi.Response` allowing the data to be
+    downloaded, using the `.LocalBlobData.response` method.
+
+    :param blob_id: the unique ID of the blob data.
+
+    :return: a `fastapi.Response` object that will send the content of
+        the blob over HTTP.
+
+    :raises HTTPException: if the requested blob is not found.
     """
-
-    def __init__(self) -> None:
-        """Initialise a BlobDataManager object."""
-        self._blobs: WeakValueDictionary[uuid.UUID, ServerSideBlobData] = (
-            WeakValueDictionary()
-        )
-
-    def add_blob(self, blob: ServerSideBlobData) -> uuid.UUID:
-        """Add a `.Blob` to the manager, generating a unique ID.
-
-        This function adds a `.ServerSideBlobData` object to the
-        `.BlobDataManager`. It will retain a weak reference to the
-        `.ServerSideBlobData` object: you are responsible for ensuring
-        the data is not garbage collected, for example by including the
-        parent `.Blob` in the output of an action.
-
-        :param blob: a `.ServerSideBlobData` object that holds the data
-            being added.
-
-        :return: a unique ID identifying the data. This forms part of
-            the URL to download the data.
-
-        :raise ValueError: if the `.ServerSideBlobData` object already
-            has an ``id`` attribute but is not in the dictionary of
-            data. This suggests the object has been added to another
-            `.BlobDataManager`, which should never happen.
-        """
-        if hasattr(blob, "id") and blob.id is not None:
-            if blob.id in self._blobs:
-                return blob.id
-            else:
-                raise ValueError(
-                    f"BlobData already has an ID {blob.id} "
-                    "but was not found in this BlobDataManager"
-                )
-        blob.id = uuid.uuid4()
-        self._blobs[blob.id] = blob
-        return blob.id
-
-    def get_blob(self, blob_id: uuid.UUID) -> ServerSideBlobData:
-        """Retrieve a `.Blob` from the manager.
-
-        :param blob_id: the unique ID assigned when the data was added to
-            this `.BlobDataManager`.
-
-        :return: the `.ServerSideBlobData` object holding the data.
-        """
-        return self._blobs[blob_id]
-
-    def download_blob(self, blob_id: uuid.UUID) -> Response:
-        """Download a `.Blob`.
-
-        This function returns a `fastapi.Response` allowing the data to be
-        downloaded, using the `.ServerSideBlobData.response` method.
-
-        :param blob_id: the unique ID assigned when the data was added to
-            this `.BlobDataManager`.
-
-        :return: a `fastapi.Response` object that will send the content of
-            the blob over HTTP.
-        """
-        blob = self.get_blob(blob_id)
-        return blob.response()
-
-    def attach_to_app(self, app: FastAPI) -> None:
-        """Attach the BlobDataManager to a FastAPI app.
-
-        Add an endpoint to a FastAPI application that will serve the content of
-        the `.ServerSideBlobData` objects in response to ``GET`` requests.
-
-        :param app: the `fastapi.FastAPI` application to which we are adding
-            the endpoint.
-        """
-        app.get("/blob/{blob_id}")(self.download_blob)
-
-
-blob_data_manager = BlobDataManager()
-"""A global register of all BlobData objects."""
-
-
-blobdata_to_url_ctx = ContextVar[Callable[[ServerSideBlobData], str]]("blobdata_to_url")
-"""This context variable gives access to a function that makes BlobData objects
-downloadable, by assigning a URL and adding them to the
-[`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
-
-It is only available within a
-[`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
-because it requires access to the `BlobDataManager` and the `url_for` function
-from the FastAPI app.
-"""
-
-url_to_blobdata_ctx = ContextVar[Callable[[str], ServerSideBlobData]]("url_to_blobdata")
-"""This context variable gives access to a function that makes BlobData objects
-from a URL, by retrieving them from the
-[`BlobDataManager`](#labthings_fastapi.outputs.blob.BlobDataManager).
-
-It is only available within a
-[`blob_serialisation_context_manager`](#labthings_fastapi.outputs.blob.blob_serialisation_context_manager)
-because it requires access to the `BlobDataManager`.
-"""
-
-
-async def blob_serialisation_context_manager(
-    request: Request,
-) -> AsyncGenerator[BlobDataManager, None]:
-    r"""Set context variables to allow blobs to be [de]serialised.
-
-    In order to serialise a `.Blob` to a JSON-serialisable dictionary, we must
-    add it to the `.BlobDataManager` and use that to generate a URL. This
-    requires that the serialisation code (which may be nested deep within a
-    `pydantic.BaseModel`) has access to the `.BlobDataManager` and also the
-    `fastapi.Request.url_for` method. At time of writing, there was not an
-    obvious way to pass these functions in to the serialisation code.
-
-    Similar problems exist for blobs used as input: the validator needs to
-    retrieve the data from the `.BlobDataManager` but does not have access.
-
-    This async context manager yields the `.BlobDataManager`, but more
-    importantly it sets the `.url_to_blobdata_ctx` and `blobdata_to_url_ctx`
-    context variables, which may be accessed by the code within `.Blob` to
-    correctly add and retrieve `.ServerSideBlobData` objects to and from the
-    `.BlobDataManager`\ .
-
-    This function will usually be called from a FastAPI dependency. See
-    :ref:`dependencies` for more on that mechanism.
-
-    :param request: the `fastapi.Request` object, used to access the server
-        and ``url_for`` method.
-
-    :yield: the `.BlobDataManager`. This is usually ignored.
-    """
-    url_for = request.url_for
-
-    def blobdata_to_url(blob: ServerSideBlobData) -> str:
-        blob_id = blob_data_manager.add_blob(blob)
-        return str(url_for("download_blob", blob_id=blob_id))
-
-    def url_to_blobdata(url: str) -> ServerSideBlobData:
-        m = re.search(r"blob/([0-9a-z\-]+)", url)
-        if not m:
-            raise HTTPException(
-                status_code=404, detail="Could not find blob ID in href"
-            )
-        invocation_id = uuid.UUID(m.group(1))
-        return blob_data_manager.get_blob(invocation_id)
-
-    t1 = blobdata_to_url_ctx.set(blobdata_to_url)
-    t2 = url_to_blobdata_ctx.set(url_to_blobdata)
     try:
-        yield blob_data_manager
-    finally:
-        blobdata_to_url_ctx.reset(t1)
-        url_to_blobdata_ctx.reset(t2)
+        blob = LocalBlobData.from_id(blob_id)
+        return blob.response()
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail="Blob not found") from e
 
 
-BlobIOContextDep: TypeAlias = Annotated[
-    BlobDataManager, Depends(blob_serialisation_context_manager)
-]
-"""A dependency that enables `.Blob` to be serialised and deserialised."""
+def url_to_id(url: str) -> uuid.UUID | None:
+    """Extract the blob ID from a URL.
+
+    Currently, this checks for a UUID at the end of a URL. In the future,
+    it might check if the URL refers to this server.
+
+    :param url: a URL previously generated by `blobdata_to_url`.
+    :return: the UUID blob ID extracted from the URL.
+    """
+    m = re.search(r"blob/([0-9a-z\-]+)", url)
+    if not m:
+        return None
+    return uuid.UUID(m.group(1))
