@@ -611,7 +611,7 @@ class BaseDescriptor(Generic[Owner, Value]):
             self.assert_set_name_called()
             owning_class = self._owner_ref()
             if owning_class is None:
-                raise RuntimeError("Class was unexpetedly deleted")
+                raise RuntimeError("Class was unexpectedly deleted")
             return info_class(self, None, owning_class)
 
     def descriptor_info(
