@@ -259,7 +259,7 @@ class LocalBlobData(BlobData):
         WeakValueDictionary()
     )
     """A way to retrieve `.LocalBlobData` objects by their ID.
-    
+
     Note that this does not interfere with garbage collection, as it only
     holds weak references to the `.LocalBlobData` objects.
     """
@@ -930,6 +930,8 @@ def download_blob(blob_id: uuid.UUID) -> Response:
 
     :return: a `fastapi.Response` object that will send the content of
         the blob over HTTP.
+
+    :raises HTTPException: if the requested blob is not found.
     """
     try:
         blob = LocalBlobData.from_id(blob_id)
