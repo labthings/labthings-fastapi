@@ -189,3 +189,16 @@ class ServerActionError(RuntimeError):
 
 class ClientPropertyError(RuntimeError):
     """Setting or getting a property via a ThingClient failed."""
+
+
+class NotBoundToInstanceError(RuntimeError):
+    """A `.BaseDescriptorInfo` is not bound to an object.
+
+    Some methods and properties of `.BaseDescriptorInfo` objects require them
+    to be bound to a `.Thing` instance. If these methods are called on a
+    `.BaseDescriptorInfo` object that is unbound, this exception is raised.
+
+    This exception should only be seen when `.BaseDescriptorInfo` objects are
+    generated from a `.Thing` class. Usually, they should be accessed via a
+    `.Thing` instance, in which case they will be bound.
+    """
