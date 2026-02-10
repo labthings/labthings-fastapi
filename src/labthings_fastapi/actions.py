@@ -933,11 +933,14 @@ class ActionDescriptor(
         )
 
     def descriptor_info(self, owner: OwnerT | None = None) -> ActionInfo:
-        """Return an `.ActionInfo` object describing this action.
+        r"""Return an `.ActionInfo` object describing this action.
 
         The returned object will either refer to the class, or be bound to a particular
         instance. If it is bound, more properties will be available - e.g. we will be
         able to get the bound function.
+
+        :param owner: The owning object, or `None` to return an unbound `.ActionInfo`\ .
+        :return: An `.ActionInfo` object describing this Action.
         """
         return self._descriptor_info(ActionInfo, owner)
 

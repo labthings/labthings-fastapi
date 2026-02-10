@@ -365,7 +365,10 @@ class BaseDescriptorInfo(
         )
 
     def __repr__(self) -> str:
-        """Represent the DescriptorInfo object as a string."""
+        """Represent the DescriptorInfo object as a string.
+
+        :return: a string representing the info object.
+        """
         descriptor = f"{self.owning_class.__name__}.{self.name}"
         bound = f" bound to {self.owning_object}>" if self.is_bound else ""
         return f"<{self.__class__.__name__} for {descriptor}{bound}>"
