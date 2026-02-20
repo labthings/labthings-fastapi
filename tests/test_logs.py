@@ -10,6 +10,7 @@ import logging
 from types import EllipsisType
 import pytest
 from uuid import UUID, uuid4
+from fastapi.testclient import TestClient
 from labthings_fastapi import logs
 from labthings_fastapi.invocation_contexts import (
     fake_invocation_context,
@@ -19,12 +20,28 @@ import labthings_fastapi as lt
 from labthings_fastapi.exceptions import LogConfigurationError
 from labthings_fastapi.testing import create_thing_without_server
 
+from .temp_client import poll_task
+
 
 class ThingThatLogs(lt.Thing):
     @lt.action
     def log_a_message(self, msg: str):
         """Log a message to the thing's logger."""
         self.logger.info(msg)
+
+    @lt.action
+    def log_and_capture(self, msg: str) -> str:
+        """Log a message to the thing's logger."""
+        self.logger.info(msg)
+        self.logger.warning(msg)
+        self.logger.error(msg)
+        logs = self.get_logs()
+        logging_str = ""
+        for record in logs:
+            level = record.levelname
+            msg = record.getMessage()
+            logging_str += f"[{level}] {msg}\n"
+        return logging_str
 
 
 def reset_thing_logger():
@@ -176,3 +193,15 @@ def test_add_thing_log_destination():
         thing.log_a_message("Test Message.")
     assert len(dest) == 1
     assert dest[0].getMessage() == "Test Message."
+
+
+def test_action_can_get_logs():
+    """Check that an action can get a copy of its own logs."""
+    server = lt.ThingServer({"logging_thing": ThingThatLogs})
+    with TestClient(server.app) as client:
+        response = client.post("/logging_thing/log_and_capture", json={"msg": "foobar"})
+    response.raise_for_status()
+    invocation = poll_task(client, response.json())
+    assert invocation["status"] == "completed"
+    expected_message = "[INFO] foobar\n[WARNING] foobar\n[ERROR] foobar\n"
+    assert invocation["output"] == expected_message
