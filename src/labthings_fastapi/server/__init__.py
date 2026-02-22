@@ -7,7 +7,7 @@ See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
 """
 
 from __future__ import annotations
-from typing import AsyncGenerator, Optional, TypeVar
+from typing import Any, AsyncGenerator, Optional, TypeVar
 from typing_extensions import Self
 import os
 
@@ -65,6 +65,7 @@ class ThingServer:
         self,
         things: ThingsConfig,
         settings_folder: Optional[str] = None,
+        application_config: Optional[Mapping[str, Any]] = None,
     ) -> None:
         r"""Initialise a LabThings server.
 
@@ -81,10 +82,17 @@ class ThingServer:
             arguments, and any connections to other `.Thing`\ s.
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
+        :param application_config: A mapping containing custom configuration for the
+            application. This is not processed by LabThings. Each `.Thing` can access
+            this via their ``application_config`` attribute
         """
         self.startup_failure: dict | None = None
         configure_thing_logger()  # Note: this is safe to call multiple times.
-        self._config = ThingServerConfig(things=things, settings_folder=settings_folder)
+        self._config = ThingServerConfig(
+            things=things,
+            settings_folder=settings_folder,
+            application_config=application_config,
+        )
         self.app = FastAPI(lifespan=self.lifespan)
         self._set_cors_middleware()
         self._set_url_for_middleware()
@@ -147,6 +155,15 @@ class ThingServer:
         :return: a dictionary mapping thing paths to `.Thing` instances.
         """
         return MappingProxyType(self._things)
+
+    @property
+    def application_config(self) -> Mapping[str, Any] | None:
+        """Return the application configuration from the config file.
+
+        :return: The custom configuration as specified in the configuration
+            file.
+        """
+        return self._config.application_config
 
     ThingInstance = TypeVar("ThingInstance", bound=Thing)
 
