@@ -1,3 +1,4 @@
+import logging
 from threading import Thread
 import tempfile
 import json
@@ -5,7 +6,7 @@ from typing import Any
 import pytest
 import os
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
@@ -274,9 +275,13 @@ def test_load_extra_settings(caplog, tempdir):
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        # Create the server with the Thing added.
+    # Recreate the server and check for the error
+    with caplog.at_level(logging.WARNING):
+        # Add thing to server
         _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].name == "labthings_fastapi.things.thing"
 
 
 def test_try_loading_corrupt_settings(tempdir, caplog):
@@ -295,7 +300,10 @@ def test_try_loading_corrupt_settings(tempdir, caplog):
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
-    # Recreate the server and check for the error
-    with pytest.raises(ValidationError, match="Invalid JSON"):
+    # Recreate the server and check for the warning in logs
+    with caplog.at_level(logging.WARNING):
         # Add thing to server
         _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].name == "labthings_fastapi.things.thing"

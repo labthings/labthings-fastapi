@@ -7,6 +7,7 @@ for how it fits with the rest of the library.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
+from pydantic import ValidationError
 from typing_extensions import Self
 from collections.abc import Mapping
 import logging
@@ -40,8 +41,6 @@ from .thing_server_interface import ThingServerInterface
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class Thing:
@@ -220,8 +219,14 @@ class Thing:
                 if value is None:
                     continue  # `None` means the key was missing
                 self.settings[key].set_without_emit_from_model(value)
-        except (FileNotFoundError, JSONDecodeError, PermissionError):
-            _LOGGER.warning("Error loading settings for %s", thing_name)
+        except (FileNotFoundError, JSONDecodeError, PermissionError, ValidationError):
+            # Note that if the settings file is missing, we should already have returned
+            # before attempting to load settings.
+            self.logger.warning(
+                "Error loading settings for %s. "
+                "These settings will be reset to default.",
+                thing_name,
+            )
         finally:
             self._disable_saving_settings = False
 
