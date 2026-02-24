@@ -30,7 +30,7 @@ from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
 from .exceptions import PropertyNotObservableError
 from .thing_server_interface import ThingServerInterface
-
+from .invocation_contexts import get_invocation_id
 
 if TYPE_CHECKING:
     from .server import ThingServer
@@ -383,3 +383,26 @@ class Thing:
             raise KeyError(f"{action_name} is not an LabThings Action")
         observers = action._observers_set(self)
         observers.add(stream)
+
+    def get_current_invocation_logs(self) -> list[logging.LogRecord]:
+        """Get the log records for an on going action.
+
+        This is useful if an action wishes to save its logs alongside any data.
+
+        Note that only the last 1000 logs are returned so for long running tasks that
+        log frequently this may want to be read periodically.
+
+        This will error if it is called outside an action invocation.
+
+        :return: a list of all logs from this action.
+
+        :raises RuntimeError: If the server cannot be retrieved. This should never
+            happen.
+        """
+        inv_id = get_invocation_id()
+        server = self._thing_server_interface._server()
+        if server is None:
+            raise RuntimeError("Could not get server from thing_server_interface")
+        action_manager = server.action_manager
+        this_invocation = action_manager.get_invocation(inv_id)
+        return this_invocation.log

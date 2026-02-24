@@ -54,23 +54,26 @@ class LogRecordModel(BaseModel):
     def generate_message(cls, data: Any) -> Any:
         """Ensure LogRecord objects have constructed their message.
 
-        :param data: The LogRecord to process.
+        :param data: The LogRecord or serialised log record data to process.
 
         :return: The LogRecord, with a message constructed.
         """
-        if not hasattr(data, "message"):
-            if isinstance(data, logging.LogRecord):
-                try:
-                    data.message = data.getMessage()
-                except (ValueError, TypeError) as e:
-                    # too many args causes an error - but errors
-                    # in validation can be a problem for us:
-                    # it will cause 500 errors when retrieving
-                    # the invocation.
-                    # This way, you can find and fix the source.
-                    data.message = f"Error constructing message ({e}) from {data!r}."
+        if not isinstance(data, logging.LogRecord):
+            return data
 
-        if data.exc_info:
+        if not hasattr(data, "message"):
+            try:
+                data.message = data.getMessage()
+            except (ValueError, TypeError) as e:
+                # too many args causes an error - but errors
+                # in validation can be a problem for us:
+                # it will cause 500 errors when retrieving
+                # the invocation.
+                # This way, you can find and fix the source.
+                data.message = f"Error constructing message ({e}) from {data!r}."
+
+        # Also check data.exc_info[0] as sys.exc_info() can return (None, None, None).
+        if data.exc_info and data.exc_info[0] is not None:
             data.exception_type = data.exc_info[0].__name__
             data.traceback = "\n".join(traceback.format_exception(*data.exc_info))
 
