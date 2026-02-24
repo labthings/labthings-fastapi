@@ -12,6 +12,7 @@ import pytest
 from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 from labthings_fastapi import logs
+from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.invocation_contexts import (
     fake_invocation_context,
     set_invocation_id,
@@ -195,13 +196,36 @@ def test_add_thing_log_destination():
     assert dest[0].getMessage() == "Test Message."
 
 
-def test_action_can_get_logs():
-    """Check that an action can get a copy of its own logs."""
+def _call_action_can_get_logs():
+    """Run `log_and_capture` as an action, Return the final HTTP response."""
     server = lt.ThingServer({"logging_thing": ThingThatLogs})
     with TestClient(server.app) as client:
         response = client.post("/logging_thing/log_and_capture", json={"msg": "foobar"})
     response.raise_for_status()
-    invocation = poll_task(client, response.json())
+    return poll_task(client, response.json())
+
+
+def test_action_can_get_logs():
+    """Check that an action can get a copy of its own logs."""
+    invocation = _call_action_can_get_logs()
     assert invocation["status"] == "completed"
+    # Check the logs are returned by the action itself.
     expected_message = "[INFO] foobar\n[WARNING] foobar\n[ERROR] foobar\n"
     assert invocation["output"] == expected_message
+
+
+def test_action_logs_over_http():
+    """Check that the action logs are sent over HTTP in JSON."""
+    invocation = _call_action_can_get_logs()
+    logs = invocation["log"]
+    assert isinstance(logs, list)
+    assert len(logs) == 3
+    assert logs[0]["levelname"] == "INFO"
+    assert logs[0]["levelno"] == 20
+    assert logs[1]["levelname"] == "WARNING"
+    assert logs[1]["levelno"] == 30
+    assert logs[2]["levelname"] == "ERROR"
+    assert logs[2]["levelno"] == 40
+    for log in logs:
+        log_as_model = LogRecordModel(**log)
+        assert log_as_model.message == "foobar"
