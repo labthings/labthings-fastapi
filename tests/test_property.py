@@ -27,6 +27,7 @@ from labthings_fastapi.properties import (
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 from labthings_fastapi.exceptions import MissingTypeError, NotConnectedToServerError
 import labthings_fastapi as lt
+from labthings_fastapi.testing import create_thing_without_server
 from .utilities import raises_or_is_caused_by
 
 
@@ -298,3 +299,48 @@ def test_premature_api_and_affordance(mocker):
         Example.prop.add_to_fastapi(mocker.Mock(), example)
     with pytest.raises(NotConnectedToServerError):
         Example.prop.property_affordance(example, None)
+
+
+def test_propertyinfo(mocker):
+    """Test out the PropertyInfo class."""
+
+    class Example(lt.Thing):
+        intprop: int = lt.property(default=0)
+        """A normal, simple, integer property."""
+
+        badprop: int = lt.property(default=1)
+        """An integer property that I will break later."""
+
+    # We will break `badprop` by setting its model to something that's
+    # neither the type nor a rootmodel.
+    badprop = Example.badprop
+    assert isinstance(badprop, lt.DataProperty)
+
+    class BadIntModel(pydantic.BaseModel):
+        root: int
+
+    badprop._model = BadIntModel
+
+    example = create_thing_without_server(Example)
+
+    # Set the property and check the three different ways we can get it
+    example.properties["intprop"].set(15)
+    assert example.intprop == 15  # Using the descriptor's __get__
+    assert example.properties["intprop"].get() == 15  # Via the PropertyInfo object
+    model = example.properties["intprop"].model_instance  # As a RootModel
+    assert isinstance(model, pydantic.RootModel)
+    assert model.root == 15
+
+    # Check we can unwrap a RootModel correctly
+    IntModel = example.properties["intprop"].model
+    assert example.properties["intprop"].model_to_value(IntModel(root=17)) == 17
+    with pytest.raises(TypeError):
+        example.properties["intprop"].model_to_value(BadIntModel(root=17))
+
+    # Check that a broken `_model` raises the right error
+    # See above for where we manually set badprop._model to something that's
+    # not a rootmodel.
+    example.badprop = 3
+    assert example.badprop == 3
+    with pytest.raises(TypeError):
+        _ = example.properties["badprop"].model_instance

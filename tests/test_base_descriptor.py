@@ -495,7 +495,7 @@ def test_optionally_bound_info():
         _ = OptionallyBoundInfo(None, None)  # type: ignore
 
 
-def test_descriptorinfo():
+def test_descriptorinfo(mocker):
     """Test that the DescriptorInfo object works as expected."""
 
     class Example7:
@@ -510,6 +510,12 @@ def test_descriptorinfo():
     intfield_descriptor = Example7.intfield
     assert isinstance(intfield_descriptor, FieldTypedBaseDescriptor)
 
+    # Test it can't be instantiated without either a class or an object
+    # Instantiation with class/object is done implicitly by the
+    # blocks below.
+    with pytest.raises(ValueError, match="must be supplied"):
+        _ = BaseDescriptorInfo(intfield_descriptor, None)
+
     # First, make an unbound info object
     intfield_info = intfield_descriptor.descriptor_info()
     assert repr(intfield_info) == "<FieldTypedBaseDescriptorInfo for Example7.intfield>"
@@ -519,6 +525,8 @@ def test_descriptorinfo():
     assert intfield_info.description == "A description from a multiline docstring."
     with pytest.raises(NotBoundToInstanceError):
         intfield_info.get()
+    with pytest.raises(NotBoundToInstanceError):
+        intfield_info.set(10)
 
     # Next, check the bound version
     example6 = Example7()
