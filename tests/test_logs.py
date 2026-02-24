@@ -31,11 +31,11 @@ class ThingThatLogs(lt.Thing):
 
     @lt.action
     def log_and_capture(self, msg: str) -> str:
-        """Log a message to the thing's logger."""
+        """Log a message to the thing's logger and retrieve it as a string."""
         self.logger.info(msg)
         self.logger.warning(msg)
         self.logger.error(msg)
-        logs = self.get_logs()
+        logs = self.get_current_invocation_logs()
         logging_str = ""
         for record in logs:
             level = record.levelname

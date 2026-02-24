@@ -384,7 +384,7 @@ class Thing:
         observers = action._observers_set(self)
         observers.add(stream)
 
-    def get_logs(self) -> list[logging.LogRecord]:
+    def get_current_invocation_logs(self) -> list[logging.LogRecord]:
         """Get the log records for an on going action.
 
         This is useful if an action wishes to save its logs alongside any data.
