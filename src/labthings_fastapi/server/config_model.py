@@ -180,6 +180,18 @@ class ThingServerConfig(BaseModel):
         description="The location of the settings folder.",
     )
 
+    application_config: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            """Any custom settings required by the application.
+
+            These settings will be available to any Things within the application via
+            their ``application_config`` attribute. Any validation of the dictionary is
+            the responsibility of application code.
+            """
+        ),
+    )
+
 
 def normalise_things_config(things: ThingsConfig) -> Mapping[ThingName, ThingConfig]:
     r"""Ensure every Thing is defined by a `.ThingConfig` object.

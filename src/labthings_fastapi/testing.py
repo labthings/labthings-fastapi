@@ -121,6 +121,14 @@ class MockThingServerInterface(ThingServerInterface):
         """
         raise NotImplementedError("MockThingServerInterface has no ActionManager.")
 
+    @property
+    def application_config(self) -> None:
+        """Return an empty application configuration when mocking.
+
+        :return: None
+        """
+        return None
+
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
