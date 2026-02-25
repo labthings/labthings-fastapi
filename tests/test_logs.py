@@ -201,8 +201,8 @@ def _call_action_can_get_logs():
     server = lt.ThingServer({"logging_thing": ThingThatLogs})
     with TestClient(server.app) as client:
         response = client.post("/logging_thing/log_and_capture", json={"msg": "foobar"})
-    response.raise_for_status()
-    return poll_task(client, response.json())
+        response.raise_for_status()
+        return poll_task(client, response.json())
 
 
 def test_action_can_get_logs():
