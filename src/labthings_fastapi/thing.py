@@ -220,7 +220,7 @@ class Thing:
                 settings = json.load(file_obj)
                 if not isinstance(settings, Mapping):
                     raise TypeError("The settings file must be a JSON object.")
-            for name, value in settings:
+            for name, value in settings.items():
                 try:
                     setting = self.settings[name]
                     # Load the key from the JSON file using the setting's model
