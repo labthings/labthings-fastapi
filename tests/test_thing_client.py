@@ -59,26 +59,49 @@ class ThingToTest(lt.Thing):
 
 
 @pytest.fixture
-def thing_client():
-    """Yield a test client connected to a ThingServer."""
+def thing_client_and_thing():
+    """Yield a test client connected to a ThingServer and the Thing itself."""
     server = lt.ThingServer({"test_thing": ThingToTest})
     with TestClient(server.app) as client:
-        yield lt.ThingClient.from_url("/test_thing/", client=client)
+        thing_client = lt.ThingClient.from_url("/test_thing/", client=client)
+        thing = server.things["test_thing"]
+        yield thing_client, thing
 
 
-def test_reading_and_setting_properties(thing_client):
+@pytest.fixture
+def thing_client(thing_client_and_thing):
+    """Yield a test client connected to a ThingServer."""
+    return thing_client_and_thing[0]
+
+
+def test_reading_and_setting_properties(thing_client_and_thing):
     """Test reading and setting properties."""
+    thing_client, thing = thing_client_and_thing
+
+    # Read the properties from the thing
     assert thing_client.int_prop == 1
     assert thing_client.float_prop == 0.1
     assert thing_client.str_prop == "foo"
 
+    # Update via thing client and check they change on the server and in the client
     thing_client.int_prop = 2
     thing_client.float_prop = 0.2
     thing_client.str_prop = "foo2"
+    thing.int_prop = 2
+    thing.float_prop = 0.2
+    thing.str_prop = "foo2"
 
     assert thing_client.int_prop == 2
     assert thing_client.float_prop == 0.2
     assert thing_client.str_prop == "foo2"
+
+    # Update them on the server side and read them again
+    thing.int_prop = 3
+    thing.float_prop = 0.3
+    thing.str_prop = "foo3"
+    assert thing_client.int_prop == 3
+    assert thing_client.float_prop == 0.3
+    assert thing_client.str_prop == "foo3"
 
     # Set a property that doesn't exist.
     err = "Failed to get property foobar: Not Found"
@@ -94,8 +117,9 @@ def test_reading_and_setting_properties(thing_client):
         thing_client.int_prop = "Bad value!"
 
 
-def test_reading_and_not_setting_read_only_properties(thing_client):
+def test_reading_and_not_setting_read_only_properties(thing_client_and_thing):
     """Test reading read_only properties, but failing to set."""
+    thing_client, thing = thing_client_and_thing
     assert thing_client.int_prop_read_only == 1
     assert thing_client.float_prop_read_only == 0.1
     assert thing_client.str_prop_read_only == "foo"
@@ -112,34 +136,42 @@ def test_reading_and_not_setting_read_only_properties(thing_client):
     assert thing_client.str_prop_read_only == "foo"
 
 
-def test_call_action(thing_client):
+def test_call_action(thing_client_and_thing):
     """Test calling an action."""
+    thing_client, thing = thing_client_and_thing
     assert thing_client.int_prop == 1
     thing_client.increment()
     assert thing_client.int_prop == 2
+    assert thing.int_prop == 2
 
 
-def test_call_action_with_return(thing_client):
+def test_call_action_with_return(thing_client_and_thing):
     """Test calling an action with a return."""
+    thing_client, thing = thing_client_and_thing
     assert thing_client.int_prop == 1
     new_value = thing_client.increment_and_return()
     assert new_value == 2
     assert thing_client.int_prop == 2
+    assert thing.int_prop == 2
 
 
-def test_call_action_with_args(thing_client):
+def test_call_action_with_args(thing_client_and_thing):
     """Test calling an action."""
+    thing_client, thing = thing_client_and_thing
     assert thing_client.int_prop == 1
     thing_client.increment_by_input(value=5)
     assert thing_client.int_prop == 6
+    assert thing.int_prop == 6
 
 
-def test_call_action_with_args_and_return(thing_client):
+def test_call_action_with_args_and_return(thing_client_and_thing):
     """Test calling an action with a return."""
+    thing_client, thing = thing_client_and_thing
     assert thing_client.int_prop == 1
     new_value = thing_client.increment_by_input_and_return(value=5)
     assert new_value == 6
     assert thing_client.int_prop == 6
+    assert thing.int_prop == 6
 
 
 def test_call_action_wrong_arg(thing_client):
