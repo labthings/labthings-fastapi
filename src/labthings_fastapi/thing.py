@@ -6,23 +6,30 @@ for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
+import json
 from typing import TYPE_CHECKING, Any, Optional
+from pydantic import ValidationError
 from typing_extensions import Self
 from collections.abc import Mapping
 import logging
 import os
-import json
 from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
 from anyio.to_thread import run_sync
 
-from pydantic import BaseModel
+
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
 
 from .logs import THING_LOGGER
-from .properties import BaseProperty, DataProperty, BaseSetting
-from .actions import ActionDescriptor
+from .properties import (
+    BaseProperty,
+    DataProperty,
+    PropertyCollection,
+    SettingCollection,
+)
+from .actions import ActionCollection, ActionDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -35,8 +42,6 @@ from .invocation_contexts import get_invocation_id
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class Thing:
@@ -183,28 +188,6 @@ class Thing:
         async def websocket(ws: WebSocket) -> None:
             await websocket_endpoint(self, ws)
 
-    # A private variable to hold the list of settings so it doesn't need to be
-    # iterated through each time it is read
-    _settings_store: Optional[dict[str, BaseSetting]] = None
-
-    @property
-    def _settings(self) -> dict[str, BaseSetting]:
-        """A private property that returns a dict of all settings for this Thing.
-
-        Each dict key is the name of the setting, the corresponding value is the
-        BaseSetting class (a descriptor). This can be used to directly get the
-        descriptor so that the value can be set without emitting signals, such
-        as on startup.
-        """
-        if self._settings_store is not None:
-            return self._settings_store
-
-        self._settings_store = {}
-        for name, attr in class_attributes(self):
-            if isinstance(attr, BaseSetting):
-                self._settings_store[name] = attr
-        return self._settings_store
-
     def load_settings(self) -> None:
         """Load settings from json.
 
@@ -217,30 +200,58 @@ class Thing:
             Note that no notifications will be triggered when the settings are set,
             so if action is needed (e.g. updating hardware with the loaded settings)
             it should be taken in ``__enter__``.
+
+        :raises TypeError: if the JSON file does not contain a dictionary. This is
+            handled internally and logged, so the exception doesn't propagate
+            outside of the function.
         """
         setting_storage_path = self._thing_server_interface.settings_file_path
         thing_name = type(self).__name__
-        if os.path.exists(setting_storage_path):
-            self._disable_saving_settings = True
-            try:
-                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
-                    setting_dict = json.load(file_obj)
-                for key, value in setting_dict.items():
-                    if key in self._settings:
-                        self._settings[key].set_without_emit(self, value)
-                    else:
-                        _LOGGER.warning(
-                            (
-                                "Cannot set %s from persistent storage as %s "
-                                "has no matching setting."
-                            ),
-                            key,
-                            thing_name,
-                        )
-            except (FileNotFoundError, JSONDecodeError, PermissionError):
-                _LOGGER.warning("Error loading settings for %s", thing_name)
-            finally:
-                self._disable_saving_settings = False
+        if not os.path.exists(setting_storage_path):
+            # If the settings file doesn't exist, we have nothing to do - the settings
+            # are already initialised to their default values.
+            return
+
+        # Stop recursion by not allowing settings to be saved as we're reading them.
+        self._disable_saving_settings = True
+
+        try:
+            with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                settings = json.load(file_obj)
+                if not isinstance(settings, Mapping):
+                    raise TypeError("The settings file must be a JSON object.")
+            for name, value in settings.items():
+                try:
+                    setting = self.settings[name]
+                    # Load the key from the JSON file using the setting's model
+                    model = setting.model.model_validate(value)
+                    setting.set_without_emit_from_model(model)
+                except ValidationError:
+                    self.logger.warning(
+                        f"Could not load setting {name} from settings file "
+                        f"because of a validation error.",
+                        exc_info=True,
+                    )
+                except KeyError:
+                    self.logger.warning(
+                        f"An extra key {name} was found in the settings file. "
+                        "It will be deleted the next time settings are saved."
+                    )
+        except (
+            FileNotFoundError,
+            JSONDecodeError,
+            PermissionError,
+            TypeError,
+        ):
+            # Note that if the settings file is missing, we should already have returned
+            # before attempting to load settings.
+            self.logger.warning(
+                "Error loading settings for %s. "
+                "Settings for this Thing will be reset to default.",
+                thing_name,
+            )
+        finally:
+            self._disable_saving_settings = False
 
     def save_settings(self) -> None:
         """Save settings to JSON.
@@ -250,18 +261,39 @@ class Thing:
         """
         if self._disable_saving_settings:
             return
-        if self._settings is not None:
-            setting_dict = {}
-            for name in self._settings.keys():
-                value = getattr(self, name)
-                if isinstance(value, BaseModel):
-                    value = value.model_dump()
-                setting_dict[name] = value
-            # Dumpy to string before writing so if this fails the file isn't overwritten
-            setting_json = json.dumps(setting_dict, indent=4)
-            path = self._thing_server_interface.settings_file_path
-            with open(path, "w", encoding="utf-8") as file_obj:
-                file_obj.write(setting_json)
+        # We dump to a string first, to avoid corrupting the file if it fails
+        setting_json = self.settings.model_instance.model_dump_json(indent=4)
+        path = self._thing_server_interface.settings_file_path
+        with open(path, "w", encoding="utf-8") as file_obj:
+            file_obj.write(setting_json)
+
+    properties: OptionallyBoundDescriptor["Thing", PropertyCollection] = (
+        OptionallyBoundDescriptor(PropertyCollection)
+    )
+    r"""Access to metadata and functions of this `.Thing`\ 's properties.
+
+    `.Thing.properties` is a mapping of names to `.PropertyInfo` objects, which
+    allows convenient access to the metadata related to its properties. Note that
+    this includes settings, as they are a subclass of properties.
+    """
+
+    settings: OptionallyBoundDescriptor["Thing", SettingCollection] = (
+        OptionallyBoundDescriptor(SettingCollection)
+    )
+    r"""Access to settings-related metadata and functions.
+
+    `.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
+    convenient access to metadata of the settings of this `.Thing`\ .
+    """
+
+    actions: OptionallyBoundDescriptor["Thing", ActionCollection] = (
+        OptionallyBoundDescriptor(ActionCollection)
+    )
+    r"""Access to metadata for the actions of this `.Thing`\ .
+
+    `.Thing.actions` is a mapping of names to `.ActionInfo` objects that allows
+    convenient access to metadata of each action.
+    """
 
     _labthings_thing_state: Optional[dict] = None
 

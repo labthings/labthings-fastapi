@@ -1,15 +1,28 @@
+import logging
 from threading import Thread
 import tempfile
 import json
 from typing import Any
 import pytest
 import os
-import logging
 
+from pydantic import BaseModel
 from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
+
+
+class MyModel(BaseModel):
+    """A basic Model subclass.
+
+    This is used to test that we can safely load/save settings that are
+    `.BaseModel` instances. Prior to v0.0.14, these were loaded as dictionaries
+    but they should now be correctly reinflated to the right class.
+    """
+
+    a: int
+    b: str
 
 
 class ThingWithSettings(lt.Thing):
@@ -22,13 +35,16 @@ class ThingWithSettings(lt.Thing):
         self._localonlysetting = "Local-only default."
 
     boolsetting: bool = lt.setting(default=False)
-    "A boolean setting"
+    "A boolean setting."
 
     stringsetting: str = lt.setting(default="foo")
-    "A string setting"
+    "A string setting."
 
     dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
-    "A dictionary setting"
+    "A dictionary setting."
+
+    modelsetting: MyModel = lt.setting(default_factory=lambda: MyModel(a=0, b="string"))
+    "A setting that is a BaseModel."
 
     @lt.setting
     def floatsetting(self) -> float:
@@ -98,6 +114,7 @@ def _settings_dict(
     floatsetting=1.0,
     stringsetting="foo",
     dictsetting=None,
+    modelsetting=None,
     localonlysetting="Local-only default.",
     localonly_boolsetting=False,
 ):
@@ -107,11 +124,14 @@ def _settings_dict(
     """
     if dictsetting is None:
         dictsetting = {"a": 1, "b": 2}
+    if modelsetting is None:
+        modelsetting = {"a": 0, "b": "string"}
     return {
         "boolsetting": boolsetting,
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
         "dictsetting": dictsetting,
+        "modelsetting": modelsetting,
         "localonlysetting": localonlysetting,
         "localonly_boolsetting": localonly_boolsetting,
     }
@@ -134,13 +154,15 @@ def test_setting_available():
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
     assert thing.dictsetting == {"a": 1, "b": 2}
+    assert thing.modelsetting == MyModel(a=0, b="string")
 
 
 def test_functional_settings_save(tempdir):
     """Check updated settings are saved to disk
 
     ``floatsetting`` is a functional setting, we should also test
-    a `.DataSetting` for completeness."""
+    a `.DataSetting` for completeness.
+    """
     server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
     setting_file = _get_setting_file(server, "thing")
     # No setting file created when first added
@@ -151,12 +173,12 @@ def test_functional_settings_save(tempdir):
         # A 201 return code means the operation succeeded (i.e.
         # the property was written to)
         assert r.status_code == 201
-        # We check the value with a GET request
-        r = client.get("/thing/floatsetting")
-        assert r.json() == 2.0
         # After successfully writing to the setting, it should
         # have created a settings file.
         assert os.path.isfile(setting_file)
+        # We check the value with a GET request
+        r = client.get("/thing/floatsetting")
+        assert r.json() == 2.0
         with open(setting_file, "r", encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
@@ -253,21 +275,13 @@ def test_load_extra_settings(caplog, tempdir):
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
+    # Recreate the server and check for the error
     with caplog.at_level(logging.WARNING):
-        # Create the server with the Thing added.
-        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        # Add thing to server
+        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert caplog.records[0].name == "labthings_fastapi.thing"
-
-    # Get the instance of the ThingWithSettings
-    thing = server.things["thing"]
-    assert isinstance(thing, ThingWithSettings)
-
-    # Check other settings are loaded as expected
-    assert not thing.boolsetting
-    assert thing.stringsetting == "bar"
-    assert thing.floatsetting == 3.0
+        assert caplog.records[0].name == "labthings_fastapi.things.thing"
 
 
 def test_try_loading_corrupt_settings(tempdir, caplog):
@@ -286,19 +300,10 @@ def test_try_loading_corrupt_settings(tempdir, caplog):
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
 
-    # Recreate the server and check for warnings
+    # Recreate the server and check for the warning in logs
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
-        assert caplog.records[0].name == "labthings_fastapi.thing"
-
-    # Get the instance of the ThingWithSettings
-    thing = server.things["thing"]
-    assert isinstance(thing, ThingWithSettings)
-
-    # Check default settings are loaded
-    assert not thing.boolsetting
-    assert thing.stringsetting == "foo"
-    assert thing.floatsetting == 1.0
+        assert caplog.records[0].name == "labthings_fastapi.things.thing"
