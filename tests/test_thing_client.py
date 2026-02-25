@@ -6,6 +6,8 @@ import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 
+from labthings_fastapi.exceptions import ClientPropertyError, FailedToInvokeActionError
+
 
 class ThingToTest(lt.Thing):
     """A thing to be tested by using a ThingClient."""
@@ -107,7 +109,7 @@ def test_reading_and_setting_properties(thing_client_and_thing):
 
     # Set a property that doesn't exist.
     err = "Failed to get property foobar: Not Found"
-    with pytest.raises(lt.exceptions.ClientPropertyError, match=err):
+    with pytest.raises(ClientPropertyError, match=err):
         thing_client.get_property("foobar")
 
     # Set a property with bad data type.
@@ -115,7 +117,7 @@ def test_reading_and_setting_properties(thing_client_and_thing):
         "Failed to set property int_prop: Input should be a valid integer, unable to "
         "parse string as an integer"
     )
-    with pytest.raises(lt.exceptions.ClientPropertyError, match=err):
+    with pytest.raises(ClientPropertyError, match=err):
         thing_client.int_prop = "Bad value!"
 
 
@@ -126,16 +128,76 @@ def test_reading_and_not_setting_read_only_properties(thing_client_and_thing):
     assert thing_client.float_prop_read_only == 0.1
     assert thing_client.str_prop_read_only == "foo"
 
-    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
+    with pytest.raises(ClientPropertyError, match="may not be set"):
         thing_client.int_prop_read_only = 2
-    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
+    with pytest.raises(ClientPropertyError, match="may not be set"):
         thing_client.float_prop_read_only = 0.2
-    with pytest.raises(lt.exceptions.ClientPropertyError, match="Method Not Allowed"):
+    with pytest.raises(ClientPropertyError, match="may not be set"):
         thing_client.str_prop_read_only = "foo2"
 
     assert thing_client.int_prop_read_only == 1
     assert thing_client.float_prop_read_only == 0.1
     assert thing_client.str_prop_read_only == "foo"
+
+
+def test_property_descriptor_errors(mocker):
+    """This checks that read/write-only properties raise an error when written/read.
+
+    Write only properties are not yet supported on the server side, so it's done with a
+    mocked up Thing Description.
+    """
+    thing_description = {
+        "title": "Example",
+        "properties": {
+            "readwrite": {
+                "title": "test",
+                "writeOnly": False,
+                "readOnly": False,
+                "type": "integer",
+                "forms": [],
+            },
+            "readonly": {
+                "title": "test",
+                "writeOnly": False,
+                "readOnly": True,
+                "type": "integer",
+                "forms": [],
+            },
+            "writeonly": {
+                "title": "test",
+                "writeOnly": True,
+                "readOnly": False,
+                "type": "integer",
+                "forms": [],
+            },
+        },
+        "actions": {},
+        "base": None,
+        "securityDefinitions": {"no_security": {}},
+        "security": "no_security",
+    }
+
+    # Create a client object
+    MyClient = lt.ThingClient.subclass_from_td(thing_description)
+    client = MyClient("/", mocker.Mock())
+    # Mock the underlying get/set functions so we don't need a server
+    mocker.patch.object(client, "get_property")
+    client.get_property.return_value = 42
+    mocker.patch.object(client, "set_property")
+
+    # Check which properties we can read
+    assert client.readwrite == 42
+    assert client.readonly == 42
+    with pytest.raises(ClientPropertyError, match="may not be read"):
+        _ = client.writeonly
+    assert client.get_property.call_count == 2
+
+    # The same check for writing
+    client.readwrite = 0
+    client.writeonly = 0
+    with pytest.raises(ClientPropertyError, match="may not be set"):
+        _ = client.readonly = 0
+    assert client.set_property.call_count == 2
 
 
 def test_call_action(thing_client_and_thing):
@@ -180,7 +242,7 @@ def test_call_action_wrong_arg(thing_client):
     """Test calling an action with wrong argument."""
     err = "Error when invoking action increment_by_input: 'value' - Field required"
 
-    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=err):
+    with pytest.raises(FailedToInvokeActionError, match=err):
         thing_client.increment_by_input(input=5)
 
 
@@ -190,7 +252,7 @@ def test_call_action_wrong_type(thing_client):
         "Error when invoking action increment_by_input: 'value' - Input should be a "
         "valid integer, unable to parse string as an integer"
     )
-    with pytest.raises(lt.exceptions.FailedToInvokeActionError, match=err):
+    with pytest.raises(FailedToInvokeActionError, match=err):
         thing_client.increment_by_input(value="foo")
 
 

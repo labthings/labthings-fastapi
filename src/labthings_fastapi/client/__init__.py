@@ -365,7 +365,7 @@ def property_descriptor(
             obj: Optional[ThingClient] = None,
             _objtype: Optional[type[ThingClient]] = None,
         ) -> Any:
-            raise ClientPropertyError("Method Not Allowed")
+            raise ClientPropertyError("This property may not be read.")
 
     __get__.__annotations__["return"] = model
     P.__get__ = __get__  # type: ignore[attr-defined]
@@ -382,7 +382,7 @@ def property_descriptor(
         def __set__(
             self: PropertyClientDescriptor, obj: ThingClient, value: Any
         ) -> None:
-            raise ClientPropertyError("Method Not Allowed")
+            raise ClientPropertyError("This property may not be set.")
 
     __set__.__annotations__["value"] = model
     P.__set__ = __set__  # type: ignore[attr-defined]
