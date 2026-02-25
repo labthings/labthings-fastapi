@@ -1,4 +1,4 @@
-"""Test that Thing Client's can call actions and read properties."""
+"""Test that Thing Clients can call actions and read properties."""
 
 import re
 
@@ -87,10 +87,12 @@ def test_reading_and_setting_properties(thing_client_and_thing):
     thing_client.int_prop = 2
     thing_client.float_prop = 0.2
     thing_client.str_prop = "foo2"
-    thing.int_prop = 2
-    thing.float_prop = 0.2
-    thing.str_prop = "foo2"
 
+    # Check the server updated
+    assert thing.int_prop == 2
+    assert thing.float_prop == 0.2
+    assert thing.str_prop == "foo2"
+    # Check the client updated
     assert thing_client.int_prop == 2
     assert thing_client.float_prop == 0.2
     assert thing_client.str_prop == "foo2"
@@ -110,7 +112,7 @@ def test_reading_and_setting_properties(thing_client_and_thing):
 
     # Set a property with bad data type.
     err = (
-        "Failed to get property int_prop: Input should be a valid integer, unable to "
+        "Failed to set property int_prop: Input should be a valid integer, unable to "
         "parse string as an integer"
     )
     with pytest.raises(lt.exceptions.ClientPropertyError, match=err):

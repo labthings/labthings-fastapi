@@ -180,7 +180,7 @@ class ThingClient:
             ):
                 err_msg = detail[0].get("msg", "Unknown error")
 
-            raise ClientPropertyError(f"Failed to get property {path}: {err_msg}")
+            raise ClientPropertyError(f"Failed to set property {path}: {err_msg}")
 
     def invoke_action(self, path: str, **kwargs: Any) -> Any:
         r"""Invoke an action on the Thing.
