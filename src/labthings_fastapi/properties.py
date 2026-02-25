@@ -467,6 +467,8 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             title=self.title,
             forms=forms,
             description=self.description,
+            readOnly=self.readonly,
+            writeOnly=False,  # write-only properties are not yet supported
         )
         # We merge the data schema with the property affordance (which subclasses the
         # DataSchema model) with the affordance second so its values take priority.
