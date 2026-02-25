@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Optional
 from pydantic import ValidationError
-from pydantic_core import InitErrorDetails
 from typing_extensions import Self
 from collections.abc import Mapping
 import logging
@@ -217,50 +216,34 @@ class Thing:
                 settings = json.load(file_obj)
                 if not isinstance(settings, Mapping):
                     raise TypeError("The settings file must be a JSON object.")
-            validation_errors: dict[str, ValidationError] = {}
             for name, value in settings:
                 try:
                     setting = self.settings[name]
                     # Load the key from the JSON file using the setting's model
                     model = setting.model.model_validate(value)
                     setting.set_without_emit_from_model(model)
-                except ValidationError as e:
-                    validation_errors[name] = e
+                except ValidationError:
+                    self.logger.warning(
+                        f"Could not load setting {name} from settings file "
+                        f"because of a validation error.",
+                        exc_info=True,
+                    )
                 except KeyError:
                     self.logger.warning(
                         f"An extra key {name} was found in the settings file. "
                         "It will be deleted the next time settings are saved."
                     )
-            if validation_errors:
-                # If one or more settings didn't validate, combine them into a single
-                # Pydantic validation error.
-                error_details: list[InitErrorDetails] = []
-                for name, exc in validation_errors.items():
-                    for err in exc.errors():
-                        error_details.append(
-                            {
-                                "type": err["type"],
-                                "loc": (name,) + err["loc"],
-                                "input": err["input"],
-                                "ctx": err["ctx"] if "ctx" in err else {},
-                            }
-                        )
-                raise ValidationError.from_exception_data(
-                    "Some settings were not valid.",
-                    error_details,
-                )
         except (
             FileNotFoundError,
             JSONDecodeError,
             PermissionError,
-            ValidationError,
             TypeError,
         ):
             # Note that if the settings file is missing, we should already have returned
             # before attempting to load settings.
             self.logger.warning(
                 "Error loading settings for %s. "
-                "These settings will be reset to default.",
+                "Settings for this Thing will be reset to default.",
                 thing_name,
             )
         finally:
