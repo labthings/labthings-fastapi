@@ -84,7 +84,8 @@ class ThingServer:
             settings will be saved.
         :param application_config: A mapping containing custom configuration for the
             application. This is not processed by LabThings. Each `.Thing` can access
-            this via their ``application_config`` attribute
+            application. This is not processed by LabThings. Each `.Thing` can access
+            this via the Thing-Server interface.
         """
         self.startup_failure: dict | None = None
         configure_thing_logger()  # Note: this is safe to call multiple times.
