@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 from typing_extensions import Self
 from collections.abc import Mapping
-from copy import deepcopy
 import logging
 import os
 import json
@@ -83,8 +82,6 @@ class Thing:
     _thing_server_interface: ThingServerInterface
     """Provide access to features of the server that this `.Thing` is attached to."""
 
-    application_config: Mapping[str, Any] | None
-
     def __init__(self, thing_server_interface: ThingServerInterface) -> None:
         """Initialise a Thing.
 
@@ -101,9 +98,6 @@ class Thing:
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
-        # Create a deepcopy of the configuration so if one Thing mutates the config
-        # it cannot propagate.
-        self.application_config = deepcopy(thing_server_interface.application_config)
         self._disable_saving_settings: bool = False
 
     @property

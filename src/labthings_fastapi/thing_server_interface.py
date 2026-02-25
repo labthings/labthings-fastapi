@@ -2,6 +2,7 @@ r"""Interface between `.Thing` subclasses and the `.ThingServer`\ ."""
 
 from __future__ import annotations
 from concurrent.futures import Future
+from copy import deepcopy
 import os
 from typing import (
     TYPE_CHECKING,
@@ -159,7 +160,7 @@ class ThingServerInterface:
     @property
     def application_config(self) -> Mapping[str, Any] | None:
         """The custom application configuration options from configuration."""
-        return self._get_server().application_config
+        return deepcopy(self._get_server().application_config)
 
     def get_thing_states(self) -> Mapping[str, Any]:
         """Retrieve metadata from all Things on the server.

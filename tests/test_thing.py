@@ -27,8 +27,10 @@ def test_thing_can_access_application_config():
     thing2 = server.things["thing2"]
 
     # Check both Things can access the application config
-    assert thing1.application_config == {"foo": "bar", "mock": True}
-    assert thing1.application_config == thing2.application_config
+    thing1_config = thing1._thing_server_interface.application_config
+    thing2_config = thing2._thing_server_interface.application_config
+    assert thing1_config == {"foo": "bar", "mock": True}
+    assert thing1_config == thing2_config
     # But that they are not the same dictionary, preventing mutations affecting
     # behaviour of another thing.
-    assert thing1.application_config is not thing2.application_config
+    assert thing1_config is not thing2_config
