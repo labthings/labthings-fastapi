@@ -180,6 +180,30 @@ class ThingServerConfig(BaseModel):
         description="The location of the settings folder.",
     )
 
+    api_prefix: str = Field(
+        default="",
+        pattern="(\/[\w-]+)*",
+        description=(
+            """A prefix added to all endpoints, including Things.
+
+            The prefix must either be empty, or start with a forward
+            slash, but not end with one. This is enforced by a regex validator
+            on this field.
+
+            By default, LabThings creates a few LabThings-specific endpoints
+            (`/action_invocations/` and `/blob/` for example) as well as
+            endpoints for attributes of `Thing`s. This prefix will apply to
+            all of those endpoints.
+
+            For example, if `api_prefix` is set to `/api/v1` then a `Thing`
+            called `my_thing` might appear at `/api/v1/my_thing/` and the
+            blob download URL would be `/api/v1/blob/{id}`.
+
+            Leading and trailing slashes will be normalised.
+            """
+        ),
+    )
+
     application_config: dict[str, Any] | None = Field(
         default=None,
         description=(
