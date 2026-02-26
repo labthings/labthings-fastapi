@@ -36,7 +36,7 @@ from typing import (
 )
 from weakref import WeakSet
 import weakref
-from fastapi import FastAPI, HTTPException, Request, Body, BackgroundTasks
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
 
 from .middleware.url_for import URLFor
@@ -72,7 +72,7 @@ if TYPE_CHECKING:
     from .thing import Thing
 
 
-__all__ = ["ACTION_INVOCATIONS_PATH", "Invocation", "ActionManager"]
+__all__ = ["Invocation", "ActionManager"]
 
 
 ACTION_INVOCATIONS_PATH = "/action_invocations"
@@ -442,17 +442,18 @@ class ActionManager:
             for k in to_delete:
                 del self._invocations[k]
 
-    def attach_to_app(self, app: FastAPI) -> None:
-        """Add /action_invocations and /action_invocation/{id} endpoints to FastAPI.
+    def router(self) -> APIRouter:
+        """Create a FastAPI Router with action-related endpoints.
 
-        :param app: The `fastapi.FastAPI` application to which we add the endpoints.
+        :return: a Router with all action-related endpoints.
         """
+        router = APIRouter()
 
-        @app.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
+        @router.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
         def list_all_invocations(request: Request) -> list[InvocationModel]:
             return self.list_invocations(request=request)
 
-        @app.get(
+        @router.get(
             ACTION_INVOCATIONS_PATH + "/{id}",
             responses={404: {"description": "Invocation ID not found"}},
         )
@@ -477,7 +478,7 @@ class ActionManager:
                     detail="No action invocation found with ID {id}",
                 ) from e
 
-        @app.get(
+        @router.get(
             ACTION_INVOCATIONS_PATH + "/{id}/output",
             response_model=Any,
             responses={
@@ -525,7 +526,7 @@ class ActionManager:
                     return invocation.output.response()
                 return invocation.output
 
-        @app.delete(
+        @router.delete(
             ACTION_INVOCATIONS_PATH + "/{id}",
             response_model=None,
             responses={
@@ -564,6 +565,8 @@ class ActionManager:
                         ),
                     )
                 invocation.cancel()
+
+        return router
 
 
 ACTION_POST_NOTICE = """

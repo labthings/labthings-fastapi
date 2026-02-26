@@ -11,7 +11,7 @@ from typing import Any, AsyncGenerator, Optional, TypeVar
 from typing_extensions import Self
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
 from contextlib import asynccontextmanager, AsyncExitStack
@@ -65,6 +65,7 @@ class ThingServer:
         self,
         things: ThingsConfig,
         settings_folder: Optional[str] = None,
+        api_prefix: str = "",
         application_config: Optional[Mapping[str, Any]] = None,
     ) -> None:
         r"""Initialise a LabThings server.
@@ -82,8 +83,9 @@ class ThingServer:
             arguments, and any connections to other `.Thing`\ s.
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
+        :param api_prefix: An optional prefix for all API routes. This must either
+            be empty, or start with a slash and not end with a slash.
         :param application_config: A mapping containing custom configuration for the
-            application. This is not processed by LabThings. Each `.Thing` can access
             application. This is not processed by LabThings. Each `.Thing` can access
             this via the Thing-Server interface.
         """
@@ -92,6 +94,7 @@ class ThingServer:
         self._config = ThingServerConfig(
             things=things,
             settings_folder=settings_folder,
+            api_prefix=api_prefix,
             application_config=application_config,
         )
         self.app = FastAPI(lifespan=self.lifespan)
@@ -99,9 +102,9 @@ class ThingServer:
         self._set_url_for_middleware()
         self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
-        self.action_manager.attach_to_app(self.app)
-        self.app.include_router(blob.router)  # include blob download endpoint
-        self._add_things_view_to_app()
+        self.app.include_router(self.action_manager.router(), prefix=self._api_prefix)
+        self.app.include_router(blob.router, prefix=self._api_prefix)
+        self.app.include_router(self._things_view_router(), prefix=self._api_prefix)
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
@@ -166,6 +169,15 @@ class ThingServer:
         """
         return self._config.application_config
 
+    @property
+    def _api_prefix(self) -> str:
+        """A string that prefixes all URLs in the application.
+
+        This must either be empty, or start with a slash and not
+        end with a slash.
+        """
+        return self._config.api_prefix
+
     ThingInstance = TypeVar("ThingInstance", bound=Thing)
 
     def things_by_class(self, cls: type[ThingInstance]) -> Sequence[ThingInstance]:
@@ -209,7 +221,7 @@ class ThingServer:
         """
         if name not in self._things:
             raise KeyError(f"No thing named {name} has been added to this server.")
-        return f"/{name}/"
+        return f"{self._api_prefix}/{name}/"
 
     def _create_things(self) -> Mapping[str, Thing]:
         r"""Create the Things, add them to the server, and connect them up if needed.
@@ -317,11 +329,15 @@ class ThingServer:
 
         self.blocking_portal = None
 
-    def _add_things_view_to_app(self) -> None:
-        """Add an endpoint that shows the list of attached things."""
+    def _things_view_router(self) -> APIRouter:
+        """Create a router for the endpoint that shows the list of attached things.
+
+        :returns: an APIRouter with the `thing_descriptions` endpoint.
+        """
+        router = APIRouter()
         thing_server = self
 
-        @self.app.get(
+        @router.get(
             "/thing_descriptions/",
             response_model_exclude_none=True,
             response_model_by_alias=True,
@@ -346,7 +362,7 @@ class ThingServer:
                 for name, thing in thing_server.things.items()
             }
 
-        @self.app.get("/things/")
+        @router.get("/things/")
         def thing_paths(request: Request) -> Mapping[str, str]:
             """URLs pointing to the Thing Descriptions of each Thing.
 
@@ -356,6 +372,8 @@ class ThingServer:
                 URLs will return the :ref:`wot_td` of one `.Thing` each.
             """  # noqa: D403 (URLs is correct capitalisation)
             return {
-                t: f"{str(request.base_url).rstrip('/')}{t}"
+                t: str(request.url_for(f"things.{t}"))
                 for t in thing_server.things.keys()
             }
+
+        return router

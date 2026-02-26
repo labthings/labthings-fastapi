@@ -100,6 +100,16 @@ def test_ThingServerConfig():
         with pytest.raises(ValidationError):
             ThingServerConfig(things={name: MyThing})
 
+    # Check some good prefixes
+    for prefix in ["", "/api", "/api/v2", "/api-v2"]:
+        config = ThingServerConfig(things={}, api_prefix=prefix)
+        assert config.api_prefix == prefix
+
+    # Check some bad prefixes
+    for prefix in ["api", "/api/", "api/v2", "/badchars!"]:
+        with pytest.raises(ValidationError):
+            ThingServerConfig(things={}, api_prefix=prefix)
+
 
 def test_unimportable_modules():
     """Test that unimportable modules raise errors as expected."""

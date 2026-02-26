@@ -7,6 +7,9 @@ be helpful to have some more bottom-up unit testing in this file.
 import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
+from starlette.routing import Route
+
+from labthings_fastapi.example_things import MyThing
 
 
 def test_server_from_config_non_thing_error():
@@ -63,3 +66,62 @@ def test_server_thing_descriptions():
             prop = thing_description["properties"][prop_name]
             expected_href = thing_name + "/" + prop_name
             assert prop["forms"][0]["href"] == expected_href
+
+
+def test_api_prefix():
+    """Check we can add a prefix to the URLs on a server."""
+
+    class Example(lt.Thing):
+        """An example Thing"""
+
+    server = lt.ThingServer(things={"example": Example}, api_prefix="/api/v3")
+    paths = [route.path for route in server.app.routes if isinstance(route, Route)]
+    for expected_path in [
+        "/api/v3/action_invocations",
+        "/api/v3/action_invocations/{id}",
+        "/api/v3/action_invocations/{id}/output",
+        "/api/v3/action_invocations/{id}",
+        "/api/v3/blob/{blob_id}",
+        "/api/v3/thing_descriptions/",
+        "/api/v3/things/",
+        "/api/v3/example/",
+    ]:
+        assert expected_path in paths
+
+    unprefixed_paths = {p for p in paths if not p.startswith("/api/v3/")}
+    assert unprefixed_paths == {
+        "/openapi.json",
+        "/docs",
+        "/docs/oauth2-redirect",
+        "/redoc",
+    }
+
+
+def test_things_endpoints():
+    """Test that the two endpoints for listing Things work."""
+    server = lt.ThingServer(
+        {
+            "thing_a": MyThing,
+            "thing_b": MyThing,
+        }
+    )
+    with TestClient(server.app) as client:
+        # Check the thing_descriptions endpoint
+        response = client.get("/thing_descriptions/")
+        response.raise_for_status()
+        tds = response.json()
+        assert "thing_a" in tds
+        assert "thing_b" in tds
+
+        # Check the things endpoint. This should map names to URLs
+        response = client.get("/things/")
+        response.raise_for_status()
+        things = response.json()
+        assert "thing_a" in things
+        assert "thing_b" in things
+
+        # Fetch a thing description from the URL in `things`
+        response = client.get(things["thing_a"])
+        response.raise_for_status()
+        td = response.json()
+        assert td["title"] == "MyThing"
