@@ -872,12 +872,20 @@ class PropertyInfo(
             type.
         :raises TypeError: if the supplied value cannot be converted to the right type.
         """
-        if isinstance(value, self.value_type):
+        # If it is a root model unrap the value
+        value = value.root if isinstance(value, RootModel) else value
+        try:
+            if isinstance(value, self.value_type):
+                return value
+        except TypeError:
+            # In the case that the self.value_type is a typing.GenericAlias or some
+            # complicated associated type like typing._UnionGenericAlias then
+            # isinstace itself with throw a TypeError.
+            # Instead create root model for validation.
+            ValidationModel = RootModel[self.value_type]
+            # Use the model to validate the value before setting.
+            ValidationModel(value)
             return value
-        elif isinstance(value, RootModel):
-            root = value.root
-            if isinstance(root, self.value_type):
-                return root
         msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
         raise TypeError(msg)
 

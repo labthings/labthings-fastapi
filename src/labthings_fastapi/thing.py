@@ -237,6 +237,8 @@ class Thing:
                         f"An extra key {name} was found in the settings file. "
                         "It will be deleted the next time settings are saved."
                     )
+                except TypeError:
+                    self.logger.warning(f"Failed to load {name} with a TypeError.")
         except (
             FileNotFoundError,
             JSONDecodeError,
