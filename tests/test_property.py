@@ -344,3 +344,49 @@ def test_propertyinfo(mocker):
     assert example.badprop == 3
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
+
+
+def test_readonly_metadata():
+    """Check read-only data propagates to the Thing Description."""
+
+    class Example(lt.Thing):
+        prop: int = lt.property(default=0)
+        ro_property: int = lt.property(default=0, readonly=True)
+
+        @lt.property
+        def ro_functional_property(self) -> int:
+            """This property should be read-only as there's no setter."""
+            return 42
+
+        @lt.property
+        def ro_functional_property_with_setter(self) -> int:
+            return 42
+
+        @ro_functional_property_with_setter.setter
+        def _set_ro_functional_property_with_setter(self, val: int) -> None:
+            pass
+
+        ro_functional_property_with_setter.readonly = True
+
+        @lt.property
+        def funcprop(self) -> int:
+            return 42
+
+        @funcprop.setter
+        def _set_funcprop(self, val: int) -> None:
+            pass
+
+    example = create_thing_without_server(Example)
+
+    td = example.thing_description()
+
+    # Check read-write properties are not read-only
+    for name in ["prop", "funcprop"]:
+        assert td.properties[name].readOnly is False
+
+    for name in [
+        "ro_property",
+        "ro_functional_property",
+        "ro_functional_property_with_setter",
+    ]:
+        assert td.properties[name].readOnly is True
