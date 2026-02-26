@@ -40,8 +40,10 @@ class ThingWithSettings(lt.Thing):
     stringsetting: str = lt.setting(default="foo")
     "A string setting."
 
-    dictsetting: dict = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
+    dictsetting: dict["str", int] = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
     "A dictionary setting."
+
+    tuplesetting: tuple[int, int] = lt.setting(default_factory=lambda: (1, 2))
 
     modelsetting: MyModel = lt.setting(default_factory=lambda: MyModel(a=0, b="string"))
     "A setting that is a BaseModel."
@@ -114,6 +116,7 @@ def _settings_dict(
     floatsetting=1.0,
     stringsetting="foo",
     dictsetting=None,
+    tuplesetting=None,
     modelsetting=None,
     localonlysetting="Local-only default.",
     localonly_boolsetting=False,
@@ -126,11 +129,14 @@ def _settings_dict(
         dictsetting = {"a": 1, "b": 2}
     if modelsetting is None:
         modelsetting = {"a": 0, "b": "string"}
+    if tuplesetting is None:
+        tuplesetting = (1, 2)
     return {
         "boolsetting": boolsetting,
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
         "dictsetting": dictsetting,
+        "tuplesetting": list(tuplesetting),  # Convert to list so json matches.
         "modelsetting": modelsetting,
         "localonlysetting": localonlysetting,
         "localonly_boolsetting": localonly_boolsetting,
@@ -245,22 +251,33 @@ def test_settings_dict_internal_update(tempdir):
         assert not os.path.isfile(setting_file)
 
 
-def test_settings_load(tempdir):
+def test_settings_load(tempdir, caplog):
     """Check settings can be loaded from disk when added to server"""
     server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
     setting_file = _get_setting_file(server, "thing")
     del server
-    setting_json = json.dumps(_settings_dict(floatsetting=3.0, stringsetting="bar"))
+    setting_json = json.dumps(
+        _settings_dict(
+            floatsetting=3.0,
+            stringsetting="bar",
+            dictsetting={"c": 3},
+            tuplesetting=(77, 22),
+        )
+    )
     # Create setting file
     with open(setting_file, "w", encoding="utf-8") as file_obj:
         file_obj.write(setting_json)
-    # Add thing to server and check new settings are loaded
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    with caplog.at_level(logging.WARNING):
+        # Add thing to server and check new settings are loaded
+        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    assert len(caplog.records) == 0
     thing = server.things["thing"]
     assert isinstance(thing, ThingWithSettings)
     assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
+    assert thing.dictsetting == {"c": 3}
+    assert thing.tuplesetting == (77, 22)
 
 
 def test_load_extra_settings(caplog, tempdir):
