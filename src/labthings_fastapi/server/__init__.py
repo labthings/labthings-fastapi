@@ -337,6 +337,11 @@ class ThingServer:
         router = APIRouter()
         thing_server = self
 
+        @router.get(
+            "/thing_descriptions/",
+            response_model_exclude_none=True,
+            response_model_by_alias=True,
+        )
         def thing_descriptions(request: Request) -> Mapping[str, ThingDescription]:
             """Describe all the things available from this server.
 
@@ -357,16 +362,7 @@ class ThingServer:
                 for name, thing in thing_server.things.items()
             }
 
-        router.add_api_route(
-            "/thing_descriptions/",
-            thing_descriptions,
-            response_model_exclude_none=True,
-            response_model_by_alias=True,
-        )
-
-        return router
-
-        @self.app.get("/things/")
+        @router.get("/things/")
         def thing_paths(request: Request) -> Mapping[str, str]:
             """URLs pointing to the Thing Descriptions of each Thing.
 
@@ -376,6 +372,8 @@ class ThingServer:
                 URLs will return the :ref:`wot_td` of one `.Thing` each.
             """  # noqa: D403 (URLs is correct capitalisation)
             return {
-                t: f"{str(request.base_url).rstrip('/')}{t}"
+                t: str(request.url_for(f"things.{t}"))
                 for t in thing_server.things.keys()
             }
+
+        return router

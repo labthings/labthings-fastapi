@@ -9,6 +9,8 @@ import labthings_fastapi as lt
 from fastapi.testclient import TestClient
 from starlette.routing import Route
 
+from labthings_fastapi.example_things import MyThing
+
 
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
@@ -81,6 +83,7 @@ def test_api_prefix():
         "/api/v3/action_invocations/{id}",
         "/api/v3/blob/{blob_id}",
         "/api/v3/thing_descriptions/",
+        "/api/v3/things/",
         "/api/v3/example/",
     ]:
         assert expected_path in paths
@@ -92,3 +95,33 @@ def test_api_prefix():
         "/docs/oauth2-redirect",
         "/redoc",
     }
+
+
+def test_things_endpoints():
+    """Test that the two endpoints for listing Things work."""
+    server = lt.ThingServer(
+        {
+            "thing_a": MyThing,
+            "thing_b": MyThing,
+        }
+    )
+    with TestClient(server.app) as client:
+        # Check the thing_descriptions endpoint
+        response = client.get("/thing_descriptions/")
+        response.raise_for_status()
+        tds = response.json()
+        assert "thing_a" in tds
+        assert "thing_b" in tds
+
+        # Check the things endpoint. This should map names to URLs
+        response = client.get("/things/")
+        response.raise_for_status()
+        things = response.json()
+        assert "thing_a" in things
+        assert "thing_b" in things
+
+        # Fetch a thing description from the URL in `things`
+        response = client.get(things["thing_a"])
+        response.raise_for_status()
+        td = response.json()
+        assert td["title"] == "MyThing"

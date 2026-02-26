@@ -176,6 +176,7 @@ class Thing:
 
         @server.app.get(
             self.path,
+            name=f"things.{self.name}",
             summary=get_summary(self.thing_description),
             description=get_docstring(self.thing_description),
             response_model_exclude_none=True,
