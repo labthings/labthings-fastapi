@@ -182,7 +182,7 @@ class ThingServerConfig(BaseModel):
 
     api_prefix: str = Field(
         default="",
-        pattern="(\/[\w-]+)*",
+        pattern=r"^(\/[\w-]+)*$",
         description=(
             """A prefix added to all endpoints, including Things.
 

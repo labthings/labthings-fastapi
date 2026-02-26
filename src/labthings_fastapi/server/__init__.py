@@ -94,6 +94,7 @@ class ThingServer:
         self._config = ThingServerConfig(
             things=things,
             settings_folder=settings_folder,
+            api_prefix=api_prefix,
             application_config=application_config,
         )
         self.app = FastAPI(lifespan=self.lifespan)
