@@ -201,9 +201,7 @@ class Thing:
             so if action is needed (e.g. updating hardware with the loaded settings)
             it should be taken in ``__enter__``.
 
-        :raises TypeError: if the JSON file does not contain a dictionary. This is
-            handled internally and logged, so the exception doesn't propagate
-            outside of the function.
+        :raises TypeError: if the JSON file does not contain a dictionary.
         """
         setting_storage_path = self._thing_server_interface.settings_file_path
         thing_name = type(self).__name__
@@ -236,13 +234,10 @@ class Thing:
                         f"An extra key {name} was found in the settings file. "
                         "It will be deleted the next time settings are saved."
                     )
-                except TypeError:
-                    self.logger.warning(f"Failed to load {name} with a TypeError.")
         except (
             FileNotFoundError,
             JSONDecodeError,
             PermissionError,
-            TypeError,
         ):
             # Note that if the settings file is missing, we should already have returned
             # before attempting to load settings.

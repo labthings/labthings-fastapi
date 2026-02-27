@@ -894,8 +894,9 @@ class PropertyInfo(
                 # be that same class.
                 return self.value_type.model_validate(value)
 
-            # This should be unreachable, because `model` is a `LabThingsRootModelWrapper`
-            # wrapping the value type, or the values' type should be a BaseModel.
+            # This should be unreachable, because `model` is a
+            # `LabThingsRootModelWrapper` wrapping the value type, or the value type
+            # should be a BaseModel.
             msg = f"Property {self.name} has an inconsistent model. This is "
             msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
             raise TypeError(msg)
