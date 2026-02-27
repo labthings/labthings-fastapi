@@ -882,23 +882,23 @@ class PropertyInfo(
             with its value type. This should never happen.
         """
         try:
-            if self.model is self.value_type and issubclass(self.value_type, BaseModel):
-                # If there's no RootModel wrapper, the value_type is a model and may be
-                # used directly for validation. The `issubclass` should not be
-                # necessary, but it's helpful for `mypy` and it does no harm to check.
-                return self.value_type.model_validate(value)
-            elif issubclass(self.model, LabThingsRootModelWrapper):
+            if issubclass(self.model, LabThingsRootModelWrapper):
                 # If a plain type has been wrapped in a RootModel, use that to validate
                 # and then set the property to the root value.
                 model = self.model.model_validate(value)
                 return model.root
-            else:
-                # This should be unreachable, because either `self.value_type` is
-                # a BaseModel and so `value_type` and `model` are identical, or
-                # `model` is a `LabThingsRootModelWrapper` wrapping the value type.
-                msg = f"Property {self.name} has an inconsistent model. This is "
-                msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
-                raise TypeError(msg)
+
+            if issubclass(self.value_type, BaseModel) and self.model is self.value_type:
+                # If there's no RootModel wrapper, the value was defined in code as a
+                # Pydantic model. This means `value_type` and `model` should both
+                # be that same class.
+                return self.value_type.model_validate(value)
+
+            # This should be unreachable, because `model` is a `LabThingsRootModelWrapper`
+            # wrapping the value type, or the values' type should be a BaseModel.
+            msg = f"Property {self.name} has an inconsistent model. This is "
+            msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
+            raise TypeError(msg)
         except ValidationError:
             raise  # This is needed for flake8 to be happy with the docstring
 
