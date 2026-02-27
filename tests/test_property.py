@@ -304,6 +304,10 @@ def test_premature_api_and_affordance(mocker):
 def test_propertyinfo(mocker):
     """Test out the PropertyInfo class."""
 
+    class MyModel(pydantic.BaseModel):
+        a: int
+        b: str
+
     class Example(lt.Thing):
         intprop: int = lt.property(default=0)
         """A normal, simple, integer property."""
@@ -316,6 +320,17 @@ def test_propertyinfo(mocker):
 
         tupleprop: tuple[int, str] = lt.property(default=(42, "the answer"))
         """A tuple property, to check subscripted generics work."""
+
+        modelprop: MyModel = lt.property(default_factory=lambda: MyModel(a=1, b="two"))
+        """A property typed as a model."""
+
+        rootmodelprop: pydantic.RootModel[int | None] = lt.property(
+            default_factory=lambda: pydantic.RootModel[int | None](root=None)
+        )
+        """A very verbosely defined optional integer.
+        
+        This tests a model that's also a subscripted generic.
+        """
 
     # We will break `badprop` by setting its model to something that's
     # neither the type nor a rootmodel.
@@ -372,6 +387,28 @@ def test_propertyinfo(mocker):
     for val in [0, "str", ("str", 0)]:
         with pytest.raises(pydantic.ValidationError):
             tupleprop.validate(val)
+
+    # Check validation for a model
+    modelprop = example.properties["modelprop"]
+    assert modelprop.validate(MyModel(a=3, b="four")) == MyModel(a=3, b="four")
+    m = MyModel(a=3, b="four")
+    assert modelprop.validate(m) is m
+    assert modelprop.validate({"a": 5, "b": "six"}) == MyModel(a=5, b="six")
+    for invalid in [{"c": 5}, (4, "f"), None]:
+        with pytest.raises(pydantic.ValidationError):
+            modelprop.validate(invalid)
+
+    # Check again for an odd rootmodel
+    rootmodelprop = example.properties["rootmodelprop"]
+    m = rootmodelprop.validate(42)
+    assert isinstance(m, pydantic.RootModel)
+    assert m.root == 42
+    assert m == pydantic.RootModel[int | None](root=42)
+    assert rootmodelprop.validate(m) is m  # RootModel passes through
+    assert rootmodelprop.validate(None).root is None
+    for invalid in ["seven", {"root": None}, 14.5, pydantic.RootModel[int](root=0)]:
+        with pytest.raises(pydantic.ValidationError):
+            modelprop.validate(invalid)
 
 
 def test_readonly_metadata():
