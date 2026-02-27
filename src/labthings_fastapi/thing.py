@@ -212,12 +212,24 @@ class Thing:
 
         # Stop recursion by not allowing settings to be saved as we're reading them.
         self._disable_saving_settings = True
-
         try:
-            with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
-                settings = json.load(file_obj)
-                if not isinstance(settings, Mapping):
-                    raise TypeError("The settings file must be a JSON object.")
+            # The inner try: block ensures we only catch these errors while loading the
+            # file, not when applying the settings.
+            try:
+                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                    settings = json.load(file_obj)
+                    if not isinstance(settings, Mapping):
+                        raise TypeError("The settings file must be a JSON object.")
+            except (FileNotFoundError, PermissionError, TypeError, JSONDecodeError):
+                # Note that if the settings file is missing, we should already have
+                # returned before attempting to load settings.
+                self.logger.warning(
+                    "Error loading settings for %s from %s, could not load a JSON "
+                    "object. Settings for this Thing will be reset to default.",
+                    thing_name,
+                    setting_storage_path,
+                )
+                return
             for name, value in settings.items():
                 try:
                     setting = self.settings[name]
@@ -234,18 +246,6 @@ class Thing:
                         f"An extra key {name} was found in the settings file. "
                         "It will be deleted the next time settings are saved."
                     )
-        except (
-            FileNotFoundError,
-            JSONDecodeError,
-            PermissionError,
-        ):
-            # Note that if the settings file is missing, we should already have returned
-            # before attempting to load settings.
-            self.logger.warning(
-                "Error loading settings for %s. "
-                "Settings for this Thing will be reset to default.",
-                thing_name,
-            )
         finally:
             self._disable_saving_settings = False
 
