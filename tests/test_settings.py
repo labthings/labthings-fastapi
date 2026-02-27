@@ -41,12 +41,16 @@ class ThingWithSettings(lt.Thing):
     "A string setting."
 
     dictsetting: dict["str", int] = lt.setting(default_factory=lambda: {"a": 1, "b": 2})
-    "A dictionary setting."
-
-    tuplesetting: tuple[int, int] = lt.setting(default_factory=lambda: (1, 2))
+    "A dictionary setting. This is a subscripted generic."
 
     modelsetting: MyModel = lt.setting(default_factory=lambda: MyModel(a=0, b="string"))
     "A setting that is a BaseModel."
+
+    tuplesetting: tuple[int, int] = lt.setting(default=(1, 2))
+    """A tuple setting that specifies component types.
+    
+    This is a "subscripted generic" and so has a tendency to break `isinstance` tests.
+    """
 
     @lt.setting
     def floatsetting(self) -> float:
@@ -116,8 +120,8 @@ def _settings_dict(
     floatsetting=1.0,
     stringsetting="foo",
     dictsetting=None,
-    tuplesetting=None,
     modelsetting=None,
+    tuplesetting=(1, 2),
     localonlysetting="Local-only default.",
     localonly_boolsetting=False,
 ):
@@ -136,8 +140,10 @@ def _settings_dict(
         "floatsetting": floatsetting,
         "stringsetting": stringsetting,
         "dictsetting": dictsetting,
-        "tuplesetting": list(tuplesetting),  # Convert to list so json matches.
         "modelsetting": modelsetting,
+        # tuples and lists are indestinguishable in JSON, so we convert
+        # tuplesetting to a list so the comparison will work.
+        "tuplesetting": list(tuplesetting),
         "localonlysetting": localonlysetting,
         "localonly_boolsetting": localonly_boolsetting,
     }
@@ -160,6 +166,7 @@ def test_setting_available():
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
     assert thing.dictsetting == {"a": 1, "b": 2}
+    assert thing.tuplesetting == (1, 2)
     assert thing.modelsetting == MyModel(a=0, b="string")
 
 

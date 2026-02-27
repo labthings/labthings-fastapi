@@ -62,7 +62,7 @@ from typing_extensions import Self
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, ConfigDict, RootModel, create_model
+from pydantic import BaseModel, ConfigDict, RootModel, ValidationError, create_model
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -71,7 +71,11 @@ from .thing_description._model import (
     PropertyAffordance,
     PropertyOp,
 )
-from .utilities import labthings_data, wrap_plain_types_in_rootmodel
+from .utilities import (
+    LabThingsRootModelWrapper,
+    labthings_data,
+    wrap_plain_types_in_rootmodel,
+)
 from .utilities.introspection import return_type
 from .base_descriptor import (
     DescriptorInfoCollection,
@@ -859,35 +863,44 @@ class PropertyInfo(
                 raise TypeError(msg)
             return cls(root=value)
 
-    def model_to_value(self, value: BaseModel) -> Value:
-        r"""Convert a model to a value for this property.
+    def validate(self, value: Any) -> Value:
+        """Use the validation logic in `self.model`.
 
-        Even properties with plain types are sometimes converted to or from a
-        `pydantic.BaseModel` to allow conversion to/from JSON. This is a convenience
-        method that accepts a model (which should be an instance of ``self.model``\ )
-        and unwraps it when necessary to get the plain Python value.
+        This method should accept anything that `pydantic` can convert to the
+        right type, and return a correctly-typed value. It also enforces any
+        constraints that were set on the property.
 
-        :param value: A `.BaseModel` instance to convert.
-        :return: the value, with `.RootModel` unwrapped so it matches the descriptor's
-            type.
-        :raises TypeError: if the supplied value cannot be converted to the right type.
+        :param value: The new value, in any form acceptable to the property's
+            model. Usually this means you can use either the correct type, or
+            the value as loaded from JSON.
+
+        :return: the new value, with the correct type.
+
+        :raises ValidationError: if the supplied value can't be loaded by
+            the property's model. This is the exception raised by ``model_validate``
+        :raises TypeError: if the property has a ``model`` that's inconsistent
+            with its value type. This should never happen.
         """
-        # If it is a root model unrap the value
-        value = value.root if isinstance(value, RootModel) else value
         try:
-            if isinstance(value, self.value_type):
-                return value
-        except TypeError:
-            # In the case that the self.value_type is a typing.GenericAlias or some
-            # complicated associated type like typing._UnionGenericAlias then
-            # isinstace itself with throw a TypeError.
-            # Instead create root model for validation.
-            ValidationModel = RootModel[self.value_type]
-            # Use the model to validate the value before setting.
-            ValidationModel(value)
-            return value
-        msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
-        raise TypeError(msg)
+            if self.model is self.value_type and issubclass(self.value_type, BaseModel):
+                # If there's no RootModel wrapper, the value_type is a model and may be
+                # used directly for validation. The `issubclass` should not be
+                # necessary, but it's helpful for `mypy` and it does no harm to check.
+                return self.value_type.model_validate(value)
+            elif issubclass(self.model, LabThingsRootModelWrapper):
+                # If a plain type has been wrapped in a RootModel, use that to validate
+                # and then set the property to the root value.
+                model = self.model.model_validate(value)
+                return model.root
+            else:
+                # This should be unreachable, because either `self.value_type` is
+                # a BaseModel and so `value_type` and `model` are identical, or
+                # `model` is a `LabThingsRootModelWrapper` wrapping the value type.
+                msg = f"Property {self.name} has an inconsistent model. This is "
+                msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
+                raise TypeError(msg)
+        except ValidationError:
+            raise  # This is needed for flake8 to be happy with the docstring
 
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
@@ -1146,13 +1159,6 @@ class SettingInfo(
         """
         obj = self.owning_object_or_error()
         self.get_descriptor().set_without_emit(obj, value)
-
-    def set_without_emit_from_model(self, value: BaseModel) -> None:
-        """Set the value from a model instance, unwrapping RootModels as needed.
-
-        :param value: the model to extract the value from.
-        """
-        self.set_without_emit(self.model_to_value(value))
 
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):

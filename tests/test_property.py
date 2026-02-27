@@ -308,8 +308,14 @@ def test_propertyinfo(mocker):
         intprop: int = lt.property(default=0)
         """A normal, simple, integer property."""
 
+        positive: int = lt.property(default=0, gt=0)
+        """A positive integer property."""
+
         badprop: int = lt.property(default=1)
         """An integer property that I will break later."""
+
+        tupleprop: tuple[int, str] = lt.property(default=(42, "the answer"))
+        """A tuple property, to check subscripted generics work."""
 
     # We will break `badprop` by setting its model to something that's
     # neither the type nor a rootmodel.
@@ -331,11 +337,15 @@ def test_propertyinfo(mocker):
     assert isinstance(model, pydantic.RootModel)
     assert model.root == 15
 
-    # Check we can unwrap a RootModel correctly
-    IntModel = example.properties["intprop"].model
-    assert example.properties["intprop"].model_to_value(IntModel(root=17)) == 17
-    with pytest.raises(TypeError):
-        example.properties["intprop"].model_to_value(BadIntModel(root=17))
+    # Check we can validate properly
+    intprop = example.properties["intprop"]
+    assert intprop.validate(15) == 15  # integers pass straight through
+    assert intprop.validate(-15) == -15
+    # A RootModel instance ought still to validate
+    assert intprop.validate(intprop.model(root=42)) == 42
+    # A wrong model won't, though.
+    with pytest.raises(pydantic.ValidationError):
+        intprop.validate(BadIntModel(root=42))
 
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
@@ -344,6 +354,24 @@ def test_propertyinfo(mocker):
     assert example.badprop == 3
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
+    with pytest.raises(TypeError):
+        # The value is fine, but the model has been set to an invalid type.
+        # This error shouldn't be seen in production.
+        example.properties["badprop"].validate(0)
+
+    # Check validation applies constraints
+    positive = example.properties["positive"]
+    assert positive.validate(42) == 42
+    with pytest.raises(pydantic.ValidationError):
+        positive.validate(0)
+
+    # Check validation works for subscripted generics
+    tupleprop = example.properties["tupleprop"]
+    assert tupleprop.validate((1, "two")) == (1, "two")
+
+    for val in [0, "str", ("str", 0)]:
+        with pytest.raises(pydantic.ValidationError):
+            tupleprop.validate(val)
 
 
 def test_readonly_metadata():
@@ -379,6 +407,7 @@ def test_readonly_metadata():
     example = create_thing_without_server(Example)
 
     td = example.thing_description()
+    assert td.properties is not None  # This is mostly for type checking
 
     # Check read-write properties are not read-only
     for name in ["prop", "funcprop"]:

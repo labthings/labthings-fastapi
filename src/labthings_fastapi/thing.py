@@ -224,8 +224,7 @@ class Thing:
                 try:
                     setting = self.settings[name]
                     # Load the key from the JSON file using the setting's model
-                    model = setting.model.model_validate(value)
-                    setting.set_without_emit_from_model(model)
+                    setting.set_without_emit(setting.validate(value))
                 except ValidationError:
                     self.logger.warning(
                         f"Could not load setting {name} from settings file "
