@@ -201,7 +201,9 @@ class Thing:
             so if action is needed (e.g. updating hardware with the loaded settings)
             it should be taken in ``__enter__``.
 
-        :raises TypeError: if the JSON file does not contain a dictionary.
+        :raises TypeError: if the JSON file does not contain a dictionary. This is
+            handled internally and logged, so the exception doesn't propagate
+            outside of the function.
         """
         setting_storage_path = self._thing_server_interface.settings_file_path
         thing_name = type(self).__name__
