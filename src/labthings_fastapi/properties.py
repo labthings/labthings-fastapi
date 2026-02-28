@@ -62,7 +62,7 @@ from typing_extensions import Self
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, ConfigDict, RootModel, create_model
+from pydantic import BaseModel, ConfigDict, RootModel, ValidationError, create_model
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -71,7 +71,11 @@ from .thing_description._model import (
     PropertyAffordance,
     PropertyOp,
 )
-from .utilities import labthings_data, wrap_plain_types_in_rootmodel
+from .utilities import (
+    LabThingsRootModelWrapper,
+    labthings_data,
+    wrap_plain_types_in_rootmodel,
+)
 from .utilities.introspection import return_type
 from .base_descriptor import (
     DescriptorInfoCollection,
@@ -859,27 +863,45 @@ class PropertyInfo(
                 raise TypeError(msg)
             return cls(root=value)
 
-    def model_to_value(self, value: BaseModel) -> Value:
-        r"""Convert a model to a value for this property.
+    def validate(self, value: Any) -> Value:
+        """Use the validation logic in `self.model`.
 
-        Even properties with plain types are sometimes converted to or from a
-        `pydantic.BaseModel` to allow conversion to/from JSON. This is a convenience
-        method that accepts a model (which should be an instance of ``self.model``\ )
-        and unwraps it when necessary to get the plain Python value.
+        This method should accept anything that `pydantic` can convert to the
+        right type, and return a correctly-typed value. It also enforces any
+        constraints that were set on the property.
 
-        :param value: A `.BaseModel` instance to convert.
-        :return: the value, with `.RootModel` unwrapped so it matches the descriptor's
-            type.
-        :raises TypeError: if the supplied value cannot be converted to the right type.
+        :param value: The new value, in any form acceptable to the property's
+            model. Usually this means you can use either the correct type, or
+            the value as loaded from JSON.
+
+        :return: the new value, with the correct type.
+
+        :raises ValidationError: if the supplied value can't be loaded by
+            the property's model. This is the exception raised by ``model_validate``
+        :raises TypeError: if the property has a ``model`` that's inconsistent
+            with its value type. This should never happen.
         """
-        if isinstance(value, self.value_type):
-            return value
-        elif isinstance(value, RootModel):
-            root = value.root
-            if isinstance(root, self.value_type):
-                return root
-        msg = f"Model {value} isn't {self.value_type} or a RootModel wrapping it."
-        raise TypeError(msg)
+        try:
+            if issubclass(self.model, LabThingsRootModelWrapper):
+                # If a plain type has been wrapped in a RootModel, use that to validate
+                # and then set the property to the root value.
+                model = self.model.model_validate(value)
+                return model.root
+
+            if issubclass(self.value_type, BaseModel) and self.model is self.value_type:
+                # If there's no RootModel wrapper, the value was defined in code as a
+                # Pydantic model. This means `value_type` and `model` should both
+                # be that same class.
+                return self.value_type.model_validate(value)
+
+            # This should be unreachable, because `model` is a
+            # `LabThingsRootModelWrapper` wrapping the value type, or the value type
+            # should be a BaseModel.
+            msg = f"Property {self.name} has an inconsistent model. This is "
+            msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
+            raise TypeError(msg)
+        except ValidationError:
+            raise  # This is needed for flake8 to be happy with the docstring
 
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
@@ -1138,13 +1160,6 @@ class SettingInfo(
         """
         obj = self.owning_object_or_error()
         self.get_descriptor().set_without_emit(obj, value)
-
-    def set_without_emit_from_model(self, value: BaseModel) -> None:
-        """Set the value from a model instance, unwrapping RootModels as needed.
-
-        :param value: the model to extract the value from.
-        """
-        self.set_without_emit(self.model_to_value(value))
 
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):

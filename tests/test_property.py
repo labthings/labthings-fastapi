@@ -304,12 +304,33 @@ def test_premature_api_and_affordance(mocker):
 def test_propertyinfo(mocker):
     """Test out the PropertyInfo class."""
 
+    class MyModel(pydantic.BaseModel):
+        a: int
+        b: str
+
     class Example(lt.Thing):
         intprop: int = lt.property(default=0)
         """A normal, simple, integer property."""
 
+        positive: int = lt.property(default=0, gt=0)
+        """A positive integer property."""
+
         badprop: int = lt.property(default=1)
         """An integer property that I will break later."""
+
+        tupleprop: tuple[int, str] = lt.property(default=(42, "the answer"))
+        """A tuple property, to check subscripted generics work."""
+
+        modelprop: MyModel = lt.property(default_factory=lambda: MyModel(a=1, b="two"))
+        """A property typed as a model."""
+
+        rootmodelprop: pydantic.RootModel[int | None] = lt.property(
+            default_factory=lambda: pydantic.RootModel[int | None](root=None)
+        )
+        """A very verbosely defined optional integer.
+        
+        This tests a model that's also a subscripted generic.
+        """
 
     # We will break `badprop` by setting its model to something that's
     # neither the type nor a rootmodel.
@@ -331,11 +352,15 @@ def test_propertyinfo(mocker):
     assert isinstance(model, pydantic.RootModel)
     assert model.root == 15
 
-    # Check we can unwrap a RootModel correctly
-    IntModel = example.properties["intprop"].model
-    assert example.properties["intprop"].model_to_value(IntModel(root=17)) == 17
-    with pytest.raises(TypeError):
-        example.properties["intprop"].model_to_value(BadIntModel(root=17))
+    # Check we can validate properly
+    intprop = example.properties["intprop"]
+    assert intprop.validate(15) == 15  # integers pass straight through
+    assert intprop.validate(-15) == -15
+    # A RootModel instance ought still to validate
+    assert intprop.validate(intprop.model(root=42)) == 42
+    # A wrong model won't, though.
+    with pytest.raises(pydantic.ValidationError):
+        intprop.validate(BadIntModel(root=42))
 
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
@@ -344,6 +369,46 @@ def test_propertyinfo(mocker):
     assert example.badprop == 3
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
+    with pytest.raises(TypeError):
+        # The value is fine, but the model has been set to an invalid type.
+        # This error shouldn't be seen in production.
+        example.properties["badprop"].validate(0)
+
+    # Check validation applies constraints
+    positive = example.properties["positive"]
+    assert positive.validate(42) == 42
+    with pytest.raises(pydantic.ValidationError):
+        positive.validate(0)
+
+    # Check validation works for subscripted generics
+    tupleprop = example.properties["tupleprop"]
+    assert tupleprop.validate((1, "two")) == (1, "two")
+
+    for val in [0, "str", ("str", 0)]:
+        with pytest.raises(pydantic.ValidationError):
+            tupleprop.validate(val)
+
+    # Check validation for a model
+    modelprop = example.properties["modelprop"]
+    assert modelprop.validate(MyModel(a=3, b="four")) == MyModel(a=3, b="four")
+    m = MyModel(a=3, b="four")
+    assert modelprop.validate(m) is m
+    assert modelprop.validate({"a": 5, "b": "six"}) == MyModel(a=5, b="six")
+    for invalid in [{"c": 5}, (4, "f"), None]:
+        with pytest.raises(pydantic.ValidationError):
+            modelprop.validate(invalid)
+
+    # Check again for an odd rootmodel
+    rootmodelprop = example.properties["rootmodelprop"]
+    m = rootmodelprop.validate(42)
+    assert isinstance(m, pydantic.RootModel)
+    assert m.root == 42
+    assert m == pydantic.RootModel[int | None](root=42)
+    assert rootmodelprop.validate(m) is m  # RootModel passes through
+    assert rootmodelprop.validate(None).root is None
+    for invalid in ["seven", {"root": None}, 14.5, pydantic.RootModel[int](root=0)]:
+        with pytest.raises(pydantic.ValidationError):
+            modelprop.validate(invalid)
 
 
 def test_readonly_metadata():
@@ -379,6 +444,7 @@ def test_readonly_metadata():
     example = create_thing_without_server(Example)
 
     td = example.thing_description()
+    assert td.properties is not None  # This is mostly for type checking
 
     # Check read-write properties are not read-only
     for name in ["prop", "funcprop"]:
