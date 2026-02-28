@@ -188,6 +188,50 @@ class Thing:
         async def websocket(ws: WebSocket) -> None:
             await websocket_endpoint(self, ws)
 
+    def _read_settings_file(self) -> Mapping[str, Any] | None:
+        """Read the settings file and return a mapping of saved settings or None.
+
+        This function handles reading the settings from the disk. It is designed
+        to be called by `load_settings`. Any exceptions caused by file handling or
+        file corruption are caught and logged as warnings.
+
+        :return: A Mapping of setting name to setting value, or None if no settings
+            could be read from file.
+        """
+        setting_storage_path = self._thing_server_interface.settings_file_path
+        thing_name = type(self).__name__
+        if not os.path.exists(setting_storage_path):
+            # If the settings file doesn't exist, we have nothing to do - the settings
+            # are already initialised to their default values.
+            return None
+
+        # Load the settings.
+        try:
+            with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+                settings = json.load(file_obj)
+        except (FileNotFoundError, PermissionError, JSONDecodeError):
+            # Note that if the settings file is missing, we should already have
+            # returned before attempting to load settings.
+            self.logger.warning(
+                "Error loading settings for %s from %s, could not load a JSON "
+                "object. Settings for this Thing will be reset to default.",
+                thing_name,
+                setting_storage_path,
+            )
+            return None
+
+        if not isinstance(settings, Mapping):
+            self.logger.warning(
+                "Error loading settings for %s from %s. The file does not contain a "
+                "Mapping",
+                thing_name,
+                setting_storage_path,
+            )
+            return None
+
+        # The settings are loaded and are a Mapping. Return them.
+        return settings
+
     def load_settings(self) -> None:
         """Load settings from json.
 
@@ -200,38 +244,15 @@ class Thing:
             Note that no notifications will be triggered when the settings are set,
             so if action is needed (e.g. updating hardware with the loaded settings)
             it should be taken in ``__enter__``.
-
-        :raises TypeError: if the JSON file does not contain a dictionary. This is
-            handled internally and logged, so the exception doesn't propagate
-            outside of the function.
         """
-        setting_storage_path = self._thing_server_interface.settings_file_path
-        thing_name = type(self).__name__
-        if not os.path.exists(setting_storage_path):
-            # If the settings file doesn't exist, we have nothing to do - the settings
-            # are already initialised to their default values.
+        settings = self._read_settings_file()
+        if settings is None:
+            # Return if no settings can be loaded from file.
             return
 
         # Stop recursion by not allowing settings to be saved as we're reading them.
         self._disable_saving_settings = True
         try:
-            # The inner try: block ensures we only catch these errors while loading the
-            # file, not when applying the settings.
-            try:
-                with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
-                    settings = json.load(file_obj)
-                    if not isinstance(settings, Mapping):
-                        raise TypeError("The settings file must be a JSON object.")
-            except (FileNotFoundError, PermissionError, TypeError, JSONDecodeError):
-                # Note that if the settings file is missing, we should already have
-                # returned before attempting to load settings.
-                self.logger.warning(
-                    "Error loading settings for %s from %s, could not load a JSON "
-                    "object. Settings for this Thing will be reset to default.",
-                    thing_name,
-                    setting_storage_path,
-                )
-                return
             for name, value in settings.items():
                 try:
                     setting = self.settings[name]
