@@ -331,3 +331,23 @@ def test_try_loading_corrupt_settings(tempdir, caplog):
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.things.thing"
+
+
+def test_try_loading_setting_file_without_mapping(tempdir, caplog):
+    """Load from setting file that isn't a JSON object."""
+    # Create the server once, so we can get the settings path
+    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    setting_file = _get_setting_file(server, "thing")
+    del server
+
+    with open(setting_file, "w", encoding="utf-8") as file_obj:
+        file_obj.write('["I", "am", "a", "list"]')
+    # Recreate the server and check for the warning in logs
+    with caplog.at_level(logging.WARNING):
+        # Add thing to server
+        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert caplog.records[0].name == "labthings_fastapi.things.thing"
+        expected_msg = "The file does not contain a Mapping"
+        assert expected_msg in caplog.records[0].message
