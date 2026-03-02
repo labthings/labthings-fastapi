@@ -418,7 +418,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         to handle `.FeatureNotAvailable` exceptions, which will be raised if this
         method is not overridden.
 
-        :param thing: the `.Thing` instance we want to reset.
+        :param obj: the `.Thing` instance we want to reset.
         :raises FeatureNotAvailable: as only some subclasses implement resetting.
         """
         raise FeatureNotAvailable(
@@ -432,6 +432,9 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         By default, this returns `True` if ``reset`` has been overridden.
         If you override ``reset`` but want more control over this behaviour,
         you probably need to override `is_resettable`\ .
+
+        :param obj: the `.Thing` instance we want to reset.
+        :return: `True` if a call to ``reset()`` should work.
         """
         return BaseProperty.reset is not self.__class__.reset
 
@@ -689,6 +692,8 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         Note that this implementation is independent of the `.Thing` instance,
         as there's currently no way to specify a per-instance default.
 
+        :param obj: the `.Thing` instance we want to reset.
+
         :return: the default value of this property.
         """
         return self._default_factory()
@@ -697,6 +702,8 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         r"""Reset the property to its default value.
 
         This resets to the value returned by ``default`` for `.DataProperty`\ .
+
+        :param obj: the `.Thing` instance we want to reset.
         """
         self.__set__(obj, self.default(obj))
 
@@ -952,7 +959,7 @@ class PropertyInfo(
             return cls(root=value)
 
     @builtins.property
-    def default(self) -> Value:
+    def default(self) -> Value:  # noqa: DOC201
         """The default value of this property.
 
         .. warning::
@@ -962,7 +969,7 @@ class PropertyInfo(
         return self.get_descriptor().default(self.owning_object)
 
     @builtins.property
-    def is_resettable(self) -> bool:
+    def is_resettable(self) -> bool:  # noqa: DOC201
         """Whether the property may be reset using the ``reset()`` method."""
         return self.get_descriptor().is_resettable(self.owning_object)
 
