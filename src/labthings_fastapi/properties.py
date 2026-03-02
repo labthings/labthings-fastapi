@@ -350,27 +350,43 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         super().__init__()
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
-        self.constraints = constraints or {}
-        for key in self.constraints:
+        self._constraints = {}
+        try:
+            self.constraints = constraints or {}
+        except UnsupportedConstraintError:
+            raise
+
+    @builtins.property
+    def constraints(self) -> Mapping[str, Any]:  # noqa[DOC201]
+        """Validation constraints applied to this property.
+
+        This mapping contains keyword arguments that will be passed to
+        `pydantic.Field` to add validation constraints to the property.
+        See `pydantic.Field` for details. The module-level constant
+        `CONSTRAINT_ARGS` lists the supported constraint arguments.
+
+        Note that these constraints will be enforced when values are
+        received over HTTP, but they are not automatically enforced
+        when setting the property directly on the `.Thing` instance
+        from Python code.
+        """
+        return self._constraints
+
+    @constraints.setter
+    def constraints(self, new_constraints: Mapping[str, Any]) -> None:
+        r"""Set the constraints added to the model.
+
+        :param new_constraints: the new value of ``constraints``\ .
+
+        :raises UnsupportedConstraintError: if invalid dictionary keys are present.
+        """
+        for key in new_constraints:
             if key not in CONSTRAINT_ARGS:
                 raise UnsupportedConstraintError(
                     f"Unknown constraint argument: {key}. \n"
                     f"Supported arguments are: {', '.join(CONSTRAINT_ARGS)}."
                 )
-
-    constraints: Mapping[str, Any]
-    """Validation constraints applied to this property.
-
-    This mapping contains keyword arguments that will be passed to
-    `pydantic.Field` to add validation constraints to the property.
-    See `pydantic.Field` for details. The module-level constant
-    `CONSTRAINT_ARGS` lists the supported constraint arguments.
-
-    Note that these constraints will be enforced when values are
-    received over HTTP, but they are not automatically enforced
-    when setting the property directly on the `.Thing` instance
-    from Python code.
-    """
+        self._constraints = new_constraints
 
     @builtins.property
     def model(self) -> type[BaseModel]:
