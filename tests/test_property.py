@@ -490,6 +490,15 @@ def test_default_and_reset():
         with pytest.raises(NotBoundToInstanceError):
             thing.properties[name].reset()
 
+    # Check the `resettable` property is correct
+    for thing in [example, Example]:
+        for name, resettable in [
+            ("intprop", True),
+            ("listprop", True),
+            ("strprop", False),
+        ]:
+            assert thing.properties[name].is_resettable is resettable
+
     # Resetting should work for DataProperty
     example.intprop = 43
     assert example.intprop == 43
