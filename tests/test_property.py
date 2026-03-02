@@ -504,3 +504,9 @@ def test_default_and_reset():
     # Resetting won't work for FunctionalProperty
     with pytest.raises(FeatureNotAvailable):
         example.properties["strprop"].reset()
+
+    # Check defaults show up in the Thing Description
+    td = example.thing_description_dict()
+    assert td["properties"]["intprop"]["default"] == 42
+    assert td["properties"]["listprop"]["default"] == ["a", "list"]
+    assert "default" not in td["properties"]["strprop"]
