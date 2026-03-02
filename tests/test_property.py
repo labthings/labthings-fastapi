@@ -478,7 +478,7 @@ def test_default_and_reset():
 
     # Defaults should be available on classes and instances
     for thing in [example, Example]:
-        # We shoulld get expected values for defaults
+        # We should get expected values for defaults
         assert thing.properties["intprop"].default == 42
         assert thing.properties["listprop"].default == ["a", "list"]
         # Defaults are not available for FunctionalProperties
