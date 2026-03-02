@@ -335,22 +335,6 @@ class BaseDescriptorInfo(
         descriptor = self.get_descriptor()
         return descriptor.__get__(self.owning_object_or_error())
 
-    def set(self, value: Value) -> None:
-        """Set the value of the descriptor.
-
-        This method may only be called if the DescriptorInfo object is bound to a
-        `.Thing` instance. It will raise an error if called on a class.
-
-        :param value: the new value.
-
-        :raises NotBoundToInstanceError: if called on an unbound info object.
-        """
-        if not self.is_bound:
-            msg = f"We can't set the value of {self.name} when called on a class."
-            raise NotBoundToInstanceError(msg)
-        descriptor = self.get_descriptor()
-        descriptor.__set__(self.owning_object_or_error(), value)
-
     def __eq__(self, other: Any) -> bool:
         """Determine if this object is equal to another one.
 
@@ -404,6 +388,11 @@ class BaseDescriptor(Generic[Owner, Value]):
         assert p.name == "my_prop"
         assert p.title == "My Property."
         assert p.description.startswith("This is")
+
+    `.BaseDescriptor` is a "non-data descriptor" (meaning it doesn't implement
+    ``__set__``). This allows it to be overwritten by assigning to an object's
+    attribute, which can be useful in test code. This can easily be changed in
+    subclasses by implementing ``__set__``\ .
     """
 
     def __init__(self) -> None:
@@ -593,21 +582,6 @@ class BaseDescriptor(Generic[Owner, Value]):
             "See BaseDescriptor.__instance_get__ for details."
         )
 
-    def __set__(self, obj: Owner, value: Value) -> None:
-        """Mark the `BaseDescriptor` as a data descriptor.
-
-        Even for read-only descriptors, it's important to define a ``__set__`` method.
-        The presence of this method prevents Python overwriting the descriptor when
-        a value is assigned. This base implementation returns an `AttributeError` to
-        signal that the descriptor is read-only. Overriding it with a method that
-        does not raise an exception will allow the descriptor to be written to.
-
-        :param obj: The object on which to set the value.
-        :param value: The value to set the descriptor to.
-        :raises AttributeError: always, as this is read-only by default.
-        """
-        raise AttributeError("This attribute is read-only.")
-
     def _descriptor_info(
         self, info_class: type[DescriptorInfoT], obj: Owner | None = None
     ) -> DescriptorInfoT:
@@ -669,9 +643,35 @@ class FieldTypedBaseDescriptorInfo(
         """The type of the descriptor's value."""
         return self.get_descriptor().value_type
 
+    def set(self, value: Value) -> None:
+        """Set the value of the descriptor.
+
+        This method may only be called if the DescriptorInfo object is bound to a
+        `.Thing` instance. It will raise an error if called on a class.
+
+        :param value: the new value.
+
+        :raises NotBoundToInstanceError: if called on an unbound info object.
+        """
+        if not self.is_bound:
+            msg = f"We can't set the value of {self.name} when called on a class."
+            raise NotBoundToInstanceError(msg)
+        descriptor = self.get_descriptor()
+        descriptor.__set__(self.owning_object_or_error(), value)
+
 
 class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Value]):
-    """A BaseDescriptor that determines its type like a dataclass field."""
+    r"""A `.BaseDescriptor` that determines its type like a dataclass field.
+
+    This adds two things to `.BaseDescriptor`\ :
+
+    1. Descriptors inheriting from this class will inspect the type annotations of
+        their owning class when determining ``value_type``\ .
+    2. This class and its children will be "data descriptors" because there is a
+        stub implementation of ``__set__``\ . This means that the attribute may not
+        be assigned to (unless ``__set__`` is overridden). This is the behaviour
+        that `builtins.property` has.
+    """
 
     def __init__(self) -> None:
         """Initialise the FieldTypedBaseDescriptor.
@@ -851,6 +851,21 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         :return: An object that may be used to refer to this descriptor.
         """
         return self._descriptor_info(FieldTypedBaseDescriptorInfo, owner)
+
+    def __set__(self, obj: Owner, value: Value) -> None:
+        """Mark the `BaseDescriptor` as a data descriptor.
+
+        Even for read-only descriptors, it's important to define a ``__set__`` method.
+        The presence of this method prevents Python overwriting the descriptor when
+        a value is assigned. This base implementation returns an `AttributeError` to
+        signal that the descriptor is read-only. Overriding it with a method that
+        does not raise an exception will allow the descriptor to be written to.
+
+        :param obj: The object on which to set the value.
+        :param value: The value to set the descriptor to.
+        :raises AttributeError: always, as this is read-only by default.
+        """
+        raise AttributeError("This attribute is read-only.")
 
 
 class DescriptorInfoCollection(
