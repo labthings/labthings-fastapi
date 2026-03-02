@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from collections.abc import Mapping
-from typing import Any, Dict, Iterable, TYPE_CHECKING, Optional
+from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVar
 from weakref import WeakSet
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
@@ -95,6 +95,21 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
     return obj.__dict__[LABTHINGS_DICT_KEY]
 
 
+WrappedT = TypeVar("WrappedT")
+
+
+class LabThingsRootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
+    """A RootModel subclass for automatically-wrapped types.
+
+    There are several places where LabThings needs a model, but may only
+    have a plain Python type. This subclass indicates to LabThings that
+    a type has been automatically wrapped, and will need to be unwrapped
+    in order for the value to have the correct type.
+
+    It has no additional functionality.
+    """
+
+
 def wrap_plain_types_in_rootmodel(
     model: type, constraints: Mapping[str, Any] | None = None
 ) -> type[BaseModel]:
@@ -131,7 +146,7 @@ def wrap_plain_types_in_rootmodel(
         return create_model(
             f"{model!r}",
             root=(model, Field(**constraints)),
-            __base__=RootModel,
+            __base__=LabThingsRootModelWrapper,
         )
     except SchemaError as e:
         for error in e.errors():
