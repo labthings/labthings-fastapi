@@ -83,6 +83,7 @@ from .base_descriptor import (
     FieldTypedBaseDescriptorInfo,
 )
 from .exceptions import (
+    FeatureNotAvailable,
     NotConnectedToServerError,
     ReadOnlyPropertyError,
     MissingTypeError,
@@ -393,6 +394,38 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             )
         return self._model
 
+    def default(self, obj: Owner | None) -> Value:
+        """Return the default value of this property.
+
+        :param obj: the `.Thing` instance on which we are looking for the default.
+            or `None` if referring to the class. For now, this is ignored.
+
+        :return: the default value of this property.
+        :raises FeatureNotAvailable: as this must be overridden.
+        """
+        raise FeatureNotAvailable(
+            f"{obj.name if obj else self.__class__}.{self.name} cannot be reset, "
+            f"as it's not supported by {self.__class__}."
+        )
+
+    def reset(self, obj: Owner) -> None:
+        """Reset the property's value to a default state.
+
+        If there is a defined default value for the property, this method
+        should reset the property to that default.
+
+        Not every property is expected to implement ``reset`` so it is important
+        to handle `.FeatureNotAvailable` exceptions, which will be raised if this
+        method is not overridden.
+
+        :param thing: the `.Thing` instance we want to reset.
+        :raises FeatureNotAvailable: as only some subclasses implement resetting.
+        """
+        raise FeatureNotAvailable(
+            f"{obj.name}.{self.name} cannot be reset, as it's not supported by "
+            f"{self.__class__}."
+        )
+
     def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
@@ -611,6 +644,23 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         obj.__dict__[self.name] = value
         if emit_changed_event:
             self.emit_changed_event(obj, value)
+
+    def default(self, obj: Owner | None) -> Value:
+        """Return the default value of this property.
+
+        Note that this implementation is independent of the `.Thing` instance,
+        as there's currently no way to specify a per-instance default.
+
+        :return: the default value of this property.
+        """
+        return self._default_factory()
+
+    def reset(self, obj: Owner) -> None:
+        r"""Reset the property to its default value.
+
+        This resets to the value returned by ``default`` for `.DataProperty`\ .
+        """
+        self.__set__(obj, self.default(obj))
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return the observers of this property.
@@ -862,6 +912,25 @@ class PropertyInfo(
                 )
                 raise TypeError(msg)
             return cls(root=value)
+
+    @builtins.property
+    def default(self) -> Value:
+        """The default value of this property.
+
+        .. warning::
+            Note that this is an optional feature, so calling code must handle
+            `.FeatureNotAvailable` exceptions.
+        """
+        return self.get_descriptor().default(self.owning_object)
+
+    def reset(self) -> None:
+        """Reset the property to a default value.
+
+        .. warning::
+            Note that this is an optional feature, so calling code must handle
+            `.FeatureNotAvailable` exceptions.
+        """
+        return self.get_descriptor().reset(self.owning_object_or_error())
 
     def validate(self, value: Any) -> Value:
         """Use the validation logic in `self.model`.
