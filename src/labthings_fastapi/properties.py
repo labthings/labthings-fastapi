@@ -473,7 +473,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             return self.__get__(thing)
 
     def property_affordance(
-        self, thing: Thing, path: str | None = None
+        self, thing: Owner, path: str | None = None
     ) -> PropertyAffordance:
         """Represent the property in a Thing Description.
 
@@ -500,12 +500,22 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             ),
         ]
         data_schema: DataSchema = type_to_dataschema(self.model)
+        extra_fields = {}
+        try:
+            # Try to get hold of the default - may raise FeatureNotAvailable
+            default = self.default(thing)
+            # Validate and dump it with the model to ensure it's simple types only
+            default_validated = self.model.model_validate(default)
+            extra_fields["default"] = default_validated.model_dump()
+        except FeatureNotAvailable:
+            pass  # Default should only be included if it's needed.
         pa: PropertyAffordance = PropertyAffordance(
             title=self.title,
             forms=forms,
             description=self.description,
             readOnly=self.readonly,
             writeOnly=False,  # write-only properties are not yet supported
+            **extra_fields,
         )
         # We merge the data schema with the property affordance (which subclasses the
         # DataSchema model) with the affordance second so its values take priority.
