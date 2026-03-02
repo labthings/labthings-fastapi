@@ -426,6 +426,15 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             f"{self.__class__}."
         )
 
+    def is_resettable(self, obj: Owner | None) -> bool:
+        r"""Determine if it's possible to reset this property.
+
+        By default, this returns `True` if ``reset`` has been overridden.
+        If you override ``reset`` but want more control over this behaviour,
+        you probably need to override `is_resettable`\ .
+        """
+        return BaseProperty.reset is not self.__class__.reset
+
     def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
@@ -471,6 +480,25 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         )
         def get_property() -> Any:
             return self.__get__(thing)
+
+        if self.is_resettable(thing):
+
+            @app.post(
+                thing.path + self.name + "/reset",
+                summary=f"Reset {self.title}.",
+                description=(
+                    f"## Reset {self.title}\n\n"
+                    "This endpoint will reset the property to its default value. "
+                    "The default value should be detailed in the Thing Description.\n\n"
+                    "Not every property supports the reset-to-default operation, and "
+                    "this endpoint is only present (e.g. in the OpenAPI docs) "
+                    "for those that do.\n\n"
+                    "This endpoint is identical to using the ``reset_property`` action"
+                    rf"with the ``name`` argument set to ``{self.name}``\ ."
+                ),
+            )
+            def reset() -> None:
+                self.reset(thing)
 
     def property_affordance(
         self, thing: Owner, path: str | None = None
@@ -932,6 +960,11 @@ class PropertyInfo(
             `.FeatureNotAvailable` exceptions.
         """
         return self.get_descriptor().default(self.owning_object)
+
+    @builtins.property
+    def is_resettable(self) -> bool:
+        """Whether the property may be reset using the ``reset()`` method."""
+        return self.get_descriptor().is_resettable(self.owning_object)
 
     def reset(self) -> None:
         """Reset the property to a default value.
