@@ -25,7 +25,12 @@ from labthings_fastapi.properties import (
     default_factory_from_arguments,
 )
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
-from labthings_fastapi.exceptions import MissingTypeError, NotConnectedToServerError
+from labthings_fastapi.exceptions import (
+    FeatureNotAvailable,
+    MissingTypeError,
+    NotBoundToInstanceError,
+    NotConnectedToServerError,
+)
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
 from .utilities import raises_or_is_caused_by
@@ -456,3 +461,61 @@ def test_readonly_metadata():
         "ro_functional_property_with_setter",
     ]:
         assert td.properties[name].readOnly is True
+
+
+def test_default_and_reset():
+    """Test retrieving property defaults, and resetting to default."""
+
+    class Example(lt.Thing):
+        intprop: int = lt.property(default=42)
+        listprop: list[str] = lt.property(default_factory=lambda: ["a", "list"])
+
+        @lt.property
+        def strprop(self) -> str:
+            return "Hello World!"
+
+    example = create_thing_without_server(Example)
+
+    # Defaults should be available on classes and instances
+    for thing in [example, Example]:
+        # We should get expected values for defaults
+        assert thing.properties["intprop"].default == 42
+        assert thing.properties["listprop"].default == ["a", "list"]
+        # Defaults are not available for FunctionalProperties
+        with pytest.raises(FeatureNotAvailable):
+            _ = thing.properties["strprop"].default
+
+    # Resetting to default isn't available on classes
+    for name in ["intprop", "listprop", "strprop"]:
+        with pytest.raises(NotBoundToInstanceError):
+            thing.properties[name].reset()
+
+    # Check the `resettable` property is correct
+    for thing in [example, Example]:
+        for name, resettable in [
+            ("intprop", True),
+            ("listprop", True),
+            ("strprop", False),
+        ]:
+            assert thing.properties[name].is_resettable is resettable
+
+    # Resetting should work for DataProperty
+    example.intprop = 43
+    assert example.intprop == 43
+    example.properties["intprop"].reset()
+    assert example.intprop == 42
+
+    example.listprop = []
+    assert example.listprop == []
+    example.properties["listprop"].reset()
+    assert example.listprop == ["a", "list"]
+
+    # Resetting won't work for FunctionalProperty
+    with pytest.raises(FeatureNotAvailable):
+        example.properties["strprop"].reset()
+
+    # Check defaults show up in the Thing Description
+    td = example.thing_description_dict()
+    assert td["properties"]["intprop"]["default"] == 42
+    assert td["properties"]["listprop"]["default"] == ["a", "list"]
+    assert "default" not in td["properties"]["strprop"]
