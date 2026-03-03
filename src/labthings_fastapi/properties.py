@@ -682,7 +682,8 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param value: the new value for the property.
         :param emit_changed_event: whether to emit a changed event.
         """
-        obj.__dict__[self.name] = value
+        property_info = self.descriptor_info(obj)
+        obj.__dict__[self.name] = property_info.validate(value)
         if emit_changed_event:
             self.emit_changed_event(obj, value)
 
@@ -906,6 +907,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def __set__(self, obj: Owner, value: Value) -> None:
         """Set the value of the property.
 
+        This will validate the value against the property's model, and an error
+        will be raised if the value is not valid.
+
         :param obj: the `.Thing` on which the attribute is accessed.
         :param value: the value of the property.
 
@@ -913,6 +917,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """
         if self.fset is None:
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
+        property_info = self.descriptor_info(obj)
+        value = property_info.validate(value)
+
         self.fset(obj, value)
 
 

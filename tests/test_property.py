@@ -370,8 +370,8 @@ def test_propertyinfo(mocker):
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
     # not a rootmodel.
-    example.badprop = 3
-    assert example.badprop == 3
+    with pytest.raises(TypeError):
+        example.badprop = 3  # Validation will fail here because of the bad model.
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
     with pytest.raises(TypeError):
