@@ -9,7 +9,6 @@ these.
 """
 
 from .dependencies.blocking_portal import BlockingPortal
-from .dependencies.invocation import InvocationID, InvocationLogger, CancelHook
 from .dependencies.metadata import GetThingStates
 from .dependencies.raw_thing import raw_thing_dependency
 from .dependencies.thing import direct_thing_client_dependency
@@ -19,9 +18,6 @@ from .client.in_server import direct_thing_client_class, DirectThingClient
 # in src/labthings_fastapi/__init__.py for more details.
 __all__ = [
     "BlockingPortal",
-    "InvocationID",
-    "InvocationLogger",
-    "CancelHook",
     "GetThingStates",
     "raw_thing_dependency",
     "direct_thing_client_dependency",
