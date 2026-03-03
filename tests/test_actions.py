@@ -230,7 +230,6 @@ def test_wrapped_action():
         @lt.action
         def action(
             self,
-            portal: lt.deps.BlockingPortal,
             param1: int = 0,
             param2: str = "string",
         ) -> float | None:
@@ -241,7 +240,6 @@ def test_wrapped_action():
         @example_decorator
         def decorated(
             self,
-            portal: lt.deps.BlockingPortal,
             param1: int = 0,
             param2: str = "string",
         ) -> float | None:
