@@ -25,7 +25,6 @@ from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
 from .actions import action
 from .endpoints import endpoint
-from . import deps
 from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
@@ -53,7 +52,6 @@ __all__ = [
     "action",
     "thing_slot",
     "endpoint",
-    "deps",
     "outputs",
     "blob",
     "ThingServer",
