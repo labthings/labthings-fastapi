@@ -8,7 +8,6 @@ See the documentation on :ref:`dependencies` for more details of how to use
 these.
 """
 
-from .dependencies.metadata import GetThingStates
 from .dependencies.raw_thing import raw_thing_dependency
 from .dependencies.thing import direct_thing_client_dependency
 from .client.in_server import direct_thing_client_class, DirectThingClient
@@ -16,7 +15,6 @@ from .client.in_server import direct_thing_client_class, DirectThingClient
 # The symbols in __all__ are part of our public API. See note
 # in src/labthings_fastapi/__init__.py for more details.
 __all__ = [
-    "GetThingStates",
     "raw_thing_dependency",
     "direct_thing_client_dependency",
     "direct_thing_client_class",
