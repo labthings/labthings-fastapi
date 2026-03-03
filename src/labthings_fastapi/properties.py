@@ -58,11 +58,19 @@ from typing import (
     overload,
     TYPE_CHECKING,
 )
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
-from pydantic import BaseModel, ConfigDict, RootModel, ValidationError, create_model
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    RootModel,
+    TypeAdapter,
+    ValidationError,
+    create_model,
+    with_config,
+)
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -120,6 +128,21 @@ CONSTRAINT_ARGS = {
     "pattern",
 }
 """The set of supported constraint arguments for properties."""
+
+
+@with_config(ConfigDict(extra="forbid"))
+class FieldConstraints(TypedDict, total=False):
+    r"""Constraints that may be applied to a `.property`\ ."""
+
+    gt: int | float
+    ge: int | float
+    lt: int | float
+    le: int | float
+    multiple_of: int | float
+    allow_inf_nan: bool
+    min_length: int
+    max_length: int
+    pattern: str
 
 
 # The following exceptions are raised only when creating/setting up properties.
@@ -350,27 +373,59 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         super().__init__()
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
-        self.constraints = constraints or {}
-        for key in self.constraints:
-            if key not in CONSTRAINT_ARGS:
-                raise UnsupportedConstraintError(
-                    f"Unknown constraint argument: {key}. \n"
-                    f"Supported arguments are: {', '.join(CONSTRAINT_ARGS)}."
-                )
+        self._constraints: FieldConstraints = {}
+        try:
+            self.constraints = self._validate_constraints(constraints or {})
+        except UnsupportedConstraintError:
+            raise
 
-    constraints: Mapping[str, Any]
-    """Validation constraints applied to this property.
+    @staticmethod
+    def _validate_constraints(constraints: Mapping[str, Any]) -> FieldConstraints:
+        """Validate an untyped dictionary of constraints.
 
-    This mapping contains keyword arguments that will be passed to
-    `pydantic.Field` to add validation constraints to the property.
-    See `pydantic.Field` for details. The module-level constant
-    `CONSTRAINT_ARGS` lists the supported constraint arguments.
+        :param constraints: A mapping that will be validated against the
+            `.FieldConstraints` typed dictionary.
+        :return: A `.FieldConstraints` instance.
+        :raises UnsupportedConstraintError: if the input is not valid.
+        """
+        validator = TypeAdapter(FieldConstraints)
+        try:
+            return validator.validate_python(constraints)
+        except ValidationError as e:
+            raise UnsupportedConstraintError(
+                f"Bad constraint arguments were supplied ({constraints}). \n"
+                f"Supported arguments are: {', '.join(CONSTRAINT_ARGS)}.\n"
+                f"Validation error details are below: \n\n{e}"
+            ) from e
 
-    Note that these constraints will be enforced when values are
-    received over HTTP, but they are not automatically enforced
-    when setting the property directly on the `.Thing` instance
-    from Python code.
-    """
+    @builtins.property
+    def constraints(self) -> FieldConstraints:  # noqa[DOC201]
+        """Validation constraints applied to this property.
+
+        This mapping contains keyword arguments that will be passed to
+        `pydantic.Field` to add validation constraints to the property.
+        See `pydantic.Field` for details. The module-level constant
+        `CONSTRAINT_ARGS` lists the supported constraint arguments.
+
+        Note that these constraints will be enforced when values are
+        received over HTTP, but they are not automatically enforced
+        when setting the property directly on the `.Thing` instance
+        from Python code.
+        """
+        return self._constraints
+
+    @constraints.setter
+    def constraints(self, new_constraints: FieldConstraints) -> None:
+        r"""Set the constraints added to the model.
+
+        :param new_constraints: the new value of ``constraints``\ .
+
+        :raises UnsupportedConstraintError: if invalid dictionary keys are present.
+        """
+        try:
+            self._constraints = self._validate_constraints(new_constraints)
+        except UnsupportedConstraintError:
+            raise
 
     @builtins.property
     def model(self) -> type[BaseModel]:

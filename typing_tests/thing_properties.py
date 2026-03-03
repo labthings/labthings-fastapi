@@ -288,3 +288,27 @@ assert_type(test_functional_property.intprop2, int)
 assert_type(test_functional_property.intprop3, int)
 assert_type(test_functional_property.fprop, int)
 # ``strprop`` will be ``Any`` because of the ``[no-redef]`` error.
+
+
+class TestConstrainedProperties(lt.Thing):
+    """A class with some correctly and incorrectly-defined constraints."""
+
+    # Constraints can be passed as kwargs to `lt.property` but currently
+    # aren't explicit, so don't get checked by mypy.
+    # The line below is valid
+    positiveint: int = lt.property(default=0, ge=0)
+
+    # The line below is not valid but doesn't bother mypy.
+    # This would get picked up at runtime, as we validate the kwargs.
+    negativeint: int = lt.property(default=0, sign="negative")
+
+    @lt.property
+    def positivefloat(self) -> float:
+        """A functional property."""
+        return 42
+
+    positivefloat.constraints = {"gt": 0.0}  # This is OK
+
+    # The typed dict checks the name and type of constraints, so the line
+    # below should be flagged. This is also validated at runtime by pydantic
+    positivefloat.constraints = {"gt": "zero"}  # type:ignore[typeddict-item]
