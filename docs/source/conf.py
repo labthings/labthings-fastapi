@@ -68,7 +68,6 @@ skipper_log.setLevel(logging.DEBUG)
 
 convenience_modules = {
     "labthings_fastapi": labthings_fastapi.__all__,
-    "labthings_fastapi.deps": labthings_fastapi.deps.__all__,
 }
 canonical_fq_names = [
     "labthings_fastapi.descriptors.action.ActionDescriptor",
@@ -79,7 +78,6 @@ canonical_fq_names = [
     "labthings_fastapi.outputs.blob.BlobIOContextDep",
     "labthings_fastapi.actions.ActionManager",
     "labthings_fastapi.descriptors.endpoint.EndpointDescriptor",
-    "labthings_fastapi.dependencies.invocation.invocation_logger",
     "labthings_fastapi.utilities.introspection.EmptyObject",
 ]
 
