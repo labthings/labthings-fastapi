@@ -467,6 +467,44 @@ def test_bad_property_constraints():
             functional_bad_prop.constraints = {"bad_constraint": 2}
 
 
+GOOD_CONSTRAINTS = []
+# Single numeric constraints (test float and int)
+GOOD_CONSTRAINTS += [
+    {k: v} for k in ["ge", "gt", "le", "lt", "multiple_of"] for v in [3, 3.4]
+]
+# Max/min length
+GOOD_CONSTRAINTS += [{k: 10} for k in ["max_length", "min_length"]]
+# Allow_inf_nan
+GOOD_CONSTRAINTS += [{"allow_inf_nan": v} for v in [True, False]]
+# Pattern
+GOOD_CONSTRAINTS += [{"pattern": v} for v in ["test", r"[0-9]+"]]
+
+
+BAD_CONSTRAINTS = []
+# These should be numerics
+BAD_CONSTRAINTS += [
+    {k: "str"}
+    for k in ["ge", "gt", "le", "lt", "multiple_of", "max_length", "min_length"]
+]
+# pattern must be a string
+BAD_CONSTRAINTS += [{"pattern": 152}]
+# other keys should not be allowed
+BAD_CONSTRAINTS += [{"invalid": None}]
+
+
+@pytest.mark.parametrize("constraints", GOOD_CONSTRAINTS)
+def test_successful_constraint_validation(constraints):
+    """Check valid constraints values are passed through."""
+    assert BaseProperty._validate_constraints(constraints) == constraints
+
+
+@pytest.mark.parametrize("constraints", BAD_CONSTRAINTS)
+def test_unsuccessful_constraint_validation(constraints):
+    """Check invalid constraints values are flagged."""
+    with pytest.raises(UnsupportedConstraintError):
+        BaseProperty._validate_constraints(constraints)
+
+
 def test_propertyinfo():
     """Check the PropertyInfo class is generated correctly."""
 
