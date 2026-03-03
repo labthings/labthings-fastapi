@@ -55,11 +55,10 @@ from typing import (
     Callable,
     Generic,
     TypeVar,
-    TypedDict,
     overload,
     TYPE_CHECKING,
 )
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict
 from weakref import WeakSet
 
 from fastapi import Body, FastAPI
