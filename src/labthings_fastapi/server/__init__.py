@@ -127,9 +127,7 @@ class ThingServer:
                       DEBUG.
         :return: A `.ThingServer` configured as per the model.
         """
-        if debug:
-            configure_thing_logger(logging.DEBUG)
-        return cls(**dict(config))
+        return cls(**dict(config), debug=debug)
 
     def _set_cors_middleware(self) -> None:
         """Configure the server to allow requests from other origins.
