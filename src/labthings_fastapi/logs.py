@@ -94,8 +94,7 @@ def configure_thing_logger(level: int | None = None) -> None:
     the handler, which filters all the records that propagate to it (i.e. anything
     that starts with ``labthings_fastapi.things``).
 
-    :param level: the logging level to use. If not specified, we use the
-        current level, or INFO if no level has been set.
+    :param level: the logging level to use. If not specified, we use INFO.
     """
     if level is not None:
         THING_LOGGER.setLevel(level)
