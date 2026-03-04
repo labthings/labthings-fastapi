@@ -26,3 +26,6 @@ def test_cli_debug_flag():
     serve_from_cli(["--json", dummy_json, "--debug"], dry_run=True)
 
     assert THING_LOGGER.level == logging.DEBUG
+
+    # Reset logger level to NOTSET
+    THING_LOGGER.setLevel(logging.NOTSET)
