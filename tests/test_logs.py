@@ -189,13 +189,12 @@ def test_cli_debug_flag():
 
     assert logs.THING_LOGGER.level == logging.INFO
 
-    reset_thing_logger()
-
     # Run with --debug
     serve_from_cli(["--json", dummy_json, "--debug"], dry_run=True)
 
     assert logs.THING_LOGGER.level == logging.DEBUG
 
+    # Reset back to info
     reset_thing_logger()
 
 

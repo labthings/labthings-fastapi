@@ -99,7 +99,7 @@ def configure_thing_logger(level: int | None = None) -> None:
     """
     if level is not None:
         THING_LOGGER.setLevel(level)
-    elif THING_LOGGER.level == logging.NOTSET:
+    else:
         THING_LOGGER.setLevel(logging.INFO)
 
     if not any(
