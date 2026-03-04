@@ -156,13 +156,13 @@ def serve_from_cli(
         option is not specified.
     """
     args = parse_args(argv)
-    if args.debug:
-        configure_thing_logger(logging.DEBUG)
 
     try:
         config, server = None, None
         config = config_from_args(args)
         server = ThingServer.from_config(config)
+        if args.debug:
+            configure_thing_logger(logging.DEBUG)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)
