@@ -19,6 +19,7 @@ the tutorial page :ref:`tutorial_running`.
 """
 
 from argparse import ArgumentParser, Namespace
+import logging
 import sys
 from typing import Literal, Optional, overload
 
@@ -28,6 +29,7 @@ import uvicorn
 from . import ThingServer
 from . import fallback
 from .config_model import ThingServerConfig, ThingImportFailure
+from ..logs import configure_thing_logger
 
 
 def get_default_parser() -> ArgumentParser:
@@ -55,6 +57,11 @@ def get_default_parser() -> ArgumentParser:
         type=int,
         default=5000,
         help="Bind socket to this port. If 0, an available port will be picked.",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging.",
     )
     return parser
 
@@ -149,6 +156,9 @@ def serve_from_cli(
         option is not specified.
     """
     args = parse_args(argv)
+    if args.debug:
+        configure_thing_logger(logging.DEBUG)
+
     try:
         config, server = None, None
         config = config_from_args(args)
