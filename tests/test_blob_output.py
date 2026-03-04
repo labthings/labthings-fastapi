@@ -90,15 +90,6 @@ def client():
         yield client
 
 
-@pytest.mark.filterwarnings("ignore:.*removed in v0.1.0.*:DeprecationWarning")
-def test_blob_type():
-    """Check we can't put dodgy values into a blob output model"""
-    with pytest.raises(ValueError):
-        lt.blob.blob_type(media_type="text/plain\\'DROP TABLES")
-    M = lt.blob.blob_type(media_type="text/plain")
-    assert M.from_bytes(b"").media_type == "text/plain"
-
-
 @pytest.mark.parametrize(
     ("media_type", "expected"),
     [

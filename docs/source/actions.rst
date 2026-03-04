@@ -51,12 +51,8 @@ parameter is the function's return value. Type hints on both arguments and
 return value are used to document the action in the OpenAPI description and
 the Thing Description, so it is important to use them consistently.
 
-There are some function arguments that are not considered input parameters.
-The first is ``self`` (the first positional argument), which is always the
-`.Thing` on which the argument is defined. The other special arguments are
-:ref:`dependencies`, which use annotated type hints to tell LabThings to
-supply resources needed by the action. Most often, this is a way of accessing
-other `.Things` on the same server.
+The ``self`` parameter of action methods is not an input: this is a standard
+Python construct giving access to the object on which the action is defined.
 
 .. _action_logging:
 
@@ -112,6 +108,6 @@ If an action raises an unhandled exception, the action will terminate with an Er
 status and LabThings will log the error and the traceback.
 
 In the case where the error has been handled, but the job needs to terminate the action
-should raise an InvocationError (or a error which subclasses this). The message from
+should raise an `.InvocationError` (or a error which subclasses this). The message from
 this exceptions will be logged, but the full traceback will not be logged as this error
 has been handled.

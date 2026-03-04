@@ -93,7 +93,6 @@ from typing import (
     Literal,
     Mapping,
 )
-from warnings import warn
 from weakref import WeakValueDictionary
 from tempfile import TemporaryDirectory
 import uuid
@@ -879,40 +878,6 @@ class Blob:
             raise NotImplementedError(
                 "Currently, only local BlobData can be served over HTTP."
             )
-
-
-def blob_type(media_type: str) -> type[Blob]:
-    r"""Create a `.Blob` subclass for a given media type.
-
-    This convenience function may confuse static type checkers, so it is usually
-    clearer to make a subclass instead, e.g.:
-
-    .. code-block:: python
-
-        class MyImageBlob(Blob):
-            media_type = "image/png"
-
-    :param media_type: the media type that the new `.Blob` subclass will use.
-
-    :return: a subclass of `.Blob` with the specified media type.
-
-    :raise ValueError: if the media type contains ``'`` or ``\``.
-    """
-    warn(
-        "`blob_type` is deprecated and will be removed in v0.1.0. "
-        "Create a subclass of `Blob` instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    if "'" in media_type or "\\" in media_type:
-        raise ValueError("media_type must not contain single quotes or backslashes")
-    return type(
-        f"{media_type.replace('/', '_')}_blob",
-        (Blob,),
-        {
-            "media_type": media_type,
-        },
-    )
 
 
 router = APIRouter()

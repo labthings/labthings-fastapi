@@ -27,7 +27,6 @@ from ..logs import configure_thing_logger
 from ..thing import Thing
 from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
-from ..dependencies.thing_server import _thing_servers  # noqa: F401
 from .config_model import (
     ThingsConfig,
     ThingServerConfig,
@@ -105,7 +104,6 @@ class ThingServer:
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
-        _thing_servers.add(self)
         # The function calls below create and set up the Things.
         self._things = self._create_things()
         self._connect_things()

@@ -48,7 +48,6 @@ from .base_descriptor import (
 from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus
-from .dependencies.invocation import NonWarningInvocationID
 from .exceptions import (
     InvocationCancelledError,
     InvocationError,
@@ -352,7 +351,6 @@ class ActionManager:
         self,
         action: ActionDescriptor,
         thing: Thing,
-        id: uuid.UUID,
         input: Any,
         dependencies: dict[str, Any],
     ) -> Invocation:
@@ -366,8 +364,6 @@ class ActionManager:
         :param thing: is the object on which we are running the ``action``, i.e.
             it is supplied to the function wrapped by ``action`` as the ``self``
             argument.
-        :param id: is a `uuid.UUID` used to identify the invocation, for example
-            when polling its status via HTTP.
         :param input: is a `pydantic.BaseModel` representing the body of the HTTP
             request that invoked the action. It is supplied to the function as
             keyword arguments.
@@ -381,7 +377,7 @@ class ActionManager:
             thing=thing,
             input=input,
             dependencies=dependencies,
-            id=id,
+            id=uuid.uuid4(),
         )
         self.append_invocation(thread)
         thread.start()
@@ -821,7 +817,6 @@ class ActionDescriptor(
         # the function to the decorator.
         def start_action(
             body: Any,  # This annotation will be overwritten below.
-            id: NonWarningInvocationID,
             background_tasks: BackgroundTasks,
             **dependencies: Any,
         ) -> InvocationModel:
@@ -831,7 +826,6 @@ class ActionDescriptor(
                 thing=thing,
                 input=body,
                 dependencies=dependencies,
-                id=id,
             )
             background_tasks.add_task(action_manager.expire_invocations)
             return action.response()

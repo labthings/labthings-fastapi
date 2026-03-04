@@ -12,13 +12,13 @@ Documentation for LabThings-FastAPI
    properties.rst
    documentation.rst
    thing_slots.rst
-   dependencies/dependencies.rst
    blobs.rst
    concurrency.rst
    using_things.rst
    see_also.rst
    examples.rst
    wot_core_concepts.rst
+   removed_features.rst
 
    autoapi/index
    developer_notes/index.rst

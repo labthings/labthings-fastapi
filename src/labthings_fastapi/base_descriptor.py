@@ -247,7 +247,7 @@ class BaseDescriptorInfo(
     encountered directly by someone using LabThings, except as a base class for
     `.Action`\ , `.Property` and others.
 
-    LabThings uses descriptors to represent the :ref:`affordances` of a `.Thing`\ .
+    LabThings uses descriptors to represent the :ref:`wot_affordances` of a `.Thing`\ .
     However, passing descriptors around isn't very elegant for two reasons:
 
     * Holding references to Descriptor objects can confuse static type checkers.
