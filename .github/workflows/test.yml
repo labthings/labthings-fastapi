@@ -182,6 +182,9 @@ jobs:
           git config --global user.name "Sir Unit of Test"
           git config --global user.email "bogus@email.com"
       
+      - name: Pull OFM web app
+        run: python ./pull_webapp.py
+      
       - name: Run OFM unit tests
         run: pytest
 
