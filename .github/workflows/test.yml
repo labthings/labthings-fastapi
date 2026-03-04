@@ -161,10 +161,12 @@ jobs:
         working-directory: /home/runner/work/openflexure-microscope-server/
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.11
+
       - name: Clone OpenFlexure Microscope Server
         working-directory: /home/runner/work/
         run: git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
@@ -174,6 +176,11 @@ jobs:
 
       - name: Install LabThings-FastAPI
         run: pip install -e ../labthings-fastapi/labthings-fastapi/
+      
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "Sir Unit of Test"
+          git config --global user.email "bogus@email.com"
       
       - name: Run OFM unit tests
         run: pytest
