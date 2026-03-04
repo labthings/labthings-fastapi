@@ -19,7 +19,6 @@ the tutorial page :ref:`tutorial_running`.
 """
 
 from argparse import ArgumentParser, Namespace
-import logging
 import sys
 from typing import Literal, Optional, overload
 
@@ -29,7 +28,6 @@ import uvicorn
 from . import ThingServer
 from . import fallback
 from .config_model import ThingServerConfig, ThingImportFailure
-from ..logs import configure_thing_logger
 
 
 def get_default_parser() -> ArgumentParser:
@@ -160,9 +158,7 @@ def serve_from_cli(
     try:
         config, server = None, None
         config = config_from_args(args)
-        server = ThingServer.from_config(config)
-        if args.debug:
-            configure_thing_logger(logging.DEBUG)
+        server = ThingServer.from_config(config, True if args.debug else False)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)

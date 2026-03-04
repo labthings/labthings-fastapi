@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, AsyncGenerator, Optional, TypeVar
 from typing_extensions import Self
 import os
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,6 +67,7 @@ class ThingServer:
         things: ThingsConfig,
         settings_folder: Optional[str] = None,
         application_config: Optional[Mapping[str, Any]] = None,
+        debug: bool = False,
     ) -> None:
         r"""Initialise a LabThings server.
 
@@ -86,9 +88,12 @@ class ThingServer:
             application. This is not processed by LabThings. Each `.Thing` can access
             application. This is not processed by LabThings. Each `.Thing` can access
             this via the Thing-Server interface.
+        :param debug: If ``True``, set the log level for `.Thing` instances to
+                      DEBUG.
         """
         self.startup_failure: dict | None = None
-        configure_thing_logger()  # Note: this is safe to call multiple times.
+        # Note: this is safe to call multiple times.
+        configure_thing_logger(logging.DEBUG if debug else None)
         self._config = ThingServerConfig(
             things=things,
             settings_folder=settings_folder,
@@ -112,14 +117,18 @@ class ThingServer:
         self._attach_things_to_server()
 
     @classmethod
-    def from_config(cls, config: ThingServerConfig) -> Self:
+    def from_config(cls, config: ThingServerConfig, debug: bool = False) -> Self:
         r"""Create a ThingServer from a configuration model.
 
         This is equivalent to ``ThingServer(**dict(config))``\ .
 
         :param config: The configuration parameters for the server.
+        :param debug: If ``True``, set the log level for `.Thing` instances to
+                      DEBUG.
         :return: A `.ThingServer` configured as per the model.
         """
+        if debug:
+            configure_thing_logger(logging.DEBUG)
         return cls(**dict(config))
 
     def _set_cors_middleware(self) -> None:
