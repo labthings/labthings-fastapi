@@ -225,7 +225,7 @@ def run_function_in_thread_and_propagate_cancellation(func, *args):
     t = ThreadWithInvocationID(target=func, args=args)
     t.start()
     try:
-        t.join_and_propagate_cancel(1)
+        t.join_and_propagate_cancel(0.04)
     except InvocationCancelledError:
         # We still want to return the finished thread if it's
         # cancelled.

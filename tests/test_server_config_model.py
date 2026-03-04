@@ -109,14 +109,14 @@ def test_unimportable_modules():
 
     with pytest.raises(
         ThingImportFailure,
-        match="\[RuntimeError\] This module should not be importable!",
+        match=r"\[RuntimeError\] This module should not be importable!",
     ):
         # This checks RuntimErrors get reported with a single error
         ThingConfig(cls="tests.unimportable.runtimeerror:SomeClass")
 
     with pytest.raises(
         ThingImportFailure,
-        match="\[ValueError\] This module should not be importable due to ValueError!",
+        match=r"\[ValueError\] This module should not be importable due to ValueError!",
     ):
         # This checks ValueErrors get reported with a single error
         # rather than getting swallowed by a ValidationError
