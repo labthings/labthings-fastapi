@@ -152,3 +152,48 @@ jobs:
           minimum-ratio: 0
           send-summary-comment: true
           show-annotations: "warning"
+
+  test-against-ofm:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: /home/runner/work/openflexure-microscope-server/
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install OpenFlexure Microscope Server
+        working-directory: /home/runner/work/
+        run: |
+          git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
+          cd openflexure-microscope-server
+          git checkout v3
+          pip install -e .[dev]
+
+      - name: Install LabThings-FastAPI
+        run: pip install -e ../labthings-fastapi/labthings-fastapi/
+      
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "Sir Unit of Test"
+          git config --global user.email "bogus@email.com"
+      
+      - name: Pull OFM web app
+        run: python ./pull_webapp.py
+      
+      - name: Run OFM unit tests
+        run: pytest
+
+      - name: Run OFM integration tests
+        run: pytest tests/integration_tests
+
+      - name: Run OFM lifecycle test
+        run: tests/lifecycle_test/testfile.py
+      
+      - name: Type check with `mypy`
+        run: mypy src
