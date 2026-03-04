@@ -108,6 +108,6 @@ If an action raises an unhandled exception, the action will terminate with an Er
 status and LabThings will log the error and the traceback.
 
 In the case where the error has been handled, but the job needs to terminate the action
-should raise an `.InvocationError`` (or a error which subclasses this). The message from
+should raise an `.InvocationError` (or a error which subclasses this). The message from
 this exceptions will be logged, but the full traceback will not be logged as this error
 has been handled.
