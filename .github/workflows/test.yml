@@ -167,12 +167,13 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Clone OpenFlexure Microscope Server
+      - name: Install OpenFlexure Microscope Server
         working-directory: /home/runner/work/
-        run: git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
-
-      - name: Install OFM Server
-        run: pip install -e .[dev]
+        run: |
+          git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
+          cd openflexure-microscope-server
+          git checkout v3
+          pip install -e .[dev]
 
       - name: Install LabThings-FastAPI
         run: pip install -e ../labthings-fastapi/labthings-fastapi/
@@ -193,4 +194,6 @@ jobs:
 
       - name: Run OFM lifecycle test
         run: tests/lifecycle_test/testfile.py
-
+      
+      - name: Type check with `mypy`
+        run: mypy src
