@@ -6,6 +6,7 @@ in ``test_action_logging`` with bottom-up tests for code in the
 """
 
 from collections import deque
+import json
 import logging
 from types import EllipsisType
 import pytest
@@ -44,6 +45,12 @@ class ThingThatLogs(lt.Thing):
             msg = record.getMessage()
             logging_str += f"[{level}] {msg}\n"
         return logging_str
+
+
+class ThingWithDebugInit(lt.Thing):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger.debug("Debug message during __init__")
 
 
 def reset_thing_logger():
@@ -175,7 +182,7 @@ def test_cli_debug_flag():
     Test that using the --debug flag sets the logger level to DEBUG,
     and that not using it leaves the logger level at INFO.
     """
-    # Reset logger level to NOTSET
+    # Reset logger level to INFO
     reset_thing_logger()
 
     # Then configure it
@@ -194,7 +201,32 @@ def test_cli_debug_flag():
 
     assert logs.THING_LOGGER.level == logging.DEBUG
 
-    # Reset back to info
+    # Reset back to INFO
+    reset_thing_logger()
+
+
+def test_cli_debug_flag_with_thing(caplog):
+    """
+    Test that using the --debug flag allows capturing debug logs during __init__.
+    """
+
+    # Reset logger level to INFO
+    reset_thing_logger()
+
+    # Define a config that uses ThingWithDebugInit
+    # We use the full path to the class so it can be imported by LabThings
+    config_json = json.dumps(
+        {"things": {"my_thing": {"cls": "tests.test_logs.ThingWithDebugInit"}}}
+    )
+
+    # Run with --debug and capture logs
+    with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
+        serve_from_cli(["--json", config_json, "--debug"], dry_run=True)
+
+    # Check that the debug message was captured
+    assert "Debug message during __init__" in caplog.text
+
+    # Reset back to INFO
     reset_thing_logger()
 
 
