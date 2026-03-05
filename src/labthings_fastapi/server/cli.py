@@ -161,7 +161,7 @@ def serve_from_cli(
         server = ThingServer.from_config(config, True if args.debug else False)
         if dry_run:
             return server
-        uvicorn.run(server.app, host=args.host, port=args.port)
+        uvicorn.run(server.app, host=args.host, port=args.port, ws="websockets-sansio")
     except BaseException as e:
         if args.fallback:
             print(f"Error: {e}")
@@ -174,7 +174,7 @@ def serve_from_cli(
                 )
             )
 
-            uvicorn.run(app, host=args.host, port=args.port)
+            uvicorn.run(app, host=args.host, port=args.port, ws="websockets-sansio")
         else:
             if isinstance(e, (ValidationError, ThingImportFailure)):
                 print(f"Error reading LabThings configuration:\n{e}")
