@@ -6,7 +6,6 @@ from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVa
 from weakref import WeakSet
 from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
 from pydantic.dataclasses import dataclass
-from pydantic_core import SchemaError
 
 from labthings_fastapi.exceptions import UnsupportedConstraintError
 from .introspection import EmptyObject
@@ -129,7 +128,7 @@ def wrap_plain_types_in_rootmodel(
     :raises UnsupportedConstraintError: if constraints are provided for an
         unsuitable type, for example `allow_inf_nan` for an `int` property, or
         any constraints for a `BaseModel` subclass.
-    :raises SchemaError: if other errors prevent Pydantic from creating a schema
+    :raises RuntimeError: if other errors prevent Pydantic from creating a schema
         for the generated model.
     """
     try:  # This needs to be a `try` as basic types are not classes
@@ -148,13 +147,9 @@ def wrap_plain_types_in_rootmodel(
             root=(model, Field(**constraints)),
             __base__=LabThingsRootModelWrapper,
         )
-    except SchemaError as e:
-        for error in e.errors():
-            if error["loc"][-1] in constraints:
-                key = error["loc"][-1]
-                raise UnsupportedConstraintError(
-                    f"Constraint {key} is not supported for type {model!r}."
-                ) from e
+    except RuntimeError as e:
+        if "Unable to apply constraint" in str(e):
+            raise UnsupportedConstraintError(str(e)) from e
         raise e
 
 

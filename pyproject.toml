@@ -13,13 +13,13 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "pydantic ~= 2.10.6",
+  "pydantic ~= 2.12",
   "numpy>=1.20",
   "jsonschema",
   "typing_extensions",
   "anyio ~=4.0",
   "httpx",
-  "fastapi[all]>=0.115.0",
+  "fastapi[all]~=0.135.0",
   "zeroconf >=0.28.0",
 ]
 
