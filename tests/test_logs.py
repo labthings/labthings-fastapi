@@ -219,6 +219,13 @@ def test_cli_debug_flag_with_thing(caplog):
         {"things": {"my_thing": {"cls": "tests.test_logs.ThingWithDebugInit"}}}
     )
 
+    # Run without --debug and capture logs
+    with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
+        serve_from_cli(["--json", config_json], dry_run=True)
+
+    # There are no logs
+    assert len(caplog.messages) == 0
+
     # Run with --debug and capture logs
     with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
         serve_from_cli(["--json", config_json, "--debug"], dry_run=True)
