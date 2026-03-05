@@ -78,4 +78,4 @@ if __name__ == "__main__":
     assert isinstance(telly, Telly)
     telly.framerate = 6
     telly.frame_limit = -1
-    uvicorn.run(server.app, port=5000)
+    uvicorn.run(server.app, port=5000, ws="websockets-sansio")
