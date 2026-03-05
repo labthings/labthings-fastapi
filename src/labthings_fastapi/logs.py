@@ -79,11 +79,11 @@ class DequeByInvocationIDHandler(logging.Handler):
                 pass  # If there's no destination for a particular log, ignore it.
 
 
-def configure_thing_logger() -> None:
+def configure_thing_logger(level: int | None = None) -> None:
     """Set up the logger for thing instances.
 
-    We always set the logger for thing instances to level INFO, as this
-    is currently used to relay progress to the client.
+    We always set the logger for thing instances to level INFO by default,
+    as this is currently used to relay progress to the client.
 
     This function will collect logs on a per-invocation
     basis by adding a `.DequeByInvocationIDHandler` to the log. Only one
@@ -93,8 +93,14 @@ def configure_thing_logger() -> None:
     a filter to add invocation ID is not possible. Instead, we attach a filter to
     the handler, which filters all the records that propagate to it (i.e. anything
     that starts with ``labthings_fastapi.things``).
+
+    :param level: the logging level to use. If not specified, we use INFO.
     """
-    THING_LOGGER.setLevel(logging.INFO)
+    if level is not None:
+        THING_LOGGER.setLevel(level)
+    else:
+        THING_LOGGER.setLevel(logging.INFO)
+
     if not any(
         isinstance(h, DequeByInvocationIDHandler) for h in THING_LOGGER.handlers
     ):

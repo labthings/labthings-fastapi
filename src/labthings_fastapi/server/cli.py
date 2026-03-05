@@ -56,6 +56,11 @@ def get_default_parser() -> ArgumentParser:
         default=5000,
         help="Bind socket to this port. If 0, an available port will be picked.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging.",
+    )
     return parser
 
 
@@ -149,10 +154,11 @@ def serve_from_cli(
         option is not specified.
     """
     args = parse_args(argv)
+
     try:
         config, server = None, None
         config = config_from_args(args)
-        server = ThingServer.from_config(config)
+        server = ThingServer.from_config(config, True if args.debug else False)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port)

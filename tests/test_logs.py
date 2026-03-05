@@ -6,6 +6,7 @@ in ``test_action_logging`` with bottom-up tests for code in the
 """
 
 from collections import deque
+import json
 import logging
 from types import EllipsisType
 import pytest
@@ -20,6 +21,7 @@ from labthings_fastapi.invocation_contexts import (
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import LogConfigurationError
 from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.server.cli import serve_from_cli
 
 from .temp_client import poll_task
 
@@ -43,6 +45,12 @@ class ThingThatLogs(lt.Thing):
             msg = record.getMessage()
             logging_str += f"[{level}] {msg}\n"
         return logging_str
+
+
+class ThingWithDebugInit(lt.Thing):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger.debug("Debug message during __init__")
 
 
 def reset_thing_logger():
@@ -167,6 +175,66 @@ def test_configure_thing_logger():
         logger.info("Test")
         assert len(dest) == 1
         assert dest[0].msg == "Test"
+
+
+def test_cli_debug_flag():
+    """
+    Test that using the --debug flag sets the logger level to DEBUG,
+    and that not using it leaves the logger level at INFO.
+    """
+    # Reset logger level to INFO
+    reset_thing_logger()
+
+    # Then configure it
+    logs.configure_thing_logger()
+
+    # Run without --debug
+    # We use dry_run=True to avoid starting uvicorn
+    # We need a dummy config
+    dummy_json = '{"things": {}}'
+    serve_from_cli(["--json", dummy_json], dry_run=True)
+
+    assert logs.THING_LOGGER.level == logging.INFO
+
+    # Run with --debug
+    serve_from_cli(["--json", dummy_json, "--debug"], dry_run=True)
+
+    assert logs.THING_LOGGER.level == logging.DEBUG
+
+    # Reset back to INFO
+    reset_thing_logger()
+
+
+def test_cli_debug_flag_with_thing(caplog):
+    """
+    Test that using the --debug flag allows capturing debug logs during __init__.
+    """
+
+    # Reset logger level to INFO
+    reset_thing_logger()
+
+    # Define a config that uses ThingWithDebugInit
+    # We use the full path to the class so it can be imported by LabThings
+    config_json = json.dumps(
+        {"things": {"my_thing": {"cls": "tests.test_logs.ThingWithDebugInit"}}}
+    )
+
+    # Run without --debug and capture logs
+    with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
+        serve_from_cli(["--json", config_json], dry_run=True)
+
+    # There are no logs
+    assert len(caplog.messages) == 0
+
+    # Run with --debug and capture logs
+    with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
+        serve_from_cli(["--json", config_json, "--debug"], dry_run=True)
+
+    # Check that the debug message was captured
+    assert "Debug message during __init__" in caplog.text
+
+    # Reset back to INFO
+    reset_thing_logger()
 
 
 def test_add_thing_log_destination():
