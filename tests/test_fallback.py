@@ -170,7 +170,7 @@ def test_actual_server_fallback():
 
     # Starting the server is a SystemExit
     with pytest.raises(SystemExit, match="3") as excinfo:
-        uvicorn.run(server.app, port=5000)
+        uvicorn.run(server.app, port=5000, ws="websockets-sansio")
     server_error = excinfo.value
     assert server.startup_failure is not None
     assert server.startup_failure["thing"] == "bad_thing"
