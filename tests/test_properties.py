@@ -438,7 +438,7 @@ def test_bad_property_constraints():
     """Test that bad constraints raise errors at definition time."""
 
     class BadConstraintThing(lt.Thing):
-        bad_prop: int = lt.property(default=0, allow_inf_nan=False)
+        bad_prop: str = lt.property(default="hello", allow_inf_nan=True)
 
     # Some constraints cause errors when the model is built. So far
     # I believe only allow_inf_nan on int does this.
