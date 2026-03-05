@@ -614,7 +614,7 @@ class Blob:
         """
         return core_schema.no_info_wrap_validator_function(
             cls._validate,
-            BlobModel.__get_pydantic_core_schema__(BlobModel, handler),
+            BlobModel.__pydantic_core_schema__,
             serialization=core_schema.wrap_serializer_function_ser_schema(
                 cls._serialize,
                 is_field_serializer=False,
