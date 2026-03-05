@@ -19,7 +19,7 @@ dependencies = [
   "typing_extensions",
   "anyio ~=4.0",
   "httpx",
-  "fastapi[all]>=0.135",
+  "fastapi[all]~=0.135.0",
   "zeroconf >=0.28.0",
 ]
 
