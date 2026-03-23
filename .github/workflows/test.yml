@@ -178,7 +178,9 @@ jobs:
         run: |
           git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
           cd openflexure-microscope-server
-          git checkout v3
+          git checkout v3-labthings-${{ github.head_ref }} || git checkout v3-labthings-main || git checkout v3
+          git rev-parse --abbrev-ref HEAD
+          git rev-parse HEAD
           pip install -e .[dev]
 
       - name: Install LabThings-FastAPI
