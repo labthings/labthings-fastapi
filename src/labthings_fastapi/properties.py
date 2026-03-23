@@ -83,7 +83,7 @@ from .base_descriptor import (
     FieldTypedBaseDescriptorInfo,
 )
 from .exceptions import (
-    FeatureNotAvailable,
+    FeatureNotAvailableError,
     NotConnectedToServerError,
     ReadOnlyPropertyError,
     MissingTypeError,
@@ -401,9 +401,9 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             or `None` if referring to the class. For now, this is ignored.
 
         :return: the default value of this property.
-        :raises FeatureNotAvailable: as this must be overridden.
+        :raises FeatureNotAvailableError: as this must be overridden.
         """
-        raise FeatureNotAvailable(
+        raise FeatureNotAvailableError(
             f"{obj.name if obj else self.__class__}.{self.name} cannot be reset, "
             f"as it's not supported by {self.__class__}."
         )
@@ -415,13 +415,13 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         should reset the property to that default.
 
         Not every property is expected to implement ``reset`` so it is important
-        to handle `.FeatureNotAvailable` exceptions, which will be raised if this
+        to handle `.FeatureNotAvailableError` exceptions, which will be raised if this
         method is not overridden.
 
         :param obj: the `.Thing` instance we want to reset.
-        :raises FeatureNotAvailable: as only some subclasses implement resetting.
+        :raises FeatureNotAvailableError: as only some subclasses implement resetting.
         """
-        raise FeatureNotAvailable(
+        raise FeatureNotAvailableError(
             f"{obj.name}.{self.name} cannot be reset, as it's not supported by "
             f"{self.__class__}."
         )
@@ -533,12 +533,12 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         data_schema: DataSchema = type_to_dataschema(self.model)
         extra_fields = {}
         try:
-            # Try to get hold of the default - may raise FeatureNotAvailable
+            # Try to get hold of the default - may raise FeatureNotAvailableError
             default = self.default(thing)
             # Validate and dump it with the model to ensure it's simple types only
             default_validated = self.model.model_validate(default)
             extra_fields["default"] = default_validated.model_dump()
-        except FeatureNotAvailable:
+        except FeatureNotAvailableError:
             pass  # Default should only be included if it's needed.
         pa: PropertyAffordance = PropertyAffordance(
             title=self.title,
@@ -964,7 +964,7 @@ class PropertyInfo(
 
         .. warning::
             Note that this is an optional feature, so calling code must handle
-            `.FeatureNotAvailable` exceptions.
+            `.FeatureNotAvailableError` exceptions.
         """
         return self.get_descriptor().default(self.owning_object)
 
@@ -978,7 +978,7 @@ class PropertyInfo(
 
         .. warning::
             Note that this is an optional feature, so calling code must handle
-            `.FeatureNotAvailable` exceptions.
+            `.FeatureNotAvailableError` exceptions.
         """
         return self.get_descriptor().reset(self.owning_object_or_error())
 

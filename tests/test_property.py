@@ -26,7 +26,7 @@ from labthings_fastapi.properties import (
 )
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 from labthings_fastapi.exceptions import (
-    FeatureNotAvailable,
+    FeatureNotAvailableError,
     MissingTypeError,
     NotBoundToInstanceError,
     NotConnectedToServerError,
@@ -482,7 +482,7 @@ def test_default_and_reset():
         assert thing.properties["intprop"].default == 42
         assert thing.properties["listprop"].default == ["a", "list"]
         # Defaults are not available for FunctionalProperties
-        with pytest.raises(FeatureNotAvailable):
+        with pytest.raises(FeatureNotAvailableError):
             _ = thing.properties["strprop"].default
 
     # Resetting to default isn't available on classes
@@ -511,7 +511,7 @@ def test_default_and_reset():
     assert example.listprop == ["a", "list"]
 
     # Resetting won't work for FunctionalProperty
-    with pytest.raises(FeatureNotAvailable):
+    with pytest.raises(FeatureNotAvailableError):
         example.properties["strprop"].reset()
 
     # Check defaults show up in the Thing Description

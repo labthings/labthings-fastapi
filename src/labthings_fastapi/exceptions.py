@@ -204,11 +204,11 @@ class NotBoundToInstanceError(RuntimeError):
     """
 
 
-class FeatureNotAvailable(NotImplementedError):
+class FeatureNotAvailableError(NotImplementedError):
     """A feature is not available.
 
     There are some methods provided by base classes where implementation is optional.
-    These methods raise `FeatureNotAvailable` if they are not implemented.
+    These methods raise `FeatureNotAvailableError` if they are not implemented.
 
     Currently this is done for the default value of properties, and their reset
     method.
