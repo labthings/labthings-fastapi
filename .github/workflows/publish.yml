@@ -4,8 +4,8 @@ on:
   push:
     # Only try to publish if it's tagged
     tags:
-      - v**
-      - testpypi-v**
+      - 'v*'
+      - 'testpypi-v*'
 
 jobs:
     build:
