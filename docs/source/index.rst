@@ -15,6 +15,7 @@ Documentation for LabThings-FastAPI
    blobs.rst
    concurrency.rst
    using_things.rst
+   updates_and_features.rst
    see_also.rst
    examples.rst
    wot_core_concepts.rst

@@ -19,7 +19,7 @@ from typing import Any
 
 
 @dataclass
-class LabthingsFeatureFlags:
+class LabThingsFeatureFlags:
     """Control over optional features of LabThings."""
 
     validate_properties_on_set: bool = False
@@ -54,4 +54,9 @@ class LabthingsFeatureFlags:
                 setattr(self, k, v)
 
 
-FEATURE_FLAGS = LabthingsFeatureFlags()
+FEATURE_FLAGS = LabThingsFeatureFlags()
+r"""This module-level object allows features of LabThings to be controlled.
+
+See the documentation for the class `.LabThingsFeatureFlags` for details of the
+flags and what they do. More information is available in :ref:`optional_features`\ .
+"""
