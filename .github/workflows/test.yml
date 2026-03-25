@@ -164,28 +164,32 @@ jobs:
     continue-on-error: true
     defaults:
       run:
-        working-directory: /home/runner/work/openflexure-microscope-server/
-    steps:
+        working-directory: ../openflexure-microscope-server/
+    env:
+      REF: v3
+    steps: &test-against-ofm-steps
       - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
-      - name: Install OpenFlexure Microscope Server
-        working-directory: /home/runner/work/
+      - name: Clone OpenFlexure Microscope Server
+        working-directory: ..  # This step creates the default working directory
         run: |
           git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
-          cd openflexure-microscope-server
-          git checkout v3
-          pip install -e .[dev]
+      
+      - name: Check out OpenFlexure Microscope Server
+        run: "git checkout $REF"
+      
+      - name: Install OpenFlexure Microscope Server
+        run: "pip install -e ../openflexure-microscope-server/[dev]"
 
       - name: Install LabThings-FastAPI
-        run: pip install -e ../labthings-fastapi/labthings-fastapi/
+        run: "pip install -e ../labthings-fastapi"
 
       - name: Print installed packages
-        run: pip freeze
+        run: "pip freeze"
       
       - name: Configure Git identity
         run: |
@@ -207,29 +211,16 @@ jobs:
       - name: Type check with `mypy`
         run: mypy src
 
-  test-against-ofm-feature-branch:
+  check-for-ofm-feature-branch:
     # This job runs only if a feature branch is specified in the merge request description.
     # The line below looks for a line starting with `OFM Feature Branch:`. This should
-    # match the `grep` command in the relevant step.
+    # match the `grep` command in the step script.
     if: contains(toJson(github.event.pull_request.body), '\r\nOFM Feature Branch:')
     runs-on: ubuntu-latest
-    continue-on-error: true
-    defaults:
-      run:
-        working-directory: /home/runner/work/openflexure-microscope-server/
+    outputs:
+      feature-branch: ${{ steps.determine-feature-branch.outputs.feature-branch}}
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-
-      - name: Clone OpenFlexure Microscope Server
-        working-directory: /home/runner/work/
-        run: git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
-      
-      - name: Checkout feature branch
+      - name: Determine feature branch
         env:
           PULL_REQUEST_BODY: ${{ github.event.pull_request.body }}
         # The `if:` block for this job has already checked we will have a matching line.
@@ -237,35 +228,23 @@ jobs:
         # then remove the prefix so we're left with only the branch name, which we check
         # out.
         run: |
-          matching_line=$(echo "${PULL_REQUEST_BODY}" | grep "^OFM Feature Branch:")
+          matching_line=$(echo "$PULL_REQUEST_BODY" | grep "^OFM Feature Branch:")
           feature_branch="${matching_line##"OFM Feature Branch: "}"
-          git checkout "${feature_branch}"
-      
-      - name: Install OpenFlexure Microscope Server
-        run: pip install -e .[dev]
+          echo "Using feature branch '$feature_branch'"
+          echo "feature-branch=$feature_branch" >> "$GITHUB_OUTPUT"
+        id: determine-feature-branch
+  
+  test-against-ofm-feature-branch:
+    # This job uses the feature branch found by the previous job.
+    # It is split from that job in order to allow re-use of the steps from
+    # test-against-ofm-v3
+    needs: check-for-ofm-feature-branch
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ../openflexure-microscope-server/
+    env:
+      REF: ${{ needs.check-for-ofm-feature-branch.outputs.feature-branch }}
+    steps: *test-against-ofm-steps
 
-      - name: Install LabThings-FastAPI
-        run: pip install -e ../labthings-fastapi/labthings-fastapi/
-
-      - name: Print installed packages
-        run: pip freeze
-      
-      - name: Configure Git identity
-        run: |
-          git config --global user.name "Sir Unit of Test"
-          git config --global user.email "bogus@email.com"
-      
-      - name: Pull OFM web app
-        run: python ./pull_webapp.py
-      
-      - name: Run OFM unit tests
-        run: pytest
-
-      - name: Run OFM integration tests
-        run: pytest tests/integration_tests
-
-      - name: Run OFM lifecycle test
-        run: tests/lifecycle_test/testfile.py
-      
-      - name: Type check with `mypy`
-        run: mypy src
