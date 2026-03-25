@@ -161,7 +161,6 @@ jobs:
 
   test-against-ofm-v3:
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: ../openflexure-microscope-server/
