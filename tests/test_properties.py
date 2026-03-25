@@ -14,6 +14,7 @@ from labthings_fastapi.exceptions import (
     ServerNotRunningError,
     UnsupportedConstraintError,
 )
+from labthings_fastapi.feature_flags import FEATURE_FLAGS
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server
 from .temp_client import poll_task
@@ -409,13 +410,20 @@ def test_constrained_properties(prop_info, mocker):
         prop.__set__(mock_thing, valid)
         validated = prop.__get__(mock_thing)
         assert validated == valid or validated is valid  # `is` for NaN
+
     for invalid in prop_info.invalid_values:
         with pytest.raises(ValidationError):
             _ = m(root=invalid)
         with pytest.raises(ValidationError):
             descriptorinfo.validate(invalid)
-        with pytest.raises(ValidationError):
+        # We check that validation on __set__ only applies if it's enabled.
+        with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=True):
+            with pytest.raises(ValidationError):
+                prop.__set__(mock_thing, invalid)
+        with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=False):
             prop.__set__(mock_thing, invalid)
+            not_validated = prop.__get__(mock_thing)
+            assert not_validated == invalid or not_validated is invalid
 
 
 def convert_inf_nan(value):

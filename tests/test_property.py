@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import pydantic
 import pytest
 from labthings_fastapi import properties
+from labthings_fastapi.feature_flags import FEATURE_FLAGS
 from labthings_fastapi.properties import (
     BaseProperty,
     DataProperty,
@@ -370,8 +371,9 @@ def test_propertyinfo(mocker):
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
     # not a rootmodel.
-    with pytest.raises(TypeError):
-        example.badprop = 3  # Validation will fail here because of the bad model.
+    with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=True):
+        with pytest.raises(TypeError):
+            example.badprop = 3  # Validation will fail here because of the bad model.
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
     with pytest.raises(TypeError):

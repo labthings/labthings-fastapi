@@ -64,6 +64,7 @@ from weakref import WeakSet
 from fastapi import Body, FastAPI
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationError, create_model
 
+from .feature_flags import FEATURE_FLAGS
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
     DataSchema,
@@ -683,7 +684,10 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param emit_changed_event: whether to emit a changed event.
         """
         property_info = self.descriptor_info(obj)
-        obj.__dict__[self.name] = property_info.validate(value)
+        if FEATURE_FLAGS.validate_properties_on_set:
+            obj.__dict__[self.name] = property_info.validate(value)
+        else:
+            obj.__dict__[self.name] = value
         if emit_changed_event:
             self.emit_changed_event(obj, value)
 
@@ -907,7 +911,8 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def __set__(self, obj: Owner, value: Value) -> None:
         """Set the value of the property.
 
-        This will validate the value against the property's model, and an error
+        If property validation is enabled by `.FEATURE_FLAGS.validate_properties_on_set`
+        this will validate the value against the property's model, and an error
         will be raised if the value is not valid.
 
         :param obj: the `.Thing` on which the attribute is accessed.
@@ -918,7 +923,8 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         if self.fset is None:
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
         property_info = self.descriptor_info(obj)
-        value = property_info.validate(value)
+        if FEATURE_FLAGS.validate_properties_on_set:
+            value = property_info.validate(value)
 
         self.fset(obj, value)
 
