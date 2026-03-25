@@ -215,7 +215,6 @@ jobs:
     # This job runs only if a feature branch is specified in the merge request description.
     # The line below looks for a line starting with `OFM Feature Branch:`. This should
     # match the `grep` command in the step script.
-    if: contains(toJson(github.event.pull_request.body), '\r\nOFM Feature Branch:')
     runs-on: ubuntu-latest
     outputs:
       feature-branch: ${{ steps.determine-feature-branch.outputs.feature-branch}}
@@ -229,9 +228,15 @@ jobs:
         # out.
         run: |
           matching_line=$(echo "$PULL_REQUEST_BODY" | grep "^OFM Feature Branch:")
-          feature_branch="${matching_line##"OFM Feature Branch: "}"
-          echo "Using feature branch '$feature_branch'"
-          echo "feature-branch=$feature_branch" >> "$GITHUB_OUTPUT"
+          regex="OFM Feature Branch: ([a-zA-Z0-9_\-]+)"
+          if [[ $matching_line =~ $regex ]]; then
+            feature_branch="${BASH_REMATCH[1]}"
+            echo "Using feature branch '$feature_branch'"
+            echo "feature-branch=$feature_branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "No feature branch found."
+            echo "feature-branch=''" >> "$GITHUB_OUTPUT"
+          fi
         id: determine-feature-branch
   
   test-against-ofm-feature-branch:
@@ -239,6 +244,7 @@ jobs:
     # It is split from that job in order to allow re-use of the steps from
     # test-against-ofm-v3
     needs: check-for-ofm-feature-branch
+    if: ${{ needs.check-for-ofm-feature-branch.outputs.feature-branch }}
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
