@@ -222,7 +222,7 @@ jobs:
         uses: KyoriPowered/action-regex-match@v3
         with:
           text: ${{ github.event.pull_request.body }}
-          regex: '^\s*OFM[ \-_]Feature[ \-_]Branch:\s*([\w\-]+)'
+          regex: '^\s*OFM[ \-_]Feature[ \-_]Branch:\s*([\w\-./]+)'
           flags: 'mi'
 
       - name: Print the recovered branch
