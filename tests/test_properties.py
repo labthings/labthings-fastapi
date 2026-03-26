@@ -456,7 +456,7 @@ def test_bad_property_constraints():
     # as metadata if used on the wrong type. We don't currently raise errors
     # for these.
 
-    # We should also raise errors if constraints are set after a property is defined
+    # Invalid constraints on functional properties should also raise errors.
     with pytest.raises(UnsupportedConstraintError):
 
         class FunctionalBadConstraintThing(lt.Thing):
