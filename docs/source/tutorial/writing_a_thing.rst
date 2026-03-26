@@ -35,7 +35,7 @@ Our first Thing will pretend to be a light: we can set its brightness and turn i
     if __name__ == "__main__":
         import uvicorn
         # We run the server using `uvicorn`:
-        uvicorn.run(server.app, port=5000)
+        uvicorn.run(server.app, port=5000, ws="websockets-sansio")
 
 If you visit `http://localhost:5000/light`, you will see the Thing Description. You can also interact with it using the OpenAPI documentation at `http://localhost:5000/docs`. If you visit `http://localhost:5000/light/brightness`, you can set the brightness of the light, and if you visit `http://localhost:5000/light/is_on`, you can see whether the light is on. Changing values on the server requires a ``PUT`` or ``POST`` request, which is easiest to do using the OpenAPI "Try it out" feature. Check that you can use a ``POST`` request to the ``toggle`` endpoint to turn the light on and off.
 
