@@ -34,4 +34,4 @@ if __name__ == "__main__":
     server = lt.ThingServer({"counter": TestThing})
 
     # We run the server using `uvicorn`:
-    uvicorn.run(server.app, port=5000)
+    uvicorn.run(server.app, port=5000, ws="websockets-sansio")
