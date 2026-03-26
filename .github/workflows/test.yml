@@ -210,46 +210,37 @@ jobs:
       - name: Type check with `mypy`
         run: mypy src
 
-  check-for-ofm-feature-branch:
-    # This job runs only if a feature branch is specified in the merge request description.
-    # The line below looks for a line starting with `OFM Feature Branch:`. This should
-    # match the `grep` command in the step script.
+  analyse-pr-description:
+    # This job uses a regex to match the feature branch specified in the
+    # PR description. If there isn't one, it should be an empty string.
     runs-on: ubuntu-latest
     outputs:
-      feature-branch: ${{ steps.determine-feature-branch.outputs.feature-branch}}
+      feature-branch: ${{ steps.regex-match.outputs.group1 }}
     steps:
-      - name: Determine feature branch
-        env:
-          PULL_REQUEST_BODY: ${{ github.event.pull_request.body }}
-        # The `if:` block for this job has already checked we will have a matching line.
-        # The logic below will first extract the matching line from the PR description,
-        # then remove the prefix so we're left with only the branch name, which we check
-        # out.
+      - name: Check the pull request body for an OFM feature branch
+        id: regex-match
+        uses: KyoriPowered/action-regex-match@v3
+        with:
+          text: ${{ github.event.pull_request.body }}
+          regex: '^\s*OFM[ \-_]Feature[ \-_]Branch:\s*([\w\-]+)'
+          flags: 'mi'
+
+      - name: Print the recovered branch
         run: |
-          matching_line=$(echo "$PULL_REQUEST_BODY" | grep "^OFM Feature Branch:")
-          regex="OFM Feature Branch: ([a-zA-Z0-9_\-]+)"
-          if [[ $matching_line =~ $regex ]]; then
-            feature_branch="${BASH_REMATCH[1]}"
-            echo "Using feature branch '$feature_branch'"
-            echo "feature-branch=$feature_branch" >> "$GITHUB_OUTPUT"
-          else
-            echo "No feature branch found."
-            echo "feature-branch=''" >> "$GITHUB_OUTPUT"
-          fi
-        id: determine-feature-branch
+          echo "Matched string: '${{ steps.regex-match.outputs.match }}'"
+          echo "Matched group: '${{ steps.regex-match.outputs.group1 }}'"
   
   test-against-ofm-feature-branch:
-    # This job uses the feature branch found by the previous job.
-    # It is split from that job in order to allow re-use of the steps from
-    # test-against-ofm-v3
-    needs: check-for-ofm-feature-branch
-    if: ${{ needs.check-for-ofm-feature-branch.outputs.feature-branch }}
+    # This job uses the feature branch found by `analyse-pr-description`.
+    # If that job didn't find a feature branch, it will be an empty string
+    # so this job won't run.
+    needs: analyse-pr-description
+    if: needs.analyse-pr-description.outputs.feature-branch != ''
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
       run:
         working-directory: ../openflexure-microscope-server/
     env:
-      REF: ${{ needs.check-for-ofm-feature-branch.outputs.feature-branch }}
+      REF: ${{ needs.analyse-pr-description.outputs.feature-branch }}
     steps: *test-against-ofm-steps
-
