@@ -6,8 +6,9 @@ each Action becomes a method and each Property becomes an attribute.
 """
 
 from __future__ import annotations
+import inspect
 import time
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List
 from typing_extensions import Self  # 3.9, 3.10 compatibility
 from collections.abc import Mapping
 import httpx
@@ -295,7 +296,16 @@ class ThingClient:
             # use this class method on `ThingClient` subclasses, i.e.
             # to provide customisation but also add methods from a
             # Thing Description.
+            properties = list(my_thing_description["properties"])
+            actions = list(my_thing_description["actions"])
             thing_description = my_thing_description
+
+        name = my_thing_description.get("title", "ThingClient")
+
+        Client.__doc__ = my_thing_description.get("description", f"Client for {name}")
+
+        Client.__name__ = name
+        Client.__qualname__ = name
 
         for name, p in thing_description["properties"].items():
             add_property(Client, name, p)
@@ -391,6 +401,104 @@ def property_descriptor(
     return P()
 
 
+def _schema_to_type(spec: dict[str, Any]) -> Any:
+    """For a given DataSchema return a python type.
+
+    This can return the actual type. For more complex types it will use GenericAliases.
+    If no type information is found it will return ``inspect.Parameter.empty``.
+
+    :param spec: The data schema.
+
+    :return: The resolved type.
+    """
+    type_map = {
+        "null": None,
+        "boolean": bool,
+        "integer": int,
+        "number": float,
+        "string": str,
+        "object": dict,
+    }
+
+    if "type" in spec:
+        spec_type = spec["type"]
+
+        # array handling
+        if spec_type == "array":
+            items = spec.get("items", {})
+            if isinstance(items, list):
+                item_types = tuple(_schema_to_type(item) for item in items)
+                # The Union here combines the types but confuses mypy.
+                return List[Union[item_types]]  # type: ignore[valid-type]
+            else:
+                # Again mypy is confused by List being used directly
+                return List[_schema_to_type(items)]  # type: ignore[misc]
+
+        return type_map.get(spec_type, spec_type)
+    if "oneOf" in spec:
+        subtypes = []
+        for sub in spec["oneOf"]:
+            t = _schema_to_type(sub)
+            if t is not inspect.Parameter.empty:
+                subtypes.append(t)
+
+        if not subtypes:
+            return inspect.Parameter.empty
+
+        # collapse single-type unions
+        if len(subtypes) == 1:
+            return subtypes[0]
+
+        return Union[tuple(subtypes)]
+
+    return inspect.Parameter.empty
+
+
+def _get_signature(action: dict[str, Any]) -> inspect.Signature:
+    """Return the signature for an action.
+
+    :param action: The action description from the thing description.
+    :return: A python signature for the thing client to call the action.
+    """
+    input_spec = action.get("input", {})
+    output_spec = action.get("output", {})
+    output_type = _schema_to_type(output_spec)
+
+    properties = input_spec.get("properties", {})
+
+    parameters = [
+        inspect.Parameter(
+            "self",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+
+    for name, spec in properties.items():
+        annotation = _schema_to_type(spec)
+
+        if "default" in spec:
+            param = inspect.Parameter(
+                name,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=spec["default"],
+                annotation=annotation,
+            )
+        else:
+            # Note that explicitly setting default = inspect.Parameter.empty confuses
+            # document generators. Hence this if-else statement.
+            param = inspect.Parameter(
+                name,
+                inspect.Parameter.KEYWORD_ONLY,
+                annotation=annotation,
+            )
+
+        parameters.append(param)
+    return inspect.Signature(
+        parameters=parameters,
+        return_annotation=output_type,
+    )
+
+
 def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
     """Add an action to a ThingClient subclass.
 
@@ -409,10 +517,17 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
     def action_method(self: ThingClient, **kwargs: Any) -> Any:
         return self.invoke_action(action_name, **kwargs)
 
-    if "output" in action and "type" in action["output"]:
-        action_method.__annotations__["return"] = action["output"]["type"]
+    # Directly accessing the signature confuses mypy
+    action_method.__signature__ = _get_signature(action)  # type: ignore[attr-defined]
+    output_type = _schema_to_type(action.get("output", {}))
+    if output_type != inspect.Parameter.empty:
+        action_method.__annotations__["return"] = output_type
     if "description" in action:
-        action_method.__doc__ = action["description"]
+        title = action["title"]
+        description = action["description"]
+        action_method.__doc__ = (
+            title if title == description else f"{title}\n\n{description}"
+        )
     setattr(cls, action_name, action_method)
 
 
@@ -431,17 +546,16 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
     :param property: a dictionary representing the property, in :ref:`wot_td`
         format.
     """
-    setattr(
-        cls,
+    docs = property.get("description", None)
+    docs = "Undocumented LabThings Property" if docs is None else docs
+    prop = property_descriptor(
         property_name,
-        property_descriptor(
-            property_name,
-            property.get("type", Any),
-            description=property.get("description", None),
-            writeable=not property.get("readOnly", False),
-            readable=not property.get("writeOnly", False),
-        ),
+        _schema_to_type(property),
+        description=docs,
+        writeable=not property.get("readOnly", False),
+        readable=not property.get("writeOnly", False),
     )
+    setattr(cls, property_name, prop)
 
 
 def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> str:
