@@ -54,6 +54,10 @@ def test_server_thing_descriptions():
 
     for thing_name in thing_names:
         thing_description = thing_descriptions[thing_name]
+
+        expected_description = "An example Thing with a few affordances."
+        assert thing_description["description"] == expected_description
+
         for action_name in actions:
             action = thing_description["actions"][action_name]
             expected_href = thing_name + "/" + action_name

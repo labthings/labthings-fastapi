@@ -377,6 +377,7 @@ class Thing:
 
         td = ThingDescription(
             title=getattr(self, "title", self.__class__.__name__),
+            description=self.__doc__,
             properties=properties,
             actions=actions,
             security="no_security",
