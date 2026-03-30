@@ -404,8 +404,8 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         :raises FeatureNotAvailableError: as this must be overridden.
         """
         raise FeatureNotAvailableError(
-            f"{obj.name if obj else self.__class__}.{self.name} cannot be reset, "
-            f"as it's not supported by {self.__class__}."
+            f"{obj.name if obj else self.__class__}.{self.name} can't return a "
+            f"default, as it's not supported by {self.__class__}."
         )
 
     def reset(self, obj: Owner) -> None:
