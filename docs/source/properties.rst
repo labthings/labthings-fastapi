@@ -45,6 +45,15 @@ It is a good idea to make sure there is a docstring for your property. This will
 
 You don't need to include the type in the docstring, as it will be inferred from the type hint. However, you can include additional information about the property, such as its units or any constraints on its value.
 
+If your property's default value is a mutable datatype, like a list or dictionary, it's a good idea to use a *default factory* instead of a default value, in order to prevent strange behaviour. This may be done as shown:
+
+.. code-block:: python
+
+    class MyThing(lt.Thing):
+        my_list: list[int] = lt.property(default_factory=list)
+
+The example above will have its default value set to the empty list, as that's what is returned when ``list()`` is called. It's often convenient to use a "lambda function" as a default factory, for example `lambda: [1,2,3]` is a function that returns the list `[1,2,3]`\ . This is better than specifying a default value, because it returns a fresh copy of the object every time - using a list as a default value can lead to multiple `.Thing` instances changing in sync unexpectedly, which gets very confusing.
+
 Data properties may be *observed*, which means notifications will be sent when the property is written to (see below).
 
 Functional properties
@@ -93,7 +102,7 @@ Adding a setter makes the property read-write (if only a getter is present, it m
 
     The setter method for regular Python properties is usually named the same as the property itself (e.g. ``def twice_my_property(self, value: int)``). Unfortunately, doing this with LabThings properties causes problems for static type checkers such as `mypy`\ . We therefore recommend you prefix setters with ``_set_`` (e.g. ``def _set_twice_my_property(self, value: int)``). This is optional, and doesn't change the way the property works - but it is useful if you need `mypy` to work on your code, and don't want to ignore every property setter.
 
-It is possible to make a property read-only for clients by setting its ``readonly`` attribute: this has the same behaviour as for data properties.
+It is possible to make a property read-only for clients by setting its ``readonly`` attribute: this has the same behaviour as for data properties. A default can also be specified in the same way:
 
 .. code-block:: python
 
@@ -115,10 +124,40 @@ It is possible to make a property read-only for clients by setting its ``readonl
 
         # Make the property read-only for clients
         twice_my_property.readonly = True
+        # Add a default to the Thing Description
+        twice_my_property.default = 84
 
-In the example above, ``twice_my_property`` may be set by code within ``MyThing`` but cannot be written to via HTTP requests or `.DirectThingClient` instances.
+In the example above, ``twice_my_property`` may be set by code within ``MyThing`` but cannot be written to via HTTP requests or `.DirectThingClient` instances. It's worth noting that you may assign to ``twice_my_property.default_factory`` instead, just like using the ``default_factory`` argument of ``lt.property``\ .
 
 Functional properties may not be observed, as they are not backed by a simple value. If you need to notify clients when the value changes, you can use a data property that is updated by the functional property. In the example above, ``my_property`` may be observed, while ``twice_my_property`` cannot be observed. It would be possible to observe changes in ``my_property`` and then query ``twice_my_property`` for its new value.
+
+Functional properties may define a "resetter" method, which resets them to some initial state. This may be done even if a default has not been defined. To do this, you may use the property as a decorator, just like adding a setter:
+
+.. code-block:: python
+
+    import labthings_fastapi as lt
+
+    class MyThing(lt.Thing):
+        def __init__(self, **kwargs):
+            super().__init__(self, **kwargs)
+            self._hardware = MyHardwareClass()
+        
+        @lt.property
+        def setpoint(self) -> int:
+            """The hardware's setpoint."""
+            return self._hardware.get_setpoint()
+
+        @setpoint.setter
+        def _set_setpoint(self, value: int):
+            """Change the hardware setpoint."""
+            self._hardware.set_setpoint(value)
+        
+        @setpoint.resetter
+        def _reset_setpoint(self):
+            """Reset the hardware's setpoint."""
+            self._hardware.reset_setpoint()
+
+A resetter method, if defined, will take precedence over a default value if both are present. If a default value (or factory) is set and there is no resetter method, resetting the property will simply call the property's setter with the default value.
 
 .. _property_constraints:
 
@@ -166,6 +205,11 @@ Note that the constraints for functional properties are set by assigning a dicti
 .. note::
 
     Property values are not validated when they are set directly, only via HTTP. This behaviour may change in the future.
+
+Property metadata
+-----------------
+
+Properties in LabThings are intended to work very much like native Python properties. This means that getting and setting the attributes of a `.Thing` get and set the value of the property. Other operations, like reading the default value or resetting to default, need a different interface. For this, we use `.Thing.properties` which is a mapping of names to `.PropertyInfo` objects. These expose the extra functionality of properties in a convenient way. For example, I can reset a property by calling ``self.properties["myprop"].reset()`` or get its default by reading ``self.properties["myprop"].default``\ . See the `.PropertyInfo` API documentation for a full list of available properties and methods.
 
 HTTP interface
 --------------

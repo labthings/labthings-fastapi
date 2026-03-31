@@ -11,6 +11,10 @@ in particular checking `lt.property` and `lt.setting` work in the
 same way.
 """
 
+from dataclasses import dataclass
+import json
+from typing import Any
+
 import fastapi
 from fastapi.testclient import TestClient
 import pydantic
@@ -30,6 +34,7 @@ from labthings_fastapi.exceptions import (
     MissingTypeError,
     NotBoundToInstanceError,
     NotConnectedToServerError,
+    PropertyRedefinitionError,
 )
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
@@ -463,59 +468,179 @@ def test_readonly_metadata():
         assert td.properties[name].readOnly is True
 
 
-def test_default_and_reset():
+@dataclass
+class PropertyDefaultInfo:
+    name: str
+    resettable: bool
+    default: Any
+    resets_to: Any = ...
+
+
+DEFAULT_AND_RESET_PROPS = [
+    PropertyDefaultInfo("intprop", True, 42, 42),
+    PropertyDefaultInfo("listprop", True, ["a", "list"], ["a", "list"]),
+    PropertyDefaultInfo("strprop", False, ...),
+    PropertyDefaultInfo("tupleprop", False, (42, 42)),
+    PropertyDefaultInfo("flistprop", True, [], []),
+    PropertyDefaultInfo("resettable_strprop", True, ..., "Reset"),
+    PropertyDefaultInfo("resettable_strprop_with_default", True, "Default", "Reset"),
+]
+
+
+@pytest.mark.parametrize("prop", DEFAULT_AND_RESET_PROPS)
+def test_default_and_reset(prop: PropertyDefaultInfo):
     """Test retrieving property defaults, and resetting to default."""
 
     class Example(lt.Thing):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self._flistprop = [0]
+            self._resettable_strprop = "Hello World!"
+            self._resettable_strprop_with_default = "Hello World!"
+
         intprop: int = lt.property(default=42)
         listprop: list[str] = lt.property(default_factory=lambda: ["a", "list"])
 
         @lt.property
         def strprop(self) -> str:
+            """A functional property without resetter or default"""
             return "Hello World!"
+
+        @lt.property
+        def tupleprop(self) -> tuple[int, int]:
+            """A functional property with a default but no setter."""
+            return (42, 42)
+
+        tupleprop.default = (42, 42)
+
+        @lt.property
+        def flistprop(self) -> list[int]:
+            """A functional property with a default and a setter."""
+            return self._listprop
+
+        @flistprop.setter
+        def _set_flistprop(self, value: list[int]) -> None:
+            self._listprop = value
+
+        flistprop.default_factory = list
+
+        @lt.property
+        def resettable_strprop(self) -> str:
+            """A string property that may be reset, but has no default defined."""
+            return self._resettable_strprop
+
+        @resettable_strprop.resetter
+        def _reset_resettable_strprop(self) -> None:
+            self._resettable_strprop = "Reset"
+
+        @lt.property
+        def resettable_strprop_with_default(self) -> str:
+            """A string property with a default, and a resetter."""
+            return self._resettable_strprop_with_default
+
+        @resettable_strprop_with_default.setter
+        def _set_resettable_strprop_with_default(self, value: str):
+            self._resettable_strprop_with_default = value
+
+        @resettable_strprop_with_default.resetter
+        def _reset_resettable_strprop_with_default(self):
+            self._resettable_strprop_with_default = "Reset"
+
+        resettable_strprop_with_default.default_factory = lambda: "Default"
 
     example = create_thing_without_server(Example)
 
     # Defaults should be available on classes and instances
     for thing in [example, Example]:
         # We should get expected values for defaults
-        assert thing.properties["intprop"].default == 42
-        assert thing.properties["listprop"].default == ["a", "list"]
-        # Defaults are not available for FunctionalProperties
-        with pytest.raises(FeatureNotAvailableError):
-            _ = thing.properties["strprop"].default
+        if prop.default is not ...:
+            assert thing.properties[prop.name].default == prop.default
+        else:
+            with pytest.raises(FeatureNotAvailableError):
+                _ = thing.properties[prop.name].default
 
     # Resetting to default isn't available on classes
-    for name in ["intprop", "listprop", "strprop"]:
-        with pytest.raises(NotBoundToInstanceError):
-            thing.properties[name].reset()
+    with pytest.raises(NotBoundToInstanceError):
+        thing.properties[prop.name].reset()
 
     # Check the `resettable` property is correct
     for thing in [example, Example]:
-        for name, resettable in [
-            ("intprop", True),
-            ("listprop", True),
-            ("strprop", False),
-        ]:
-            assert thing.properties[name].is_resettable is resettable
+        assert thing.properties[prop.name].is_resettable is prop.resettable
 
-    # Resetting should work for DataProperty
-    example.intprop = 43
-    assert example.intprop == 43
-    example.properties["intprop"].reset()
-    assert example.intprop == 42
-
-    example.listprop = []
-    assert example.listprop == []
-    example.properties["listprop"].reset()
-    assert example.listprop == ["a", "list"]
-
-    # Resetting won't work for FunctionalProperty
-    with pytest.raises(FeatureNotAvailableError):
-        example.properties["strprop"].reset()
+    # Check resetting either works as expected, or fails with the right error
+    if prop.resettable:
+        example.properties[prop.name].reset()
+        assert getattr(example, prop.name) == prop.resets_to
+    else:
+        with pytest.raises(FeatureNotAvailableError):
+            example.properties[prop.name].reset()
 
     # Check defaults show up in the Thing Description
     td = example.thing_description_dict()
-    assert td["properties"]["intprop"]["default"] == 42
-    assert td["properties"]["listprop"]["default"] == ["a", "list"]
-    assert "default" not in td["properties"]["strprop"]
+    if prop.default is not ...:
+        # The TD goes via JSON, so types may get changed
+        default = json.loads(json.dumps(prop.default))
+        assert td["properties"][prop.name]["default"] == default
+    else:
+        assert "default" not in td["properties"][prop.name]
+
+
+def test_reading_default_and_factory():
+    """Ensure reading the default/factory does what's expected.
+
+    Note that this is **not** the same as Example.properties["prop"].default,
+    which uses ``Example.prop.get_default()`` internally.
+
+    This property really only exists for use during class definitions, and
+    would be write-only if that wasn't confusing!
+    """
+
+    class Example(lt.Thing):
+        @lt.property
+        def prop(self) -> int:
+            return 42
+
+        @lt.property
+        def prop_d(self) -> int:
+            return 42
+
+        prop_d.default = 42
+        assert prop_d.default == 42
+        assert prop_d.default_factory is not None
+        assert prop_d.default_factory() == 42
+
+        @lt.property
+        def prop_df(self) -> int:
+            return 42
+
+        prop_df.default_factory = lambda: 42
+        assert prop_df.default == 42
+        assert prop_df.default_factory is not None
+        assert prop_df.default_factory() == 42
+
+    with pytest.raises(FeatureNotAvailableError):
+        _ = Example.prop.default
+    assert Example.prop.default_factory is None
+
+    assert Example.prop_d.default == 42
+    assert Example.prop_d.default_factory is not None
+    assert Example.prop_d.default_factory() == 42
+
+    assert Example.prop_df.default == 42
+    assert Example.prop_df.default_factory is not None
+    assert Example.prop_df.default_factory() == 42
+
+
+def test_bad_reset_decorator():
+    """Check that a resetter can't have the same name as the property."""
+
+    with pytest.raises(PropertyRedefinitionError):
+
+        class Example(lt.Thing):
+            @lt.property
+            def myprop(self) -> int:
+                return 42
+
+            @myprop.resetter
+            def myprop(self) -> None:
+                pass
