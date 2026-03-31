@@ -1057,7 +1057,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             msg = f"Property {self._owner_name}.{self.name} cannot be reset."
             raise FeatureNotAvailableError(msg)
 
-    def is_resettable(self, obj: Owner) -> bool:
+    def is_resettable(self, obj: Owner | None) -> bool:
         """Whether the property may be reset.
 
         This will be true if a `resetter` function has been added, or if a default is
