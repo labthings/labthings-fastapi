@@ -34,6 +34,7 @@ from labthings_fastapi.exceptions import (
     MissingTypeError,
     NotBoundToInstanceError,
     NotConnectedToServerError,
+    PropertyRedefinitionError,
 )
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
@@ -582,3 +583,64 @@ def test_default_and_reset(prop: PropertyDefaultInfo):
         assert td["properties"][prop.name]["default"] == default
     else:
         assert "default" not in td["properties"][prop.name]
+
+
+def test_reading_default_and_factory():
+    """Ensure reading the default/factory does what's expected.
+
+    Note that this is **not** the same as Example.properties["prop"].default,
+    which uses ``Example.prop.get_default()`` internally.
+
+    This property really only exists for use during class definitions, and
+    would be write-only if that wasn't confusing!
+    """
+
+    class Example(lt.Thing):
+        @lt.property
+        def prop(self) -> int:
+            return 42
+
+        @lt.property
+        def prop_d(self) -> int:
+            return 42
+
+        prop_d.default = 42
+        assert prop_d.default == 42
+        assert prop_d.default_factory is not None
+        assert prop_d.default_factory() == 42
+
+        @lt.property
+        def prop_df(self) -> int:
+            return 42
+
+        prop_df.default_factory = lambda: 42
+        assert prop_df.default == 42
+        assert prop_df.default_factory is not None
+        assert prop_df.default_factory() == 42
+
+    with pytest.raises(FeatureNotAvailableError):
+        _ = Example.prop.default
+    assert Example.prop.default_factory is None
+
+    assert Example.prop_d.default == 42
+    assert Example.prop_d.default_factory is not None
+    assert Example.prop_d.default_factory() == 42
+
+    assert Example.prop_df.default == 42
+    assert Example.prop_df.default_factory is not None
+    assert Example.prop_df.default_factory() == 42
+
+
+def test_bad_reset_decorator():
+    """Check that a resetter can't have the same name as the property."""
+
+    with pytest.raises(PropertyRedefinitionError):
+
+        class Example(lt.Thing):
+            @lt.property
+            def myprop(self) -> int:
+                return 42
+
+            @myprop.resetter
+            def myprop(self) -> None:
+                pass
