@@ -363,7 +363,9 @@ class ThingServer:
                 dictionaries.
             """
             return {
-                name: thing.thing_description(name + "/", base=str(request.base_url))
+                name: thing.thing_description(
+                    path=f"{self._api_prefix}/{name}/", base=str(request.base_url)
+                )
                 for name, thing in thing_server.things.items()
             }
 
