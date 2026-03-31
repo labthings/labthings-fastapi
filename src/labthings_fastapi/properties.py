@@ -85,6 +85,7 @@ from .base_descriptor import (
 from .exceptions import (
     FeatureNotAvailableError,
     NotConnectedToServerError,
+    PropertyRedefinitionError,
     ReadOnlyPropertyError,
     MissingTypeError,
     UnsupportedConstraintError,
@@ -394,7 +395,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             )
         return self._model
 
-    def default(self, obj: Owner | None) -> Value:
+    def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
 
         :param obj: the `.Thing` instance on which we are looking for the default.
@@ -534,7 +535,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         extra_fields = {}
         try:
             # Try to get hold of the default - may raise FeatureNotAvailableError
-            default = self.default(thing)
+            default = self.get_default(thing)
             # Validate and dump it with the model to ensure it's simple types only
             default_validated = self.model.model_validate(default)
             extra_fields["default"] = default_validated.model_dump()
@@ -686,7 +687,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         if emit_changed_event:
             self.emit_changed_event(obj, value)
 
-    def default(self, obj: Owner | None) -> Value:
+    def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
 
         Note that this implementation is independent of the `.Thing` instance,
@@ -705,7 +706,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
 
         :param obj: the `.Thing` instance we want to reset.
         """
-        self.__set__(obj, self.default(obj))
+        self.__set__(obj, self.get_default(obj))
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return the observers of this property.
@@ -796,7 +797,19 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
                 "Return type annotations are required for property getters."
             )
             raise MissingTypeError(msg)
-        self._fset: Callable[[Owner, Value], None] | None = None
+        self._fset: Callable[[Owner, Value], None] | None = None  # setter function
+        # `_freset` should reset the property to its default value.
+        self._freset: (
+            Callable[
+                [
+                    Owner,
+                ],
+                None,
+            ]
+            | None
+        ) = None
+        # `_default_factory` should return a default value.
+        self._default_factory: Callable[[], Value] | None = None
         self.readonly: bool = True
 
     @builtins.property
@@ -915,6 +928,162 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
         self.fset(obj, value)
 
+    @builtins.property
+    def default(self) -> Value:
+        r"""The default value for this property.
+
+        This attribute is mostly provided to allow it to be set at class definition
+        time - it should usually be retrieved through
+        ``thing_instance.properties['name'].default``\ .
+
+
+        .. warning::
+
+            The default is not guaranteed to be available! It should usually be accessed
+            via a `PropertyInfo` object, as ``thing.properties['name'].default``\ .
+            If a default is not available, a `FeatureNotAvailableError` will be raised.
+
+        :raises FeatureNotAvailableError: if no default is defined.
+        :return: the default value.
+        """
+        if self.default_factory is None:
+            msg = "No default has been defined for this property."
+            raise FeatureNotAvailableError(msg)
+        return self.default_factory()
+
+    @default.setter
+    def default(self, value: Value) -> None:
+        """Set the default value.
+
+        :param value: the new default value.
+        """
+        self.default_factory = default_factory_from_arguments(default=value)
+
+    @builtins.property
+    def default_factory(self) -> Callable[[], Value] | None:
+        """The default factory function, if available.
+
+        This property will be `None` if no default is set, or it will be a function
+        that returns a default value.
+
+        Setting the default factory will also allow this property to be reset using
+        its `reset()` method, which will call the property's setter with the default
+        value. If a reset function was already specified (e.g. with the ``resetter``
+        decorator), it will not be overwritten.
+
+        :return: the default factory function, or `None` if it is not set.
+        """
+        return self._default_factory
+
+    @default_factory.setter
+    def default_factory(self, value: Callable[[], Value] | None) -> None:
+        """Set the default factory.
+
+        :param value: a function that takes no arguments and returns a default value.
+        """
+        self._default_factory = value
+        if not self._freset:
+            self._freset = self._reset_using_default_factory
+
+    def _reset_using_default_factory(self, obj: Owner) -> None:
+        """Reset the property to the default defined by its default factory.
+
+        :param obj: the object on which the property should be reset.
+        :raises FeatureNotAvailableError: if no default is defined.
+        """
+        if self._default_factory is None:
+            msg = "The property does not have a ``_default_factory`` defined."
+            raise FeatureNotAvailableError(msg)
+        self.__set__(obj, self._default_factory())
+
+    def get_default(self, obj: Owner | None) -> Value:
+        """Return a default value, if available.
+
+        :param obj: The Thing for which we are retrieving the default value, or
+            `None` if we are referring only to the class.
+
+        :return: the default value.
+        :raises FeatureNotAvailable: if no default has been defined.
+        """
+        if self._default_factory is None:
+            msg = "No default has been defined for {self._owner_name}.{self.name}."
+            raise FeatureNotAvailableError(msg)
+        return self._default_factory()
+
+    def resetter(
+        self,
+        freset: Callable[
+            [
+                Owner,
+            ],
+            None,
+        ],
+    ) -> Callable[[Owner], None]:
+        r"""Decorate a method that resets the property to a default state.
+
+        Functional properties may optionally define a function that resets the property
+        to a default state. This method is intended to be used as a decorator:
+
+        .. code-block:: python
+
+
+            import labthings_fastapi as lt
+
+
+            class MyThing(lt.Thing):
+                def __init__(self, **kwargs):
+                    super().__init__(**kwargs)
+                    self._myprop = 42
+
+                @lt.property
+                def myprop(self) -> int:
+                    return self._myprop
+
+                @myprop.setter
+                def _set_myprop(self, val: int) -> None:
+                    self._myprop = val
+
+                @myprop.resetter
+                def _reset_myprop(self) -> None:
+                    self._myprop = 42
+
+        :param freset: The method being decorated. This should take one
+            positional argument, ``self``\ , which has the usual meaning for
+            Python methods.
+        :raises PropertyRedefinitionError: if the decorated method has the same name as
+            the property. Please use a different name, as shown in the example above.
+        :return: the decorated function (unchanged). Note that we don't return the
+            property, so you must choose a different name for the reset function.
+        """
+        self._freset = freset
+        if freset.__name__ == self.fget.__name__:
+            msg = "The resetter function may not have the same name as the property."
+            raise PropertyRedefinitionError(msg)
+        return freset
+
+    def reset(self, obj: Owner) -> None:
+        r"""Reset the property to its default value.
+
+        This resets to the value returned by ``default`` for `.DataProperty`\ .
+
+        :param obj: the `.Thing` instance we want to reset.
+        :raises FeatureNotAvailable: if no reset method is available, which means there
+            is no default defined, and no resetter method.
+        """
+        if self._freset:
+            self._freset(obj)
+        else:
+            msg = f"Property {self._owner_name}.{self.name} cannot be reset."
+            raise FeatureNotAvailableError(msg)
+
+    def is_resettable(self, obj: Owner) -> bool:
+        """Whether the property may be reset.
+
+        :param obj: the object on which we are defined.
+        :return: whether a call to ``reset()`` should succeed.
+        """
+        return self._freset is not None
+
 
 class PropertyInfo(
     FieldTypedBaseDescriptorInfo[BasePropertyT, Owner, Value],
@@ -966,7 +1135,7 @@ class PropertyInfo(
             Note that this is an optional feature, so calling code must handle
             `.FeatureNotAvailableError` exceptions.
         """
-        return self.get_descriptor().default(self.owning_object)
+        return self.get_descriptor().get_default(self.owning_object)
 
     @builtins.property
     def is_resettable(self) -> bool:  # noqa: DOC201

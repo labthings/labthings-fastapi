@@ -213,3 +213,12 @@ class FeatureNotAvailableError(NotImplementedError):
     Currently this is done for the default value of properties, and their reset
     method.
     """
+
+
+class PropertyRedefinitionError(AttributeError):
+    """A property is being incorrectly redefined.
+
+    This method is raised if a property is at risk of being redefined. This usually
+    happens when a decorator is applied to a function with the same name as the
+    property. The solution is usually to rename the function.
+    """
