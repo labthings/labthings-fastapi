@@ -32,3 +32,17 @@ def test_set_bad_setting():
             pass
     with pytest.raises(AttributeError):
         lt.FEATURE_FLAGS.bogus_name = True
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_set_temporarily_with_exception(value):
+    """Test that flags are reset even if an exception occurs inside the block."""
+    value_before = lt.FEATURE_FLAGS.validate_properties_on_set
+
+    with pytest.raises(RuntimeError, match="Simulated crash"):
+        with lt.FEATURE_FLAGS.set_temporarily(validate_properties_on_set=value):
+            assert lt.FEATURE_FLAGS.validate_properties_on_set == value
+            raise RuntimeError("Simulated crash")
+
+    # The flag should be restored despite the exception
+    assert lt.FEATURE_FLAGS.validate_properties_on_set == value_before
