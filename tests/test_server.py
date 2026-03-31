@@ -35,7 +35,8 @@ def test_server_thing_descriptions():
                 "class": "labthings_fastapi.example_things:MyThing",
                 "kwargs": {},
             },
-        }
+        },
+        "api_prefix": "/api",
     }
 
     thing_names = ["thing1", "thing2"]
@@ -51,7 +52,7 @@ def test_server_thing_descriptions():
 
     server = lt.ThingServer.from_config(conf)
     with TestClient(server.app) as client:
-        response = client.get("/thing_descriptions/")
+        response = client.get("/api/thing_descriptions/")
     response.raise_for_status()
     thing_descriptions = response.json()
 
@@ -63,12 +64,12 @@ def test_server_thing_descriptions():
 
         for action_name in actions:
             action = thing_description["actions"][action_name]
-            expected_href = thing_name + "/" + action_name
+            expected_href = f"/api/{thing_name}/{action_name}"
             assert action["forms"][0]["href"] == expected_href
 
         for prop_name in props:
             prop = thing_description["properties"][prop_name]
-            expected_href = thing_name + "/" + prop_name
+            expected_href = f"/api/{thing_name}/{prop_name}"
             assert prop["forms"][0]["href"] == expected_href
 
 
@@ -129,3 +130,4 @@ def test_things_endpoints():
         response.raise_for_status()
         td = response.json()
         assert td["title"] == "MyThing"
+        assert tds["thing_a"] == td
