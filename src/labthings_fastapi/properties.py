@@ -982,19 +982,6 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param value: a function that takes no arguments and returns a default value.
         """
         self._default_factory = value
-        if not self._freset:
-            self._freset = self._reset_using_default_factory
-
-    def _reset_using_default_factory(self, obj: Owner) -> None:
-        """Reset the property to the default defined by its default factory.
-
-        :param obj: the object on which the property should be reset.
-        :raises FeatureNotAvailableError: if no default is defined.
-        """
-        if self._default_factory is None:
-            msg = "The property does not have a ``_default_factory`` defined."
-            raise FeatureNotAvailableError(msg)
-        self.__set__(obj, self._default_factory())
 
     def get_default(self, obj: Owner | None) -> Value:
         """Return a default value, if available.
@@ -1010,15 +997,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             raise FeatureNotAvailableError(msg)
         return self._default_factory()
 
-    def resetter(
-        self,
-        freset: Callable[
-            [
-                Owner,
-            ],
-            None,
-        ],
-    ) -> Callable[[Owner], None]:
+    def resetter(self, freset: Callable[[Owner], None]) -> Callable[[Owner], None]:
         r"""Decorate a method that resets the property to a default state.
 
         Functional properties may optionally define a function that resets the property
@@ -1072,6 +1051,8 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """
         if self._freset:
             self._freset(obj)
+        elif self._default_factory and self.fset:
+            self.__set__(obj, self._default_factory())
         else:
             msg = f"Property {self._owner_name}.{self.name} cannot be reset."
             raise FeatureNotAvailableError(msg)
@@ -1079,10 +1060,17 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def is_resettable(self, obj: Owner) -> bool:
         """Whether the property may be reset.
 
+        This will be true if a `resetter` function has been added, or if a default is
+        defined and the property has a `setter` defined.
+
         :param obj: the object on which we are defined.
         :return: whether a call to ``reset()`` should succeed.
         """
-        return self._freset is not None
+        if self._freset is not None:
+            return True
+        if self._default_factory is not None and self.fset is not None:
+            return True
+        return False
 
 
 class PropertyInfo(
