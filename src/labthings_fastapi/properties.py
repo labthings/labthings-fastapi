@@ -83,6 +83,7 @@ from .base_descriptor import (
     FieldTypedBaseDescriptorInfo,
 )
 from .exceptions import (
+    FeatureNotAvailableError,
     NotConnectedToServerError,
     ReadOnlyPropertyError,
     MissingTypeError,
@@ -393,6 +394,50 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             )
         return self._model
 
+    def default(self, obj: Owner | None) -> Value:
+        """Return the default value of this property.
+
+        :param obj: the `.Thing` instance on which we are looking for the default.
+            or `None` if referring to the class. For now, this is ignored.
+
+        :return: the default value of this property.
+        :raises FeatureNotAvailableError: as this must be overridden.
+        """
+        raise FeatureNotAvailableError(
+            f"{obj.name if obj else self.__class__}.{self.name} cannot be reset, "
+            f"as it's not supported by {self.__class__}."
+        )
+
+    def reset(self, obj: Owner) -> None:
+        """Reset the property's value to a default state.
+
+        If there is a defined default value for the property, this method
+        should reset the property to that default.
+
+        Not every property is expected to implement ``reset`` so it is important
+        to handle `.FeatureNotAvailableError` exceptions, which will be raised if this
+        method is not overridden.
+
+        :param obj: the `.Thing` instance we want to reset.
+        :raises FeatureNotAvailableError: as only some subclasses implement resetting.
+        """
+        raise FeatureNotAvailableError(
+            f"{obj.name}.{self.name} cannot be reset, as it's not supported by "
+            f"{self.__class__}."
+        )
+
+    def is_resettable(self, obj: Owner | None) -> bool:
+        r"""Determine if it's possible to reset this property.
+
+        By default, this returns `True` if ``reset`` has been overridden.
+        If you override ``reset`` but want more control over this behaviour,
+        you probably need to override `is_resettable`\ .
+
+        :param obj: the `.Thing` instance we want to reset.
+        :return: `True` if a call to ``reset()`` should work.
+        """
+        return BaseProperty.reset is not self.__class__.reset
+
     def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
 
@@ -439,8 +484,27 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         def get_property() -> Any:
             return self.__get__(thing)
 
+        if self.is_resettable(thing):
+
+            @app.post(
+                thing.path + self.name + "/reset",
+                summary=f"Reset {self.title}.",
+                description=(
+                    f"## Reset {self.title}\n\n"
+                    "This endpoint will reset the property to its default value. "
+                    "The default value should be detailed in the Thing Description.\n\n"
+                    "Not every property supports the reset-to-default operation, and "
+                    "this endpoint is only present (e.g. in the OpenAPI docs) "
+                    "for those that do.\n\n"
+                    "This endpoint is identical to using the ``reset_property`` action"
+                    rf"with the ``name`` argument set to ``{self.name}``\ ."
+                ),
+            )
+            def reset() -> None:
+                self.reset(thing)
+
     def property_affordance(
-        self, thing: Thing, path: str | None = None
+        self, thing: Owner, path: str | None = None
     ) -> PropertyAffordance:
         """Represent the property in a Thing Description.
 
@@ -467,12 +531,22 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             ),
         ]
         data_schema: DataSchema = type_to_dataschema(self.model)
+        extra_fields = {}
+        try:
+            # Try to get hold of the default - may raise FeatureNotAvailableError
+            default = self.default(thing)
+            # Validate and dump it with the model to ensure it's simple types only
+            default_validated = self.model.model_validate(default)
+            extra_fields["default"] = default_validated.model_dump()
+        except FeatureNotAvailableError:
+            pass  # Default should only be included if it's needed.
         pa: PropertyAffordance = PropertyAffordance(
             title=self.title,
             forms=forms,
             description=self.description,
             readOnly=self.readonly,
             writeOnly=False,  # write-only properties are not yet supported
+            **extra_fields,
         )
         # We merge the data schema with the property affordance (which subclasses the
         # DataSchema model) with the affordance second so its values take priority.
@@ -611,6 +685,27 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         obj.__dict__[self.name] = value
         if emit_changed_event:
             self.emit_changed_event(obj, value)
+
+    def default(self, obj: Owner | None) -> Value:
+        """Return the default value of this property.
+
+        Note that this implementation is independent of the `.Thing` instance,
+        as there's currently no way to specify a per-instance default.
+
+        :param obj: the `.Thing` instance we want to reset.
+
+        :return: the default value of this property.
+        """
+        return self._default_factory()
+
+    def reset(self, obj: Owner) -> None:
+        r"""Reset the property to its default value.
+
+        This resets to the value returned by ``default`` for `.DataProperty`\ .
+
+        :param obj: the `.Thing` instance we want to reset.
+        """
+        self.__set__(obj, self.default(obj))
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return the observers of this property.
@@ -862,6 +957,30 @@ class PropertyInfo(
                 )
                 raise TypeError(msg)
             return cls(root=value)
+
+    @builtins.property
+    def default(self) -> Value:  # noqa: DOC201
+        """The default value of this property.
+
+        .. warning::
+            Note that this is an optional feature, so calling code must handle
+            `.FeatureNotAvailableError` exceptions.
+        """
+        return self.get_descriptor().default(self.owning_object)
+
+    @builtins.property
+    def is_resettable(self) -> bool:  # noqa: DOC201
+        """Whether the property may be reset using the ``reset()`` method."""
+        return self.get_descriptor().is_resettable(self.owning_object)
+
+    def reset(self) -> None:
+        """Reset the property to a default value.
+
+        .. warning::
+            Note that this is an optional feature, so calling code must handle
+            `.FeatureNotAvailableError` exceptions.
+        """
+        return self.get_descriptor().reset(self.owning_object_or_error())
 
     def validate(self, value: Any) -> Value:
         """Use the validation logic in `self.model`.

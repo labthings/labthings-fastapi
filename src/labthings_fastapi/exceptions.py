@@ -202,3 +202,14 @@ class NotBoundToInstanceError(RuntimeError):
     generated from a `.Thing` class. Usually, they should be accessed via a
     `.Thing` instance, in which case they will be bound.
     """
+
+
+class FeatureNotAvailableError(NotImplementedError):
+    """A feature is not available.
+
+    There are some methods provided by base classes where implementation is optional.
+    These methods raise `FeatureNotAvailableError` if they are not implemented.
+
+    Currently this is done for the default value of properties, and their reset
+    method.
+    """
