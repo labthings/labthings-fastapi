@@ -14,12 +14,12 @@ A `.Blob` consists of some data and a MIME type, which sets how the data should 
 Creating and using `.Blob` objects
 ------------------------------------------------
 
-Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes`, on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`). A `.Blob` may also point to remote data (see `.Blob.from_url`). Code that uses a `.Blob` should not need to know how the data is stored, as the interface is the same in each case.
+Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes` or on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`). A `.Blob` may also point to remote data (see `.Blob.from_url`). Code that uses a `.Blob` should not need to know how the data is stored, as the interface is the same in each case.
 
 Blobs offer three ways to access their data:
 
 * A `bytes` object, obtained via the `.Blob.data` property. For blobs created with a `bytes` object, this simply returns the original data object with no copying. If the data is stored in a file, the file is opened and read when the `.Blob.data` property is accessed. If the `.Blob` references a URL, it is retrieved and returned when `.Blob.data` is accessed.
-* An `.Blob.open` method providing a file-like object. This returns a `~io.BytesIO` wrapper if the `.Blob` was created from a `bytes` object or the file if the data is stored on disk. URLs are retrieved, stored as `bytes` and returned wrapped in a :class:`~io.BytesIO` object. 
+* An `~.Blob.open` method providing a file-like object. This returns a `~io.BytesIO` wrapper if the `.Blob` was created from a `bytes` object or the file if the data is stored on disk. URLs are retrieved, stored as `bytes` and returned wrapped in a :class:`~io.BytesIO` object. 
 * A `.Blob.save` method will either save the data to a file, or copy the existing file on disk. This should be more efficient than loading `.Blob.data` and writing to a file, if the `.Blob` is pointing to a file rather than data in memory. 
 
 The intention here is that `.Blob` objects may be used identically with data in memory or on disk or even at a remote URL, and the code that uses them should not need to know which is the case.
@@ -58,6 +58,26 @@ The corresponding client code might look like this:
     with image_blob.open() as f:
         img = Image.open(f)
     img.show()  # This will display the image in a window
+
+Another `.Thing` on the same server can also make use of this action, in which case the image data will not be copied:
+
+.. code-block:: python
+
+    from datetime import datetime
+    import os.path
+
+    class Gallery(lt.Thing):
+        _camera: Camera = lt.thing_slot()
+
+        @lt.action
+        def capture_to_gallery(self) -> str:
+            """Capture an image and save it in the gallery."""
+            jpeg = self._camera.capture_image()
+            fname = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.jpg"
+            jpeg.save(os.path.join(".", "gallery", fname))
+            return fname
+
+When the ``JPEGBlob`` is returned by the camera, nothing is copied - and when it is saved, the `bytes` object is written to disk. Note that, if the data had been backed by a file, ``save`` would have copied the file on disk, with no requirement for Python to load it back into memory.
 
 Using `.Blob` objects as inputs
 --------------------------------------
@@ -118,6 +138,10 @@ On the client, we can use the `capture_image` action directly (as before), or we
     jpeg_blob.save("converted_image.jpg")
 
     raw_blob.save("raw_image.raw")  # Download and save the raw image to a file
+
+.. warning::
+
+    Currently, `.Blob` objects are only retained on the server as part of the output of the action that created them. This means they will expire after a timeout (by default, a few minutes). This mechanism is likely to change in future releases: the use of `.Blob` objects as inputs should be considered experimental.
 
 HTTP interface and serialization
 --------------------------------
