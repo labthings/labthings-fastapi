@@ -25,6 +25,7 @@ from .thing_server_interface import ThingServerInterface
 from .properties import property, setting, DataProperty, DataSetting
 from .actions import action
 from .endpoints import endpoint
+from .feature_flags import FEATURE_FLAGS
 from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
@@ -52,6 +53,7 @@ __all__ = [
     "action",
     "thing_slot",
     "endpoint",
+    "FEATURE_FLAGS",
     "outputs",
     "blob",
     "ThingServer",

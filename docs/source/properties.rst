@@ -204,7 +204,8 @@ Note that the constraints for functional properties are set by assigning a dicti
 
 .. note::
 
-    Property values are not validated when they are set directly, only via HTTP. This behaviour may change in the future.
+    Currently, property values are not validated when they are set directly in Python, only via HTTP.
+    Setting ``lt.FEATURE_FLAGS.validate_properties_on_set = True`` enables validation when they are set in Python. This may become default behaviour in the future.
 
 Property metadata
 -----------------

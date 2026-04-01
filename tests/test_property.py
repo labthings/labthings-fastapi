@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 import pydantic
 import pytest
 from labthings_fastapi import properties
+from labthings_fastapi.feature_flags import FEATURE_FLAGS
 from labthings_fastapi.properties import (
     BaseProperty,
     DataProperty,
@@ -375,8 +376,9 @@ def test_propertyinfo(mocker):
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
     # not a rootmodel.
-    example.badprop = 3
-    assert example.badprop == 3
+    with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=True):
+        with pytest.raises(TypeError):
+            example.badprop = 3  # Validation will fail here because of the bad model.
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
     with pytest.raises(TypeError):
@@ -401,12 +403,24 @@ def test_propertyinfo(mocker):
     # Check validation for a model
     modelprop = example.properties["modelprop"]
     assert modelprop.validate(MyModel(a=3, b="four")) == MyModel(a=3, b="four")
+    # Check that a valid model passes through unchanged: this should indicate that
+    # we're not unnecessarily re-validating already-valid models.
     m = MyModel(a=3, b="four")
     assert modelprop.validate(m) is m
     assert modelprop.validate({"a": 5, "b": "six"}) == MyModel(a=5, b="six")
     for invalid in [{"c": 5}, (4, "f"), None]:
         with pytest.raises(pydantic.ValidationError):
             modelprop.validate(invalid)
+    # Check that an invalid model doesn't get re-validated. This is intended behaviour:
+    # it is another test that we're not unnecessarily re-validating a model that
+    # should already have been validated when it was created.
+    # Creating models with `model_construct` intentionally allows invalid models:
+    # if this is used downstream, the downstream code should accept responsibility!
+    bad_m = MyModel.model_construct(a="not an int", b=6)
+    assert modelprop.validate(bad_m) is bad_m
+    with pytest.raises(pydantic.ValidationError):
+        # Check that passing the same data in as a dict fails validation.
+        modelprop.validate(bad_m.model_dump())
 
     # Check again for an odd rootmodel
     rootmodelprop = example.properties["rootmodelprop"]
@@ -419,6 +433,11 @@ def test_propertyinfo(mocker):
     for invalid in ["seven", {"root": None}, 14.5, pydantic.RootModel[int](root=0)]:
         with pytest.raises(pydantic.ValidationError):
             modelprop.validate(invalid)
+        # Tty constructing a model with an invalid root value, skipping validation
+        invalid_model = rootmodelprop.model.model_construct(invalid)
+        # The RootModel gets re-validated, in contrast to the BaseModel above.
+        with pytest.raises(pydantic.ValidationError):
+            assert modelprop.validate(invalid_model) == invalid
 
 
 def test_readonly_metadata():
