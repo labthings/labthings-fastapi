@@ -315,7 +315,7 @@ def test_blob_output_direct():
 
 
 def test_blob_output_inserver(client):
-    """Test that the blob output works the same when used via a `.thing_slot`."""
+    """Test that the blob output works the same when used via a `~lt.thing_slot`."""
     tc = lt.ThingClient.from_url("/thing_two/", client=client)
     output = tc.check_both()
     assert output is True

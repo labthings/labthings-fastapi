@@ -3,11 +3,11 @@
 Writing a Thing
 =========================
 
-In this section, we will write a simple example `.Thing` that provides some functionality on the server. 
+In this section, we will write a simple example `~lt.Thing` that provides some functionality on the server. 
 
 .. note::
     
-    Usually, you will write your own `.Thing` in a separate Python module and run it using a configuration file as described in :ref:`tutorial_running`. However, for this tutorial, we will write the `.Thing` in a single file, and use a ``__name__ == "__main__"`` block to run it directly. This is not recommended for production code, but it is convenient for a tutorial.
+    Usually, you will write your own `~lt.Thing` in a separate Python module and run it using a configuration file as described in :ref:`tutorial_running`. However, for this tutorial, we will write the `~lt.Thing` in a single file, and use a ``__name__ == "__main__"`` block to run it directly. This is not recommended for production code, but it is convenient for a tutorial.
 
 Our first Thing will pretend to be a light: we can set its brightness and turn it on and off. A first, most basic implementation might look like:
 

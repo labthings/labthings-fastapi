@@ -129,7 +129,7 @@ assert_type(test_defaults_match.optionalintprop4, int | None)
 class TestExplicitDescriptor(lt.Thing):
     r"""A Thing that checks our explicit descriptor type hints are working.
 
-    This tests `.DataProperty` descriptors work as intended when used directly,
+    This tests `~lt.DataProperty` descriptors work as intended when used directly,
     rather than via ``lt.property``\ .
 
     ``lt.property`` has a "white lie" on its return type, which makes it

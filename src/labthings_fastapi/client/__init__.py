@@ -1,4 +1,4 @@
-"""Code to access `.Thing` features over HTTP.
+"""Code to access `~lt.Thing` features over HTTP.
 
 This module defines a base class for controlling LabThings-FastAPI over HTTP.
 It is based on `httpx`, and attempts to create a simple wrapper such that
@@ -265,7 +265,7 @@ class ThingClient:
             set HTTP options, or if you want to work with a local server
             object for testing purposes (see `fastapi.TestClient`).
 
-        :return: a `.ThingClient` subclass with properties and methods that
+        :return: a `~lt.ThingClient` subclass with properties and methods that
             match the retrieved Thing Description (see :ref:`wot_thing`).
         """
         td_client = client or httpx
@@ -278,13 +278,13 @@ class ThingClient:
     def subclass_from_td(cls, thing_description: dict) -> type[Self]:
         """Create a ThingClient subclass from a Thing Description.
 
-        Dynamically subclass `.ThingClient` to add properties and
+        Dynamically subclass `~lt.ThingClient` to add properties and
         methods for each property and action in the Thing Description.
 
         :param thing_description: A :ref:`wot_td` as a dictionary, which will
             be used to construct the class.
 
-        :return: a `.ThingClient` subclass with the right properties and
+        :return: a `~lt.ThingClient` subclass with the right properties and
             methods.
         """
         my_thing_description = thing_description
@@ -305,7 +305,7 @@ class ThingClient:
 
 
 class PropertyClientDescriptor:
-    """A base class for properties on `.ThingClient` objects."""
+    """A base class for properties on `~lt.ThingClient` objects."""
 
     name: str
     type: type | BaseModel
@@ -324,7 +324,7 @@ def property_descriptor(
 
     The returned `.PropertyClientDescriptor` will have ``__get__`` and
     (optionally) ``__set__`` methods that are typed according to the
-    supplied ``model``. The descriptor should be added to a `.ThingClient`
+    supplied ``model``. The descriptor should be added to a `~lt.ThingClient`
     subclass and used to access the relevant property via
     `.ThingClient.get_property` and `.ThingClient.set_property`.
 
@@ -398,7 +398,7 @@ def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
     Currently, this will have a return type hint but no argument names
     or type hints.
 
-    :param cls: the `.ThingClient` subclass to which we are adding the
+    :param cls: the `~lt.ThingClient` subclass to which we are adding the
         action.
     :param action_name: is both the name we assign the method to, and
         the name of the action in the Thing Description.
@@ -424,7 +424,7 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
     by the ``property`` dictionary.
 
 
-    :param cls: the `.ThingClient` subclass to which we are adding the
+    :param cls: the `~lt.ThingClient` subclass to which we are adding the
         property.
     :param property_name: is both the name we assign the descriptor to, and
         the name of the property in the Thing Description.

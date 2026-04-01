@@ -20,7 +20,7 @@ descriptor.
 
 `.DescriptorInfoCollection` is a mapping of descriptor names to `.BaseDescriptorInfo`
 objects, and may be used to retrieve all descriptors of a particular type on a
-`.Thing`\ .
+`~lt.Thing`\ .
 """
 
 from __future__ import annotations
@@ -223,7 +223,7 @@ class OptionallyBoundInfo(Generic[Owner]):
         return self._bound_to_obj is not None
 
     def owning_object_or_error(self) -> Owner:
-        """Return the `.Thing` instance to which we are bound, or raise an error.
+        """Return the `~lt.Thing` instance to which we are bound, or raise an error.
 
         This is mostly a convenience function that saves type-checking boilerplate.
 
@@ -243,12 +243,13 @@ class BaseDescriptorInfo(
     r"""A class that describes a `BaseDescriptor`\ .
 
     This class is used internally by LabThings to describe :ref:`properties`\ ,
-    :ref:`actions`\ , and other attributes of a `.Thing`\ . It's not usually
+    :ref:`actions`\ , and other attributes of a `~lt.Thing`\ . It's not usually
     encountered directly by someone using LabThings, except as a base class for
-    `.Action`\ , `.Property` and others.
+    `~.actions.Action`\ , `~.properties.BaseProperty` and others.
 
-    LabThings uses descriptors to represent the :ref:`wot_affordances` of a `.Thing`\ .
-    However, passing descriptors around isn't very elegant for two reasons:
+    LabThings uses descriptors to represent the :ref:`wot_affordances` of a
+    `~lt.Thing`\ . However, passing descriptors around isn't very elegant for two
+    reasons:
 
     * Holding references to Descriptor objects can confuse static type checkers.
     * Descriptors are attached to a *class* but do not know which *object* they
@@ -256,8 +257,8 @@ class BaseDescriptorInfo(
 
     This class allows the attributes of a descriptor to be accessed, and holds
     a reference to the underlying descriptor and its owning class. It may
-    optionally hold a reference to a `.Thing` instance, in which case it is
-    said to be "bound". This means there's no need to separately pass the `.Thing`
+    optionally hold a reference to a `~lt.Thing` instance, in which case it is
+    said to be "bound". This means there's no need to separately pass the `~lt.Thing`
     along with the descriptor, which should help keep things simple in several
     places in the code.
     """
@@ -324,7 +325,7 @@ class BaseDescriptorInfo(
         """Get the value of the descriptor.
 
         This method only works on a bound info object, it will raise an error
-        if called via a class rather than a `.Thing` instance.
+        if called via a class rather than a `~lt.Thing` instance.
 
         :return: the value of the descriptor.
         :raises NotBoundToInstanceError: if called on an unbound object.
@@ -421,7 +422,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         an argument.
         See `.get_class_attribute_docstrings` for more details.
 
-        :param owner: the `.Thing` subclass to which we are being attached.
+        :param owner: the `~lt.Thing` subclass to which we are being attached.
         :param name: the name to which we have been assigned.
 
         :raises DescriptorAddedToClassTwiceError: if the descriptor has been
@@ -547,8 +548,8 @@ class BaseDescriptor(Generic[Owner, Value]):
         boilerplate in every subclass, we will call ``__instance_get__`` to get the
         value.
 
-        :param obj: the `.Thing` instance to which we are attached.
-        :param type: the `.Thing` subclass on which we are defined.
+        :param obj: the `~lt.Thing` instance to which we are attached.
+        :param type: the `~lt.Thing` subclass on which we are defined.
 
         :return: the value of the descriptor returned from ``__instance_get__`` when
             accessed on an instance, or the descriptor object if accessed on a class.
@@ -571,7 +572,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         the case where we are called as an instance attribute. This simplifies type
         annotations and removes the need for overload definitions in every subclass.
 
-        :param obj: is the `.Thing` instance on which this descriptor is being
+        :param obj: is the `~lt.Thing` instance on which this descriptor is being
             accessed.
         :return: the value of the descriptor (i.e. property value, or bound method).
 
@@ -596,7 +597,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         object, and if not it is unbound, i.e. knows only about the class.
 
         :param info_class: the `.BaseDescriptorInfo` subclass to return.
-        :param obj: The `.Thing` instance to which the return value is bound.
+        :param obj: The `~lt.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
         :raises RuntimeError: if garbage collection occurs unexpectedly. This
             should not happen and would indicate a LabThings bug.
@@ -622,7 +623,7 @@ class BaseDescriptor(Generic[Owner, Value]):
         If ``owner`` is supplied, the returned object is bound to a particular
         object, and if not it is unbound, i.e. knows only about the class.
 
-        :param owner: The `.Thing` instance to which the return value is bound.
+        :param owner: The `~lt.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
         """
         return self._descriptor_info(BaseDescriptorInfo, owner)
@@ -647,7 +648,7 @@ class FieldTypedBaseDescriptorInfo(
         """Set the value of the descriptor.
 
         This method may only be called if the DescriptorInfo object is bound to a
-        `.Thing` instance. It will raise an error if called on a class.
+        `~lt.Thing` instance. It will raise an error if called on a class.
 
         :param value: the new value.
 
@@ -723,7 +724,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         check for the existence of a type hint during ``__set_name__`` and
         will evaluate it fully during ``value_type``\ .
 
-        :param owner: the `.Thing` subclass to which we are being attached.
+        :param owner: the `~lt.Thing` subclass to which we are being attached.
         :param name: the name to which we have been assigned.
 
         :raises InconsistentTypeError: if the type is specified twice and
@@ -847,7 +848,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         If ``owner`` is supplied, the returned object is bound to a particular
         object, and if not it is unbound, i.e. knows only about the class.
 
-        :param owner: The `.Thing` instance to which the return value is bound.
+        :param owner: The `~lt.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
         """
         return self._descriptor_info(FieldTypedBaseDescriptorInfo, owner)
@@ -886,7 +887,7 @@ class DescriptorInfoCollection(
 
     This class is subclassed by each of the LabThings descriptors
     (Properties, Actions, etc.) and generated by a corresponding
-    `.OptionallyBoundDescriptor` on `.Thing` for convenience.
+    `.OptionallyBoundDescriptor` on `~lt.Thing` for convenience.
     """
 
     def __init__(
@@ -962,7 +963,7 @@ class OptionallyBoundDescriptor(Generic[Owner, OptionallyBoundInfoT]):
     with either the object, or its class, depending on how it is accessed.
 
     This is useful for returning collections of `.BaseDescriptorInfo` objects
-    from a `.Thing` subclass.
+    from a `~lt.Thing` subclass.
     """
 
     def __init__(self, cls: type[OptionallyBoundInfoT]) -> None:

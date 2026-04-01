@@ -7,17 +7,17 @@ Properties
 
 Properties are values that can be read from and written to a Thing. They are used to represent the state of the Thing, such as its current temperature, brightness, or status. :ref:`wot_properties` are a key concept in the Web of Things standard.
 
-LabThings implements properties in a very similar way to the built-in Python `~builtins.property`. The key difference is that defining an attribute as a `.property` means that the property will be listed in the :ref:`gen_td` and exposed over HTTP. This is important for two reasons:
+LabThings implements properties in a very similar way to the built-in Python `~builtins.property`. The key difference is that defining an attribute as a `~lt.property` means that the property will be listed in the :ref:`gen_td` and exposed over HTTP. This is important for two reasons:
 
-* Only properties declared using `.property` (usually imported as ``lt.property``) can be accessed over HTTP. Regular attributes or properties using `builtins.property` are only available to your `.Thing` internally, except in some special cases.
-* Communication between `.Thing`\ s within a LabThings server should be done using a `.DirectThingClient` class. The purpose of `.DirectThingClient` is to provide the same interface as a `.ThingClient` over HTTP, so it will also only expose functionality described in the Thing Description.
+* Only properties declared using `~lt.property` (usually imported as ``lt.property``) can be accessed over HTTP. Regular attributes or properties using `builtins.property` are only available to your `~lt.Thing` internally, except in some special cases.
+* Communication between `~lt.Thing`\ s within a LabThings server should be done using a `.DirectThingClient` class. The purpose of `.DirectThingClient` is to provide the same interface as a `~lt.ThingClient` over HTTP, so it will also only expose functionality described in the Thing Description.
 
-You can add properties to a `.Thing` by using `.property` (usually imported as ``lt.property``).
+You can add properties to a `~lt.Thing` by using `~lt.property` (usually imported as ``lt.property``).
 
 Data properties
 -------------------------
 
-Data properties behave like variables: they simply store a value that is used by other code on the `.Thing`. They are defined similarly to fields in `dataclasses` or `pydantic` models:
+Data properties behave like variables: they simply store a value that is used by other code on the `~lt.Thing`. They are defined similarly to fields in `dataclasses` or `pydantic` models:
 
 .. code-block:: python
 
@@ -52,7 +52,7 @@ If your property's default value is a mutable datatype, like a list or dictionar
     class MyThing(lt.Thing):
         my_list: list[int] = lt.property(default_factory=list)
 
-The example above will have its default value set to the empty list, as that's what is returned when ``list()`` is called. It's often convenient to use a "lambda function" as a default factory, for example `lambda: [1,2,3]` is a function that returns the list `[1,2,3]`\ . This is better than specifying a default value, because it returns a fresh copy of the object every time - using a list as a default value can lead to multiple `.Thing` instances changing in sync unexpectedly, which gets very confusing.
+The example above will have its default value set to the empty list, as that's what is returned when ``list()`` is called. It's often convenient to use a "lambda function" as a default factory, for example `lambda: [1,2,3]` is a function that returns the list `[1,2,3]`\ . This is better than specifying a default value, because it returns a fresh copy of the object every time - using a list as a default value can lead to multiple `~lt.Thing` instances changing in sync unexpectedly, which gets very confusing.
 
 Data properties may be *observed*, which means notifications will be sent when the property is written to (see below).
 
@@ -200,7 +200,7 @@ We can modify the previous example to show how to add constraints to both data a
 
 In the example above, the ``temperature`` property is a data property with constraints that limit its value to between -40.0 and 125.0 degrees Celsius. The ``humidity`` property is a functional property with constraints that limit its value to between 0.0 and 100.0 percent. The ``sensor_name`` property is a data property with a regex pattern constraint that only allows alphanumeric characters and underscores.
 
-Note that the constraints for functional properties are set by assigning a dictionary to the property's ``constraints`` attribute. This dictionary should contain the same keys and values as the arguments to `pydantic.Field` definitions. The `.property` decorator does not currently accept arguments, so constraints may only be set this way for functional properties and settings.
+Note that the constraints for functional properties are set by assigning a dictionary to the property's ``constraints`` attribute. This dictionary should contain the same keys and values as the arguments to `pydantic.Field` definitions. The `~lt.property` decorator does not currently accept arguments, so constraints may only be set this way for functional properties and settings.
 
 .. note::
 
@@ -210,7 +210,7 @@ Note that the constraints for functional properties are set by assigning a dicti
 Property metadata
 -----------------
 
-Properties in LabThings are intended to work very much like native Python properties. This means that getting and setting the attributes of a `.Thing` get and set the value of the property. Other operations, like reading the default value or resetting to default, need a different interface. For this, we use `.Thing.properties` which is a mapping of names to `.PropertyInfo` objects. These expose the extra functionality of properties in a convenient way. For example, I can reset a property by calling ``self.properties["myprop"].reset()`` or get its default by reading ``self.properties["myprop"].default``\ . See the `.PropertyInfo` API documentation for a full list of available properties and methods.
+Properties in LabThings are intended to work very much like native Python properties. This means that getting and setting the attributes of a `~lt.Thing` get and set the value of the property. Other operations, like reading the default value or resetting to default, need a different interface. For this, we use `~lt.Thing.properties` which is a mapping of names to `.PropertyInfo` objects. These expose the extra functionality of properties in a convenient way. For example, I can reset a property by calling ``self.properties["myprop"].reset()`` or get its default by reading ``self.properties["myprop"].default``\ . See the `.PropertyInfo` API documentation for a full list of available properties and methods.
 
 HTTP interface
 --------------
@@ -229,11 +229,11 @@ Observable properties
 
 Properties can be made observable, which means that clients can subscribe to changes in the property's value. This is useful for properties that change frequently, such as sensor readings or instrument settings. In order for a property to be observable, LabThings must know whenever it changes. Currently, this means only data properties can be observed, as functional properties do not have a simple value that can be tracked.
 
-Properties are currently only observable via websockets: in the future, it may be possible to observe them from other `.Thing` instances or from other parts of the code.
+Properties are currently only observable via websockets: in the future, it may be possible to observe them from other `~lt.Thing` instances or from other parts of the code.
 
 .. _settings:
 
 Settings
 ------------
 
-Settings are properties with an additional feature: they are saved to disk. This means that settings will be automatically restored after the server is restarted. The function `.setting` can be used to declare a `.DataSetting` or decorate a function to make a `.FunctionalSetting` in the same way that `.property` can. It is usually imported as ``lt.setting``\ .
+Settings are properties with an additional feature: they are saved to disk. This means that settings will be automatically restored after the server is restarted. The function `~lt.setting` can be used to declare a `~lt.DataSetting` or decorate a function to make a `~lt.FunctionalSetting` in the same way that `~lt.property` can. It is usually imported as ``lt.setting``\ .

@@ -31,7 +31,7 @@ def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]:
     It is used to obtain the various descriptors used to represent
     properties and actions. It calls `.attributes` on ``obj.__class__``.
 
-    :param obj: The instance, usually a `.Thing` instance.
+    :param obj: The instance, usually a `~lt.Thing` instance.
 
     :yield: tuples of ``(name, value)`` giving each attribute of the class.
     """
@@ -59,17 +59,17 @@ LABTHINGS_DICT_KEY = "__labthings"
 
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class LabThingsObjectData:
-    r"""Data used by LabThings, stored on each `.Thing`.
+    r"""Data used by LabThings, stored on each `~lt.Thing`.
 
     This `pydantic.dataclass` groups together some properties used
     by LabThings descriptors, to avoid cluttering the namespace of the
-    `.Thing` subclass on which they are defined.
+    `~lt.Thing` subclass on which they are defined.
     """
 
     property_observers: Dict[str, WeakSet] = Field(default_factory=dict)
     r"""The observers added to each property.
 
-    Keys are property names, values are weak sets used by `.DataProperty`\ .
+    Keys are property names, values are weak sets used by `~lt.DataProperty`\ .
     """
     action_observers: Dict[str, WeakSet] = Field(default_factory=dict)
     r"""The observers added to each action.
@@ -83,9 +83,9 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
     """Get (or create) a dictionary for LabThings properties.
 
     Ensure there is a `.LabThingsObjectData` dataclass attached to
-    a particular `.Thing`, and return it.
+    a particular `~lt.Thing`, and return it.
 
-    :param obj: The `.Thing` we are looking for the dataclass on.
+    :param obj: The `~lt.Thing` we are looking for the dataclass on.
 
     :return: a `.LabThingsObjectData` instance attached to ``obj``.
     """

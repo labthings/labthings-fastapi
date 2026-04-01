@@ -1,6 +1,6 @@
 r"""Pydantic models to enable server configuration to be loaded from file.
 
-The models in this module allow `.ThingConfig` dataclasses to be constructed
+The models in this module allow `ThingConfig` dataclasses to be constructed
 from dictionaries or JSON files. They also describe the full server configuration
 with `.ServerConfigModel`\ . These models are used by the `.cli` module to
 start servers based on configuration files or strings.
@@ -86,7 +86,7 @@ ThingImportString = Annotated[
 # The type: ignore below is a spurious warning about `kwargs`.
 # see https://github.com/pydantic/pydantic/issues/3125
 class ThingConfig(BaseModel):  # type: ignore[no-redef]
-    r"""The information needed to add a `.Thing` to a `.ThingServer`\ ."""
+    r"""The information needed to add a `~lt.Thing` to a `~lt.ThingServer`\ ."""
 
     cls: ThingImportString = Field(
         validation_alias=AliasChoices("cls", "class"),
@@ -127,14 +127,14 @@ ThingsConfig: TypeAlias = Mapping[ThingName, ThingConfig | ThingImportString]
 
 
 class ThingServerConfig(BaseModel):
-    r"""The configuration parameters for a `.ThingServer`\ ."""
+    r"""The configuration parameters for a `~lt.ThingServer`\ ."""
 
     things: ThingsConfig = Field(
         description=(
             """A mapping of names to Thing configurations.
 
             Each Thing on the server must be given a name, which is the dictionary
-            key. The value is either the class to be used, or a `.ThingConfig`
+            key. The value is either the class to be used, or a `ThingConfig`
             object specifying the class, initial arguments, and other settings.
             """
         ),
@@ -152,26 +152,26 @@ class ThingServerConfig(BaseModel):
         it will accept any Python object.
 
         This validator runs `.normalise_thing_config` to check each value is either
-        a valid `.ThingConfig` or a type or a mapping. If it's a mapping, we
-        will attempt to make a `.ThingConfig` from it. If it's a `type` we will
-        create a `.ThingConfig` using that type as the class. We don't check for
-        `.Thing` subclasses in this module to avoid a dependency loop.
+        a valid `ThingConfig` or a type or a mapping. If it's a mapping, we
+        will attempt to make a `ThingConfig` from it. If it's a `type` we will
+        create a `ThingConfig` using that type as the class. We don't check for
+        `~lt.Thing` subclasses in this module to avoid a dependency loop.
 
         :param things: The validated value of the field.
 
-        :return: A copy of the input, with all values converted to `.ThingConfig`
+        :return: A copy of the input, with all values converted to `ThingConfig`
             instances.
         """
         return normalise_things_config(things)
 
     @property
     def thing_configs(self) -> Mapping[ThingName, ThingConfig]:
-        r"""A copy of the ``things`` field where every value is a ``.ThingConfig``\ .
+        r"""A copy of the ``things`` field where every value is a ``ThingConfig``\ .
 
         The field validator on ``things`` already ensures it returns a mapping, but
         it's not typed strictly, to allow Things to be specified with just a class.
 
-        This property returns the list of `.ThingConfig` objects, and is typed strictly.
+        This property returns the list of `ThingConfig` objects, and is typed strictly.
         """
         return normalise_things_config(self.things)
 
@@ -218,17 +218,17 @@ class ThingServerConfig(BaseModel):
 
 
 def normalise_things_config(things: ThingsConfig) -> Mapping[ThingName, ThingConfig]:
-    r"""Ensure every Thing is defined by a `.ThingConfig` object.
+    r"""Ensure every Thing is defined by a `ThingConfig` object.
 
-    Things may be specified either using a `.ThingConfig` object, or just a bare
-    `.Thing` subclass, if the other parameters are not needed. To simplify code that
-    uses the configuration, this function wraps bare classes in a `.ThingConfig` so
+    Things may be specified either using a `ThingConfig` object, or just a bare
+    `~lt.Thing` subclass, if the other parameters are not needed. To simplify code that
+    uses the configuration, this function wraps bare classes in a `ThingConfig` so
     the values are uniformly typed.
 
-    :param things: A mapping of names to Things, either classes or `.ThingConfig`
+    :param things: A mapping of names to Things, either classes or `ThingConfig`
         objects.
 
-    :return: A mapping of names to `.ThingConfig` objects.
+    :return: A mapping of names to `ThingConfig` objects.
 
     :raises ValueError: if a Python object is passed that's neither a `type` nor
         a `dict`\ .

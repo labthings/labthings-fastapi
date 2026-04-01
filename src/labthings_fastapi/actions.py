@@ -1,6 +1,6 @@
 """Actions module.
 
-:ref:`actions` are represented by methods, decorated with the `.action`
+:ref:`actions` are represented by methods, decorated with the `lt.action`
 decorator.
 
 See the :ref:`actions` documentation for a top-level overview of actions in
@@ -9,7 +9,7 @@ LabThings-FastAPI.
 Developer notes
 ---------------
 
-Currently much of the code related to Actions is in `.action` and the
+Currently much of the code related to Actions is in `lt.action` and the
 underlying `.ActionDescriptor`. This is likely to be refactored in the near
 future.
 """
@@ -84,7 +84,7 @@ class Invocation(Thread):
     `.Invocation` threads add several bits of functionality compared to the base
     `threading.Thread`.
 
-    * They are instantiated with an `.ActionDescriptor` and a `.Thing`
+    * They are instantiated with an `.ActionDescriptor` and a `~lt.Thing`
       rather than a target function (see ``__init__``).
     * Each invocation is assigned a unique ``ID`` to allow it to be polled
       over HTTP.
@@ -105,7 +105,7 @@ class Invocation(Thread):
 
         :param action: provides the function that we run, as well as metadata
             and type information. The descriptor is not bound to an object, so we
-            supply the `.Thing` it's bound to when the function is run.
+            supply the `~lt.Thing` it's bound to when the function is run.
         :param thing: is the object on which we are running the ``action``, i.e.
             it is supplied to the function wrapped by ``action`` as the ``self``
             argument.
@@ -187,7 +187,7 @@ class Invocation(Thread):
 
     @property
     def thing(self) -> Thing:
-        """The `.Thing` to which the action is bound, i.e. this is ``self``.
+        """The `~lt.Thing` to which the action is bound, i.e. this is ``self``.
 
         :raises RuntimeError: if the Thing no longer exists.
         """
@@ -250,7 +250,7 @@ class Invocation(Thread):
 
         The code to be run is the function wrapped in the `.ActionDescriptor`
         that is passed in as ``action``. Its arguments are the associated
-        `.Thing` (the first argument, i.e. ``self``), the ``input`` model
+        `~lt.Thing` (the first argument, i.e. ``self``), the ``input`` model
         (split into keyword arguments for each field), and any ``dependencies``
         (also as keyword arguments).
 
@@ -360,7 +360,7 @@ class ActionManager:
 
         :param action: provides the function that we run, as well as metadata
             and type information. The descriptor is not bound to an object, so we
-            supply the `.Thing` it's bound to when the function is run.
+            supply the `~lt.Thing` it's bound to when the function is run.
         :param thing: is the object on which we are running the ``action``, i.e.
             it is supplied to the function wrapped by ``action`` as the ``self``
             argument.
@@ -407,8 +407,8 @@ class ActionManager:
         :param action: filters out only the invocations of a particular
             `.ActionDescriptor`. Note that if there are two Things
             of the same subclass, filtering by action will return invocations
-            on either `.Thing`.
-        :param thing: returns only invocations of actions on a particular `.Thing`.
+            on either `~lt.Thing`.
+        :param thing: returns only invocations of actions on a particular `~lt.Thing`.
             This will often be combined with filtering by ``action`` to give the
             list of invocations returned by a GET request on an action endpoint.
         :param request: is used to pass a `fastapi.Request` object to the
@@ -654,9 +654,9 @@ class ActionDescriptor(
     .. note::
         Descriptors are instantiated once per class. This means that we cannot
         assume there is only one action corresponding to this descriptor: there
-        may be multiple `.Thing` instances with the same descriptor. That is
-        why the host `.Thing` must be passed to many functions as an argument,
-        and why observers, for example, must be keyed by the `.Thing` rather
+        may be multiple `~lt.Thing` instances with the same descriptor. That is
+        why the host `~lt.Thing` must be passed to many functions as an argument,
+        and why observers, for example, must be keyed by the `~lt.Thing` rather
         than kept as a property of ``self``.
     """
 
@@ -668,7 +668,7 @@ class ActionDescriptor(
     ) -> None:
         """Create a new action descriptor.
 
-        The action descriptor wraps a method of a `.Thing`. It may still be
+        The action descriptor wraps a method of a `~lt.Thing`. It may still be
         called from Python in the same way, but it will also be added to the
         HTTP API and automatic documentation.
 
@@ -732,7 +732,7 @@ class ActionDescriptor(
         in future. In its present form, this is equivalent to a regular
         Python method, i.e. all we do is supply the first argument, `self`.
 
-        :param obj: the `.Thing` to which we are attached. This will be
+        :param obj: the `~lt.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
         :return: the action function, bound to ``obj``.
@@ -742,11 +742,11 @@ class ActionDescriptor(
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.
 
-        Note that we need to supply the `.Thing` we are looking at, as in
+        Note that we need to supply the `~lt.Thing` we are looking at, as in
         general there may be more than one object of the same type, and
         descriptor instances are shared between all instances of their class.
 
-        :param obj: The `.Thing` on which the action is being observed.
+        :param obj: The `~lt.Thing` on which the action is being observed.
 
         :return: a weak set of callables to notify on changes to the action.
             This is used by websocket endpoints.
@@ -765,7 +765,7 @@ class ActionDescriptor(
         portal. Async code must not use the blocking portal as it can deadlock
         the event loop.
 
-        :param obj: The `.Thing` on which the action is being observed.
+        :param obj: The `~lt.Thing` on which the action is being observed.
         :param status: The status of the action, to be sent to observers.
         """
         obj._thing_server_interface.start_async_task_soon(
@@ -781,10 +781,10 @@ class ActionDescriptor(
         It will send messages to each observer to notify them that something
         has changed.
 
-        :param obj: The `.Thing` on which the action is defined.
+        :param obj: The `~lt.Thing` on which the action is defined.
             `.ActionDescriptor` objects are unique to the class, but there may
-            be more than one `.Thing` attached to a server with the same class.
-            We use ``obj`` to look up the observers of the current `.Thing`.
+            be more than one `~lt.Thing` attached to a server with the same class.
+            We use ``obj`` to look up the observers of the current `~lt.Thing`.
         :param value: The action status to communicate to the observers.
         """
         action_name = self.name
@@ -804,12 +804,12 @@ class ActionDescriptor(
         application.
 
         :param app: The `fastapi.FastAPI` app to add the endpoint to.
-        :param thing: The `.Thing` to which the action is attached. Bear in
-            mind that the descriptor may be used by more than one `.Thing`,
+        :param thing: The `~lt.Thing` to which the action is attached. Bear in
+            mind that the descriptor may be used by more than one `~lt.Thing`,
             so this can't be a property of the descriptor.
 
         :raises NotConnectedToServerError: if the function is run before the
-            ``thing`` has a ``path`` property. This is assigned when the `.Thing`
+            ``thing`` has a ``path`` property. This is assigned when the `~lt.Thing`
             is added to a server.
         """
 
@@ -904,15 +904,15 @@ class ActionDescriptor(
 
         This function describes the Action in :ref:`wot_td` format.
 
-        :param thing: The `.Thing` to which the action is attached.
+        :param thing: The `~lt.Thing` to which the action is attached.
         :param path: The prefix applied to all endpoints associated with the
-            `.Thing`. This is the URL for the Thing Description. If it is
+            `~lt.Thing`. This is the URL for the Thing Description. If it is
             omitted, we use the ``path`` property of the ``thing``.
 
         :return: An `.ActionAffordance` describing this action.
 
         :raises NotConnectedToServerError: if the function is run before the
-            ``thing`` has a ``path`` property. This is assigned when the `.Thing`
+            ``thing`` has a ``path`` property. This is assigned when the `~lt.Thing`
             is added to a server.
         """
         path = path or thing.path
@@ -971,7 +971,7 @@ def action(
         ActionDescriptor[ActionParams, ActionReturn, OwnerT],
     ]
 ):
-    r"""Mark a method of a `.Thing` as a LabThings Action.
+    r"""Mark a method of a `~lt.Thing` as a LabThings Action.
 
     Methods decorated with :deco:`action` will be available to call
     over HTTP as actions. See :ref:`actions` for an introduction to the concept

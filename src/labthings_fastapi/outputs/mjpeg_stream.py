@@ -1,6 +1,6 @@
 """MJPEG Stream support.
 
-This module defines a descriptor that allows `.Thing` subclasses to expose an
+This module defines a descriptor that allows `~lt.Thing` subclasses to expose an
 MJPEG stream. See `.MJPEGStreamDescriptor`.
 """
 
@@ -115,7 +115,7 @@ class MJPEGStream:
     The minimum needed to make the stream work is to periodically
     call `add_frame` with JPEG image data.
 
-    To add a stream to a `.Thing`, use the `.MJPEGStreamDescriptor`
+    To add a stream to a `~lt.Thing`, use the `.MJPEGStreamDescriptor`
     which will handle creating an `.MJPEGStream` object on first access,
     and will also add it to the HTTP API.
 
@@ -134,8 +134,8 @@ class MJPEGStream:
         See the class docstring for `.MJPEGStream`. Note that it will
         often be initialised by `.MJPEGStreamDescriptor`.
 
-        :param thing_server_interface: the `.ThingServerInterface` of the
-            `.Thing` associated with this stream. It's used to run the async
+        :param thing_server_interface: the `~lt.ThingServerInterface` of the
+            `~lt.Thing` associated with this stream. It's used to run the async
             code that relays frames to open connections.
         :param ringbuffer_size: The number of frames to retain in
             memory, to allow retrieval after the frame has been sent.
@@ -369,7 +369,7 @@ class MJPEGStream:
 class MJPEGStreamDescriptor:
     """A descriptor that returns a MJPEGStream object when accessed.
 
-    If this descriptor is added to a `.Thing`, it will create an `.MJPEGStream`
+    If this descriptor is added to a `~lt.Thing`, it will create an `.MJPEGStream`
     object when it is first accessed. It will also add two HTTP endpoints,
     one with the name of the descriptor serving the MJPEG stream, and another
     with `/viewer` appended, which serves a basic HTML page that views the stream.
@@ -391,7 +391,7 @@ class MJPEGStreamDescriptor:
         The name is important, as it will set the URL of the HTTP endpoint used
         to access the stream.
 
-        :param _owner: the `.Thing` to which we are attached.
+        :param _owner: the `~lt.Thing` to which we are attached.
         :param name: the name to which this descriptor is assigned.
         """
         self.name = name
@@ -412,7 +412,7 @@ class MJPEGStreamDescriptor:
 
         When accessed on the object, an `.MJPEGStream` is returned.
 
-        :param obj: the host `.Thing`, or ``None`` if accessed on the class.
+        :param obj: the host `~lt.Thing`, or ``None`` if accessed on the class.
         :param type: the class on which we are defined.
 
         :return: an `.MJPEGStream`, or this descriptor.
@@ -441,7 +441,7 @@ class MJPEGStreamDescriptor:
         """Add the stream to the FastAPI app.
 
         We create two endpoints, one for the MJPEG stream (using the name of
-        the descriptor, relative to the host `.Thing`) and one serving a
+        the descriptor, relative to the host `~lt.Thing`) and one serving a
         basic viewer.
 
         The example code below would create endpoints at ``/camera/stream``
@@ -459,7 +459,7 @@ class MJPEGStreamDescriptor:
             server = lt.ThingServer({"camera": Camera})
 
         :param app: the `fastapi.FastAPI` application to which we are being added.
-        :param thing: the host `.Thing` instance.
+        :param thing: the host `~lt.Thing` instance.
         """
         app.get(
             f"{thing.path}{self.name}",

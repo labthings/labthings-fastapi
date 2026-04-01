@@ -21,15 +21,16 @@ Documentation for LabThings-FastAPI
    wot_core_concepts.rst
    removed_features.rst
 
+   quick_reference.rst
    autoapi/index
    developer_notes/index.rst
 
 `labthings-fastapi` is a Python library to simplify the process of making laboratory instruments available via a HTTP. It aims to create an API that is usable from any modern programming language, with API documentation in both :ref:`openapi` and :ref:`gen_td` formats. It is the underlying framework for v3 of the `OpenFlexure Microscope software <https://gitlab.com/openflexure/openflexure-microscope-server/>`_. Key features and design aims are:
 
-* The functionality of a unit of hardware or software is described using `.Thing` subclasses.
-* Methods and properties of `.Thing` subclasses may be added to the HTTP API and associated documentation using decorators.
+* The functionality of a unit of hardware or software is described using `~lt.Thing` subclasses.
+* Methods and properties of `~lt.Thing` subclasses may be added to the HTTP API and associated documentation using decorators.
 * Datatypes of action input/outputs and properties are defined with Python type hints.
-* Actions are decorated methods of a `.Thing` class. There is no need for separate schemas or endpoint definitions.
+* Actions are decorated methods of a `~lt.Thing` class. There is no need for separate schemas or endpoint definitions.
 * Properties are defined either as typed attributes (similar to `pydantic` or `dataclasses`) or with a `property`\ -like decorator.
 * Lifecycle and concurrency are appropriate for hardware: `Thing` code is always run in a thread, and each `Thing` is instantiated, started up, and shut down only once.
 * Vocabulary and concepts are aligned with the `W3C Web of Things <https://www.w3.org/WoT/>`_ standard (see :ref:`wot_cc`)

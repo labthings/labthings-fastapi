@@ -26,7 +26,7 @@ class MyModel(BaseModel):
 
 
 class ThingWithSettings(lt.Thing):
-    """A test `.Thing` with some settings and actions."""
+    """A test `~lt.Thing` with some settings and actions."""
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)

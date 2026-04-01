@@ -864,7 +864,7 @@ class Blob:
     def response(self) -> Response:
         """Return a suitable response for serving the output.
 
-        This method is called by the `.ThingServer` to generate a response
+        This method is called by the `~lt.ThingServer` to generate a response
         that returns the data over HTTP.
 
         :return: an HTTP response that streams data from memory or file.

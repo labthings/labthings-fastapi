@@ -263,7 +263,7 @@ def test_decorator_exception():
     r"""Check decorators work as expected when the setter has a different name.
 
     This is done to satisfy ``mypy`` and more information is in the
-    documentation for `.property`\ , `.DescriptorAddedToClassTwiceError`
+    documentation for `~lt.property`\ , `.DescriptorAddedToClassTwiceError`
     and `.FunctionalProperty.__set_name__`\ .
     """
     # The exception should be specific - a simple double assignment is

@@ -1,8 +1,8 @@
-"""Define properties of `.Thing` objects.
+"""Define properties of `~lt.Thing` objects.
 
-:ref:`properties` are attributes of a `.Thing` that may be read or written to
+:ref:`properties` are attributes of a `~lt.Thing` that may be read or written to
 over HTTP, and they are described in :ref:`gen_docs`. They are implemented with
-a function `.property` (usually referenced as ``lt.property``), which is
+a function `~lt.property` (usually referenced as ``lt.property``), which is
 intentionally similar to Python's built in `property`.
 
 Properties can be defined in two ways as shown below:
@@ -32,7 +32,7 @@ Properties can be defined in two ways as shown below:
 
 The first two properties are simple variables: they may be read and assigned
 to, and will behave just like a regular variable. Their syntax is similar to
-`dataclasses` or `pydantic` in that `.property` is used as a "field specifier"
+`dataclasses` or `pydantic` in that `~lt.property` is used as a "field specifier"
 to set options like the default value, and the type annotation is on the
 class attribute. Documentation is in strings immediately following the
 properties, which is understood by most automatic documentation tools.
@@ -135,7 +135,7 @@ CONSTRAINT_ARGS = {
 
 @with_config(ConfigDict(extra="forbid"))
 class FieldConstraints(TypedDict, total=False):
-    r"""Constraints that may be applied to a `.property`\ ."""
+    r"""Constraints that may be applied to a `~lt.property`\ ."""
 
     gt: int | float
     ge: int | float
@@ -152,7 +152,7 @@ class FieldConstraints(TypedDict, total=False):
 class OverspecifiedDefaultError(ValueError):
     """The default value has been specified more than once.
 
-    This error is raised when a `.DataProperty` is instantiated with both a
+    This error is raised when a `~lt.DataProperty` is instantiated with both a
     ``default`` value and a ``default_factory`` provided.
     """
 
@@ -160,7 +160,7 @@ class OverspecifiedDefaultError(ValueError):
 class MissingDefaultError(ValueError):
     """The default value has not been specified.
 
-    This error is raised when a `.DataProperty` is instantiated without a
+    This error is raised when a `~lt.DataProperty` is instantiated without a
     ``default`` value or a ``default_factory`` function.
     """
 
@@ -169,7 +169,7 @@ Value = TypeVar("Value")
 """The value returned by a property."""
 
 Owner = TypeVar("Owner", bound="Thing")
-"""The `.Thing` instance on which a property is bound."""
+"""The `~lt.Thing` instance on which a property is bound."""
 
 BasePropertyT = TypeVar("BasePropertyT", bound="BaseProperty")
 """An instance of (a subclass of) BaseProperty."""
@@ -197,8 +197,8 @@ def default_factory_from_arguments(
     This function also ensures the default is specified exactly once, and
     raises exceptions if it is not.
 
-    This logic originally lived only in the initialiser of `.DataProperty`
-    but it was needed in the `.property` and `.setting` functions in order
+    This logic originally lived only in the initialiser of `~lt.DataProperty`
+    but it was needed in the `~lt.property` and `~lt.setting` functions in order
     to correctly type them (so that specifying both or neither of the
     ``default`` and ``default_factory`` arguments would raise an error
     with mypy).
@@ -256,11 +256,11 @@ def property(
     readonly: bool = False,
     **constraints: Any,
 ) -> Value | FunctionalProperty[Owner, Value]:
-    r"""Define a Property on a `.Thing`\ .
+    r"""Define a Property on a `~lt.Thing`\ .
 
     This function may be used to define :ref:`properties` in
     two ways, as either a decorator or a field specifier. See the
-    examples in the :mod:`.property` documentation.
+    examples in the :ref:`properties`\ .
 
     Properties should always have a type annotation. This type annotation
     will be used in automatic documentation and also to serialise the value
@@ -279,9 +279,9 @@ def property(
         need to use a mutable datatype. For example, it would be
         better to specify ``default_factory=list`` than
         ``default=[]`` because the second form would be shared
-        between all `.Thing`\ s with this property.
+        between all `~lt.Thing`\ s with this property.
     :param readonly: whether the property should be read-only
-        via the `.ThingClient` interface (i.e. over HTTP or via
+        via the `~lt.ThingClient` interface (i.e. over HTTP or via
         a `.DirectThingClient`). This is automatically true if
         ``property`` is used as a decorator and no setter is
         specified.
@@ -292,7 +292,7 @@ def property(
         of constraint arguments.
 
     :return: a property descriptor, either a `.FunctionalProperty`
-        if used as a decorator, or a `.DataProperty` if used as
+        if used as a decorator, or a `~lt.DataProperty` if used as
         a field.
 
     :raises MissingDefaultError: if no valid default value is supplied,
@@ -311,8 +311,8 @@ def property(
     its type hint until after it's been called.
 
     When used as a field specifier, ``property`` returns a generic
-    `.DataProperty` descriptor instance, which will determine its type
-    when it is attached to the `.Thing`. The type hint on the return
+    `~lt.DataProperty` descriptor instance, which will determine its type
+    when it is attached to the `~lt.Thing`. The type hint on the return
     value of ``property`` in that situation is a "white lie": we annotate
     the return as having the same type as the ``default`` value (or the
     ``default_factory`` return value). This means that type checkers such
@@ -354,12 +354,12 @@ def property(
 class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]):
     """A descriptor that marks Properties on Things.
 
-    This class is used to determine whether an attribute of a `.Thing` should
+    This class is used to determine whether an attribute of a `~lt.Thing` should
     be treated as a Property (see :ref:`wot_properties` - essentially, it
     means the value should be available over HTTP).
 
     `.BaseProperty` should not be used directly, instead it is recommended to
-    use `.property` to declare properties on your `.Thing` subclass.
+    use `~lt.property` to declare properties on your `~lt.Thing` subclass.
     """
 
     def __init__(self, constraints: Mapping[str, Any] | None = None) -> None:
@@ -412,7 +412,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
 
         Note that these constraints will be enforced when values are
         received over HTTP, but they are not automatically enforced
-        when setting the property directly on the `.Thing` instance
+        when setting the property directly on the `~lt.Thing` instance
         from Python code.
         """
         return self._constraints
@@ -454,7 +454,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
 
-        :param obj: the `.Thing` instance on which we are looking for the default.
+        :param obj: the `~lt.Thing` instance on which we are looking for the default.
             or `None` if referring to the class. For now, this is ignored.
 
         :return: the default value of this property.
@@ -475,7 +475,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         to handle `.FeatureNotAvailableError` exceptions, which will be raised if this
         method is not overridden.
 
-        :param obj: the `.Thing` instance we want to reset.
+        :param obj: the `~lt.Thing` instance we want to reset.
         :raises FeatureNotAvailableError: as only some subclasses implement resetting.
         """
         raise FeatureNotAvailableError(
@@ -490,7 +490,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         If you override ``reset`` but want more control over this behaviour,
         you probably need to override `is_resettable`\ .
 
-        :param obj: the `.Thing` instance we want to reset.
+        :param obj: the `~lt.Thing` instance we want to reset.
         :return: `True` if a call to ``reset()`` should work.
         """
         return BaseProperty.reset is not self.__class__.reset
@@ -499,9 +499,9 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         """Add this action to a FastAPI app, bound to a particular Thing.
 
         :param app: The FastAPI application we are adding endpoints to.
-        :param thing: The `.Thing` we are adding the endpoints for.
+        :param thing: The `~lt.Thing` we are adding the endpoints for.
 
-        :raises NotConnectedToServerError: if the `.Thing` does not have
+        :raises NotConnectedToServerError: if the `~lt.Thing` does not have
             a ``path`` set.
         """
         if thing.path is None:
@@ -565,12 +565,12 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     ) -> PropertyAffordance:
         """Represent the property in a Thing Description.
 
-        :param thing: the `.Thing` to which we are attached.
-        :param path: the URL of the `.Thing`. If not present, we will retrieve
+        :param thing: the `~lt.Thing` to which we are attached.
+        :param path: the URL of the `~lt.Thing`. If not present, we will retrieve
             the ``path`` from ``thing``.
 
         :return: A description of the property in :ref:`wot_td` format.
-        :raises NotConnectedToServerError: if the `.Thing` does not have
+        :raises NotConnectedToServerError: if the `~lt.Thing` does not have
             a ``path`` set.
         """
         path = path or thing.path
@@ -645,7 +645,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
 class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A Property descriptor that acts like a regular variable.
 
-    `.DataProperty` descriptors remember their value, and can be read and
+    `~lt.DataProperty` descriptors remember their value, and can be read and
     written to like a regular Python variable.
     """
 
@@ -677,15 +677,15 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     ) -> None:
         """Create a property that acts like a regular variable.
 
-        `.DataProperty` descriptors function just like variables, in that
-        they can be read and written to as attributes of the `.Thing` and
+        `~lt.DataProperty` descriptors function just like variables, in that
+        they can be read and written to as attributes of the `~lt.Thing` and
         their value will be the same every time it is read (i.e. it changes
         only when it is set). This differs from `.FunctionalProperty` which
         uses a "getter" function just like `builtins.property` and may
         return a different value each time.
 
-        `.DataProperty` instances may always be set, when they are accessed
-        as an attribute of the `.Thing` instance. The ``readonly`` parameter
+        `~lt.DataProperty` instances may always be set, when they are accessed
+        as an attribute of the `~lt.Thing` instance. The ``readonly`` parameter
         applies only to client code, whether it is remote or a
         `.DirectThingClient` wrapper.
 
@@ -703,7 +703,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             a mutable default value can lead to odd behaviour.
         :param readonly: if ``True``, the property may not be written to via
             HTTP, or via `.DirectThingClient` objects, i.e. it may only be
-            set as an attribute of the `.Thing` and not from a client.
+            set as an attribute of the `~lt.Thing` and not from a client.
         :param constraints: is passed as keyword arguments to `pydantic.Field`
             to add validation constraints to the property. See `pydantic.Field`
             for details.
@@ -719,7 +719,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
 
         This will supply a default if the property has not yet been set.
 
-        :param obj: The `.Thing` on which the property is being accessed.
+        :param obj: The `~lt.Thing` on which the property is being accessed.
         :return: the value of the property.
         """
         if self.name not in obj.__dict__:
@@ -739,7 +739,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         this will validate the value against the property's model, and an error
         will be raised if the value is not valid.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value for the property.
         :param emit_changed_event: whether to emit a changed event.
         """
@@ -754,10 +754,10 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
 
-        Note that this implementation is independent of the `.Thing` instance,
+        Note that this implementation is independent of the `~lt.Thing` instance,
         as there's currently no way to specify a per-instance default.
 
-        :param obj: the `.Thing` instance we want to reset.
+        :param obj: the `~lt.Thing` instance we want to reset.
 
         :return: the default value of this property.
         """
@@ -766,9 +766,9 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def reset(self, obj: Owner) -> None:
         r"""Reset the property to its default value.
 
-        This resets to the value returned by ``default`` for `.DataProperty`\ .
+        This resets to the value returned by ``default`` for `~lt.DataProperty`\ .
 
-        :param obj: the `.Thing` instance we want to reset.
+        :param obj: the `~lt.Thing` instance we want to reset.
         """
         self.__set__(obj, self.get_default(obj))
 
@@ -778,7 +778,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         Each observer in this set will be notified when the property is changed.
         See ``.DataProperty.emit_changed_event``
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
 
         :return: the set of observers corresponding to ``obj``.
         """
@@ -799,7 +799,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         This method will raise a `.ServerNotRunningError` if the event loop is not
         running, and should only be called after the server has started.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
         """
         obj._thing_server_interface.start_async_task_soon(
@@ -814,7 +814,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         This function may only be run in the `anyio` event loop. See
         `.DataProperty.emit_changed_event`.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new property value, to be sent to observers.
         """
         for observer in self._observers_set(obj):
@@ -826,7 +826,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
 class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     """A property that uses a getter and a setter.
 
-    For properties that should work like variables, use `.DataProperty`. For
+    For properties that should work like variables, use `~lt.DataProperty`. For
     properties that need to run code every time they are read, use this class.
 
     Functional properties should work very much like Python's `builtins.property`
@@ -934,7 +934,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             as the getter. Using a different name avoids type checkers such as
             ``mypy`` raising an error that the getter has been redefined with a
             different type. The behaviour is identical whether the setter and getter
-            have the same name or not. The only difference is that the `.Thing`
+            have the same name or not. The only difference is that the `~lt.Thing`
             will have an additional method called ``_set_myprop`` in the example
             above.
 
@@ -975,7 +975,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def instance_get(self, obj: Owner) -> Value:
         """Get the value of the property.
 
-        :param obj: the `.Thing` on which the attribute is accessed.
+        :param obj: the `~lt.Thing` on which the attribute is accessed.
         :return: the value of the property.
         """
         return self.fget(obj)
@@ -987,7 +987,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         this will validate the value against the property's model, and an error
         will be raised if the value is not valid.
 
-        :param obj: the `.Thing` on which the attribute is accessed.
+        :param obj: the `~lt.Thing` on which the attribute is accessed.
         :param value: the value of the property.
 
         :raises ReadOnlyPropertyError: if the property cannot be set.
@@ -1115,9 +1115,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def reset(self, obj: Owner) -> None:
         r"""Reset the property to its default value.
 
-        This resets to the value returned by ``default`` for `.DataProperty`\ .
+        This resets to the value returned by ``default`` for `~lt.DataProperty`\ .
 
-        :param obj: the `.Thing` instance we want to reset.
+        :param obj: the `~lt.Thing` instance we want to reset.
         :raises FeatureNotAvailable: if no reset method is available, which means there
             is no default defined, and no resetter method.
         """
@@ -1153,7 +1153,7 @@ class PropertyInfo(
 
     This class provides a way to access the metadata of a Property, without
     needing to retrieve the Descriptor object directly. It may be bound to a
-    `.Thing` instance, or may be accessed from the class.
+    `~lt.Thing` instance, or may be accessed from the class.
     """
 
     @builtins.property
@@ -1253,10 +1253,10 @@ class PropertyInfo(
 
 
 class PropertyCollection(DescriptorInfoCollection[Owner, PropertyInfo], Generic[Owner]):
-    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+    """Access to metadata on all the properties of a `~lt.Thing` instance or subclass.
 
     This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
-    each Property of a `.Thing` by name. This allows easy access to metadata like
+    each Property of a `~lt.Thing` by name. This allows easy access to metadata like
     their description and model.
     """
 
@@ -1287,18 +1287,18 @@ def setting(
     readonly: bool = False,
     **constraints: Any,
 ) -> FunctionalSetting[Owner, Value] | Value:
-    r"""Define a Setting on a `.Thing`\ .
+    r"""Define a Setting on a `~lt.Thing`\ .
 
     A setting is a property that is saved to disk.
 
     This function defines a setting, which is a special Property that will
     be saved to disk, so it persists even when the LabThings server is
-    restarted. It is otherwise very similar to `.property`\ .
+    restarted. It is otherwise very similar to `~lt.property`\ .
 
     A type annotation is required, and should follow the same constraints as
-    for :deco:`.property`.
+    for :deco:`~lt.property`.
 
-    Every ``setting`` on a `.Thing` will be read each time the settings are
+    Every ``setting`` on a `~lt.Thing` will be read each time the settings are
     saved, which may be quite frequent. This means your getter must not take
     too long to run, or have side-effects. Settings that use getters and
     setters may be removed in the future pending the outcome of `#159`_.
@@ -1327,9 +1327,9 @@ def setting(
         need to use a mutable datatype. For example, it would be
         better to specify ``default_factory=list`` than
         ``default=[]`` because the second form would be shared
-        between all `.Thing`\ s with this setting.
+        between all `~lt.Thing`\ s with this setting.
     :param readonly: whether the setting should be read-only
-        via the `.ThingClient` interface (i.e. over HTTP or via
+        via the `~lt.ThingClient` interface (i.e. over HTTP or via
         a `.DirectThingClient`).
     :param \**constraints: additional keyword arguments are passed
         to `pydantic.Field` and allow constraints to be added to the
@@ -1345,7 +1345,7 @@ def setting(
 
     **Typing Notes**
 
-    See the typing notes on `.property` as they all apply to `.setting` as
+    See the typing notes on `~lt.property` as they all apply to `~lt.setting` as
     well.
     """
     if getter is not ...:
@@ -1376,7 +1376,7 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
     r"""A base class for settings.
 
     This is a subclass of `.BaseProperty` that is used to define settings.
-    It is not intended to be used directly, but via `.setting` and the
+    It is not intended to be used directly, but via `~lt.setting` and the
     two concrete implementations: `.DataSetting` and `.FunctionalSetting`\ .
     """
 
@@ -1387,7 +1387,7 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
         It is used during initialisation to set the value from disk before
         the server is fully started.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
 
         :raises NotImplementedError: this method should be implemented in subclasses.
@@ -1407,12 +1407,12 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
 class DataSetting(
     DataProperty[Owner, Value], BaseSetting[Owner, Value], Generic[Owner, Value]
 ):
-    """A `.DataProperty` that persists on disk.
+    """A `~lt.DataProperty` that persists on disk.
 
     A setting can be accessed via the HTTP API and is persistent between sessions.
 
-    A `.DataSetting` is a `.DataProperty` with extra functionality for triggering
-    a `.Thing` to save its settings.
+    A `.DataSetting` is a `~lt.DataProperty` with extra functionality for triggering
+    a `~lt.Thing` to save its settings.
 
     Note: If a setting is mutated rather than assigned to, this will not trigger saving.
     For example: if a Thing has a setting called `dictsetting` holding the dictionary
@@ -1430,7 +1430,7 @@ class DataSetting(
 
         This will cause the settings to be saved to disk.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
         :param emit_changed_event: whether to emit a changed event.
         """
@@ -1444,7 +1444,7 @@ class DataSetting(
         initial setup so that the setting can be set from disk before the server
         is fully started.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
         """
         super().__set__(obj, value, emit_changed_event=False)
@@ -1458,7 +1458,7 @@ class FunctionalSetting(
     A setting can be accessed via the HTTP API and is persistent between sessions.
 
     A `.FunctionalSetting` is a `.FunctionalProperty` with extra functionality for
-    triggering a `.Thing` to save its settings.
+    triggering a `~lt.Thing` to save its settings.
 
     Note: If a setting is mutated rather than assigned to, this will not trigger
     saving. For example: if a Thing has a setting called ``dictsetting`` holding
@@ -1475,7 +1475,7 @@ class FunctionalSetting(
 
         This will cause the settings to be saved to disk.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
         """
         super().__set__(obj, value)
@@ -1488,7 +1488,7 @@ class FunctionalSetting(
         initial setup so that the setting can be set from disk before the server
         is fully started.
 
-        :param obj: the `.Thing` to which we are attached.
+        :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
         """
         # FunctionalProperty does not emit changed events, so no special
@@ -1511,10 +1511,10 @@ class SettingInfo(
 
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):
-    """Access to metadata on all the properties of a `.Thing` instance or subclass.
+    """Access to metadata on all the properties of a `~lt.Thing` instance or subclass.
 
     This object may be used as a mapping, to retrieve `.PropertyInfo` objects for
-    each Property of a `.Thing` by name. This allows easy access to metadata like
+    each Property of a `~lt.Thing` by name. This allows easy access to metadata like
     their description and model.
     """
 

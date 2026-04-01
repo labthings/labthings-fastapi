@@ -33,7 +33,7 @@ ReturnType = TypeVar("ReturnType")
 class MockThingServerInterface(ThingServerInterface):
     r"""A mock class that simulates a ThingServerInterface without the server.
 
-    This allows a `.Thing` to be instantiated but not connected to a server.
+    This allows a `~lt.Thing` to be instantiated but not connected to a server.
     The methods normally provided by the server are mocked, specifically:
 
     * The `name` is set by an argument to `__init__`\ .
@@ -68,9 +68,9 @@ class MockThingServerInterface(ThingServerInterface):
         the future object to resolve. Cancelling it may cause errors if you need
         the return value.
 
-        If you need the async code to run, it's best to add the `.Thing` to a
+        If you need the async code to run, it's best to add the `~lt.Thing` to a
         `lt.ThingServer` instead. Using a test client will start an event loop
-        in a background thread, and allow you to use a real `.ThingServerInterface`
+        in a background thread, and allow you to use a real `~lt.ThingServerInterface`
         without the overhead of actually starting an HTTP server.
 
         :param async_function: the asynchronous function to call.
@@ -140,15 +140,15 @@ def create_thing_without_server(
     mock_all_slots: bool = False,
     **kwargs: Any,
 ) -> ThingSubclass:
-    r"""Create a `.Thing` and supply a mock ThingServerInterface.
+    r"""Create a `~lt.Thing` and supply a mock ThingServerInterface.
 
-    This function is intended for use in testing, where it will enable a `.Thing`
+    This function is intended for use in testing, where it will enable a `~lt.Thing`
     to be created without a server, by supplying a `.MockThingServerInterface`
-    instead of a real `.ThingServerInterface`\ .
+    instead of a real `~lt.ThingServerInterface`\ .
 
     The name of the Thing will be taken from the class name, lowercased.
 
-    :param cls: The `.Thing` subclass to instantiate.
+    :param cls: The `~lt.Thing` subclass to instantiate.
     :param \*args: positional arguments to ``__init__``.
     :param settings_folder: The path to the settings folder. A temporary folder
         is used by default.

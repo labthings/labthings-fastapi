@@ -105,8 +105,8 @@ async def process_messages_from_websocket(
     :param send_stream: an `anyio.abc.ObjectSendStream` that we
         use to register for events, i.e. data sent to that stream will
         be sent through this websocket, by `.relay_notifications_to_websocket`\ .
-    :param thing: the `.Thing` we are attached to. The websocket is specific to
-        one `.Thing`, and this is it.
+    :param thing: the `~lt.Thing` we are attached to. The websocket is specific to
+        one `~lt.Thing`, and this is it.
     """
     while True:
         try:
@@ -133,11 +133,11 @@ async def process_messages_from_websocket(
 async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
     r"""Handle communication to a client via websocket.
 
-    This function handles a websocket connection to a `.Thing`\ 's websocket
+    This function handles a websocket connection to a `~lt.Thing`\ 's websocket
     endpoint. It can add observers to properties and actions, and will forward
     notifications from the property or action back to the websocket.
 
-    :param thing: the `.Thing` the websocket is attached to.
+    :param thing: the `~lt.Thing` the websocket is attached to.
     :param websocket: the web socket that has been created.
     """
     await websocket.accept()

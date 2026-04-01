@@ -13,10 +13,15 @@ imports and is intended to be imported using:
 
     import labthings_fastapi as lt
 
+
+The most important symbols are described in `lt` with links to the full API
+documentation as appropriate.
+
 The example code elsewhere in the documentation generally follows this
 convention. Symbols in the top-level module mostly exist elsewhere in
 the package, but should be imported from here as a preference, to ensure
 code does not break if modules are rearranged.
+
 """
 
 from .thing import Thing

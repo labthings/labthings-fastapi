@@ -9,15 +9,15 @@ class NotConnectedToServerError(RuntimeError):
     """The Thing is not connected to a server.
 
     This exception is called if an Action is called or
-    a `.DataProperty` is updated on a Thing that is not
+    a `~lt.DataProperty` is updated on a Thing that is not
     connected to a ThingServer.
 
     A server connection is needed to manage asynchronous behaviour.
 
-    `.Thing` instances are also only assigned a ``path`` when they
+    `~lt.Thing` instances are also only assigned a ``path`` when they
     are added to a server, so this error may be raised by functions
     that implement the HTTP API if an attempt is made to construct
-    the API before the `.Thing` has been assigned a path.
+    the API before the `~lt.Thing` has been assigned a path.
     """
 
 
@@ -41,7 +41,7 @@ class ReadOnlyPropertyError(AttributeError):
 class PropertyNotObservableError(RuntimeError):
     """The property is not observable.
 
-    This exception is raised when `.Thing.observe_property` is called with a
+    This exception is raised when `~lt.Thing.observe_property` is called with a
     property that is not observable. Currently, only data properties are
     observable: functional properties (using a getter/setter) may not be
     observed.
@@ -51,9 +51,9 @@ class PropertyNotObservableError(RuntimeError):
 class InconsistentTypeError(TypeError):
     """Different type hints have been given for a descriptor.
 
-    Some descriptors in LabThings, particularly `.DataProperty` and `.ThingSlot`
+    Some descriptors in LabThings, particularly `~lt.DataProperty` and `.ThingSlot`
     may have their type specified in different ways. If multiple type hints are
-    provided, they must match. See `.property` for more details.
+    provided, they must match. See `~lt.property` for more details.
     """
 
 
@@ -64,16 +64,16 @@ class MissingTypeError(TypeError):
     There are different ways of providing these type hints.
     This error indicates that no type hint was found.
 
-    See documentation for `.property` and `.thing_slot` for more details.
+    See documentation for `~lt.property` and `~lt.thing_slot` for more details.
     """
 
 
 class ThingNotConnectedError(RuntimeError):
     r"""`.ThingSlot`\ s have not yet been set up.
 
-    This error is raised if a `.ThingSlot` is accessed before the `.Thing` has
+    This error is raised if a `.ThingSlot` is accessed before the `~lt.Thing` has
     been supplied by the LabThings server. This usually happens because either
-    the `.Thing` is being used without a server (in which case the attribute
+    the `~lt.Thing` is being used without a server (in which case the attribute
     should be mocked), or because it has been accessed before ``__enter__``
     has been called.
     """
@@ -172,7 +172,8 @@ class UnsupportedConstraintError(ValueError):
 class FailedToInvokeActionError(RuntimeError):
     """The action could not be started.
 
-    This error is raised by a `.ThingClient` instance if an action could not be started.
+    This error is raised by a `~lt.ThingClient` instance if an action could not be
+    started.
     It most commonly occurs because the input to the action could not be converted
     to the required type: the error message should give more detail on what's wrong.
     """
@@ -195,12 +196,12 @@ class NotBoundToInstanceError(RuntimeError):
     """A `.BaseDescriptorInfo` is not bound to an object.
 
     Some methods and properties of `.BaseDescriptorInfo` objects require them
-    to be bound to a `.Thing` instance. If these methods are called on a
+    to be bound to a `~lt.Thing` instance. If these methods are called on a
     `.BaseDescriptorInfo` object that is unbound, this exception is raised.
 
     This exception should only be seen when `.BaseDescriptorInfo` objects are
-    generated from a `.Thing` class. Usually, they should be accessed via a
-    `.Thing` instance, in which case they will be bound.
+    generated from a `~lt.Thing` class. Usually, they should be accessed via a
+    `~lt.Thing` instance, in which case they will be bound.
     """
 
 

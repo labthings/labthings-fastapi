@@ -2,18 +2,18 @@ r"""Facilitate connections between Things.
 
 It is often desirable for two Things in the same server to be able to communicate.
 In order to do this in a nicely typed way that is easy to test and inspect,
-LabThings-FastAPI provides the `.thing_slot`\ . This allows a `.Thing`
-to declare that it depends on another `.Thing` being present, and provides a way for
+LabThings-FastAPI provides the `thing_slot`\ . This allows a `~lt.Thing`
+to declare that it depends on another `~lt.Thing` being present, and provides a way for
 the server to automatically connect the two when the server is set up.
 
-Thing connections are set up **after** all the `.Thing` instances are initialised.
+Thing connections are set up **after** all the `~lt.Thing` instances are initialised.
 This means you should not rely on them during initialisation: if you attempt to
 access a connection before it is provided, it will raise an exception. The
 advantage of making connections after initialisation is that circular connections
 are not a problem: Thing `a` may depend on Thing `b` and vice versa.
 
 As with properties, thing connections will usually be declared using the function
-`.thing_slot` rather than the descriptor directly. This allows them to be
+`thing_slot` rather than the descriptor directly. This allows them to be
 typed and documented on the class, i.e.
 
 .. code-block:: python
@@ -65,23 +65,23 @@ class ThingSlot(
     r"""Descriptor that instructs the server to supply other Things.
 
     A `.ThingSlot` provides either one or several
-    `.Thing` instances as a property of a `.Thing`\ . This allows `.Thing`\ s
+    `~lt.Thing` instances as a property of a `~lt.Thing`\ . This allows `~lt.Thing`\ s
     to communicate with each other within the server, including accessing
     attributes that are not exposed over HTTP.
 
-    While it is possible to dynamically retrieve a `.Thing` from the `.ThingServer`
-    this is not recommended: using Thing Connections ensures all the `.Thing`
-    instances are available before the server starts, reducing the likelihood
-    of run-time crashes.
+    While it is possible to dynamically retrieve a `~lt.Thing` from the
+    `~lt.ThingServer` this is not recommended: using Thing Connections ensures all the
+    `~lt.Thing` instances are available before the server starts, reducing the
+    likelihood of run-time crashes.
 
     The usual way of creating these connections is the function
-    `.thing_slot`\ . This class and its subclasses are not usually
+    `thing_slot`\ . This class and its subclasses are not usually
     instantiated directly.
 
     The type of the `.ThingSlot` attribute is key to its operation.
-    It should be assigned to an attribute typed either as a `.Thing` subclass,
-    a mapping of strings to `.Thing` or subclass instances, or an optional
-    `.Thing` instance:
+    It should be assigned to an attribute typed either as a `~lt.Thing` subclass,
+    a mapping of strings to `~lt.Thing` or subclass instances, or an optional
+    `~lt.Thing` instance:
 
     .. code-block:: python
 
@@ -96,7 +96,7 @@ class ThingSlot(
             # This may evaluate to an `OtherExample` or `None`
             optional: OtherExample | None = lt.thing_slot("other_thing")
 
-            # This evaluates to a mapping of `str` to `.Thing` instances
+            # This evaluates to a mapping of `str` to `~lt.Thing` instances
             things: Mapping[str, OtherExample] = lt.thing_slot(["thing_a"])
     """
 
@@ -115,7 +115,7 @@ class ThingSlot(
             in an error, unless the server has set another value in its
             configuration.
 
-            If the type is a mapping of `str` to `.Thing` the default should be
+            If the type is a mapping of `str` to `~lt.Thing` the default should be
             of type `Iterable[str]` (and could be an empty list).
         """
         super().__init__()
@@ -126,7 +126,7 @@ class ThingSlot(
 
     @property
     def thing_type(self) -> tuple[type, ...]:
-        r"""The `.Thing` subclass(es) returned by this connection.
+        r"""The `~lt.Thing` subclass(es) returned by this connection.
 
         A tuple is returned to allow for optional thing connections that
         are typed as the union of two Thing types. It will work with
@@ -174,21 +174,21 @@ class ThingSlot(
         This function is used internally by `.ThingSlot.connect` to choose
         the Things we return when the `.ThingSlot` is accessed.
 
-        :param things: the available `.Thing` instances on the server.
+        :param things: the available `~lt.Thing` instances on the server.
         :param target: the name(s) we should connect to, or `None` to set the
             connection to `None` (if it is optional). A special value is `...`
-            which will pick the `.Thing` instannce(s) matching this connection's
+            which will pick the `~lt.Thing` instannce(s) matching this connection's
             type hint.
 
-        :raises ThingSlotError: if the supplied `.Thing` is of the wrong
-            type, if a sequence is supplied when a single `.Thing` is required,
+        :raises ThingSlotError: if the supplied `~lt.Thing` is of the wrong
+            type, if a sequence is supplied when a single `~lt.Thing` is required,
             or if `None` is supplied and the connection is not optional.
         :raises TypeError: if ``target`` is not one of the allowed types.
 
         `KeyError` will also be raised if names specified in ``target`` do not
         exist in ``things``\ .
 
-        :return: a list of `.Thing` instances to supply in response to ``__get__``\ .
+        :return: a list of `~lt.Thing` instances to supply in response to ``__get__``\ .
         """
         if target is None:
             return []
@@ -217,19 +217,19 @@ class ThingSlot(
         things: "Mapping[str, Thing]",
         target: str | Iterable[str] | None | EllipsisType = ...,
     ) -> None:
-        r"""Find the `.Thing`\ (s) we should supply when accessed.
+        r"""Find the `~lt.Thing`\ (s) we should supply when accessed.
 
         This method sets up a ThingSlot on ``host_thing`` by finding the
-        `.Thing` instance(s) it should supply when its ``__get__`` method is
+        `~lt.Thing` instance(s) it should supply when its ``__get__`` method is
         called. The logic for determining this is:
 
-        * If ``target`` is specified, we look for the specified `.Thing`\ (s).
+        * If ``target`` is specified, we look for the specified `~lt.Thing`\ (s).
           ``None`` means we should return ``None`` - that's only allowed if the
           type hint permits it.
         * If ``target`` is not specified or is ``...`` we use the default value
           set when the connection was defined.
         * If the default value was ``...`` and no target was specified, we will
-          attempt to find the `.Thing` by type. Most of the time, this is the
+          attempt to find the `~lt.Thing` by type. Most of the time, this is the
           desired behaviour.
 
         If the type of this connection is a ``Mapping``\ , ``target`` should be
@@ -243,15 +243,15 @@ class ThingSlot(
         is set as ``None``\ , then an error will be raised. ``None`` will only
         be returned at runtime if it is permitted by the type hint.
 
-        :param host: the `.Thing` on which the connection is defined.
-        :param things: the available `.Thing` instances on the server.
+        :param host: the `~lt.Thing` on which the connection is defined.
+        :param things: the available `~lt.Thing` instances on the server.
         :param target: the name(s) we should connect to, or `None` to set the
             connection to `None` (if it is optional). The default is `...`
             which will use the default that was set when this `.ThingSlot`
             was defined.
 
-        :raises ThingSlotError: if the supplied `.Thing` is of the wrong
-            type, if a sequence is supplied when a single `.Thing` is required,
+        :raises ThingSlotError: if the supplied `~lt.Thing` is of the wrong
+            type, if a sequence is supplied when a single `~lt.Thing` is required,
             or if `None` is supplied and the connection is not optional.
         """
         used_target = self.default if target is ... else target
@@ -296,11 +296,11 @@ class ThingSlot(
             raise ThingSlotError(msg) from e
 
     def instance_get(self, obj: "Thing") -> ConnectedThings:
-        r"""Supply the connected `.Thing`\ (s).
+        r"""Supply the connected `~lt.Thing`\ (s).
 
-        :param obj: The `.Thing` on which the connection is defined.
+        :param obj: The `~lt.Thing` on which the connection is defined.
 
-        :return: the `.Thing` instance(s) connected.
+        :return: the `~lt.Thing` instance(s) connected.
 
         :raises ThingNotConnectedError: if the ThingSlot has not yet been set up.
         :raises ReferenceError: if a connected Thing no longer exists (should not
@@ -339,14 +339,14 @@ class ThingSlot(
 
 
 def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
-    r"""Declare a connection to another `.Thing` in the same server.
+    r"""Declare a connection to another `~lt.Thing` in the same server.
 
     ``lt.thing_slot`` marks a class attribute as a connection to another
-    `.Thing` on the same server. This will be automatically supplied when the
+    `~lt.Thing` on the same server. This will be automatically supplied when the
     server is started, based on the type hint and default value.
 
-    In keeping with `.property` and `.setting`, the type of the attribute should
-    be the type of the connected `.Thing`\ . For example:
+    In keeping with `~lt.property` and `~lt.setting`, the type of the attribute should
+    be the type of the connected `~lt.Thing`\ . For example:
 
     .. code-block:: python
 
@@ -368,12 +368,12 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
 
     The type hint of a Thing Connection should be one of the following:
 
-    * A `.Thing` subclass. An instance of this subclass will be returned when
+    * A `~lt.Thing` subclass. An instance of this subclass will be returned when
         the attribute is accessed.
-    * An optional `.Thing` subclass (e.g. ``MyThing | None``). This will either
+    * An optional `~lt.Thing` subclass (e.g. ``MyThing | None``). This will either
         return a ``MyThing`` instance or ``None``\ .
-    * A mapping of `str` to `.Thing` (e.g. ``Mapping[str, MyThing]``). This will
-        return a mapping of `.Thing` names to `.Thing` instances. The mapping
+    * A mapping of `str` to `~lt.Thing` (e.g. ``Mapping[str, MyThing]``). This will
+        return a mapping of `~lt.Thing` names to `~lt.Thing` instances. The mapping
         may be empty.
 
     Example:
@@ -405,26 +405,26 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
     The example above is very contrived, but shows how to apply the different types.
 
     If no default value is supplied, and no value is configured for the connection,
-    the server will attempt to find a `.Thing` that
-    matches the specified type when the server is started. If no matching `.Thing`
+    the server will attempt to find a `~lt.Thing` that
+    matches the specified type when the server is started. If no matching `~lt.Thing`
     instances are found, the descriptor will return ``None`` or an empty mapping.
     If that is not allowed by the type hint, the server will fail to start with
     an error.
 
-    The default value may be a string specifying a `.Thing` name, or a sequence of
+    The default value may be a string specifying a `~lt.Thing` name, or a sequence of
     strings (for connections that return mappings). In those cases, the relevant
-    `.Thing` will be returned from the server. If a name is given that either
-    doesn't correspond to a `.Thing` on the server, or is a `.Thing` that doesn't
+    `~lt.Thing` will be returned from the server. If a name is given that either
+    doesn't correspond to a `~lt.Thing` on the server, or is a `~lt.Thing` that doesn't
     match the type of this connection, the server will fail to start with an error.
 
     The default may also be ``None``
     which is appropriate when the type is optional or a mapping. If the type is
-    a `.Thing` subclass, a default value of ``None`` forces the connection to be
+    a `~lt.Thing` subclass, a default value of ``None`` forces the connection to be
     specified in configuration.
 
     :param default: The name(s) of the Thing(s) that will be connected by default.
         If the default is omitted or set to ``...`` the server will attempt to find
-        a matching `.Thing` instance (or instances). A default value of `None` is
+        a matching `~lt.Thing` instance (or instances). A default value of `None` is
         allowed if the connection is type hinted as optional.
     :return: A `.ThingSlot` descriptor.
 
@@ -433,7 +433,7 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
     In the example above, using `.ThingSlot` directly would assign an object
     with type ``ThingSlot[ThingA]`` to the attribute ``thing_a``, which is
     typed as ``ThingA``\ . This would cause a type error. Using
-    `.thing_slot` suppresses this error, as its return type is a`Any``\ .
+    `thing_slot` suppresses this error, as its return type is a`Any``\ .
 
     The use of ``Any`` or an alternative type-checking exemption seems to be
     inevitable when implementing descriptors that are typed via attribute annotations,
