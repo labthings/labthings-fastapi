@@ -402,7 +402,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             ) from e
 
     @builtins.property
-    def constraints(self) -> FieldConstraints:  # noqa[DOC201]
+    def constraints(self) -> FieldConstraints:  # noqa: DOC201
         """Validation constraints applied to this property.
 
         This mapping contains keyword arguments that will be passed to

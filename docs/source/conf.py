@@ -42,6 +42,7 @@ autoapi_dirs = ["../../src/labthings_fastapi"]
 autoapi_generate_api_docs = True
 autoapi_keep_files = True
 autoapi_python_class_content = "both"
+autoapi_template_dir = "../autoapi_templates"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

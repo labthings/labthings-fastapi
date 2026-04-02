@@ -87,7 +87,7 @@ class ThingServer:
         :param api_prefix: A prefix for all API routes. This must either
             be empty, or start with a slash and not end with a slash.
         :param application_config: A mapping containing custom configuration for the
-            application. This is not processed by LabThings. Each `~lt.Thing` can 
+            application. This is not processed by LabThings. Each `~lt.Thing` can
             access this via the Thing-Server interface.
         :param debug: If ``True``, set the log level for `~lt.Thing` instances to
                       DEBUG.

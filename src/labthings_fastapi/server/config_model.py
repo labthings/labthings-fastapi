@@ -2,8 +2,9 @@ r"""Pydantic models to enable server configuration to be loaded from file.
 
 The models in this module allow `ThingConfig` dataclasses to be constructed
 from dictionaries or JSON files. They also describe the full server configuration
-with `.ServerConfigModel`\ . These models are used by the `.cli` module to
-start servers based on configuration files or strings.
+with `.ServerConfigModel`\ . These models are used by the
+`labthings_fastapi.server.cli` module to start servers based on configuration
+files or strings.
 """
 
 from pydantic import (

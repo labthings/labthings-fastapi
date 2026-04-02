@@ -1,7 +1,8 @@
 .. _quickref:
+.. _public_api:
 
-Quick Reference API Documentation
-=================================
+Public API Documentation
+========================
 
 This page summarises the parts of the LabThings API that should be most frequently used by people writing `lt.Thing` subclasses. It doesn't list options exhaustively: the full :doc:`API documentation <autoapi/index>` does that if extra detail is needed.
 
@@ -453,3 +454,26 @@ This page summarises the parts of the LabThings API that should be most frequent
 
       Run the target function, with invocation ID set in the context variable.
 
+.. py:class:: DataProperty
+
+    This is an alias of `labthings_fastapi.properties.DataProperty` but is not usually used: consider using `property` instead.
+
+.. py:class:: DataSetting
+
+    This is an alias of `labthings_fastapi.properties.DataSetting` but is not usually used: consider using `property` instead.
+
+.. py:attribute:: FEATURE_FLAGS
+
+    Feature flags are used to control optional features of LabThings. Setting the attributes of `FEATURE_FLAGS` enables or disables a feature. It is an instance of the dataclass `labthings_fastapi.feature_flags.LabThingsFeatureFlags` and the various available options are described there.
+
+.. py:attribute:: outputs
+
+    This is an alias for `labthings_fastapi.outputs` and contains, for example `MJPEGStream`\ .
+
+.. py:attribute:: blob
+
+    This module implements :ref:`blobs`\ , which is the intended way to return files and binary data from LabThings. It is an alias for `labthings_fastapi.outputs.blob`\ .
+
+.. py:attribute:: cli
+
+    The CLI module implements command-line functions, and is where the command-line script ``labthings-server`` is implemented. It is an alias for `labthings_fastapi.server.cli`\ .

@@ -21,7 +21,7 @@ Documentation for LabThings-FastAPI
    wot_core_concepts.rst
    removed_features.rst
 
-   quick_reference.rst
+   public_api.rst
    autoapi/index
    developer_notes/index.rst
 

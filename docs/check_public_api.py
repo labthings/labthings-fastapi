@@ -30,3 +30,5 @@ if __name__ == "__main__":
         msg = "Failure: the following symbols are missing from the `lt` namespace: \n\n"
         msg += "\n".join(missing)
         raise AssertionError(msg)
+
+    print("All symbols in `lt.__all__` appear in the Sphinx documentation.")
