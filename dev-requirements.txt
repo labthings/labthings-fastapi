@@ -22,6 +22,7 @@ attrs==25.3.0
     # via
     #   jsonschema
     #   referencing
+    #   sphobjinv
 autodocsumm==0.2.14
     # via sphinx-toolbox
 babel==2.17.0
@@ -37,6 +38,7 @@ certifi==2025.7.14
     #   requests
     #   sentry-sdk
     #   sphinx-prompt
+    #   sphobjinv
 charset-normalizer==3.4.2
     # via requests
 click==8.2.1
@@ -140,7 +142,9 @@ jinja2==3.1.6
     #   sphinx-autoapi
     #   sphinx-jinja2-compat
 jsonschema==4.24.1
-    # via labthings-fastapi (pyproject.toml)
+    # via
+    #   labthings-fastapi (pyproject.toml)
+    #   sphobjinv
 jsonschema-specifications==2025.4.1
     # via jsonschema
 markdown-it-py==3.0.0
@@ -309,6 +313,8 @@ sphinxcontrib-qthelp==2.0.0
     # via sphinx
 sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
+sphobjinv==2.4
+    # via labthings-fastapi (pyproject.toml)
 starlette==0.47.1
     # via fastapi
 tabulate==0.9.0
