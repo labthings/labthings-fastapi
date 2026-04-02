@@ -1,9 +1,9 @@
 """Code supporting the LabThings server.
 
-LabThings wraps the `fastapi.FastAPI` application in a `.ThingServer`, which
-provides the tools to serve and manage `.Thing` instances.
+LabThings wraps the `fastapi.FastAPI` application in a `~lt.ThingServer`, which
+provides the tools to serve and manage `~lt.Thing` instances.
 
-See the :ref:`tutorial` for examples of how to set up a `.ThingServer`.
+See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
 from __future__ import annotations
@@ -44,17 +44,17 @@ ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
 
 
 class ThingServer:
-    """Use FastAPI to serve `.Thing` instances.
+    """Use FastAPI to serve `~lt.Thing` instances.
 
-    The `.ThingServer` sets up a `fastapi.FastAPI` application and uses it
-    to expose the capabilities of `.Thing` instances over HTTP.
+    The `~lt.ThingServer` sets up a `fastapi.FastAPI` application and uses it
+    to expose the capabilities of `~lt.Thing` instances over HTTP.
 
-    There are several functions of a `.ThingServer`:
+    There are several functions of a `~lt.ThingServer`:
 
-    * Manage where settings are stored, to allow `.Thing` instances to
+    * Manage where settings are stored, to allow `~lt.Thing` instances to
       load and save their settings from disk.
     * Configure the server to allow cross-origin requests (required if
-      we use a web app that is not served from the `.ThingServer`).
+      we use a web app that is not served from the `~lt.ThingServer`).
     * Manage the threads used to run :ref:`actions`.
     * Manage :ref:`blobs` to allow binary data to be returned.
     * Allow threaded code to call functions in the event loop, by providing
@@ -71,25 +71,25 @@ class ThingServer:
     ) -> None:
         r"""Initialise a LabThings server.
 
-        Setting up the `.ThingServer` involves creating the underlying
+        Setting up the `~lt.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
-        set up and shut down the `.Thing` instances), and configuring it
+        set up and shut down the `~lt.Thing` instances), and configuring it
         to allow cross-origin requests.
 
         We also create the `.ActionManager` to manage :ref:`actions` and the
         `.BlobManager` to manage the downloading of :ref:`blobs`.
 
-        :param things: A mapping of Thing names to `.Thing` subclasses, or
-            `.ThingConfig` objects specifying the subclass, its initialisation
-            arguments, and any connections to other `.Thing`\ s.
-        :param settings_folder: the location on disk where `.Thing`
+        :param things: A mapping of Thing names to `~lt.Thing` subclasses, or
+            `~lt.ThingConfig` objects specifying the subclass, its initialisation
+            arguments, and any connections to other `~lt.Thing`\ s.
+        :param settings_folder: the location on disk where `~lt.Thing`
             settings will be saved.
         :param api_prefix: A prefix for all API routes. This must either
             be empty, or start with a slash and not end with a slash.
         :param application_config: A mapping containing custom configuration for the
-            application. This is not processed by LabThings. Each `.Thing` can access
-            this via the Thing-Server interface.
-        :param debug: If ``True``, set the log level for `.Thing` instances to
+            application. This is not processed by LabThings. Each `~lt.Thing` can
+            access this via the Thing-Server interface.
+        :param debug: If ``True``, set the log level for `~lt.Thing` instances to
                       DEBUG.
         """
         self.startup_failure: dict | None = None
@@ -124,9 +124,9 @@ class ThingServer:
         This is equivalent to ``ThingServer(**dict(config))``\ .
 
         :param config: The configuration parameters for the server.
-        :param debug: If ``True``, set the log level for `.Thing` instances to
+        :param debug: If ``True``, set the log level for `~lt.Thing` instances to
                       DEBUG.
-        :return: A `.ThingServer` configured as per the model.
+        :return: A `~lt.ThingServer` configured as per the model.
         """
         return cls(**dict(config), debug=debug)
 
@@ -135,7 +135,7 @@ class ThingServer:
 
         This is required to allow web applications access to the HTTP API,
         if they are not served from the same origin (i.e. if they are not
-        served as part of the `.ThingServer`.).
+        served as part of the `~lt.ThingServer`.).
 
         This is usually needed during development, and may be needed at
         other times depending on how you are using LabThings.
@@ -161,7 +161,7 @@ class ThingServer:
     def things(self) -> Mapping[str, Thing]:
         """Return a dictionary of all the things.
 
-        :return: a dictionary mapping thing paths to `.Thing` instances.
+        :return: a dictionary mapping thing paths to `~lt.Thing` instances.
         """
         return MappingProxyType(self._things)
 
@@ -190,7 +190,7 @@ class ThingServer:
 
         Return all instances of ``cls`` attached to this server.
 
-        :param cls: A `.Thing` subclass.
+        :param cls: A `~lt.Thing` subclass.
 
         :return: all instances of ``cls`` that have been added to this server.
         """
@@ -202,7 +202,7 @@ class ThingServer:
         This function calls `.ThingServer.things_by_class`, but asserts that
         there is exactly one match.
 
-        :param cls: a `.Thing` subclass.
+        :param cls: a `~lt.Thing` subclass.
 
         :return: the instance of ``cls`` attached to this server.
 
@@ -231,16 +231,16 @@ class ThingServer:
     def _create_things(self) -> Mapping[str, Thing]:
         r"""Create the Things, add them to the server, and connect them up if needed.
 
-        This method is responsible for creating instances of `.Thing` subclasses
-        and adding them to the server. It also ensures the `.Thing`\ s are connected
+        This method is responsible for creating instances of `~lt.Thing` subclasses
+        and adding them to the server. It also ensures the `~lt.Thing`\ s are connected
         together if required.
 
         The Things are defined in ``self._config.thing_configs`` which in turn is
         generated from the ``things`` argument to ``__init__``\ .
 
-        :return: A mapping of names to `.Thing` instances.
+        :return: A mapping of names to `~lt.Thing` instances.
 
-        :raise TypeError: if ``cls`` is not a subclass of `.Thing`.
+        :raise TypeError: if ``cls`` is not a subclass of `~lt.Thing`.
         """
         things: dict[str, Thing] = {}
         for name, config in self._config.thing_configs.items():
@@ -259,10 +259,10 @@ class ThingServer:
     def _connect_things(self) -> None:
         r"""Connect the `thing_slot` attributes of Things.
 
-        A `.Thing` may have attributes defined as ``lt.thing_slot()``, which
-        will be populated after all `.Thing` instances are loaded on the server.
+        A `~lt.Thing` may have attributes defined as ``lt.thing_slot()``, which
+        will be populated after all `~lt.Thing` instances are loaded on the server.
 
-        This function is responsible for supplying the `.Thing` instances required
+        This function is responsible for supplying the `~lt.Thing` instances required
         for each connection. This will be done by using the name specified either
         in the connection's default, or in the configuration of the server.
 
@@ -281,8 +281,8 @@ class ThingServer:
     def _attach_things_to_server(self) -> None:
         """Add the Things to the FastAPI App.
 
-        This calls `.Thing.attach_to_server` on each `.Thing` that is a part of
-        this `.ThingServer` in order to add the HTTP endpoints and load settings.
+        This calls `~lt.Thing.attach_to_server` on each `~lt.Thing` that is a part of
+        this `~lt.ThingServer` in order to add the HTTP endpoints and load settings.
         """
         for thing in self.things.values():
             thing.attach_to_server(self)
@@ -351,9 +351,9 @@ class ThingServer:
             """Describe all the things available from this server.
 
             This returns a dictionary, where the keys are the paths to each
-            `.Thing` attached to the server, and the values are :ref:`wot_td` documents
-            represented as `.ThingDescription` objects. These should enable
-            clients to see all the capabilities of the `.Thing` instances and
+            `~lt.Thing` attached to the server, and the values are :ref:`wot_td`
+            documents represented as `.ThingDescription` objects. These should enable
+            clients to see all the capabilities of the `~lt.Thing` instances and
             access them over HTTP.
 
             :param request: is supplied automatically by FastAPI.
@@ -375,8 +375,8 @@ class ThingServer:
 
             :param request: is supplied automatically by FastAPI.
 
-            :return: a list of paths pointing to `.Thing` instances. These
-                URLs will return the :ref:`wot_td` of one `.Thing` each.
+            :return: a list of paths pointing to `~lt.Thing` instances. These
+                URLs will return the :ref:`wot_td` of one `~lt.Thing` each.
             """  # noqa: D403 (URLs is correct capitalisation)
             return {
                 t: str(request.url_for(f"things.{t}"))

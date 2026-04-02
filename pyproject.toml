@@ -41,6 +41,7 @@ dev = [
   "sphinx>=7.2",
   "sphinx-autoapi",
   "sphinx-toolbox",
+  "sphobjinv",
   "tomli; python_version < '3.11'",
   "codespell",
 ]

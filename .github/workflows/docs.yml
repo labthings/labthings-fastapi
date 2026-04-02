@@ -1,0 +1,30 @@
+name: Documentation
+
+on:
+  - pull_request
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: pip install -e . -r dev-requirements.txt
+
+      - name: Print installed packages
+        run: pip freeze
+      
+      - name: Build docs with Sphinx
+        working-directory: ./docs/
+        run: make html
+      
+      - name: Check public API docs are complete
+        working-directory: ./docs/
+        run: python check_public_api.py

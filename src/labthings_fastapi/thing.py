@@ -1,6 +1,6 @@
 """A class to represent hardware or software Things.
 
-The `.Thing` class enables most of the functionality of this library,
+The `~lt.Thing` class enables most of the functionality of this library,
 and is the way in to most of its features. See :ref:`structure`
 for how it fits with the rest of the library.
 """
@@ -64,9 +64,9 @@ class Thing:
         except after errors. You should be safe to ignore them, and just include
         code that will close down your hardware, which is equivalent to a
         ``finally:`` block.
-    *   Properties and Actions are defined using decorators: the :deco:`.action`
+    *   Properties and Actions are defined using decorators: the :deco:`lt.action`
         decorator declares a method to be an action, which will run when it's triggered,
-        and the :deco:`.property` decorator does the same for a property.
+        and the :deco:`~lt.property` decorator does the same for a property.
 
         Properties may also be defined using dataclass-style syntax, if they do
         not need getter and setter functions.
@@ -76,30 +76,29 @@ class Thing:
         so it makes sense to set this in a subclass.
 
     There are various LabThings methods that you should avoid overriding unless you
-    know what you are doing: anything not mentioned above that's defined in `.Thing` is
-    probably best left alone. They may in time be collected together into a single
-    object to avoid namespace clashes.
+    know what you are doing: anything not mentioned above that's defined in `Thing`
+    is probably best left alone.
     """
 
     title: str
     """A human-readable description of the Thing"""
 
     _thing_server_interface: ThingServerInterface
-    """Provide access to features of the server that this `.Thing` is attached to."""
+    """Provide access to features of the server that this `Thing` is attached to."""
 
     def __init__(self, thing_server_interface: ThingServerInterface) -> None:
         """Initialise a Thing.
 
         The most important function of ``__init__`` is attaching the
-        thing_server_interface, and setting the path. Note that `.Thing`
-        instances are usually created by a `.ThingServer` and not instantiated
-        directly: if you do make a `.Thing` directly, you will need to supply
-        a `.ThingServerInterface` that is connected to a `.ThingServer` or a
+        thing_server_interface, and setting the path. Note that `Thing`
+        instances are usually created by a `~lt.ThingServer` and not instantiated
+        directly: if you do make a `Thing` directly, you will need to supply
+        a `~lt.ThingServerInterface` that is connected to a `~lt.ThingServer` or a
         suitable mock object.
 
         :param thing_server_interface: The interface to the server that
-            is hosting this Thing. It will be supplied when the `.Thing` is
-            instantiated by the `.ThingServer` or by
+            is hosting this Thing. It will be supplied when the `Thing` is
+            instantiated by the `~lt.ThingServer` or by
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
@@ -107,7 +106,7 @@ class Thing:
 
     @property
     def path(self) -> str:
-        """The path at which the `.Thing` is exposed over HTTP."""
+        """The path at which the `~lt.Thing` is exposed over HTTP."""
         return self._thing_server_interface.path
 
     @property
@@ -155,11 +154,11 @@ class Thing:
 
         :param server: The server to attach this Thing to.
 
-        Attaching the `.Thing` to a `.ThingServer` allows the `.Thing` to start
+        Attaching the `~lt.Thing` to a `~lt.ThingServer` allows the `~lt.Thing` to start
         actions, load its settings from the correct place, and create HTTP endpoints
         to allow it to be accessed from the HTTP API.
 
-        We create HTTP endpoints for all :ref:`wot_affordances` on the `.Thing`, as well
+        We create HTTP endpoints for all :ref:`wot_affordances` on the `Thing`, as well
         as any `.EndpointDescriptor` descriptors.
         """
         self.action_manager: ActionManager = server.action_manager
@@ -290,9 +289,9 @@ class Thing:
     properties: OptionallyBoundDescriptor["Thing", PropertyCollection] = (
         OptionallyBoundDescriptor(PropertyCollection)
     )
-    r"""Access to metadata and functions of this `.Thing`\ 's properties.
+    r"""Access to metadata and functions of this `~lt.Thing`\ 's properties.
 
-    `.Thing.properties` is a mapping of names to `.PropertyInfo` objects, which
+    `~lt.Thing.properties` is a mapping of names to `.PropertyInfo` objects, which
     allows convenient access to the metadata related to its properties. Note that
     this includes settings, as they are a subclass of properties.
     """
@@ -302,16 +301,16 @@ class Thing:
     )
     r"""Access to settings-related metadata and functions.
 
-    `.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
-    convenient access to metadata of the settings of this `.Thing`\ .
+    `~lt.Thing.settings` is a mapping of names to `.SettingInfo` objects that allows
+    convenient access to metadata of the settings of this `~lt.Thing`\ .
     """
 
     actions: OptionallyBoundDescriptor["Thing", ActionCollection] = (
         OptionallyBoundDescriptor(ActionCollection)
     )
-    r"""Access to metadata for the actions of this `.Thing`\ .
+    r"""Access to metadata for the actions of this `~lt.Thing`\ .
 
-    `.Thing.actions` is a mapping of names to `.ActionInfo` objects that allows
+    `~lt.Thing.actions` is a mapping of names to `.ActionInfo` objects that allows
     convenient access to metadata of each action.
     """
 
@@ -395,7 +394,7 @@ class Thing:
     ) -> dict:
         r"""Describe this Thing with a Thing Description as a simple dict.
 
-        See `.Thing.thing_description`\ . This function converts the
+        See `~lt.Thing.thing_description`\ . This function converts the
         return value of that function into a simple dictionary.
 
         :param path: the URL pointing to this Thing.

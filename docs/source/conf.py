@@ -1,5 +1,6 @@
+import inspect
 import logging
-import labthings_fastapi
+import labthings_fastapi as lt
 import importlib.metadata
 
 # Configuration file for the Sphinx documentation builder.
@@ -20,6 +21,7 @@ release = importlib.metadata.version("labthings-fastapi")
 
 extensions = [
     "sphinx.ext.intersphinx",
+    "sphinx.ext.autodoc",
     # "sphinx.ext.napoleon",
     # "autodoc2",
     "autoapi.extension",
@@ -40,6 +42,7 @@ autoapi_dirs = ["../../src/labthings_fastapi"]
 autoapi_generate_api_docs = True
 autoapi_keep_files = True
 autoapi_python_class_content = "both"
+autoapi_template_dir = "../autoapi_templates"
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -66,10 +69,7 @@ skipper_log = logging.getLogger("skipper")
 skipper_log.addHandler(logging.FileHandler("./skipper.log", mode="w"))
 skipper_log.setLevel(logging.DEBUG)
 
-convenience_modules = {
-    "labthings_fastapi": labthings_fastapi.__all__,
-}
-canonical_fq_names = [
+canonical_fq_names = {
     "labthings_fastapi.descriptors.action.ActionDescriptor",
     "labthings_fastapi.outputs.blob.BlobDataManager",
     "labthings_fastapi.invocations.InvocationModel",
@@ -79,7 +79,17 @@ canonical_fq_names = [
     "labthings_fastapi.actions.ActionManager",
     "labthings_fastapi.descriptors.endpoint.EndpointDescriptor",
     "labthings_fastapi.utilities.introspection.EmptyObject",
-]
+    "labthings_fastapi.feature_flags.FEATURE_FLAGS",
+}
+
+# Everything in `labthings_fastapi` is documented elsewhere, so we
+# add all of those fq names to the list.
+top_level_objects = [getattr(lt, name) for name in lt.__all__]
+canonical_fq_names.update(
+    f"{obj.__module__}.{obj.__qualname__}"
+    for obj in top_level_objects
+    if not inspect.ismodule(obj) and obj is not lt.FEATURE_FLAGS
+)
 
 
 def unqual(name):
@@ -90,8 +100,6 @@ def unqual(name):
 
 canonical_names = {unqual(n): n for n in canonical_fq_names}
 
-skipper_log.info("Convenience modules: %s.", convenience_modules)
-
 
 def skip_public_api(app, what, name: str, obj, skip, options):
     """Skip documenting members that are re-exported from the public API."""
@@ -100,10 +108,6 @@ def skip_public_api(app, what, name: str, obj, skip, options):
     if unqual in canonical_names and name != canonical_names[unqual]:
         skip = True
         return skip
-    for conv, all in convenience_modules.items():
-        if unqual in all and name != f"{conv}.{unqual}":
-            skipper_log.warning(f"skipping {name}")
-            skip = True
     return skip
 
 

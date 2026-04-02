@@ -6,7 +6,7 @@ These replace the old dependencies ``CancelHook`` and ``InvocationLogger``\ .
 
 If you are writing action code and want to use logging or allow cancellation,
 most of the time you should just use `.get_invocation_logger` or
-`.cancellable_sleep` which are exposed as part of the top-level module.
+`~lt.cancellable_sleep` which are exposed as part of the top-level module.
 
 This module includes lower-level functions that are useful for testing or
 managing concurrency. Many of these accept an ``id`` argument, which is
@@ -227,7 +227,7 @@ def raise_if_cancelled() -> None:
     This function checks for cancellation events and, if the current
     action invocation has been cancelled, it will raise an
     `.InvocationCancelledError` to signal the thread to terminate.
-    It is equivalent to `.cancellable_sleep` but without waiting any
+    It is equivalent to `~lt.cancellable_sleep` but without waiting any
     time.
 
     If called outside of an invocation context, this function does

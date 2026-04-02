@@ -3,7 +3,7 @@
 Optional Features and updates
 =============================
 
-LabThings allows some features to be turned on and off globally, using the `.FEATURE_FLAGS` object.
+LabThings allows some features to be turned on and off globally, using the `lt.FEATURE_FLAGS` object.
 This was introduced as a way to smooth the upgrade process for downstream projects, meaning that when a new version of LabThings is released, they need not adopt all the new features at once.
 
 Typically, your application will set the feature flags once, just after importing LabThings. For example, to validate properties when they are written to in Python, we would do:

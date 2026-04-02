@@ -1,4 +1,4 @@
-"""Command-line interface to the `.ThingServer`.
+"""Command-line interface to the `~lt.ThingServer`.
 
 This module provides a command-line interface that is provided as
 `labthings-server`. It exposes various functions that may be useful to
@@ -130,7 +130,7 @@ def serve_from_cli(
 
     This function will parse command line arguments, load configuration,
     set up a server, and start it. It calls `.parse_args`,
-    `.config_from_args` and `.ThingServer.from_config` to get a server, then
+    `.config_from_args` and `~lt.ThingServer.from_config` to get a server, then
     starts `uvicorn` to serve on the specified host and port.
 
     If the ``fallback`` argument is specified, errors that stop the
@@ -148,7 +148,7 @@ def serve_from_cli(
         Things specified can be correctly loaded and instantiated, but
         does not start `uvicorn`\ .
 
-    :return: the `.ThingServer` instance created, if ``dry_run`` is ``True``.
+    :return: the `~lt.ThingServer` instance created, if ``dry_run`` is ``True``.
 
     :raise BaseException: if the server cannot start, and the ``fallback``
         option is not specified.

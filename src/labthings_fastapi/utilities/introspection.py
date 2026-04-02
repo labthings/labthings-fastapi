@@ -138,12 +138,12 @@ def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     We give special treatment to dependency parameters, as they must not
     appear in the input model, and they must be supplied by the
     `.DirectThingClient` wrapper to make the signature identical to that
-    of the `.ThingClient` over HTTP.
+    of the `~lt.ThingClient` over HTTP.
 
     .. note::
 
         Path and query parameters are ignored. These should not be used as action
-        parameters, and will most likely raise an error when the `.Thing` is
+        parameters, and will most likely raise an error when the `~lt.Thing` is
         added to FastAPI.
 
     :param func: a function to inspect.

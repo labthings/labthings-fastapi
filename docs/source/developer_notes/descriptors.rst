@@ -3,11 +3,11 @@
 Descriptors
 ===========
 
-Descriptors are a way to intercept attribute access on an object, and they are used extensively by LabThings to add functionality to `.Thing` instances, while continuing to look like normal Python objects.
+Descriptors are a way to intercept attribute access on an object, and they are used extensively by LabThings to add functionality to `~lt.Thing` instances, while continuing to look like normal Python objects.
 
 By default, attributes of an object are just variables - so an object called ``foo`` might have an attribute called ``bar``, and you may read its value with ``foo.bar``, write its value with ``foo.bar = "baz"``, and delete the attribute with ``del foo.bar``. If ``foo`` is a descriptor, Python will call the ``__get__`` method of that descriptor when it's read and the ``__set__`` method when it's written to. You have quite probably used a descriptor already, because the built-in `~builtins.property` creates a descriptor object: that's what runs your getter method when the property is accessed. The descriptor protocol is described with plenty of examples in the `Descriptor Guide`_ in the Python documentation.
 
-In LabThings-FastAPI, descriptors are used to implement :ref:`actions` and :ref:`properties` on `.Thing` subclasses. The intention is that these will function like standard Python methods and properties, but will also be available over HTTP, along with :ref:`gen_docs`.
+In LabThings-FastAPI, descriptors are used to implement :ref:`actions` and :ref:`properties` on `~lt.Thing` subclasses. The intention is that these will function like standard Python methods and properties, but will also be available over HTTP, along with :ref:`gen_docs`.
 
 .. _field_typing:
 
@@ -22,7 +22,7 @@ Field typing
         my_property: int = lt.property(default=0)
         """An integer property."""
 
-This makes it clear to anyone using ``MyThing`` that ``my_property`` is an integer, and should be picked up by most type checking/autocompletion tools. However, because the annotation is attached to the *class* and not passed to the underlying `.DataProperty` descriptor, we need to use the descriptor protocol to figure it out.
+This makes it clear to anyone using ``MyThing`` that ``my_property`` is an integer, and should be picked up by most type checking/autocompletion tools. However, because the annotation is attached to the *class* and not passed to the underlying `~lt.DataProperty` descriptor, we need to use the descriptor protocol to figure it out.
 
 Field typing in LabThings is implemented by `.FieldTypedBaseDescriptor` and there are docstrings on all of the relevant "magic" methods explaining what each one does. Below, there is a brief overview of how these fit together.
 
@@ -39,7 +39,7 @@ Descriptor implementation
 There are a few useful notes that relate to many of the descriptors in LabThings-FastAPI:
 
 * Descriptor objects **may have more than one owner**. As a rule, a descriptor object
-    (e.g. an instance of `.DataProperty`) is assigned to an attribute of one `.Thing` subclass. There may, however, be multiple *instances* of that class, so it is not safe to assume that the descriptor object corresponds to only one `.Thing`. This is why the `.Thing` is passed to the ``__get__`` method: we should ensure that any values being remembered are keyed to the owning `.Thing` and are not simply stored in the descriptor. Usually, this is done using `.WeakKeyDictionary` objects, which allow us to look up values based on the `.Thing`, without interfering with garbage collection.
+    (e.g. an instance of `~lt.DataProperty`) is assigned to an attribute of one `~lt.Thing` subclass. There may, however, be multiple *instances* of that class, so it is not safe to assume that the descriptor object corresponds to only one `~lt.Thing`. This is why the `~lt.Thing` is passed to the ``__get__`` method: we should ensure that any values being remembered are keyed to the owning `~lt.Thing` and are not simply stored in the descriptor. Usually, this is done using `.WeakKeyDictionary` objects, which allow us to look up values based on the `~lt.Thing`, without interfering with garbage collection.
 
     The example below shows how this can go wrong.
 

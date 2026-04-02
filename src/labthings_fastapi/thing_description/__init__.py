@@ -1,7 +1,7 @@
 """Thing Description module.
 
 This module supports the generation of Thing Descriptions. Currently, the top
-level function lives in `.Thing.thing_description`,
+level function lives in `~lt.Thing.thing_description`,
 but most of the supporting code is in this submodule.
 
 A Pydantic model implementing the Thing Description is in

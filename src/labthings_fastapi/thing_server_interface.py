@@ -1,4 +1,4 @@
-r"""Interface between `.Thing` subclasses and the `.ThingServer`\ ."""
+r"""Interface between `~lt.Thing` subclasses and the `~lt.ThingServer`\ ."""
 
 from __future__ import annotations
 from concurrent.futures import Future
@@ -39,7 +39,7 @@ class ThingServerMissingError(RuntimeError):
 class ThingServerInterface:
     r"""An interface for Things to interact with their server.
 
-    This is added to every `.Thing` during ``__init__`` and is available
+    This is added to every `~lt.Thing` during ``__init__`` and is available
     as ``self._thing_server_interface``\ .
     """
 
@@ -54,9 +54,9 @@ class ThingServerInterface:
         to mock the server during testing: only functions provided here
         need be mocked, not the whole functionality of the server.
 
-        :param server: the `.ThingServer` instance we're connected to.
+        :param server: the `~lt.ThingServer` instance we're connected to.
             This will be retained as a weak reference.
-        :param name: the name of the `.Thing` instance this interface
+        :param name: the name of the `~lt.Thing` instance this interface
             is provided for.
         """
         self._name: str = name
@@ -165,12 +165,12 @@ class ThingServerInterface:
     def get_thing_states(self) -> Mapping[str, Any]:
         """Retrieve metadata from all Things on the server.
 
-        This function will retrieve the `.Thing.thing_state` property from
-        each `.Thing` on the server, and return it as a dictionary.
+        This function will retrieve the `~lt.Thing.thing_state` property from
+        each `~lt.Thing` on the server, and return it as a dictionary.
         It is intended to make it easy to add metadata to the results
         of actions, for example to embed in an image.
 
-        :return: a dictionary of metadata, with the `.Thing` names as keys.
+        :return: a dictionary of metadata, with the `~lt.Thing` names as keys.
         """
         return {k: v.thing_state for k, v in self._get_server().things.items()}
 

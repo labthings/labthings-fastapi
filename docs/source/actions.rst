@@ -3,9 +3,9 @@
 Actions
 =======
 
-Actions are the way `.Thing` objects are instructed to do things. In Python
-terms, any method of a `.Thing` that we want to be able to call over HTTP
-should be decorated as an Action, using `.action`.
+Actions are the way `~lt.Thing` objects are instructed to do things. In Python
+terms, any method of a `~lt.Thing` that we want to be able to call over HTTP
+should be decorated as an Action, using `lt.action`.
 
 This page gives an overview of how actions are implemented in LabThings-FastAPI.
 Our implementation should align with :ref:`wot_actions` as defined by the Web of Things standard.
@@ -19,7 +19,7 @@ invokes an action will return almost immediately with a ``201`` code, and a
 JSON payload that describes the invocation as an `.InvocationModel`. This includes
 a link ``href`` that can be polled to check the status of the invocation.
 
-The HTTP implementation of `.ThingClient` first makes a ``POST`` request to
+The HTTP implementation of `~lt.ThingClient` first makes a ``POST`` request to
 invoke the action, then polls the invocation using the ``href`` supplied.
 Once the action has finished (i.e. its status is ``completed``, ``error``, or
 ``cancelled``), its output (the return value) is retrieved and used as the
@@ -38,14 +38,14 @@ where Invocation-related HTTP endpoints are handled, including listing all the
 Running actions from other actions
 ----------------------------------
 
-If code running in a `.Thing` runs methods belonging either to that `.Thing`
-or to another `.Thing` on the same server, no new thread is created: the
+If code running in a `~lt.Thing` runs methods belonging either to that `~lt.Thing`
+or to another `~lt.Thing` on the same server, no new thread is created: the
 called action runs in the same thread as the calling action, just like any
 other Python code.
 
 Action inputs and outputs
 -------------------------
-The code that implements an action is a method of a `.Thing`, meaning it is
+The code that implements an action is a method of a `~lt.Thing`, meaning it is
 a function. The input parameters are the function's arguments, and the output
 parameter is the function's return value. Type hints on both arguments and
 return value are used to document the action in the OpenAPI description and
@@ -58,7 +58,7 @@ Python construct giving access to the object on which the action is defined.
 
 Logging from actions
 --------------------
-Action code should use `.Thing.logger` to log messages. This will be configured
+Action code should use `~lt.Thing.logger` to log messages. This will be configured
 to handle messages on a per-invocation basis and make them available when the action
 is queried over HTTP.
 
@@ -101,7 +101,7 @@ If an action could run for a long time, it is useful to be able to cancel it
 cleanly. LabThings makes provision for this by allowing actions to be cancelled
 using a ``DELETE`` HTTP request. In order to allow an action to be cancelled,
 you must give LabThings opportunities to interrupt it. This is most often done
-by replacing a `time.sleep()` statement with `.cancellable_sleep()` which
+by replacing a `time.sleep()` statement with `lt.cancellable_sleep()` which
 is equivalent,  but will raise an exception if the action is cancelled.
 
 For more advanced options, see `.invocation_contexts` for detail.
@@ -116,15 +116,15 @@ such that the action code can use module-level symbols rather than needing
 to explicitly pass the logger and cancel hook as arguments to the action
 method.
 
-Usually, you don't need to consider this mechanism: simply use `.Thing.logger`
-or `.cancellable_sleep` as explained above. However, if you want to run actions
+Usually, you don't need to consider this mechanism: simply use `~lt.Thing.logger`
+or `~lt.cancellable_sleep` as explained above. However, if you want to run actions
 outside of the server (for example, for testing purposes) or if you want to
 call one action from another action, but not share the cancellation signal
 or log, functions are provided in `.invocation_contexts` to manage this.
 
 If you start a new thread from an action, code running in that thread will
 not have an invocation ID set in a context variable. A subclass of
-`threading.Thread` is provided to do this, `.ThreadWithInvocationID`\ .
+`threading.Thread` is provided to do this, `~lt.ThreadWithInvocationID`\ .
 This may be useful for test code, or if you wish to run actions in the
 background, with the option of cancelling them.
 
