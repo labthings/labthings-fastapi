@@ -7,6 +7,9 @@ be helpful to have some more bottom-up unit testing in this file.
 import pytest
 import labthings_fastapi as lt
 from fastapi.testclient import TestClient
+from starlette.routing import Route
+
+from labthings_fastapi.example_things import MyThing
 
 
 def test_server_from_config_non_thing_error():
@@ -32,7 +35,8 @@ def test_server_thing_descriptions():
                 "class": "labthings_fastapi.example_things:MyThing",
                 "kwargs": {},
             },
-        }
+        },
+        "api_prefix": "/api",
     }
 
     thing_names = ["thing1", "thing2"]
@@ -48,7 +52,7 @@ def test_server_thing_descriptions():
 
     server = lt.ThingServer.from_config(conf)
     with TestClient(server.app) as client:
-        response = client.get("/thing_descriptions/")
+        response = client.get("/api/thing_descriptions/")
     response.raise_for_status()
     thing_descriptions = response.json()
 
@@ -60,10 +64,76 @@ def test_server_thing_descriptions():
 
         for action_name in actions:
             action = thing_description["actions"][action_name]
-            expected_href = thing_name + "/" + action_name
+            expected_href = f"/api/{thing_name}/{action_name}"
             assert action["forms"][0]["href"] == expected_href
 
         for prop_name in props:
             prop = thing_description["properties"][prop_name]
-            expected_href = thing_name + "/" + prop_name
+            expected_href = f"/api/{thing_name}/{prop_name}"
             assert prop["forms"][0]["href"] == expected_href
+
+
+@pytest.mark.parametrize("api_prefix", ["/api/v3", "/v1", "/custom/prefix"])
+def test_api_prefix(api_prefix):
+    """Check we can add a prefix to the URLs on a server."""
+
+    class Example(lt.Thing):
+        """An example Thing"""
+
+    server = lt.ThingServer(things={"example": Example}, api_prefix=api_prefix)
+    paths = [route.path for route in server.app.routes if isinstance(route, Route)]
+
+    # Dynamically generate expected paths based on the parametrized prefix
+    expected_paths = [
+        f"{api_prefix}/action_invocations",
+        f"{api_prefix}/action_invocations/{{id}}",
+        f"{api_prefix}/action_invocations/{{id}}/output",
+        f"{api_prefix}/blob/{{blob_id}}",
+        f"{api_prefix}/thing_descriptions/",
+        f"{api_prefix}/things/",
+        f"{api_prefix}/example/",
+    ]
+
+    for expected_path in expected_paths:
+        assert expected_path in paths
+
+    prefix_with_slash = f"{api_prefix}/"
+    unprefixed_paths = {p for p in paths if not p.startswith(prefix_with_slash)}
+
+    assert unprefixed_paths == {
+        "/openapi.json",
+        "/docs",
+        "/docs/oauth2-redirect",
+        "/redoc",
+    }
+
+
+def test_things_endpoints():
+    """Test that the two endpoints for listing Things work."""
+    server = lt.ThingServer(
+        {
+            "thing_a": MyThing,
+            "thing_b": MyThing,
+        }
+    )
+    with TestClient(server.app) as client:
+        # Check the thing_descriptions endpoint
+        response = client.get("/thing_descriptions/")
+        response.raise_for_status()
+        tds = response.json()
+        assert "thing_a" in tds
+        assert "thing_b" in tds
+
+        # Check the things endpoint. This should map names to URLs
+        response = client.get("/things/")
+        response.raise_for_status()
+        things = response.json()
+        assert "thing_a" in things
+        assert "thing_b" in things
+
+        # Fetch a thing description from the URL in `things`
+        response = client.get(things["thing_a"])
+        response.raise_for_status()
+        td = response.json()
+        assert td["title"] == "MyThing"
+        assert tds["thing_a"] == td
