@@ -78,6 +78,7 @@ canonical_fq_names = {
     "labthings_fastapi.actions.ActionManager",
     "labthings_fastapi.descriptors.endpoint.EndpointDescriptor",
     "labthings_fastapi.utilities.introspection.EmptyObject",
+    "labthings_fastapi.feature_flags.FEATURE_FLAGS",
 }
 
 # Everything in `labthings_fastapi` is documented elsewhere, so we
@@ -86,7 +87,7 @@ top_level_objects = [getattr(lt, name) for name in lt.__all__]
 canonical_fq_names.update(
     f"{obj.__module__}.{obj.__qualname__}"
     for obj in top_level_objects
-    if not inspect.ismodule(obj)
+    if not inspect.ismodule(obj) and obj is not lt.FEATURE_FLAGS
 )
 
 
