@@ -84,7 +84,7 @@ class ThingServer:
             arguments, and any connections to other `.Thing`\ s.
         :param settings_folder: the location on disk where `.Thing`
             settings will be saved.
-        :param api_prefix: An optional prefix for all API routes. This must either
+        :param api_prefix: A prefix for all API routes. This must either
             be empty, or start with a slash and not end with a slash.
         :param application_config: A mapping containing custom configuration for the
             application. This is not processed by LabThings. Each `.Thing` can access
@@ -176,10 +176,10 @@ class ThingServer:
 
     @property
     def _api_prefix(self) -> str:
-        """A string that prefixes all URLs in the application.
+        r"""A string that prefixes all URLs in the application.
 
-        This must either be empty, or start with a slash and not
-        end with a slash.
+        This will either be empty, or start with a slash and not
+        end with a slash. Validation is performed in `.ThingServerConfig`\ .
         """
         return self._config.api_prefix
 

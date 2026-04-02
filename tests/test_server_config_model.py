@@ -106,7 +106,7 @@ def test_ThingServerConfig():
         assert config.api_prefix == prefix
 
     # Check some bad prefixes
-    for prefix in ["api", "/api/", "api/v2", "/badchars!"]:
+    for prefix in ["api", "/api/", "api/", "api/v2", "/badchars!"]:
         with pytest.raises(ValidationError):
             ThingServerConfig(things={}, api_prefix=prefix)
 

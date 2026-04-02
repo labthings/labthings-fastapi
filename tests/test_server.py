@@ -73,27 +73,33 @@ def test_server_thing_descriptions():
             assert prop["forms"][0]["href"] == expected_href
 
 
-def test_api_prefix():
+@pytest.mark.parametrize("api_prefix", ["/api/v3", "/v1", "/custom/prefix"])
+def test_api_prefix(api_prefix):
     """Check we can add a prefix to the URLs on a server."""
 
     class Example(lt.Thing):
         """An example Thing"""
 
-    server = lt.ThingServer(things={"example": Example}, api_prefix="/api/v3")
+    server = lt.ThingServer(things={"example": Example}, api_prefix=api_prefix)
     paths = [route.path for route in server.app.routes if isinstance(route, Route)]
-    for expected_path in [
-        "/api/v3/action_invocations",
-        "/api/v3/action_invocations/{id}",
-        "/api/v3/action_invocations/{id}/output",
-        "/api/v3/action_invocations/{id}",
-        "/api/v3/blob/{blob_id}",
-        "/api/v3/thing_descriptions/",
-        "/api/v3/things/",
-        "/api/v3/example/",
-    ]:
+
+    # Dynamically generate expected paths based on the parametrized prefix
+    expected_paths = [
+        f"{api_prefix}/action_invocations",
+        f"{api_prefix}/action_invocations/{{id}}",
+        f"{api_prefix}/action_invocations/{{id}}/output",
+        f"{api_prefix}/blob/{{blob_id}}",
+        f"{api_prefix}/thing_descriptions/",
+        f"{api_prefix}/things/",
+        f"{api_prefix}/example/",
+    ]
+
+    for expected_path in expected_paths:
         assert expected_path in paths
 
-    unprefixed_paths = {p for p in paths if not p.startswith("/api/v3/")}
+    prefix_with_slash = f"{api_prefix}/"
+    unprefixed_paths = {p for p in paths if not p.startswith(prefix_with_slash)}
+
     assert unprefixed_paths == {
         "/openapi.json",
         "/docs",
