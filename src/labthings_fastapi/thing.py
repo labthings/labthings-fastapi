@@ -6,10 +6,11 @@ for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
+from copy import deepcopy
 import json
 from typing import TYPE_CHECKING, Any, Optional
-from pydantic import ValidationError
-from typing_extensions import Self
+from pydantic import ValidationError, with_config, ConfigDict, TypeAdapter
+from typing_extensions import Self, ReadOnly, TypedDict
 from collections.abc import Mapping
 import logging
 import os
@@ -19,9 +20,6 @@ from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
 from anyio.to_thread import run_sync
 
-
-from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
-
 from .logs import THING_LOGGER
 from .properties import (
     BaseProperty,
@@ -30,6 +28,7 @@ from .properties import (
     SettingCollection,
 )
 from .actions import ActionCollection, ActionDescriptor
+from .base_descriptor import OptionallyBoundDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -42,6 +41,45 @@ from .invocation_contexts import get_invocation_id
 if TYPE_CHECKING:
     from .server import ThingServer
     from .actions import ActionManager
+
+
+@with_config(ConfigDict(extra="forbid"))
+class ThingSettings(TypedDict, total=False):
+    r"""Constraints that may be applied to a `~lt.property`\ ."""
+
+    validate_properties_on_set: ReadOnly[bool]
+
+
+class ThingSettingsDescriptor:
+    """A descriptor to make ThingSettings read-only."""
+
+    def __init__(self, value: ThingSettings) -> None:
+        """Initialise a ThingSettingsDescriptor.
+
+        :param value: the value to be frozen.
+        """
+        self._value = deepcopy(value)
+
+    def __get__(
+        self, _obj: Thing | None, _cls: type[Thing] | None = None
+    ) -> ThingSettings:
+        """Return the value.
+
+        Note that this returns a deep copy, to prevent mutation.
+
+        :param _obj: The object on which we are retrieving the value.
+        :param _cls: The class on which we are retrieving the value
+        :return: The frozen ThingSettings value.
+        """
+        return deepcopy(self._value)
+
+    def __set__(self, _obj: Thing) -> None:
+        """Indicate that the settings are read-only.
+
+        :param _obj: the object on which the attribute is accessed.
+        :raises AttributeError: because this is read-only.
+        """
+        raise AttributeError("Thing subclass settings may not be modified.")
 
 
 class Thing:
@@ -83,6 +121,23 @@ class Thing:
     title: str
     """A human-readable description of the Thing"""
 
+    _class_settings: ThingSettings
+    r"""A dictionary of settings that affect how the Thing subclass works.
+
+    Valid keys are listed below:
+
+    ``validate_properties_on_set`` `bool`
+        If this key is set to `True`\ , property values will be validated when they are
+        set by Python code, as well as when they are set over HTTP. Currently, the
+        default behaviour is only to validate values sent over HTTP, not set directly
+        in Python. It is likely that validation in both cases will happen by default in
+        a future release.
+
+    .. note::
+
+        Class settings must not be changed after the class is defined.
+    """
+
     _thing_server_interface: ThingServerInterface
     """Provide access to features of the server that this `Thing` is attached to."""
 
@@ -103,6 +158,17 @@ class Thing:
         """
         self._thing_server_interface = thing_server_interface
         self._disable_saving_settings: bool = False
+
+    def __init_subclass__(cls) -> None:
+        """Freeze the class settings to stop them being modified."""
+        settings_dict = getattr(cls, "_class_settings", {})
+        settings = TypeAdapter(ThingSettings).validate_python(settings_dict)
+        # The next line turns _class_settings into a descriptor, to prevent
+        # modification. The descriptor's value type is the same as the variable's type,
+        # but as we're turning an attribute into a descriptor, mypy gives an error.
+        # Accessing _class_settings will still return a ThingSettings typed dict, so the
+        # type seen by other code hasn't changed.
+        cls._class_settings = ThingSettingsDescriptor(settings)  # type: ignore[assignment]
 
     @property
     def path(self) -> str:
