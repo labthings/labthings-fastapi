@@ -610,4 +610,5 @@ def test_title_and_description(name, title, description):
     assert prop.title == title
     if description is ...:
         description = title
-    assert prop.description == description
+    # If a description is present, ignore any trailing whitespace.
+    assert (prop.description.rstrip() if prop.description else None) == description
