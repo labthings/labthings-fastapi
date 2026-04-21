@@ -48,6 +48,9 @@ This page summarises the parts of the LabThings API that should be most frequent
         This property may be set using a dictionary literal, and most type checkers or IDEs should help catch incorrect keys or types.
         The keys and values are also validated when your class is defined.
 
+        This property should *only* be set during class definition: it should not be
+        modified after the class is defined.
+
     .. autoproperty:: labthings_fastapi.thing.Thing.name
         :no-index:
 
@@ -159,9 +162,6 @@ This page summarises the parts of the LabThings API that should be most frequent
 
    :param \**kwargs: Keyword arguments are passed to the constructor
        of `.ActionDescriptor`.
-
-
-
 
 
 .. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ...) -> Any

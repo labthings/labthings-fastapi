@@ -15,7 +15,7 @@ If your `Thing` makes use of a recent feature, it might need to be opted into by
     class MyThing(lt.Thing):
         _class_settings = {"validate_properties_on_set": True}
 
-        positive: int = lt.property(default=0, gt=0)
+        positive: int = lt.property(default=1, gt=0)
         """A positive integer, thanks to the ``gt=0`` constraint."""
     
 
