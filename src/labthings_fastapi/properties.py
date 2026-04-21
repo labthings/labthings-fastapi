@@ -72,7 +72,6 @@ from pydantic import (
     with_config,
 )
 
-from .feature_flags import FEATURE_FLAGS
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
     DataSchema,
@@ -99,6 +98,7 @@ from .exceptions import (
     MissingTypeError,
     UnsupportedConstraintError,
 )
+from .thing_class_settings import get_validate_properties_on_set
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -735,7 +735,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
 
         This sets the property's value, and notifies any observers.
 
-        If property validation is enabled by `.FEATURE_FLAGS.validate_properties_on_set`
+        If property validation is enabled by `lt.Thing._class_settings`
         this will validate the value against the property's model, and an error
         will be raised if the value is not valid.
 
@@ -743,7 +743,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param value: the new value for the property.
         :param emit_changed_event: whether to emit a changed event.
         """
-        if FEATURE_FLAGS.validate_properties_on_set:
+        if get_validate_properties_on_set(self.owning_class):
             property_info = self.descriptor_info(obj)
             obj.__dict__[self.name] = property_info.validate(value)
         else:
@@ -987,7 +987,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
     def __set__(self, obj: Owner, value: Value) -> None:
         """Set the value of the property.
 
-        If property validation is enabled by `.FEATURE_FLAGS.validate_properties_on_set`
+        If property validation is enabled by `lt.Thing._class_settings`
         this will validate the value against the property's model, and an error
         will be raised if the value is not valid.
 
@@ -998,7 +998,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """
         if self.fset is None:
             raise ReadOnlyPropertyError(f"Property {self.name} of {obj} has no setter.")
-        if FEATURE_FLAGS.validate_properties_on_set:
+        if get_validate_properties_on_set(self.owning_class):
             property_info = self.descriptor_info(obj)
             value = property_info.validate(value)
 
