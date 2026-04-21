@@ -14,7 +14,6 @@ from labthings_fastapi.exceptions import (
     ServerNotRunningError,
     UnsupportedConstraintError,
 )
-from labthings_fastapi.feature_flags import FEATURE_FLAGS
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server
 from .temp_client import poll_task
@@ -22,6 +21,8 @@ from .temp_client import poll_task
 
 class PropertyTestThing(lt.Thing):
     """A Thing with various properties for testing."""
+
+    _class_settings = {"validate_properties_on_set": True}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -434,14 +435,13 @@ def test_constrained_properties(prop_info, mocker):
             _ = m(root=invalid)
         with pytest.raises(ValidationError):
             descriptorinfo.validate(invalid)
-        # We check that validation on __set__ only applies if it's enabled.
-        with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=True):
-            with pytest.raises(ValidationError):
-                prop.__set__(mock_thing, invalid)
-        with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=False):
+        # We check that validation on __set__ occurs.
+        # This is enabled explicitly in the class definition.
+        with pytest.raises(ValidationError):
             prop.__set__(mock_thing, invalid)
-            not_validated = prop.__get__(mock_thing)
-            assert not_validated == invalid or not_validated is invalid
+        # See test_property.py::test_validate_properties_on_set
+        # for tests that check the default behaviour and bypassing
+        # with _class_settings.
 
 
 def convert_inf_nan(value):

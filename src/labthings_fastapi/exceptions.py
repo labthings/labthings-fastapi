@@ -342,3 +342,11 @@ class PropertyRedefinitionError(AttributeError):
     happens when a decorator is applied to a function with the same name as the
     property. The solution is usually to rename the function.
     """
+
+
+class DefaultWillChangeWarning(DeprecationWarning):
+    """A default value will change in a future release.
+
+    A default value will change in the future. This warning can usually be eliminated
+    by setting the value explicitly.
+    """

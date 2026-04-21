@@ -11,6 +11,8 @@ from typing_extensions import TypedDict, ReadOnly
 from typing import TYPE_CHECKING
 import warnings
 
+from .exceptions import DefaultWillChangeWarning
+
 if TYPE_CHECKING:
     from .thing import Thing
 
@@ -30,7 +32,18 @@ class ThingClassSettings(TypedDict, total=False):
     """
 
 
-def validate_thing_class_settings(cls: type[Thing]) -> None:
+with warnings.catch_warnings():
+    # Pydantic will warn that it doesn't enforce the ReadOnly type hint.
+    # That's fine: it should help mypy and we don't need to worry that pydantic
+    # doesn't enforce it.
+    warnings.filterwarnings(
+        "ignore",
+        ".*Pydantic will not protect items from any mutation on dictionary instances.",
+    )
+    SETTINGS_TYPEADAPTER = TypeAdapter(ThingClassSettings)
+
+
+def validate_thing_class_settings(cls: "type[Thing]") -> None:
     """Validate a class settings dict.
 
     This retrieves the dict from the class, and ensures the attribute
@@ -40,24 +53,28 @@ def validate_thing_class_settings(cls: type[Thing]) -> None:
     :raises InvalidClassSettingsError: if the dictionary is not valid.
     """
     unvalidated = getattr(cls, "_class_settings", {})
-    adapter = TypeAdapter(ThingClassSettings)
     try:
-        cls._class_settings = adapter.validate_python(unvalidated)
+        cls._class_settings = SETTINGS_TYPEADAPTER.validate_python(unvalidated)
     except ValueError as e:
         msg = "The settings dictionary for this class is not valid."
         raise InvalidClassSettingsError(msg) from e
 
-    if not get_validate_properties_on_set(cls):
+    # Add deprecation warnings here if settings will change in the future.
+    # This should cover settings where the default will change, or settings
+    # that might be removed.
+    if "validate_properties_on_set" not in unvalidated:
         warnings.warn(
-            DeprecationWarning(
-                "`get_validate_properties_on_set will become `True` by default "
-                "in the future. Set this property to `True` to eliminate this warning."
+            DefaultWillChangeWarning(
+                "`get_validate_properties_on_set` will become `True` by default "
+                "in the future. Set this property to `True` in "
+                f"`{cls.__module__}.{cls.__name__}._class_settings` to eliminate "
+                "this warning."
             ),
             stacklevel=3,
         )
 
 
-def get_validate_properties_on_set(cls: type[Thing]) -> bool:
+def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
     r"""Determine whether properties should perform validation when set from Python.
 
     .. note::
