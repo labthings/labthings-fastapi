@@ -96,6 +96,19 @@ class DescriptorNotAddedToClassError(RuntimeError):
     """
 
 
+class UnexpectedGarbageCollectionError(RuntimeError):
+    """An object was garbage collected unexpectedly.
+
+    This error is raised when a weak reference fails to resolve unexpectedly.
+    It usually means an object (often a class) has been deleted, while a weak reference
+    to it is still held somewhere. This is done, for example, by `BaseDescriptor`
+    holding a weak reference to the owning class.
+
+    It is hard to imagine a situation where the class would be deleted while the
+    descriptor object remains accessible, but this error exists for that state.
+    """
+
+
 class DescriptorAddedToClassTwiceError(RuntimeError):
     """A Descriptor has been added to a class more than once.
 

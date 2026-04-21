@@ -43,6 +43,7 @@ from .exceptions import (
     NotBoundToInstanceError,
     DescriptorNotAddedToClassError,
     DescriptorAddedToClassTwiceError,
+    UnexpectedGarbageCollectionError,
 )
 
 if TYPE_CHECKING:
@@ -387,7 +388,9 @@ class BaseDescriptor(Generic[Owner, Value]):
         """The class on which this descriptor is defined.
 
         :raises DescriptorNotAddedToClassError: if the owning
-            class is not available.
+            class is not set.
+        :raises UnexpectedGarbageCollectionError: if the owning class has been
+            finalized.
         """
         self.assert_set_name_called()
         if self._owner_ref is None:  # pragma: no cover
@@ -396,8 +399,9 @@ class BaseDescriptor(Generic[Owner, Value]):
         # doesn't raise an error, `BaseDescriptor.__set_name__` has been
         # called and thus `self._owner_ref`` has been set.
         cls = self._owner_ref()
-        if cls is None:  # pragma: no cover
-            raise DescriptorNotAddedToClassError("Owning class was deleted.")
+        if cls is None:
+            msg = f"The class owning the descriptor '{self.name}' was deleted."
+            raise UnexpectedGarbageCollectionError(msg)
         # This should never happen: the class ought not to be deleted, and once
         # it is, the descriptor should also not be accessible.
         return cls
@@ -514,17 +518,11 @@ class BaseDescriptor(Generic[Owner, Value]):
         :param info_class: the `.BaseDescriptorInfo` subclass to return.
         :param obj: The `~lt.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
-        :raises RuntimeError: if garbage collection occurs unexpectedly. This
-            should not happen and would indicate a LabThings bug.
         """
         if obj:
             return info_class(self, obj)
         else:
-            self.assert_set_name_called()
-            owning_class = self._owner_ref()
-            if owning_class is None:
-                raise RuntimeError("Class was unexpectedly deleted")
-            return info_class(self, None, owning_class)
+            return info_class(self, None, self.owning_class)
 
     def descriptor_info(
         self, owner: Owner | None = None
@@ -659,7 +657,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
             self._type = typing.get_args(self.__orig_class__)[1]
             if isinstance(self._type, typing.ForwardRef):
                 raise MissingTypeError(
-                    f"{owner}.{name} is a subscripted descriptor, where the "
+                    f"{owner.__name__}.{name} is a subscripted descriptor, where the "
                     f"subscript is a forward reference ({self._type}). Forward "
                     "references are not supported as subscripts."
                 )
@@ -706,22 +704,12 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         :return: the type of the descriptor's value.
         :raises MissingTypeError: if the type is None, not resolvable, or not specified.
         """
+        # The two lines below should be outside the try: block, so their exceptions
+        # propagate rather than getting wrapped by a MissingTypeError.
         self.assert_set_name_called()
+        cls = self.owning_class
         if self._type is None and self._unevaluated_type_hint is not None:
             # We have a forward reference, so we need to resolve it.
-            if self._owner_ref is None:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name} because "
-                    "the class on which it was defined wasn't saved. This is a "
-                    "LabThings bug - please report it."
-                )
-            # `self._owner_ref` is set in `BaseDescriptor.__set_name__`.
-            owner = self._owner_ref()
-            if owner is None:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name} because "
-                    "the class on which it was defined has been garbage collected."
-                )
             try:
                 # Resolving a forward reference has quirks, and rather than tie us
                 # to undocumented implementation details of `typing` we just use
@@ -733,12 +721,12 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
                 #
                 # Note that we already checked there was an annotation in
                 # __set_name__.
-                hints = typing.get_type_hints(owner, include_extras=True)
+                hints = typing.get_type_hints(cls, include_extras=True)
                 self._type = hints[self.name]
             except Exception as e:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name}."
-                ) from e
+                msg = "Can't resolve forward reference for type of "
+                msg += f"{cls.__name__}.{self.name}."
+                raise MissingTypeError(msg) from e
         if self._type is None:
             # We should never reach this line: if `__set_name__` was called, we'd
             # have raised an exception there if _type was None. If `__set_name__`

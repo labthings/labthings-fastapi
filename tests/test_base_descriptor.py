@@ -18,6 +18,7 @@ from labthings_fastapi.exceptions import (
     MissingTypeError,
     InconsistentTypeError,
     NotBoundToInstanceError,
+    UnexpectedGarbageCollectionError,
 )
 import labthings_fastapi as lt
 
@@ -149,6 +150,7 @@ def test_basedescriptor_with_good_docstring():
     assert prop.name == "my_property_with_nice_docs"
     assert prop.title == "Title goes here."
     assert prop.description.startswith("The docstring")
+    assert prop.owning_class is Example
 
 
 def test_basedescriptor_with_oneline_docstring():
@@ -157,6 +159,7 @@ def test_basedescriptor_with_oneline_docstring():
     assert prop.name == "my_property"
     assert prop.title == "Docs for my_property."
     assert prop.description.startswith("Docs for my_property.")
+    assert prop.owning_class is Example
 
 
 def test_basedescriptor_with_bad_multiline_docstring():
@@ -169,6 +172,7 @@ def test_basedescriptor_with_bad_multiline_docstring():
     assert prop.name == "my_property_with_only_description"
     assert prop.title == "This is a poorly formatted docstring that does not have"
     assert prop.description.startswith("This is a poorly formatted")
+    assert prop.owning_class is Example
 
 
 def test_basedescriptor_orphaned():
@@ -176,6 +180,30 @@ def test_basedescriptor_orphaned():
     prop = MockProperty()
     with pytest.raises(DescriptorNotAddedToClassError):
         _ = prop.name
+    with pytest.raises(DescriptorNotAddedToClassError):
+        _ = prop.owning_class
+
+
+def test_basedescriptor_with_deleted_class():
+    """Check that, if a class is deleted, we get a sensible error."""
+
+    class Example(lt.Thing):
+        prop: int = FieldTypedBaseDescriptor()
+
+    eprop = Example.prop
+    assert eprop.owning_class is Example
+    del Example
+    gc.collect()
+    with pytest.raises(
+        UnexpectedGarbageCollectionError,
+        match="The class owning the descriptor 'prop' was deleted",
+    ):
+        _ = eprop.owning_class
+    with pytest.raises(
+        UnexpectedGarbageCollectionError,
+        match="The class owning the descriptor 'prop' was deleted",
+    ):
+        _ = eprop.value_type
 
 
 def test_basedescriptor_fallback():
@@ -361,7 +389,6 @@ def test_fieldtyped_missingtype():
     class Example3:
         field3: "BadForwardReference" = FieldTypedBaseDescriptor()  # noqa: F821
         field4: "int" = FieldTypedBaseDescriptor()
-        field5: "int" = FieldTypedBaseDescriptor()
 
     with pytest.raises(MissingTypeError) as excinfo:
         _ = Example3.field3.value_type
@@ -370,22 +397,7 @@ def test_fieldtyped_missingtype():
     assert "resolve forward ref" in msg
     assert "field3" in msg
 
-    # If we try to resolve a forward reference and the owner is None, it
-    # should raise an error.
-    # I don't see how this could happen in practice, _owner is always
-    # set if we find a forward reference.
-    # We force this error condition by manually setting _owner to None
-    Example3.field4._owner_ref = None
-
-    with pytest.raises(MissingTypeError) as excinfo:
-        _ = Example3.field4.value_type
-
-    msg = str(excinfo.value)
-    assert "resolve forward ref" in msg
-    assert "wasn't saved" in msg
-    assert "field4" in msg
-
-    # We reuse field4 but manually set _type and _unevaluated_type_hint
+    # We manually set _type and _unevaluated_type_hint
     # to None, to test the catch-all error
     Example3.field4._unevaluated_type_hint = None
     Example3.field4._type = None
@@ -398,21 +410,8 @@ def test_fieldtyped_missingtype():
     assert "caught before now" in msg
     assert "field4" in msg
 
-    # If the class is finalised before we evaluate type hints, we should
-    # get a MissingTypeError. This probably only happens on dynamically
-    # generated classes, and I think it's unlikely we'd dynamically generate
-    # Thing subclasses in a way that they go out of scope.
-    prop = Example3.field5
-    del Example3
-    gc.collect()
-
-    with pytest.raises(MissingTypeError) as excinfo:
-        _ = prop.value_type
-
-    msg = str(excinfo.value)
-    assert "resolve forward ref" in msg
-    assert "garbage collected" in msg
-    assert "field5" in msg
+    # Dealing with the case where a class has been garbage collected is
+    # now tested in `test_basedescriptor_with_deleted_class`
 
     # Rather than roll my own evaluator for forward references, we just
     # won't support forward references in subscripted types for now.
@@ -422,9 +421,8 @@ def test_fieldtyped_missingtype():
             field6 = FieldTypedBaseDescriptor[lt.Thing, "str"]()
 
     msg = str(excinfo.value)
-    assert "forward reference" in msg
-    assert "not supported as subscripts"
-    assert "field6" in msg
+    assert "Forward references are not supported as subscripts." in msg
+    assert "Example4.field6" in msg
 
 
 def test_mismatched_types():
