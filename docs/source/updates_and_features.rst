@@ -3,21 +3,25 @@
 Optional Features and updates
 =============================
 
-LabThings allows some features to be turned on and off globally, using the `lt.FEATURE_FLAGS` object.
+LabThings allows some features to be turned on and off using `lt.Thing._class_settings`.
 This was introduced as a way to smooth the upgrade process for downstream projects, meaning that when a new version of LabThings is released, they need not adopt all the new features at once.
 
-Typically, your application will set the feature flags once, just after importing LabThings. For example, to validate properties when they are written to in Python, we would do:
+If your `Thing` makes use of a recent feature, it might need to be opted into by setting ``_class_settings`` on your `lt.Thing` subclass. For example, you can enable validation of property values (when they are set in Python code) as shown:
 
 .. code-block: python
 
     import labthings_fastapi as lt
 
+    class MyThing(lt.Thing):
+        _class_settings = {"validate_properties_on_set": True}
 
-    lt.FEATURE_FLAGS.validate_properties_on_set = True
+        positive: int = lt.property(default=0, gt=0)
+        """A positive integer, thanks to the ``gt=0`` constraint."""
+    
 
 When new features are intended to become non-optional, the usual procedure will be:
 
-* Introduce the feature in a release, but disable it by default. It may be activated by setting a flag to `True`\ .
+* Introduce the feature in a release, but disable it by default. It may be activated using a class setting.
 * At some point (either the release that introduces it, or a future release) a `DeprecationWarning` will be raised by relevant code if the feature has not been enabled.
 * A subsequent release will enable the feature by default, but it may still be disabled by setting the flag to `False`\ . This will raise a `DeprecationWarning`\ .
 * Another release will remove the feature flag and the feature will be permanently enabled.
