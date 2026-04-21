@@ -53,10 +53,11 @@ def validate_thing_class_settings(cls: "type[Thing]") -> None:
     :raises InvalidClassSettingsError: if the dictionary is not valid.
     """
     unvalidated = getattr(cls, "_class_settings", {})
+    qualname = f"`{cls.__module__}.{cls.__name__}._class_settings`"
     try:
         cls._class_settings = SETTINGS_TYPEADAPTER.validate_python(unvalidated)
     except ValueError as e:
-        msg = "The settings dictionary for this class is not valid."
+        msg = f"{qualname} is not valid."
         raise InvalidClassSettingsError(msg) from e
 
     # Add deprecation warnings here if settings will change in the future.
@@ -67,8 +68,7 @@ def validate_thing_class_settings(cls: "type[Thing]") -> None:
             DefaultWillChangeWarning(
                 "`get_validate_properties_on_set` will become `True` by default "
                 "in the future. Set this property to `True` in "
-                f"`{cls.__module__}.{cls.__name__}._class_settings` to eliminate "
-                "this warning."
+                f"{qualname} to eliminate this warning."
             ),
             stacklevel=3,
         )
