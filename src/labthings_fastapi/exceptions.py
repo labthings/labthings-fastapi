@@ -348,6 +348,15 @@ class InvalidClassSettingsError(ValueError):
     """
 
 
+class FeatureNotEnabledError(RuntimeError):
+    """A feature is being used that is currently disabled.
+
+    Some new or optional features are only available if the relevant feature flag
+    is set. See `lt.FEATURE_FLAGS` for a list of features that may be enabled.
+    This error is raised if a feature is used when it is not enabled.
+    """
+
+
 class PropertyRedefinitionError(AttributeError):
     """A property is being incorrectly redefined.
 
@@ -362,4 +371,13 @@ class DefaultWillChangeWarning(DeprecationWarning):
 
     A default value will change in the future. This warning can usually be eliminated
     by setting the value explicitly.
+    """
+
+
+class GlobalLockBusyError(TimeoutError):
+    """The global lock is already in use.
+
+    This exception is raised when code needs the global lock but cannot acquire
+    it. It indicates that the LabThings server is busy running another action or
+    property setter.
     """

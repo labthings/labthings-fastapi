@@ -1,7 +1,9 @@
 r"""Interface between `~lt.Thing` subclasses and the `~lt.ThingServer`\ ."""
 
 from __future__ import annotations
+from collections.abc import Iterator
 from concurrent.futures import Future
+from contextlib import contextmanager
 from copy import deepcopy
 import os
 from typing import (
@@ -15,7 +17,9 @@ from typing import (
 )
 from weakref import ref, ReferenceType
 
-from .exceptions import ServerNotRunningError
+from labthings_fastapi.global_lock import GlobalLock
+
+from .exceptions import FeatureNotEnabledError, ServerNotRunningError
 
 if TYPE_CHECKING:
     from .server import ThingServer
@@ -181,3 +185,42 @@ class ThingServerInterface:
         This property may be removed in future, and is for internal use only.
         """
         return self._get_server().action_manager
+
+    @property
+    def global_lock(self) -> GlobalLock | None:
+        r"""A lock that ensures property writes and actions are one-at-a-time.
+
+        If global locking is not enabled, this property will return None.
+        """
+        return self._get_server().global_lock
+
+    @contextmanager
+    def hold_global_lock(self, enabled: bool | None = True) -> Iterator[None]:
+        """Hold the global lock, if required, as a context manager.
+
+        This function will hold the global lock if necessary while a block of code runs.
+        Its behaviour is controlled by the `enabled` parameter: if `enabled` is `False`
+        this function does nothing. If it is `None` (the default when called from a
+        property or action that's not otherwise configured), the global lock is
+        held if it exists, but no error is raised if global locking is disabled.
+
+        If ``enabled`` is `True` (the default if no arguments are passed), an error
+        will be raised if there is no global lock.
+
+        :param enabled: whether to use the global lock. `True` and `False` have the
+            obvious meanings described above, `None` will use the lock if it is enabled
+            globally but won't raise an error if it is unavailable.
+        :raises FeatureNotEnabledError: if `enabled` is `True` but the global lock is
+            not enabled.
+        """
+        if self.global_lock is None:
+            if enabled is True:
+                msg = "The global lock is required, but is not enabled."
+                raise FeatureNotEnabledError(msg)
+            # If we get here, the global lock is disabled so we do nothing.
+            yield
+        else:
+            if enabled is False:  # The lock is being explicitly skipped
+                yield
+            with self.global_lock:
+                yield

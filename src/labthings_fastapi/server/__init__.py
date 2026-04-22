@@ -31,6 +31,7 @@ from ..logs import configure_thing_logger
 from ..thing import Thing
 from ..thing_server_interface import ThingServerInterface
 from ..thing_description._model import ThingDescription
+from ..global_lock import GlobalLock
 from .config_model import (
     ThingsConfig,
     ThingServerConfig,
@@ -147,6 +148,7 @@ class ThingServer:
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
+        self.global_lock = GlobalLock() if self._config.enable_global_lock else None
         # The function calls below create and set up the Things.
         self._things = self._create_things()
         self._connect_things()

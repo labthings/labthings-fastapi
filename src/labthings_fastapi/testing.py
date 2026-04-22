@@ -17,6 +17,8 @@ from typing import (
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock
 
+from labthings_fastapi.global_lock import GlobalLock
+
 from .utilities import class_attributes
 from .thing_slots import ThingSlot
 from .thing_server_interface import ThingServerInterface
@@ -44,18 +46,26 @@ class MockThingServerInterface(ThingServerInterface):
     * `get_thing_states` will return an empty dictionary.
     """
 
-    def __init__(self, name: str, settings_folder: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        settings_folder: str | None = None,
+        enable_global_lock: bool = False,
+    ) -> None:
         """Initialise a ThingServerInterface.
 
         :param name: The name of the Thing we're providing an interface to.
         :param settings_folder: The location where we should save settings.
             By default, this is a temporary directory.
+        :param enable_global_lock: Whether to create a global lock object, to
+            mock the server setting of the same name.
         """
         # We deliberately don't call super().__init__(), as it won't work without
         # a server.
         self._name: str = name
         self._settings_tempdir: TemporaryDirectory | None = None
         self._settings_folder = settings_folder
+        self._global_lock = GlobalLock() if enable_global_lock else None
         self._mocks: list[Mock] = []
 
     def start_async_task_soon(
@@ -128,6 +138,11 @@ class MockThingServerInterface(ThingServerInterface):
         :return: None
         """
         return None
+
+    @property
+    def global_lock(self) -> GlobalLock | None:
+        """Return a global lock."""
+        return self._global_lock
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")

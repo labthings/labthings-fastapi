@@ -54,6 +54,7 @@ from typing import (
     Any,
     Callable,
     Generic,
+    Literal,
     TypeVar,
     overload,
     TYPE_CHECKING,
@@ -238,13 +239,21 @@ def property(
 
 @overload  # use as `field: int = property(default=0)`
 def property(
-    *, default: Value, readonly: bool = False, **constraints: Any
+    *,
+    default: Value,
+    readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
+    **constraints: Any,
 ) -> Value: ...
 
 
 @overload  # use as `field: int = property(default_factory=lambda: 0)`
 def property(
-    *, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any
+    *,
+    default_factory: Callable[[], Value],
+    readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
+    **constraints: Any,
 ) -> Value: ...
 
 
@@ -254,6 +263,7 @@ def property(
     default: Value | EllipsisType = ...,
     default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
     **constraints: Any,
 ) -> Value | FunctionalProperty[Owner, Value]:
     r"""Define a Property on a `~lt.Thing`\ .
@@ -285,12 +295,14 @@ def property(
         a `.DirectThingClient`). This is automatically true if
         ``property`` is used as a decorator and no setter is
         specified.
+    :param use_global_lock: may be set to `False` to disable the global lock
+        for setting this property. By default, if global locking is enabled,
+        we hold the global lock while setting the property.
     :param \**constraints: additional keyword arguments are passed
         to `pydantic.Field` and allow constraints to be added to the
         property. For example, ``ge=0`` constrains a numeric property
         to be non-negative. See `pydantic.Field` for the full range
         of constraint arguments.
-
     :return: a property descriptor, either a `.FunctionalProperty`
         if used as a decorator, or a `~lt.DataProperty` if used as
         a field.
@@ -348,6 +360,7 @@ def property(
         default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
         constraints=constraints,
+        use_global_lock=use_global_lock,
     )
 
 
@@ -362,13 +375,20 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     use `~lt.property` to declare properties on your `~lt.Thing` subclass.
     """
 
-    def __init__(self, constraints: Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
+    ) -> None:
         """Initialise a BaseProperty.
 
         :param constraints: is passed as keyword arguments to `pydantic.Field`
             to add validation constraints to the property. See `pydantic.Field`
             for details. The module-level constant `CONSTRAINT_ARGS` lists
             the supported constraint arguments.
+        :param use_global_lock: may be set to `False` to disable the global lock
+            for setting this property. By default, if global locking is enabled,
+            we hold the global lock while setting the property.
 
         :raises UnsupportedConstraintError: if unsupported constraint arguments
             are supplied. See `CONSTRAINT_ARGS` for the supported arguments.
@@ -377,6 +397,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         self._model: type[BaseModel] | None = None
         self.readonly: bool = False
         self._constraints: FieldConstraints = {}
+        self.use_global_lock = use_global_lock
         try:
             self.constraints = self._validate_constraints(constraints or {})
         except UnsupportedConstraintError:
@@ -656,6 +677,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         *,
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
     ) -> None: ...
 
     @overload
@@ -665,6 +687,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         default_factory: Callable[[], Value],
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
     ) -> None: ...
 
     def __init__(
@@ -674,6 +697,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         default_factory: Callable[[], Value] | None = None,
         readonly: bool = False,
         constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
     ) -> None:
         """Create a property that acts like a regular variable.
 
@@ -707,8 +731,11 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param constraints: is passed as keyword arguments to `pydantic.Field`
             to add validation constraints to the property. See `pydantic.Field`
             for details.
+        :param use_global_lock: may be set to `False` to disable the global lock
+            for setting this property. By default, if global locking is enabled,
+            we hold the global lock while setting the property.
         """
-        super().__init__(constraints=constraints)
+        super().__init__(constraints=constraints, use_global_lock=use_global_lock)
         self._default_factory = default_factory_from_arguments(
             default=default, default_factory=default_factory
         )
@@ -743,13 +770,14 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param value: the new value for the property.
         :param emit_changed_event: whether to emit a changed event.
         """
-        if get_validate_properties_on_set(obj.__class__):
-            property_info = self.descriptor_info(obj)
-            obj.__dict__[self.name] = property_info.validate(value)
-        else:
-            obj.__dict__[self.name] = value
-        if emit_changed_event:
-            self.emit_changed_event(obj, value)
+        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+            if get_validate_properties_on_set(obj.__class__):
+                property_info = self.descriptor_info(obj)
+                obj.__dict__[self.name] = property_info.validate(value)
+            else:
+                obj.__dict__[self.name] = value
+            if emit_changed_event:
+                self.emit_changed_event(obj, value)
 
     def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
@@ -837,6 +865,7 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         self,
         fget: Callable[[Owner], Value],
         constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
     ) -> None:
         """Set up a FunctionalProperty.
 
@@ -849,10 +878,13 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param constraints: is passed as keyword arguments to `pydantic.Field`
             to add validation constraints to the property. See `pydantic.Field`
             for details.
+        :param use_global_lock: may be set to `False` to disable the global lock
+            for setting this property. By default, if global locking is enabled,
+            we hold the global lock while setting the property.
 
         :raises MissingTypeError: if the getter does not have a return type annotation.
         """
-        super().__init__(constraints=constraints)
+        super().__init__(constraints=constraints, use_global_lock=use_global_lock)
         self._fget = fget
         self._type = return_type(self._fget)
         if fget.__doc__:
@@ -1001,8 +1033,8 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         if get_validate_properties_on_set(obj.__class__):
             property_info = self.descriptor_info(obj)
             value = property_info.validate(value)
-
-        self.fset(obj, value)
+        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+            self.fset(obj, value)
 
     @builtins.property
     def default(self) -> Value:
@@ -1274,12 +1306,22 @@ def setting(
 
 
 @overload  # use as `field: int = setting(default=0)``
-def setting(*, default: Value, readonly: bool = False, **constraints: Any) -> Value: ...
+def setting(
+    *,
+    default: Value,
+    readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
+    **constraints: Any,
+) -> Value: ...
 
 
 @overload  # use as `field: int = setting(default_factory=lambda: 0)`
 def setting(
-    *, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any
+    *,
+    default_factory: Callable[[], Value],
+    readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
+    **constraints: Any,
 ) -> Value: ...
 
 
@@ -1289,6 +1331,7 @@ def setting(
     default: Value | EllipsisType = ...,
     default_factory: Callable[[], Value] | None = None,
     readonly: bool = False,
+    use_global_lock: Literal[False] | None = None,
     **constraints: Any,
 ) -> FunctionalSetting[Owner, Value] | Value:
     r"""Define a Setting on a `~lt.Thing`\ .
@@ -1335,9 +1378,12 @@ def setting(
     :param readonly: whether the setting should be read-only
         via the `~lt.ThingClient` interface (i.e. over HTTP or via
         a `.DirectThingClient`).
+    :param use_global_lock: may be set to `False` to disable the global lock
+        for setting this setting. By default, if global locking is enabled,
+        we hold the global lock while setting the setting.
     :param \**constraints: additional keyword arguments are passed
         to `pydantic.Field` and allow constraints to be added to the
-        property. For example, ``ge=0`` constrains a numeric property
+        setting. For example, ``ge=0`` constrains a numeric setting
         to be non-negative. See `pydantic.Field` for the full range
         of constraint arguments.
 
@@ -1373,6 +1419,7 @@ def setting(
         default_factory=default_factory_from_arguments(default, default_factory),
         readonly=readonly,
         constraints=constraints,
+        use_global_lock=use_global_lock,
     )
 
 

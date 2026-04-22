@@ -18,7 +18,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections import deque
-from functools import partial
+from functools import partial, wraps
 import inspect
 from threading import Thread, Lock
 import uuid
@@ -29,6 +29,7 @@ from typing import (
     Callable,
     Concatenate,
     Generic,
+    Literal,
     Optional,
     ParamSpec,
     TypeVar,
@@ -38,6 +39,7 @@ from weakref import WeakSet
 import weakref
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
+
 
 from .middleware.url_for import URLFor
 from .base_descriptor import (
@@ -665,6 +667,7 @@ class ActionDescriptor(
         func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn],
         response_timeout: float = 1,
         retention_time: float = 300,
+        use_global_lock: Literal[False] | None = None,
     ) -> None:
         """Create a new action descriptor.
 
@@ -683,6 +686,17 @@ class ActionDescriptor(
             of the action.
         :param retention_time: how long, in seconds, the action should be kept
             for after it has completed.
+        :param use_global_lock: If the global lock is enabled in `lt.FEATURE_FLAGS`
+            this parameter may be used to opt out. When the global lock is enabled,
+            by default all actions acquire the global lock before starting, and
+            release it after they finish. That means only one action thread may
+            run at a time. The same lock is used to set properties.
+
+            If this parameter is `False` then the lock will not be acquired, even
+            if global locking is enabled. That is appropriate if the action does
+            not have side effects that would cause problems for other actions, or
+            if more nuanced locking behaviour is required meaning the lock is
+            acquired directly in the action code.
         """
         super().__init__()
         self.func = func
@@ -692,6 +706,7 @@ class ActionDescriptor(
         name = func.__name__  # this is checked in __set_name__
         self.response_timeout = response_timeout
         self.retention_time = retention_time
+        self.use_global_lock = use_global_lock
         self.dependency_params = fastapi_dependency_params(func)
         self.input_model = input_model_from_signature(
             func,
@@ -725,19 +740,48 @@ class ActionDescriptor(
                 f"'{self.func.__name__}'",
             )
 
+    def wrapped_func(
+        self, obj: OwnerT
+    ) -> Callable[Concatenate[OwnerT, ActionParams], ActionReturn]:
+        """Wrap the action function if necessary, so that it holds the global lock.
+
+        If global locking is enabled and this action hasn't opted out, this function
+        will wrap `func` such that it holds the global lock while it is running.
+
+        :param obj: The object on which the method is being called.
+        :return: the function, wrapped if necessary.
+        """
+        # hold_global_lock returns a context manager. It won't hold the lock
+        # until we enter the context in `wrapped` (defined below).
+        lock_context_manager = obj._thing_server_interface.hold_global_lock(
+            self.use_global_lock
+        )
+        func = self.func
+
+        @wraps(func)
+        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
+            """Acquire the lock then run `func` with supplied arguments."""
+            with lock_context_manager:
+                return func(*args, **kwargs)
+
+        return wrapped
+
     def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
         """Return the function, bound to an object as for a normal method.
 
         This currently doesn't validate the arguments, though it may do so
-        in future. In its present form, this is equivalent to a regular
+        in future. If locking is disabled this is equivalent to a regular
         Python method, i.e. all we do is supply the first argument, `self`.
+
+        If locking is enabled, we return a wrapped function that holds the
+        global lock while the action runs.
 
         :param obj: the `~lt.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        return partial(self.func, obj)
+        return partial(self.wrapped_func(obj), obj)
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.

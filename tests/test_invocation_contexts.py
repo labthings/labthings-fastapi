@@ -5,8 +5,6 @@ in the context of a ``ThingServer`` in, for example, ``test_action_logging`` and
 ``test_action_cancel`` .
 """
 
-from contextlib import contextmanager
-import time
 import pytest
 import uuid
 from threading import Thread
@@ -25,6 +23,7 @@ from labthings_fastapi.exceptions import (
     NoInvocationContextError,
     InvocationCancelledError,
 )
+from .utilities import assert_takes_time
 
 
 def append_invocation_id(ids: list):
@@ -75,19 +74,6 @@ def test_getting_and_setting_id():
         assert before == after
         assert len(ids) == 1
         assert isinstance(ids[0], NoInvocationContextError)
-
-
-@contextmanager
-def assert_takes_time(min_t: float | None, max_t: float | None):
-    """Assert that a code block takes a certain amount of time."""
-    before = time.time()
-    yield
-    after = time.time()
-    duration = after - before
-    if min_t is not None:
-        assert duration >= min_t
-    if max_t is not None:
-        assert duration <= max_t
 
 
 def test_cancel_event():
