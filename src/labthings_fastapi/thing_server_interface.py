@@ -222,5 +222,6 @@ class ThingServerInterface:
         else:
             if enabled is False:  # The lock is being explicitly skipped
                 yield
-            with self.global_lock:
-                yield
+            else:
+                with self.global_lock:
+                    yield

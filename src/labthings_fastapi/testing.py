@@ -144,6 +144,17 @@ class MockThingServerInterface(ThingServerInterface):
         """Return a global lock."""
         return self._global_lock
 
+    @contextmanager
+    def hold_global_lock(self, enabled: bool | None = True) -> Iterator[None]:
+        """Hold the global lock while a block of code executes.
+
+        See `lt.ThingServerInterface.hold_global_lock` for full documentation.
+
+        :param enabled: whether or not the lock must be held.
+        """
+        with ThingServerInterface.hold_global_lock(self, enabled):
+            yield
+
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
@@ -195,6 +206,20 @@ def create_thing_without_server(
     if mock_all_slots:
         _mock_slots(thing)
     return thing
+
+
+def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
+    """Create a mock Thing instance, with some important attributes.
+
+    :param spec: the Thing subclass we're mocking an instance of. Pass
+        `lt.Thing` if it doesn't matter.
+    :return: a Mock instance that pretends to be an instance of `spec`.
+    """
+    mock = Mock(spec=spec)
+    mock.__name__ = "Mock{spec.__name__}"
+    mock.__module__ = "mock_module"
+    mock._thing_server_interface = MockThingServerInterface(mock.__name__)
+    return mock
 
 
 def _mock_slots(thing: Thing) -> None:

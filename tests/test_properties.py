@@ -14,7 +14,7 @@ from labthings_fastapi.exceptions import (
     UnsupportedConstraintError,
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
-from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.testing import create_thing_without_server, mock_thing_instance
 from .temp_client import poll_task
 
 
@@ -410,8 +410,7 @@ def test_constrained_properties(prop_info, mocker):
     assert prop.value_type is prop_info.value_type
     m = prop.model
     assert issubclass(m, RootModel)
-    mock_thing = mocker.Mock(spec=PropertyTestThing)
-    mock_thing._thing_server_interface = mocker.Mock()
+    mock_thing = mock_thing_instance(spec=PropertyTestThing)
     descriptorinfo = prop.descriptor_info(mock_thing)
     assert isinstance(descriptorinfo, PropertyInfo)
     for ann in prop_info.constraints:

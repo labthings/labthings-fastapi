@@ -302,6 +302,17 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. automethod:: labthings_fastapi.thing_server_interface.ThingServerInterface.get_thing_states
         :no-index:
 
+   .. py:property:: global_lock
+        :type GlobalLock | None:
+
+        A global lock object that is used to restrict concurrent execution of actions and setting of properties.
+
+   .. py:method:: hold_global_lock(enabled: bool | None = True)
+
+        A context manager that holds the global lock. The `enabled` parameter sets
+        whether the lock is held. `False` ignores the lock, `None` uses the lock if
+        available, and `True` uses the lock or raises an error if it is missing.    
+
 
 .. py:class:: ThingClassSettings
     
