@@ -52,7 +52,7 @@ def validate_thing_class_settings(cls: "type[Thing]") -> None:
     :param cls: The `Thing` subclass where we are validating.
     :raises InvalidClassSettingsError: if the dictionary is not valid.
     """
-    unvalidated = getattr(cls, "_class_settings", {})
+    unvalidated = get_class_settings(cls)
     qualname = f"`{cls.__module__}.{cls.__name__}._class_settings`"
     try:
         cls._class_settings = SETTINGS_TYPEADAPTER.validate_python(unvalidated)
@@ -74,6 +74,18 @@ def validate_thing_class_settings(cls: "type[Thing]") -> None:
         )
 
 
+def get_class_settings(cls: "type[Thing]") -> ThingClassSettings:
+    """Retrieve a class settings dict or default to an empty dict.
+
+    :param cls: The class from which to retrieve the dict.
+    :return: The ``_class_settings`` dict, or an empty dict.
+    """
+    try:
+        return cls._class_settings
+    except AttributeError:
+        return {}
+
+
 def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
     r"""Determine whether properties should perform validation when set from Python.
 
@@ -85,7 +97,8 @@ def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
     :param cls: the `Thing` subclass on which the property is defined.
     :return: whether validation should be performed.
     """
-    return cls._class_settings.get(
+    settings = get_class_settings(cls)
+    return settings.get(
         "validate_properties_on_set",
         False,
     )

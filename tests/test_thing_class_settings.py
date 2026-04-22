@@ -5,6 +5,7 @@ import warnings
 
 import labthings_fastapi as lt
 from labthings_fastapi.thing_class_settings import (
+    get_class_settings,
     validate_thing_class_settings,
     get_validate_properties_on_set,
 )
@@ -29,6 +30,7 @@ def test_validate_settings(settings, expected):
         _class_settings = settings
 
     # This should run, raise no errors, and leave settings unchanged.
+    assert get_class_settings(TestThing) == settings
     validate_thing_class_settings(TestThing)
     assert TestThing._class_settings == settings
     assert get_validate_properties_on_set(TestThing) is expected
@@ -61,15 +63,25 @@ def test_invalid_settings(settings, mocker):
         validate_thing_class_settings(Stub)
 
 
-def test_no_settings():
+def test_no_settings(mocker):
     """Test the settings are allowed to be unspecified and default to {}."""
 
     class TestThing(lt.Thing):
         pass
 
-    validate_thing_class_settings(TestThing)
-    assert get_validate_properties_on_set(TestThing) is False
-    assert TestThing._class_settings == {}
+    class TestClass:
+        pass
+
+    for cls in [TestThing, TestClass, mocker.MagicMock()]:
+        assert get_class_settings(cls) == {}
+        # This shouldn't error even if settings are missing. This
+        # may occur with mixin classes, as __init_subclass__
+        # won't be called.
+        assert get_validate_properties_on_set(cls) is False
+
+        validate_thing_class_settings(cls)
+        assert get_validate_properties_on_set(cls) is False
+        assert cls._class_settings == {}
 
 
 def test_validate_raises_deprecation_warning_when_setting_not_specified():
