@@ -88,6 +88,15 @@ def test_no_settings(mocker):
         assert cls._class_settings == {}
 
 
+def test_non_dictionary_settings(mocker):
+    """Test we get a helpful error if the class settings has the wrong type."""
+    MockClass = mocker.MagicMock()
+    MockClass.__name__ = "MockClass"
+    MockClass._class_settings = "settings"
+    with pytest.raises(TypeError, match="`_class_settings` .* `dict`."):
+        get_class_settings(MockClass)
+
+
 def test_validate_raises_deprecation_warning_when_setting_not_specified():
     """Test that deprecation warning is raised for a missing value."""
     with pytest.warns(DefaultWillChangeWarning):

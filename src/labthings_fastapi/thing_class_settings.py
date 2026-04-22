@@ -79,8 +79,11 @@ def get_class_settings(cls: "type[Thing]") -> ThingClassSettings:
 
     :param cls: The class from which to retrieve the dict.
     :return: The ``_class_settings`` dict, or an empty dict.
+    :raises TypeError: if the settings is not a dictionary.
     """
     try:
+        if type(cls._class_settings) is not dict:
+            raise TypeError("`_class_settings` must be a `dict`.")
         return cls._class_settings
     except AttributeError:
         return {}
