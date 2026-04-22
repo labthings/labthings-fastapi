@@ -72,7 +72,11 @@ def test_no_settings(mocker):
     class TestClass:
         pass
 
-    for cls in [TestThing, TestClass, mocker.MagicMock()]:
+    MockClass = mocker.MagicMock()
+    MockClass.__name__ = "MockClass"
+    del MockClass._class_settings
+
+    for cls in [TestThing, TestClass, MockClass]:
         assert get_class_settings(cls) == {}
         # This shouldn't error even if settings are missing. This
         # may occur with mixin classes, as __init_subclass__
