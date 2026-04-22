@@ -99,13 +99,12 @@ def test_non_dictionary_settings(mocker):
 
 def test_validate_raises_deprecation_warning_when_setting_not_specified():
     """Test that deprecation warning is raised for a missing value."""
-    with pytest.warns(DefaultWillChangeWarning):
 
-        class TestThing(lt.Thing):
-            _class_settings = {}
+    class TestThing(lt.Thing):
+        _class_settings = {}
 
     with pytest.warns(DefaultWillChangeWarning):
-        validate_thing_class_settings(TestThing)
+        get_validate_properties_on_set(TestThing)
 
 
 @pytest.mark.parametrize("value", [True, False])

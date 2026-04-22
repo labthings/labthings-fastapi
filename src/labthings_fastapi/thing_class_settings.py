@@ -53,25 +53,13 @@ def validate_thing_class_settings(cls: "type[Thing]") -> None:
     :raises InvalidClassSettingsError: if the dictionary is not valid.
     """
     unvalidated = get_class_settings(cls)
-    qualname = f"`{cls.__module__}.{cls.__name__}._class_settings`"
     try:
         cls._class_settings = SETTINGS_TYPEADAPTER.validate_python(unvalidated)
     except ValueError as e:
-        msg = f"{qualname} is not valid."
+        msg = f"`{cls.__module__}.{cls.__name__}._class_settings` is not valid."
         raise InvalidClassSettingsError(msg) from e
 
-    # Add deprecation warnings here if settings will change in the future.
-    # This should cover settings where the default will change, or settings
-    # that might be removed.
-    if "validate_properties_on_set" not in unvalidated:
-        warnings.warn(
-            DefaultWillChangeWarning(
-                "`get_validate_properties_on_set` will become `True` by default "
-                "in the future. Set this property to `True` in "
-                f"{qualname} to eliminate this warning."
-            ),
-            stacklevel=3,
-        )
+    # Add deprecation warnings here if settings will be removed in the future.
 
 
 def get_class_settings(cls: "type[Thing]") -> ThingClassSettings:
@@ -101,6 +89,16 @@ def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
     :return: whether validation should be performed.
     """
     settings = get_class_settings(cls)
+    if "validate_properties_on_set" not in settings:
+        warnings.warn(
+            DefaultWillChangeWarning(
+                "`get_validate_properties_on_set` will become `True` by default "
+                "in the future. Set this property to `True` in "
+                f"`{cls.__module__}.{cls.__name__}._class_settings` "
+                "to eliminate this warning."
+            ),
+            stacklevel=3,
+        )
     return settings.get(
         "validate_properties_on_set",
         False,
