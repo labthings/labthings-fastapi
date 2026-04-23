@@ -80,7 +80,6 @@ class ConcurrencyChecker(lt.Thing):
         """
         names = ["prop1", "prop2", "fprop1", "fprop2"]
         initial_values = {n: getattr(self, n) for n in names}
-        print(f"initial: {initial_values}")
         for _i in range(ticks):
             self._tick_event.wait(timeout=0.1)
             self._tick_event.clear()
@@ -113,6 +112,58 @@ class ConcurrencyChecker(lt.Thing):
         self.prop1 += 1
 
     increment_prop1.use_global_lock = False
+
+
+def assert_can_change_property(thing: ConcurrencyChecker, name: str):
+    """Check whether we can change a property of a Thing.
+
+    :param thing: The ConcurrencyChecker instance being checked.
+    :param name: The name of the property.
+    :return: `True` if the property can be changed.
+    """
+    thing.changes_detected = False
+    val = getattr(thing, name)  # read should always succeed
+    setattr(thing, name, val + 1)
+    thing.tick()
+    assert thing.changes_detected is True
+
+
+def assert_cannot_change_property(
+    thing: ConcurrencyChecker, name: str, error: Exception = GlobalLockBusyError
+):
+    """Check whether we cannot change a property of a Thing.
+
+    :param thing: The ConcurrencyChecker instance being checked.
+    :param name: The name of the property.
+    :return: `True` if setting the property raises an error.
+    """
+    thing.changes_detected = False
+    val = getattr(thing, name)  # read should always succeed
+    with pytest.raises(error):
+        setattr(thing, name, val + 1)
+    thing.tick()
+    assert thing.changes_detected is False
+
+
+def assert_action_makes_change(thing: ConcurrencyChecker, name: str):
+    """Assert an action runs OK and causes properties to change."""
+    thing.changes_detected = False
+    action = getattr(thing, name)
+    action()
+    thing.tick()
+    assert thing.changes_detected is True
+
+
+def assert_action_fails(
+    thing: ConcurrencyChecker, name: str, error: Exception = GlobalLockBusyError
+):
+    """Assert an action fails with an error and doesn't cause a change."""
+    thing.changes_detected = False
+    action = getattr(thing, name)
+    with pytest.raises(error):
+        action()
+    thing.tick()
+    assert thing.changes_detected is False
 
 
 def lock_is_available(lock: GlobalLock) -> bool:
@@ -219,19 +270,11 @@ def test_global_lock_with_thing():
 
     # When we are using the non-blocking checker, all the properties should work.
     for name in ["prop1", "prop2", "fprop1", "fprop2"]:
-        thing.changes_detected = False
-        val = getattr(thing, name)
-        setattr(thing, name, val + 1)
-        thing.tick()
-        assert thing.changes_detected is True
+        assert_can_change_property(thing, name)
 
     # Increment actions should work too.
     for name in ["increment_fprop2", "increment_fprop2_unlocked", "increment_prop1"]:
-        thing.changes_detected = False
-        action = getattr(thing, name)
-        action()
-        thing.tick()
-        assert thing.changes_detected is True
+        assert_action_makes_change(thing, name)
 
     assert monitor_thread.is_alive()
     thing.tick()
@@ -243,35 +286,18 @@ def test_global_lock_with_thing():
 
     # When we are holding the lock, by default properties can't be written.
     for name in ["prop1", "fprop1"]:
-        thing.changes_detected = False
-        val = getattr(thing, name)  # read should always succeed
-        with pytest.raises(GlobalLockBusyError):
-            setattr(thing, name, val + 1)
-        thing.tick()
-        assert thing.changes_detected is False
+        assert_cannot_change_property(thing, name, GlobalLockBusyError)
 
     # The properties excluded from the lock may still be written
     for name in ["prop2", "fprop2"]:
-        thing.changes_detected = False
-        val = getattr(thing, name)
-        setattr(thing, name, val + 1)
-        thing.tick()
-        assert thing.changes_detected is True
+        assert_can_change_property(thing, name)
 
     # By default, other actions won't run
     for name in ["increment_fprop2", "increment_prop1"]:
-        thing.changes_detected = False
-        action = getattr(thing, name)
-        with pytest.raises(GlobalLockBusyError):
-            action()
-        thing.tick()
-        assert thing.changes_detected is False
+        assert_action_fails(thing, name, GlobalLockBusyError)
 
     # Actions may run if they're excluded from the lock.
-    thing.changes_detected = False
-    thing.increment_fprop2_unlocked()
-    thing.tick()
-    assert thing.changes_detected is True
+    assert_action_makes_change(thing, "increment_fprop2_unlocked")
 
     assert monitor_thread.is_alive()
     thing.tick()
