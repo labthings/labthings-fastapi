@@ -2,9 +2,11 @@
 
 from threading import Thread, Event
 from labthings_fastapi.exceptions import GlobalLockBusyError
+from labthings_fastapi.testing import create_thing_without_server
 import pytest
 
 from labthings_fastapi.global_lock import GlobalLock
+import labthings_fastapi as lt
 
 from .utilities import assert_takes_time
 
@@ -18,6 +20,99 @@ class LockChecker(Thread):
         self.acquired = self._lock.acquire(blocking=False)
         if self.acquired:
             self._lock.release()
+
+
+class ConcurrencyChecker(lt.Thing):
+    """A class to check if actions may run concurrently."""
+
+    def __init__(self, thing_server_interface: lt.ThingServerInterface):
+        super().__init__(thing_server_interface)
+        self._tick_event = Event()
+        self._tock_event = Event()
+        self._fprop1 = 0
+        self._fprop2 = 0
+
+    def tick(self):
+        """Set the tick event and block until it's acknowledged.
+
+        This avoids race conditions in the test code.
+        """
+        self._tick_event.set()
+        self._tock_event.wait(0.1)
+        self._tock_event.clear()
+
+    changes_detected: bool = lt.property(default=False, use_global_lock=False)
+
+    prop1: int = lt.property(default=0)
+    """A data property, subject to the global lock by default."""
+
+    prop2: int = lt.property(default=0, use_global_lock=False)
+    """A data property that may be changed without the lock."""
+
+    @lt.property
+    def fprop1(self) -> int:
+        """A functional property that is locked (by default)."""
+        return self._fprop1
+
+    @fprop1.setter
+    def _set_fprop1(self, val: int) -> None:
+        self._fprop1 = val
+
+    @lt.property
+    def fprop2(self) -> int:
+        """A functional property that is not locked."""
+        return self._fprop2
+
+    fprop2.use_global_lock = False
+
+    @fprop2.setter
+    def _set_fprop2(self, val: int) -> None:
+        self._fprop2 = val
+
+    @lt.action
+    def check_for_changes_unlocked(self, ticks=2) -> None:
+        """Check if any properties have changed.
+
+        This function does not acquire the global lock.
+
+        :param ticks: the number of times to wait for the tick event.
+        :return: whether any changes were detected.
+        """
+        names = ["prop1", "prop2", "fprop1", "fprop2"]
+        initial_values = {n: getattr(self, n) for n in names}
+        print(f"initial: {initial_values}")
+        for _i in range(ticks):
+            self._tick_event.wait(timeout=0.1)
+            self._tick_event.clear()
+            for n in names:
+                # Check for changes and reset to initial state
+                if getattr(self, n) != initial_values[n]:
+                    self.changes_detected = True
+                    setattr(self, n, initial_values[n])
+            self._tock_event.set()
+
+    check_for_changes_unlocked.use_global_lock = False
+
+    @lt.action
+    def check_for_changes_locked(self, ticks=2):
+        return self.check_for_changes_unlocked(ticks=ticks)
+
+    @lt.action
+    def increment_fprop2(self):
+        self._fprop2 += 1
+
+    @lt.action
+    def increment_fprop2_unlocked(self):
+        self._fprop2 += 1
+
+    increment_fprop2_unlocked.use_global_lock = False
+
+    @lt.action
+    def increment_prop1(self):
+        """This function is excluded from the lock - but prop1 is locked."""
+        self.prop1 += 1
+
+    increment_prop1.use_global_lock = False
 
 
 def lock_is_available(lock: GlobalLock) -> bool:
@@ -110,3 +205,74 @@ def test_global_lock_timeout():
     assert t.is_alive
     finished.set()
     t.join()
+
+
+def test_global_lock_with_thing():
+    """Ensure the global lock stops multiple things happening at once."""
+    thing = create_thing_without_server(ConcurrencyChecker, enable_global_lock=True)
+
+    # Start the background action that checks for changes.
+    monitor_thread = Thread(
+        target=thing.check_for_changes_unlocked, kwargs={"ticks": 8}
+    )
+    monitor_thread.start()
+
+    # When we are using the non-blocking checker, all the properties should work.
+    for name in ["prop1", "prop2", "fprop1", "fprop2"]:
+        thing.changes_detected = False
+        val = getattr(thing, name)
+        setattr(thing, name, val + 1)
+        thing.tick()
+        assert thing.changes_detected is True
+
+    # Increment actions should work too.
+    for name in ["increment_fprop2", "increment_fprop2_unlocked", "increment_prop1"]:
+        thing.changes_detected = False
+        action = getattr(thing, name)
+        action()
+        thing.tick()
+        assert thing.changes_detected is True
+
+    assert monitor_thread.is_alive()
+    thing.tick()
+    monitor_thread.join()
+
+    # Start the background action that checks for changes, and holds the lock
+    monitor_thread = Thread(target=thing.check_for_changes_locked, kwargs={"ticks": 8})
+    monitor_thread.start()
+
+    # When we are holding the lock, by default properties can't be written.
+    for name in ["prop1", "fprop1"]:
+        thing.changes_detected = False
+        val = getattr(thing, name)  # read should always succeed
+        with pytest.raises(GlobalLockBusyError):
+            setattr(thing, name, val + 1)
+        thing.tick()
+        assert thing.changes_detected is False
+
+    # The properties excluded from the lock may still be written
+    for name in ["prop2", "fprop2"]:
+        thing.changes_detected = False
+        val = getattr(thing, name)
+        setattr(thing, name, val + 1)
+        thing.tick()
+        assert thing.changes_detected is True
+
+    # By default, other actions won't run
+    for name in ["increment_fprop2", "increment_prop1"]:
+        thing.changes_detected = False
+        action = getattr(thing, name)
+        with pytest.raises(GlobalLockBusyError):
+            action()
+        thing.tick()
+        assert thing.changes_detected is False
+
+    # Actions may run if they're excluded from the lock.
+    thing.changes_detected = False
+    thing.increment_fprop2_unlocked()
+    thing.tick()
+    assert thing.changes_detected is True
+
+    assert monitor_thread.is_alive()
+    thing.tick()
+    monitor_thread.join()

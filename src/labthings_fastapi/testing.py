@@ -164,6 +164,7 @@ def create_thing_without_server(
     *args: Any,
     settings_folder: str | None = None,
     mock_all_slots: bool = False,
+    enable_global_lock: bool = True,
     **kwargs: Any,
 ) -> ThingSubclass:
     r"""Create a `~lt.Thing` and supply a mock ThingServerInterface.
@@ -182,6 +183,7 @@ def create_thing_without_server(
         connected to each thing slot. It follows the default of the specified
         to the slot. So if an optional slot has a default of `None`, no mock
         will be provided.
+    :param enable_global_lock: Whether a global lock should be provided.
     :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
@@ -195,7 +197,11 @@ def create_thing_without_server(
         msg = "You may not supply a keyword argument called 'thing_server_interface'."
         raise ValueError(msg)
 
-    msi = MockThingServerInterface(name=name, settings_folder=settings_folder)
+    msi = MockThingServerInterface(
+        name=name,
+        settings_folder=settings_folder,
+        enable_global_lock=enable_global_lock,
+    )
     # Note: we must ignore misc typing errors above because mypy flags an error
     # that `thing_server_interface` is multiply specified.
     # This is a conflict with *args, if we had only **kwargs it would not flag
