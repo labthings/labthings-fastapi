@@ -855,6 +855,10 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         super().__init__(constraints=constraints)
         self._fget = fget
         self._type = return_type(self._fget)
+        if fget.__doc__:
+            # If there is a docstring on the getter, use it as the property's docstring.
+            # BaseDescriptor parses __doc__ to generate the title and description.
+            self.__doc__ = fget.__doc__
         if self._type is None:
             msg = (
                 f"{fget} does not have a valid type. "

@@ -40,10 +40,25 @@ class PropertyTestThing(lt.Thing):
     def undoc(self):
         return self._undoc
 
+    @lt.property
+    def intprop_with_description(self) -> int:
+        """An integer functional property with a description.
+
+        The description is the body of the docstring.
+        """
+        return 42
+
+    floatprop_with_description: float = lt.property(default=0)
+    """A float data property with a description.
+    
+    The description is the body of the docstring.
+    """
+
     _float = 1.0
 
     @lt.property
     def floatprop(self) -> float:
+        """A floating point property, defined with a function."""
         return self._float
 
     @floatprop.setter
@@ -52,6 +67,7 @@ class PropertyTestThing(lt.Thing):
 
     @lt.action
     def toggle_boolprop(self):
+        """Toggle the boolean property."""
         self.boolprop = not self.boolprop
 
     @lt.action
@@ -82,6 +98,7 @@ class PropertyTestThing(lt.Thing):
 
     @lt.property
     def constrained_functional_int(self) -> int:
+        """A functional property with constraints."""
         return self._constrained_functional_int
 
     @constrained_functional_int.setter
@@ -92,6 +109,7 @@ class PropertyTestThing(lt.Thing):
 
     @lt.setting
     def constrained_functional_str_setting(self) -> str:
+        """A setting with constraints."""
         return self._constrained_functional_str_setting
 
     @constrained_functional_str_setting.setter
@@ -565,3 +583,32 @@ def test_propertyinfo():
 
     assert "not a property" not in PropertyTestThing.properties
     assert "not a property" not in thing.properties
+
+
+@pytest.mark.parametrize(
+    ("name", "title", "description"),
+    [
+        ("boolprop", "A boolean property.", ...),
+        ("undoc", "undoc", None),
+        (
+            "intprop_with_description",
+            "An integer functional property with a description.",
+            "The description is the body of the docstring.",
+        ),
+        (
+            "floatprop_with_description",
+            "A float data property with a description.",
+            "The description is the body of the docstring.",
+        ),
+        ("floatprop", "A floating point property, defined with a function.", ...),
+    ],
+)
+def test_title_and_description(name, title, description):
+    """Check title and description propagate correctly."""
+    thing = create_thing_without_server(PropertyTestThing)
+    prop = thing.properties[name]
+    assert prop.title == title
+    if description is ...:
+        description = title
+    # If a description is present, ignore any trailing whitespace.
+    assert (prop.description.rstrip() if prop.description else None) == description
