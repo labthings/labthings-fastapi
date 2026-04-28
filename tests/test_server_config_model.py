@@ -111,44 +111,46 @@ def test_ThingServerConfig():
             ThingServerConfig(things={}, api_prefix=prefix)
 
 
-def test_unimportable_modules():
+@pytest.mark.parametrize(
+    ("import_string", "message"),
+    [
+        (
+            # The error message should refer to the missing module - i.e.
+            # `missing` rather than `missing.module`\ .
+            "missing.module:object",
+            "No module named 'missing'",
+        ),
+        (
+            # Check that, if a module has a broken import, the error refers
+            # to that missing import and doesn't suggest the target module
+            # is missing. This was an upstream bug, fixed in Pydantic 2.13
+            "tests.unimportable.missing_import:object",
+            "No module named 'missing_module'",
+        ),
+        (
+            # RuntimeError in the module should get reported with a single error
+            "tests.unimportable.runtimeerror:SomeClass",
+            r"\[RuntimeError\] This module should not be importable!",
+        ),
+        (
+            # ValueError in the module should be wrapped in ThingImportFailure
+            "tests.unimportable.valueerror:SomeClass",
+            r"\[ValueError\] This module should not be importable due to ValueError!",
+        ),
+        (
+            "tests.unimportable.missing:SomeClass",  # This module does not exist
+            "No module named 'tests.unimportable.missing'",
+        ),
+        (
+            "tests.unimportable:MissingClass",  # Module exists, class does not.
+            "cannot import name 'MissingClass' from 'tests.unimportable'",
+        ),
+    ],
+)
+def test_unimportable_modules(import_string: str, message: str):
     """Test that unimportable modules raise errors as expected."""
 
-    with pytest.raises(ThingImportFailure, match="No module named 'missing'"):
+    with pytest.raises(ThingImportFailure, match=message):
         # If a module is missing, the error should make that clear.
         # Note that the error message changed with Pydantic 2.13.
-        ThingConfig(cls="missing.module:object")
-    with pytest.raises(ThingImportFailure, match="No module named 'missing_module'"):
-        # Check that, if a module has a broken import, the error refers
-        # to that missing import and doesn't suggest the target module
-        # is missing. This was an upstream bug, fixed in Pydantic 2.13
-        ThingConfig(cls="tests.unimportable.missing_import:object")
-
-    with pytest.raises(
-        ThingImportFailure,
-        match=r"\[RuntimeError\] This module should not be importable!",
-    ):
-        # This checks RuntimErrors get reported with a single error
-        ThingConfig(cls="tests.unimportable.runtimeerror:SomeClass")
-
-    with pytest.raises(
-        ThingImportFailure,
-        match=r"\[ValueError\] This module should not be importable due to ValueError!",
-    ):
-        # This checks ValueErrors get reported with a single error
-        # rather than getting swallowed by a ValidationError
-        ThingConfig(cls="tests.unimportable.valueerror:SomeClass")
-
-    with pytest.raises(
-        ThingImportFailure,
-        match="No module named 'tests.unimportable.missing'",
-    ):
-        # This checks normal ImportErrors get reported as usual
-        ThingConfig(cls="tests.unimportable.missing:SomeClass")
-
-    with pytest.raises(
-        ThingImportFailure,
-        match=("cannot import name 'MissingClass' from 'tests.unimportable'"),
-    ):
-        # This checks normal ImportErrors get reported as usual
-        ThingConfig(cls="tests.unimportable:MissingClass")
+        ThingConfig(cls=import_string)
