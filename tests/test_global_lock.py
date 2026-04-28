@@ -6,7 +6,11 @@ from fastapi.testclient import TestClient
 import pytest
 from contextlib import contextmanager
 
-from labthings_fastapi.exceptions import GlobalLockBusyError, ServerActionError
+from labthings_fastapi.exceptions import (
+    ClientPropertyError,
+    GlobalLockBusyError,
+    ServerActionError,
+)
 from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.global_lock import GlobalLock
 import labthings_fastapi as lt
@@ -151,12 +155,10 @@ def assert_changes(thing: ConcurrencyChecker):
 
 
 @contextmanager
-def assert_fails(
-    thing: ConcurrencyChecker, error: type[Exception] = GlobalLockBusyError
-) -> Iterator[None]:
+def assert_fails(thing: ConcurrencyChecker) -> Iterator[None]:
     """Assert that the code in a with block doesn't change properties and errors."""
     thing.changes_detected = False
-    with pytest.raises(error):
+    with pytest.raises((GlobalLockBusyError, ServerActionError, ClientPropertyError)):
         yield
     thing.tick()
     assert thing.changes_detected is False
@@ -298,9 +300,7 @@ def assertions_without_locking(thing: ConcurrencyChecker):
         thing.increment_fprop2_unlocked()
 
 
-def assertions_with_locking(
-    thing: ConcurrencyChecker, action_error: type[Exception] = GlobalLockBusyError
-):
+def assertions_with_locking(thing: ConcurrencyChecker):
     """Test that only the unlocked actions and properties produce a change.
 
     Note that this requires `check_for_changes_locked` to be running in a background
@@ -326,7 +326,7 @@ def assertions_with_locking(
         thing.fprop2 += 1
 
     # By default actions won't run
-    with assert_fails(thing, error=action_error):
+    with assert_fails(thing):
         thing.increment_fprop2()
 
     # Actions may run if they're excluded from the lock.
@@ -334,7 +334,7 @@ def assertions_with_locking(
         thing.increment_fprop2_unlocked()
 
     # Actions that use locked resources (like prop1) should also fail
-    with assert_fails(thing, error=action_error):
+    with assert_fails(thing):
         thing.increment_prop1()
 
 
@@ -371,7 +371,7 @@ def test_actions_and_properties_testclient_lock_enabled():
     with TestClient(server.app) as client:
         thing = lt.ThingClient.from_url("/checker/", client=client)
         with monitor_for_changes(thing, hold_lock=True):
-            assertions_with_locking(thing, action_error=ServerActionError)
+            assertions_with_locking(thing)
         with monitor_for_changes(thing, hold_lock=False):
             assertions_without_locking(thing)
 

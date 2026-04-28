@@ -10,6 +10,7 @@ import warnings
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from typing import Any, AsyncGenerator, Optional, TypeVar, overload
+from fastapi.responses import JSONResponse
 from typing_extensions import Self
 import os
 import logging
@@ -21,6 +22,8 @@ from contextlib import asynccontextmanager, AsyncExitStack, contextmanager
 from collections.abc import Iterator, Mapping, Sequence
 from types import MappingProxyType
 import uvicorn
+
+from labthings_fastapi.exceptions import GlobalLockBusyError
 
 from ..middleware.url_for import url_for_middleware
 from ..thing_slots import ThingSlot
@@ -141,6 +144,7 @@ class ThingServer:
         self.app = FastAPI(lifespan=self.lifespan)
         self._set_cors_middleware()
         self._set_url_for_middleware()
+        self._add_exception_handlers()
         self.action_manager = ActionManager()
         self.app.include_router(self.action_manager.router(), prefix=self._api_prefix)
         self.app.include_router(blob.router, prefix=self._api_prefix)
@@ -231,6 +235,18 @@ class ThingServer:
         using FastAPI's `url_for` function.
         """
         self.app.middleware("http")(url_for_middleware)
+
+    def _add_exception_handlers(self) -> None:
+        """Add exception handlers to the FastAPI application."""
+
+        @self.app.exception_handler(GlobalLockBusyError)
+        async def global_lock_exception_handler(
+            _request: Request, exc: GlobalLockBusyError
+        ) -> JSONResponse:
+            return JSONResponse(
+                status_code=409,
+                content={"detail": repr(exc)},
+            )
 
     @property
     def debug(self) -> bool:

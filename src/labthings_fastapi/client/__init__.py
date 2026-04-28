@@ -171,7 +171,7 @@ class ThingClient:
         """
         response = self.client.put(urljoin(self.path, path), json=value)
         if response.is_error:
-            detail = response.json().get("detail")
+            detail = response.json().get("detail", None)
             err_msg = "Unknown error"
             if isinstance(detail, str):
                 err_msg = detail
