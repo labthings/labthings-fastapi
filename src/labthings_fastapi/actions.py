@@ -748,21 +748,22 @@ class ActionDescriptor(
         If global locking is enabled and this action hasn't opted out, this function
         will wrap `func` such that it holds the global lock while it is running.
 
+        .. note::
+
+            The returned function will hold a reference to both `obj` and `self`
+            (this descriptor). Given that accessing ``instance.method`` returns
+            a function that's already bound to the instance, this shouldn't cause
+            any problems.
+
         :param obj: The object on which the method is being called.
         :return: the function, wrapped if necessary.
         """
-        # hold_global_lock returns a context manager. It won't hold the lock
-        # until we enter the context in `wrapped` (defined below).
-        lock_context_manager = obj._thing_server_interface.hold_global_lock(
-            self.use_global_lock
-        )
-        func = self.func
 
-        @wraps(func)
+        @wraps(self.func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
             """Acquire the lock then run `func` with supplied arguments."""
-            with lock_context_manager:
-                return func(*args, **kwargs)
+            with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+                return self.func(*args, **kwargs)
 
         return wrapped
 

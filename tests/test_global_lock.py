@@ -41,7 +41,10 @@ def lock_is_available(lock: GlobalLock) -> bool:
 
 
 class ConcurrencyChecker(lt.Thing):
-    """A class to check if actions may run concurrently."""
+    """A class to check if actions may run concurrently.
+
+    See `check_for_changes_unlocked` for some important concurrency notes.
+    """
 
     def __init__(self, thing_server_interface: lt.ThingServerInterface):
         super().__init__(thing_server_interface)
@@ -54,7 +57,10 @@ class ConcurrencyChecker(lt.Thing):
     def tick(self):
         """Set the tick event and block until it's acknowledged.
 
-        This avoids race conditions in the test code.
+        This avoids race conditions in the test code, by ensuring
+        the checks performed by `check_for_changes_unlocked` happen at
+        well-defined points in the foreground thread. See that method
+        for more details.
         """
         self._tick_event.set()
         self._tock_event.wait(0.1)
@@ -93,12 +99,28 @@ class ConcurrencyChecker(lt.Thing):
 
     @lt.action
     def check_for_changes_unlocked(self) -> None:
-        """Check if any properties have changed.
+        r"""Check if any properties have changed.
 
         This function does not acquire the global lock.
 
-        :param ticks: the number of times to wait for the tick event.
-        :return: whether any changes were detected.
+        In order to minimise dead time and remove the need for lots of `time.sleep`
+        calls, this method is synchronised by `_tick_event` and `_tock_event` and
+        terminated with `keep_checking_for_changes`\ .
+
+        Code using this method should run it in a background thread or action
+        (most likely using the `monitor_for_changes` context manager) and then
+        set `changes_detected` to `False` then
+        call the `tick()` action whenever a check is required. Once the `tick()`
+        action has completed, `changes_detected` will be set to the right value
+        and the property values will be reset.
+
+        The routine above is done automatically by `assert_changes` or `assert fails`
+        when run as context managers.
+
+        At the end of the test (or when `monitor_for_changes` exits), you should
+        set `keep_checking_for_changes` to `False` and call `tick()` one last time
+        before `join()`\ ing the thread. Doing this using the context manager
+        should ensure your test code does not hang when it fails.
         """
         names = ["prop1", "prop2", "fprop1", "fprop2"]
         initial_values = {n: getattr(self, n) for n in names}
@@ -147,7 +169,10 @@ class ConcurrencyChecker(lt.Thing):
 
 @contextmanager
 def assert_changes(thing: ConcurrencyChecker):
-    """Assert the code in a with block does or does not change properties."""
+    """Assert the code in a with block does or does not change properties.
+
+    See `ConcurrencyChecker.check_for_changes_unlocked` for notes on synchronisation.
+    """
     thing.changes_detected = False
     yield
     thing.tick()
@@ -156,7 +181,13 @@ def assert_changes(thing: ConcurrencyChecker):
 
 @contextmanager
 def assert_fails(thing: ConcurrencyChecker) -> Iterator[None]:
-    """Assert that the code in a with block doesn't change properties and errors."""
+    """Assert that the code in a with block fails with an error.
+
+    Currently, this will look for several exceptions, so that it works on both client
+    and server-side.
+
+    See `ConcurrencyChecker.check_for_changes_unlocked` for notes on synchronisation.
+    """
     thing.changes_detected = False
     with pytest.raises((GlobalLockBusyError, ServerActionError, ClientPropertyError)):
         yield
@@ -292,6 +323,13 @@ def assertions_without_locking(thing: ConcurrencyChecker):
         thing.fprop2 += 1
 
     # Increment actions should work too.
+    # Each action is called twice to check for reuse of context managers.
+    with assert_changes(thing):
+        thing.increment_fprop2()
+    with assert_changes(thing):
+        thing.increment_prop1()
+    with assert_changes(thing):
+        thing.increment_fprop2_unlocked()
     with assert_changes(thing):
         thing.increment_fprop2()
     with assert_changes(thing):
@@ -306,6 +344,9 @@ def assertions_with_locking(thing: ConcurrencyChecker):
     Note that this requires `check_for_changes_locked` to be running in a background
     thread. See `assertions_without_locking` for a version that should work with locking
     disabled.
+
+    This should run if either a `ConcurrencyChecker` or a `ThingClient` connected to
+    one is supplied.
     """
     # Properties may always be read
     assert thing.prop1 == 0
@@ -330,6 +371,10 @@ def assertions_with_locking(thing: ConcurrencyChecker):
         thing.increment_fprop2()
 
     # Actions may run if they're excluded from the lock.
+    # Note this is done twice to check for reuse of context managers
+    # (which will fail on the second attempt)
+    with assert_changes(thing):
+        thing.increment_fprop2_unlocked()
     with assert_changes(thing):
         thing.increment_fprop2_unlocked()
 
@@ -379,7 +424,7 @@ def test_actions_and_properties_testclient_lock_enabled():
 def test_actions_and_properties_testclient_lock_disabled():
     """Ensure the global lock stops multiple things happening at once.
 
-    This test uses a Thing instance directly, with locking enabled.
+    This test uses a Thing instance directly, with locking disabled.
     """
     server = lt.ThingServer({"checker": ConcurrencyChecker}, enable_global_lock=False)
     with TestClient(server.app) as client:
@@ -388,3 +433,14 @@ def test_actions_and_properties_testclient_lock_disabled():
             assertions_without_locking(thing)
         with monitor_for_changes(thing, hold_lock=False):
             assertions_without_locking(thing)
+
+
+def test_reuse_of_action_callables():
+    """Test that it's OK to get a bound action and call it multiple times."""
+    thing = create_thing_without_server(ConcurrencyChecker, enable_global_lock=True)
+    with monitor_for_changes(thing, hold_lock=False):
+        func = thing.increment_fprop2
+        with assert_changes(thing):
+            func()
+        with assert_changes(thing):
+            func()
