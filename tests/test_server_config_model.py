@@ -24,7 +24,7 @@ def test_ThingConfig():
     assert direct.kwargs == {}
     assert direct.thing_slots == {}
 
-    with pytest.raises(ThingImportFailure, match="No module named 'missing.*'"):
+    with pytest.raises(ThingImportFailure, match="No module named 'missing'"):
         ThingConfig(cls="missing.module")
 
 
@@ -114,8 +114,15 @@ def test_ThingServerConfig():
 def test_unimportable_modules():
     """Test that unimportable modules raise errors as expected."""
 
-    with pytest.raises(ThingImportFailure, match="No module named 'missing.*'"):
+    with pytest.raises(ThingImportFailure, match="No module named 'missing'"):
+        # If a module is missing, the error should make that clear.
+        # Note that the error message changed with Pydantic 2.13.
         ThingConfig(cls="missing.module:object")
+    with pytest.raises(ThingImportFailure, match="No module named 'missing_module'"):
+        # Check that, if a module has a broken import, the error refers
+        # to that missing import and doesn't suggest the target module
+        # is missing. This was an upstream bug, fixed in Pydantic 2.13
+        ThingConfig(cls="tests.unimportable.missing_import:object")
 
     with pytest.raises(
         ThingImportFailure,
