@@ -68,6 +68,8 @@ INVALID_THING_NAMES = [
     "thing/with/slashes",
     "trailingslash/",
     "/leadingslash",
+    "things",
+    "cls",
 ]
 
 

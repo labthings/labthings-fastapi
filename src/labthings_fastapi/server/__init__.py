@@ -238,11 +238,11 @@ class ThingServer:
     def settings_folder(self) -> str:
         """The folder in which we will store `Thing` settings.
 
-        :raises ValueError: if there is no settings folder set.
+        :raises RuntimeError: if there is no settings folder set.
             This should never happen, as it's set in `__init__`.
         """
         if self._config.settings_folder is None:
-            raise ValueError(
+            raise RuntimeError(
                 "The settings folder should be set during initialisation. "
                 "This may indicate a LabThings bug, or incorrect subclassing "
                 "of `ThingServer`."

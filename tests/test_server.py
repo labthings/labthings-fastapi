@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from starlette.routing import Route
 
 from labthings_fastapi.example_things import MyThing
+from labthings_fastapi.server.config_model import ThingServerConfig
 
 
 def test_server_from_config_non_thing_error():
@@ -137,3 +138,67 @@ def test_things_endpoints():
         td = response.json()
         assert td["title"] == "MyThing"
         assert tds["thing_a"] == td
+
+
+@pytest.mark.parametrize(
+    ("input", "validated"),
+    [
+        (None, False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_debug_flag(input, validated):
+    """Check that the debug flag can be retrieved."""
+    kwargs = {}
+    if input is not None:
+        kwargs["debug"] = input
+    server = lt.ThingServer({}, **kwargs)
+    assert server.debug is validated
+    with pytest.raises(AttributeError):
+        server.debug = False
+
+
+def test_settings_folder():
+    """Check that the settings folder behaves correctly."""
+    # Without setting a value, it should take the default value
+    server = lt.ThingServer({})
+    assert server.settings_folder == "./settings"
+    server._config.settings_folder = None  # Deliberately induce error
+    with pytest.raises(RuntimeError):
+        # If the config object has None for the settings folder,
+        # an error should be raised. This is set to a string in
+        # __init__.
+        _ = server.settings_folder
+
+    # The settings folder should be settable from an argument or config
+    server = lt.ThingServer({}, settings_folder="./mysettings")
+    assert server.settings_folder == "./mysettings"
+
+    # The settings folder should be settable from an argument or config
+    server = lt.ThingServer({"things": {}, "settings_folder": "./mysettings"})
+    assert server.settings_folder == "./mysettings"
+
+
+def test_server_init():
+    """Check the various different ways in which the server may be initialised."""
+    config_dict = {
+        "things": {
+            "my_thing": MyThing,
+        },
+        "api_prefix": "/api/v3",
+    }
+    config_model = ThingServerConfig(**config_dict)
+
+    def check_server(server: lt.ThingServer, debug: bool = False):
+        """Make sure the server config is as expected."""
+        assert len(server.things) == 1
+        assert isinstance(server.things["my_thing"], MyThing)
+        assert server._api_prefix == "/api/v3"
+        assert server.debug == debug
+
+    check_server(lt.ThingServer(config_dict))
+    check_server(lt.ThingServer(config_model))
+    check_server(lt.ThingServer(config_dict["things"], api_prefix="/api/v3"))
+    check_server(lt.ThingServer(config_model.thing_configs, api_prefix="/api/v3"))
+    check_server(lt.ThingServer(config_model, debug=True), debug=True)
