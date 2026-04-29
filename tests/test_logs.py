@@ -176,11 +176,12 @@ def test_configure_thing_logger():
         assert dest[0].msg == "Test"
 
 
-def test_cli_debug_flag():
+def test_cli_debug_flag(mocker):
     """
     Test that using the --debug flag sets the logger level to DEBUG,
     and that not using it leaves the logger level at INFO.
     """
+    mocker.patch("uvicorn.run")
     # Reset logger level to INFO
     reset_thing_logger()
 
@@ -188,26 +189,28 @@ def test_cli_debug_flag():
     logs.configure_thing_logger()
 
     # Run without --debug
-    # We use dry_run=True to avoid starting uvicorn
     # We need a dummy config
     dummy_json = '{"things": {}}'
-    serve_from_cli(["--json", dummy_json], dry_run=True)
+    server = serve_from_cli(["--json", dummy_json])
 
     assert logs.THING_LOGGER.level == logging.INFO
+    assert server.debug is False
 
     # Run with --debug
-    serve_from_cli(["--json", dummy_json, "--debug"], dry_run=True)
+    server = serve_from_cli(["--json", dummy_json, "--debug"])
 
     assert logs.THING_LOGGER.level == logging.DEBUG
+    assert server.debug is True
 
     # Reset back to INFO
     reset_thing_logger()
 
 
-def test_cli_debug_flag_with_thing(caplog):
+def test_cli_debug_flag_with_thing(caplog, mocker):
     """
     Test that using the --debug flag allows capturing debug logs during __init__.
     """
+    mocker.patch("uvicorn.run")
 
     # Reset logger level to INFO
     reset_thing_logger()
@@ -220,14 +223,16 @@ def test_cli_debug_flag_with_thing(caplog):
 
     # Run without --debug and capture logs
     with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
-        serve_from_cli(["--json", config_json], dry_run=True)
+        server = serve_from_cli(["--json", config_json])
+        assert server.debug is False
 
     # There are no logs
     assert len(caplog.messages) == 0
 
     # Run with --debug and capture logs
     with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
-        serve_from_cli(["--json", config_json, "--debug"], dry_run=True)
+        server = serve_from_cli(["--json", config_json, "--debug"])
+        assert server.debug is True
 
     # Check that the debug message was captured
     assert "Debug message during __init__" in caplog.text

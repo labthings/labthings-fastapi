@@ -20,7 +20,7 @@ the tutorial page :ref:`tutorial_running`.
 
 from argparse import ArgumentParser, Namespace
 import sys
-from typing import Literal, Optional, overload
+from typing import Optional
 
 from pydantic import ValidationError
 import uvicorn
@@ -113,25 +113,13 @@ def config_from_args(args: Namespace) -> ThingServerConfig:
         raise RuntimeError("No configuration (or empty configuration) provided")
 
 
-@overload
-def serve_from_cli(
-    argv: Optional[list[str]], dry_run: Literal[True]
-) -> ThingServer: ...
-
-
-@overload
-def serve_from_cli(argv: Optional[list[str]], dry_run: Literal[False]) -> None: ...
-
-
-def serve_from_cli(
-    argv: Optional[list[str]] = None, dry_run: bool = False
-) -> ThingServer | None:
+def serve_from_cli(argv: Optional[list[str]] = None) -> ThingServer:
     r"""Start the server from the command line.
 
     This function will parse command line arguments, load configuration,
     set up a server, and start it. It calls `.parse_args`,
-    `.config_from_args` and `~lt.ThingServer.from_config` to get a server, then
-    starts `uvicorn` to serve on the specified host and port.
+    `.config_from_args` and `~lt.ThingServer` to get a server, then
+    serves on the specified host and port using `uvicorn`\ .
 
     If the ``fallback`` argument is specified, errors that stop the
     LabThings server from starting will be handled by starting a simple
@@ -143,12 +131,10 @@ def serve_from_cli(
 
     :param argv: command line arguments (defaults to arguments supplied
         to the current command).
-    :param dry_run: may be set to ``True`` to terminate after the server
-        has been created. This tests set-up code and verifies all of the
-        Things specified can be correctly loaded and instantiated, but
-        does not start `uvicorn`\ .
 
-    :return: the `~lt.ThingServer` instance created, if ``dry_run`` is ``True``.
+    :return: the `~lt.ThingServer` instance created. This is mostly useful
+        for test code that mocks `uvicorn.run` to allow inspection of the
+        server.
 
     :raise BaseException: if the server cannot start, and the ``fallback``
         option is not specified.
@@ -159,9 +145,8 @@ def serve_from_cli(
         config, server = None, None
         config = config_from_args(args)
         server = ThingServer(config, debug=True if args.debug else False)
-        if dry_run:
-            return server
-        uvicorn.run(server.app, host=args.host, port=args.port, ws="websockets-sansio")
+        server.serve(host=args.host, port=args.port)
+        return server
     except BaseException as e:
         if args.fallback:
             print(f"Error: {e}")
@@ -175,10 +160,10 @@ def serve_from_cli(
             )
 
             uvicorn.run(app, host=args.host, port=args.port, ws="websockets-sansio")
+            sys.exit(3)  # If we served the fallback, be clear that it wasn't a success.
         else:
             if isinstance(e, (ValidationError, ThingImportFailure)):
                 print(f"Error reading LabThings configuration:\n{e}")
                 sys.exit(3)
             else:
                 raise e
-    return None  # This is required as we sometimes return the server

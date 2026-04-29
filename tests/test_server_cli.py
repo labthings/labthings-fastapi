@@ -112,16 +112,19 @@ def test_serve_from_cli_with_config_file():
 
 
 @pytest.mark.slow
-def test_serve_with_no_config_without_multiprocessing():
+def test_serve_with_no_config_without_multiprocessing(mocker):
+    """Test that no configuration options result in an error."""
     with raises(RuntimeError):
-        serve_from_cli([], dry_run=True)
+        serve_from_cli([])
 
 
 @pytest.mark.slow
 def test_serve_with_no_config():
     """Check an empty config fails, using multiprocessing.
+
     This is important, because if it passes it means our tests above
-    are not actually testing anything.
+    are not actually testing anything - perhaps the errors are being
+    swallowed by `check_serve_from_cli`.
     """
     with raises(RuntimeError):
         check_serve_from_cli([])
