@@ -136,7 +136,7 @@ def test_fallback_with_error():
 
 def test_fallback_with_server():
     config = lt.ThingServerConfig.model_validate(CONFIG_DICT)
-    server = lt.ThingServer.from_config(config)
+    server = lt.ThingServer(config)
     app.set_context(FallbackContext(server=server))
     with TestClient(app) as client:
         response = client.get("/")
@@ -166,7 +166,7 @@ def test_actual_server_fallback():
     fallback.
     """
     # ThingThatCantStart has an error in __enter__
-    server = lt.ThingServer({"bad_thing": ThingThatCantStart})
+    server = lt.ThingServer.from_things({"bad_thing": ThingThatCantStart})
 
     # Starting the server is a SystemExit
     with pytest.raises(SystemExit, match="3") as excinfo:

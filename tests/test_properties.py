@@ -204,7 +204,9 @@ CONSTRAINED_PROPS = [
 @pytest.fixture
 def server():
     with TemporaryDirectory() as dirpath:
-        server = lt.ThingServer({"thing": PropertyTestThing}, settings_folder=dirpath)
+        server = lt.ThingServer.from_things(
+            {"thing": PropertyTestThing}, settings_folder=dirpath
+        )
         yield server
 
 
@@ -389,7 +391,7 @@ def test_setting_without_event_loop():
     # This test may need to change, if we change the intended behaviour
     # Currently it should never be necessary to change properties from the
     # main thread, so we raise an error if you try to do so
-    server = lt.ThingServer({"thing": PropertyTestThing})
+    server = lt.ThingServer.from_things({"thing": PropertyTestThing})
     thing = server.things["thing"]
     assert isinstance(thing, PropertyTestThing)
     with pytest.raises(ServerNotRunningError):

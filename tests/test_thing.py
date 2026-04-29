@@ -11,7 +11,7 @@ def test_td_validates():
 
 def test_add_thing():
     """Check that thing can be added to the server"""
-    server = ThingServer({"thing": MyThing})
+    server = ThingServer.from_things({"thing": MyThing})
     assert isinstance(server.things["thing"], MyThing)
 
 
@@ -22,7 +22,7 @@ def test_thing_can_access_application_config():
         "application_config": {"foo": "bar", "mock": True},
     }
 
-    server = ThingServer.from_config(conf)
+    server = ThingServer(conf)
     thing1 = server.things["thing1"]
     thing2 = server.things["thing2"]
 

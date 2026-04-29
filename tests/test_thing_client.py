@@ -63,7 +63,9 @@ class ThingToTest(lt.Thing):
 @pytest.fixture
 def thing_client_and_thing():
     """Yield a test client connected to a ThingServer and the Thing itself."""
-    server = lt.ThingServer({"test_thing": ThingToTest}, api_prefix="/api/v1")
+    server = lt.ThingServer.from_things(
+        {"test_thing": ThingToTest}, api_prefix="/api/v1"
+    )
     with TestClient(server.app) as client:
         thing_client = lt.ThingClient.from_url("/api/v1/test_thing/", client=client)
         thing = server.things["test_thing"]

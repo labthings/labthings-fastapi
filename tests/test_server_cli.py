@@ -81,7 +81,7 @@ CONFIG = {
 
 def test_server_from_config():
     """Check we can create a server from a config object"""
-    server = ThingServer.from_config(CONFIG)
+    server = ThingServer(CONFIG)
     assert isinstance(server, ThingServer)
 
 

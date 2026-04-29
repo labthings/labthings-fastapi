@@ -16,7 +16,7 @@ from labthings_fastapi.server.config_model import ThingServerConfig
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
     with pytest.raises(TypeError, match="not a Thing"):
-        lt.ThingServer.from_config(
+        lt.ThingServer(
             lt.ThingServerConfig(
                 things={"thingone": lt.ThingConfig(cls="builtins:object")}
             )
@@ -51,7 +51,7 @@ def test_server_thing_descriptions():
         "slowly_increase_counter",
     ]
 
-    server = lt.ThingServer.from_config(conf)
+    server = lt.ThingServer(conf)
     with TestClient(server.app) as client:
         response = client.get("/api/thing_descriptions/")
     response.raise_for_status()
@@ -81,7 +81,7 @@ def test_api_prefix(api_prefix):
     class Example(lt.Thing):
         """An example Thing"""
 
-    server = lt.ThingServer(things={"example": Example}, api_prefix=api_prefix)
+    server = lt.ThingServer.from_things({"example": Example}, api_prefix=api_prefix)
     paths = [route.path for route in server.app.routes if isinstance(route, Route)]
 
     # Dynamically generate expected paths based on the parametrized prefix
@@ -111,7 +111,7 @@ def test_api_prefix(api_prefix):
 
 def test_things_endpoints():
     """Test that the two endpoints for listing Things work."""
-    server = lt.ThingServer(
+    server = lt.ThingServer.from_things(
         {
             "thing_a": MyThing,
             "thing_b": MyThing,
@@ -153,7 +153,7 @@ def test_debug_flag(input, validated):
     kwargs = {}
     if input is not None:
         kwargs["debug"] = input
-    server = lt.ThingServer({}, **kwargs)
+    server = lt.ThingServer.from_things({}, **kwargs)
     assert server.debug is validated
     with pytest.raises(AttributeError):
         server.debug = False
@@ -162,7 +162,7 @@ def test_debug_flag(input, validated):
 def test_settings_folder():
     """Check that the settings folder behaves correctly."""
     # Without setting a value, it should take the default value
-    server = lt.ThingServer({})
+    server = lt.ThingServer.from_things({})
     assert server.settings_folder == "./settings"
     server._config.settings_folder = None  # Deliberately induce error
     with pytest.raises(RuntimeError):
@@ -172,11 +172,13 @@ def test_settings_folder():
         _ = server.settings_folder
 
     # The settings folder should be settable from an argument or config
-    server = lt.ThingServer({}, settings_folder="./mysettings")
+    server = lt.ThingServer.from_things({}, settings_folder="./mysettings")
     assert server.settings_folder == "./mysettings"
 
     # The settings folder should be settable from an argument or config
-    server = lt.ThingServer({"things": {}, "settings_folder": "./mysettings"})
+    server = lt.ThingServer(
+        lt.ThingServerConfig(things={}, settings_folder="./mysettings")
+    )
     assert server.settings_folder == "./mysettings"
 
 
@@ -199,6 +201,10 @@ def test_server_init():
 
     check_server(lt.ThingServer(config_dict))
     check_server(lt.ThingServer(config_model))
-    check_server(lt.ThingServer(config_dict["things"], api_prefix="/api/v3"))
-    check_server(lt.ThingServer(config_model.thing_configs, api_prefix="/api/v3"))
+    check_server(
+        lt.ThingServer.from_things(config_dict["things"], api_prefix="/api/v3")
+    )
+    check_server(
+        lt.ThingServer.from_things(config_model.thing_configs, api_prefix="/api/v3")
+    )
     check_server(lt.ThingServer(config_model, debug=True), debug=True)

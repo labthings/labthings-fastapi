@@ -115,7 +115,7 @@ def test_rootmodel():
 
 def test_numpy_over_http():
     """Read numpy array over http."""
-    server = lt.ThingServer({"np_thing": MyNumpyThing})
+    server = lt.ThingServer.from_things({"np_thing": MyNumpyThing})
     with TestClient(server.app) as client:
         np_thing_client = lt.ThingClient.from_url("/np_thing/", client=client)
 

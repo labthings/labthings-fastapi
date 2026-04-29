@@ -69,7 +69,7 @@ class ExampleWithSlots(lt.Thing):
 def server():
     """Return a LabThings server"""
     with tempfile.TemporaryDirectory() as dir:
-        server = lt.ThingServer(
+        server = lt.ThingServer.from_things(
             things={"example": ExampleThing},
             settings_folder=dir,
         )
@@ -102,7 +102,7 @@ def test_get_server_error():
     This is an error condition that I would find surprising if it
     ever occurred, but it's worth checking.
     """
-    server = lt.ThingServer(things={})
+    server = lt.ThingServer.from_things(things={})
     interface = ThingServerInterface(server, NAME)
     assert interface._get_server() is server
     del server

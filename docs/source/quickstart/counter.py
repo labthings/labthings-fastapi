@@ -31,7 +31,7 @@ class TestThing(lt.Thing):
 if __name__ == "__main__":
     import uvicorn
 
-    server = lt.ThingServer({"counter": TestThing})
+    server = lt.ThingServer.from_things({"counter": TestThing})
 
     # We run the server using `uvicorn`:
     uvicorn.run(server.app, port=5000, ws="websockets-sansio")

@@ -176,7 +176,9 @@ def test_functional_settings_save(tempdir):
     ``floatsetting`` is a functional setting, we should also test
     a `.DataSetting` for completeness.
     """
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
@@ -202,7 +204,9 @@ def test_data_settings_save(tempdir):
 
     This uses ``intsetting`` which is a `.DataSetting` so it tests
     a different code path to the functional setting above."""
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     # The settings file should not be created yet - it's created the
     # first time we write to a setting.
@@ -225,7 +229,9 @@ def test_data_settings_save(tempdir):
 
 def test_settings_dict_save(tempdir):
     """Check settings are saved if the dict is updated in full"""
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     thing = server.things["thing"]
     assert isinstance(thing, ThingWithSettings)
@@ -245,7 +251,9 @@ def test_settings_dict_internal_update(tempdir):
     This behaviour is not ideal, but it is documented. If the behaviour is updated
     then the documentation should be updated and this test removed
     """
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     thing = server.things["thing"]
     assert isinstance(thing, ThingWithSettings)
@@ -260,7 +268,9 @@ def test_settings_dict_internal_update(tempdir):
 
 def test_settings_load(tempdir, caplog):
     """Check settings can be loaded from disk when added to server"""
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     del server
     setting_json = json.dumps(
@@ -276,7 +286,9 @@ def test_settings_load(tempdir, caplog):
         file_obj.write(setting_json)
     with caplog.at_level(logging.WARNING):
         # Add thing to server and check new settings are loaded
-        server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        server = lt.ThingServer.from_things(
+            {"thing": ThingWithSettings}, settings_folder=tempdir
+        )
     assert len(caplog.records) == 0
     thing = server.things["thing"]
     assert isinstance(thing, ThingWithSettings)
@@ -289,7 +301,9 @@ def test_settings_load(tempdir, caplog):
 
 def test_load_extra_settings(caplog, tempdir):
     """Load from setting file. Extra setting in file should create a warning."""
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     del server
     setting_dict = _settings_dict(floatsetting=3.0, stringsetting="bar")
@@ -302,7 +316,9 @@ def test_load_extra_settings(caplog, tempdir):
     # Recreate the server and check for the error
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        _ = lt.ThingServer.from_things(
+            {"thing": ThingWithSettings}, settings_folder=tempdir
+        )
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.things.thing"
@@ -311,7 +327,9 @@ def test_load_extra_settings(caplog, tempdir):
 def test_try_loading_corrupt_settings(tempdir, caplog):
     """Load from setting file. Extra setting in file should create a warning."""
     # Create the server once, so we can get the settings path
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     del server
 
@@ -327,7 +345,9 @@ def test_try_loading_corrupt_settings(tempdir, caplog):
     # Recreate the server and check for the warning in logs
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        _ = lt.ThingServer.from_things(
+            {"thing": ThingWithSettings}, settings_folder=tempdir
+        )
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.things.thing"
@@ -336,7 +356,9 @@ def test_try_loading_corrupt_settings(tempdir, caplog):
 def test_try_loading_setting_file_without_mapping(tempdir, caplog):
     """Load from setting file that isn't a JSON object."""
     # Create the server once, so we can get the settings path
-    server = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
     setting_file = _get_setting_file(server, "thing")
     del server
 
@@ -345,7 +367,9 @@ def test_try_loading_setting_file_without_mapping(tempdir, caplog):
     # Recreate the server and check for the warning in logs
     with caplog.at_level(logging.WARNING):
         # Add thing to server
-        _ = lt.ThingServer({"thing": ThingWithSettings}, settings_folder=tempdir)
+        _ = lt.ThingServer.from_things(
+            {"thing": ThingWithSettings}, settings_folder=tempdir
+        )
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert caplog.records[0].name == "labthings_fastapi.things.thing"

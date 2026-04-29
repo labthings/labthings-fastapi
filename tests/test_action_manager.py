@@ -28,7 +28,7 @@ class CounterThing(lt.Thing):
 @pytest.fixture
 def client():
     """Yield a TestClient connected to a ThingServer."""
-    server = lt.ThingServer({"thing": CounterThing})
+    server = lt.ThingServer.from_things({"thing": CounterThing})
     with TestClient(server.app) as client:
         yield client
 

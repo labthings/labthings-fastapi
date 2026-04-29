@@ -344,7 +344,7 @@ def test_circular_connection(cls_1, cls_2, connections) -> None:
     Thing classes. Circular dependencies should not cause any problems for
     the LabThings server.
     """
-    server = lt.ThingServer(
+    server = lt.ThingServer.from_things(
         things={
             "thing_one": lt.ThingConfig(
                 cls=cls_1, thing_slots=connections.get("thing_one", {})
@@ -397,7 +397,7 @@ def test_connections_none_default(connections, error):
     }
 
     if error is None:
-        server = lt.ThingServer(things)
+        server = lt.ThingServer.from_things(things)
         with TestClient(server.app):
             thing_one = server.things["thing_one"]
             assert isinstance(thing_one, ThingN)
@@ -405,12 +405,12 @@ def test_connections_none_default(connections, error):
         return
 
     with pytest.raises(ThingSlotError, match=error):
-        server = lt.ThingServer(things)
+        server = lt.ThingServer.from_things(things)
 
 
 def test_optional_and_empty():
     """Check that an optional or mapping connection can be None/empty."""
-    server = lt.ThingServer({"thing_one": ThingOne, "thing_two": ThingTwo})
+    server = lt.ThingServer.from_things({"thing_one": ThingOne, "thing_two": ThingTwo})
 
     with TestClient(server.app):
         thing_one = server.things["thing_one"]
@@ -435,14 +435,14 @@ def test_mapping_and_multiple():
     # We can't set up a server like this, because
     # thing_one.optional_thing will match multiple ThingThree instances.
     with pytest.raises(ThingSlotError, match="multiple Things"):
-        server = lt.ThingServer(things)
+        server = lt.ThingServer.from_things(things)
 
     # Set optional thing to one specific name and it will start OK.
     things["thing_one"] = lt.ThingConfig(
         cls=ThingOne,
         thing_slots={"optional_thing": "thing_3"},
     )
-    server = lt.ThingServer(things)
+    server = lt.ThingServer.from_things(things)
     with TestClient(server.app):
         thing_one = server.things["thing_one"]
         assert isinstance(thing_one, ThingOne)

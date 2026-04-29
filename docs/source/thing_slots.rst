@@ -43,7 +43,7 @@ The following example shows the use of a `~lt.thing_slot`:
 
 
     things = {"thing_a": ThingA, "thing_b": ThingB}
-    server = lt.ThingServer(things)
+    server = lt.ThingServer.from_things(things)
 
 
 In this example, ``ThingB.thing_a`` is the simplest form of `~lt.thing_slot`: it

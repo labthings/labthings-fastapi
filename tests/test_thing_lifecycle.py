@@ -20,7 +20,7 @@ class LifecycleThing(lt.Thing):
 @pytest.fixture
 def server():
     """A ThingServer with a LifecycleThing."""
-    return lt.ThingServer({"thing": LifecycleThing})
+    return lt.ThingServer.from_things({"thing": LifecycleThing})
 
 
 @pytest.fixture
