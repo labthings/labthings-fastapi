@@ -7,6 +7,7 @@ See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
 import warnings
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 from typing_extensions import Self
@@ -16,9 +17,10 @@ import logging
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
-from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Mapping, Sequence
+from contextlib import asynccontextmanager, AsyncExitStack, contextmanager
+from collections.abc import Iterator, Mapping, Sequence
 from types import MappingProxyType
+import uvicorn
 
 from ..middleware.url_for import url_for_middleware
 from ..thing_slots import ThingSlot
@@ -474,3 +476,39 @@ class ThingServer:
             }
 
         return router
+
+    def serve(self, host: str = "localhost", port: int = 5000) -> None:
+        r"""Run the server in `uvicorn`\ .
+
+        This method will run the server from Python, using `uvicorn.run`\ .
+        This is the most convenient way to run a LabThings server from Python, and
+        is identical to what happens when it is run from the command line.
+
+        :param host: The IP address or hostname on which to serve. By default, this
+            is ``localhost`` which is only accessible from your computer. To serve
+            over a network on all available IPv4 addresses, use ``"0.0.0.0"``.
+        :param port: The port on which to serve. This defaults to 5000.
+        """
+        uvicorn.run(self.app, host=host, port=port, ws="websockets-sansio")
+
+    @contextmanager
+    def test_client(self) -> Iterator[TestClient]:
+        """A context manager to test out a server without binding to a port.
+
+        This context manager will start up the server and run an event loop, but
+        instead of responding to requests on a network port, it uses
+        `fastapi.testclient.TestClient` to simulate HTTP requests.
+
+        This is provided to simplify test code, and should not be used in production.
+
+        :yields: a `fastapi.testclient.TestClient` to simulate HTTP requests.
+
+        .. warning::
+
+            Usually, a server is only started up and shut down once. Calling this
+            method multiple times may have unexpected results.
+
+            As a rule, only ever use this method in your test suite.
+        """
+        with TestClient(self.app) as client:
+            yield client
