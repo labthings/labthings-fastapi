@@ -6,8 +6,9 @@ provides the tools to serve and manage `~lt.Thing` instances.
 See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
-from __future__ import annotations
-from typing import Any, AsyncGenerator, Optional, TypeVar
+import warnings
+from pydantic import ValidationError
+from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 from typing_extensions import Self
 import os
 import logging
@@ -61,50 +62,55 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
+    @overload
+    def __init__(self, config: ThingServerConfig, debug: bool = False) -> None: ...
+
+    @overload
+    def __init__(
+        self, config: ThingsConfig, debug: bool = False, **kwargs: Any
+    ) -> None: ...
+
     def __init__(
         self,
-        things: ThingsConfig,
-        settings_folder: Optional[str] = None,
-        api_prefix: str = "",
-        application_config: Optional[Mapping[str, Any]] = None,
+        config: ThingServerConfig | ThingsConfig | None = None,
         debug: bool = False,
+        **kwargs: Any,
     ) -> None:
         r"""Initialise a LabThings server.
+
+        The `~lt.ThingServer` is responsible for running the code in `~lt.Thing`
+        instances, and making them available over the network. It should be configured
+        by passing a `~lt.ThingServerConfig` object (or a dictionary that can
+        be validated as a `~lt.ThingServerConfig` object).
+
+        For convenience, it's also possible to supply a dictionary mapping Thing
+        names to Thing configurations or classes. In this case, any extra keyword
+        arguments will be interpreted as additional keys in the server configuration.
 
         Setting up the `~lt.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
         set up and shut down the `~lt.Thing` instances), and configuring it
         to allow cross-origin requests.
 
-        We also create the `.ActionManager` to manage :ref:`actions` and the
-        `.BlobManager` to manage the downloading of :ref:`blobs`.
-
-        :param things: A mapping of Thing names to `~lt.Thing` subclasses, or
-            `~lt.ThingConfig` objects specifying the subclass, its initialisation
-            arguments, and any connections to other `~lt.Thing`\ s.
-        :param settings_folder: the location on disk where `~lt.Thing`
-            settings will be saved.
-        :param api_prefix: A prefix for all API routes. This must either
-            be empty, or start with a slash and not end with a slash.
-        :param application_config: A mapping containing custom configuration for the
-            application. This is not processed by LabThings. Each `~lt.Thing` can
-            access this via the Thing-Server interface.
+        :param config: A `~lt.ThingServerConfig` object that configures the server,
+            or a mapping of Thing names to `~lt.Thing` subclasses or
+            `~lt.ThingConfig` objects.
         :param debug: If ``True``, set the log level for `~lt.Thing` instances to
-                      DEBUG.
+            DEBUG.
+        :param \**kwargs: If keyword arguments are supplied, they will be passed
+            to the constructor of `~lt.ThingServerConfig`\ . This is not allowed
+            if `config` is a `~lt.ThingServerConfig` object.
         """
         self.startup_failure: dict | None = None
+        self._debug = debug
         # Note: this is safe to call multiple times.
-        configure_thing_logger(logging.DEBUG if debug else None)
-        self._config = ThingServerConfig(
-            things=things,
-            settings_folder=settings_folder,
-            api_prefix=api_prefix,
-            application_config=application_config,
-        )
+        configure_thing_logger(logging.DEBUG if self._debug else None)
+        self._config = self.config_from_args(config, **kwargs)
+        if self._config.settings_folder is None:
+            self._config.settings_folder = "./settings"
         self.app = FastAPI(lifespan=self.lifespan)
         self._set_cors_middleware()
         self._set_url_for_middleware()
-        self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.app.include_router(self.action_manager.router(), prefix=self._api_prefix)
         self.app.include_router(blob.router, prefix=self._api_prefix)
@@ -118,17 +124,81 @@ class ThingServer:
         self._attach_things_to_server()
 
     @classmethod
+    def config_from_args(
+        cls,
+        config: ThingServerConfig | ThingsConfig | None,
+        **kwargs: Any,
+    ) -> ThingServerConfig:
+        r"""Parse the arguments to __init__ to generate a config instance.
+
+        See the `__init__` docstring for details of valid arguments.
+
+        :param config: The configuration model or the `things` dictionary.
+        :param \**kwargs: Additional keyword arguments.
+        :return: A valid server configuration.
+
+        :raises ValueError: if no configuration is supplied, or if arguments
+            are inconsistent.
+        """
+        # The next step is to figure out our config. We support a few different ways
+        # of specifying the config: see the docstring for details.
+        if isinstance(config, ThingServerConfig):
+            # If an instance of the config model is supplied, there should be no kwargs.
+            if kwargs != {}:
+                raise ValueError(
+                    f"Extra keyword arguments supplied to `ThingServer()`: {kwargs}. "
+                    "When a `ThingServerConfig` object is specified, no extra keyword "
+                    "arguments may be supplied."
+                )
+            return config
+        if kwargs == {} and config is not None:
+            # If there are not additional keyword arguments, attempt to validate the
+            # `config` argument as a config model. This allows a dictionary to be
+            # supplied instead of a model instance.
+            try:
+                return ThingServerConfig.model_validate(config)
+            except ValidationError:
+                pass
+        if config is None and "things" in kwargs:
+            # The first argument used to be called "things" so this adds backwards
+            # compatibility.
+            config = kwargs.pop("things")
+            warnings.warn(
+                DeprecationWarning(
+                    "The `things` argument has been renamed to `config`. See the "
+                    "documentation for `ThingServer()`."
+                ),
+                stacklevel=3,
+            )
+        if config is None:
+            # No config has been supplied, and no things argument either.
+            raise ValueError("No server configuration has been supplied.")
+        # If we get to here, the only remaining option is that we've been supplied a
+        # dictionary of Things, so we try to build a config model using that.
+        return ThingServerConfig(
+            things=config,
+            **kwargs,
+        )
+
+    @classmethod
     def from_config(cls, config: ThingServerConfig, debug: bool = False) -> Self:
         r"""Create a ThingServer from a configuration model.
 
-        This is equivalent to ``ThingServer(**dict(config))``\ .
+        This is equivalent to ``ThingServer(config, debug=debug)``\ .
 
         :param config: The configuration parameters for the server.
         :param debug: If ``True``, set the log level for `~lt.Thing` instances to
                       DEBUG.
         :return: A `~lt.ThingServer` configured as per the model.
         """
-        return cls(**dict(config), debug=debug)
+        warnings.warn(
+            DeprecationWarning(
+                "`ThingServer.from_config()` is redundant and will be removed in "
+                "a future release. Use `ThingServer()` instead."
+            ),
+            stacklevel=2,
+        )
+        return cls(config, debug=debug)
 
     def _set_cors_middleware(self) -> None:
         """Configure the server to allow requests from other origins.
@@ -156,6 +226,26 @@ class ThingServer:
         using FastAPI's `url_for` function.
         """
         self.app.middleware("http")(url_for_middleware)
+
+    @property
+    def debug(self) -> bool:
+        """Whether the server is in debug mode."""
+        return self._debug
+
+    @property
+    def settings_folder(self) -> str:
+        """The folder in which we will store `Thing` settings.
+
+        :raises ValueError: if there is no settings folder set.
+            This should never happen, as it's set in `__init__`.
+        """
+        if self._config.settings_folder is None:
+            raise ValueError(
+                "The settings folder should be set during initialisation. "
+                "This may indicate a LabThings bug, or incorrect subclassing "
+                "of `ThingServer`."
+            )
+        return self._config.settings_folder
 
     @property
     def things(self) -> Mapping[str, Thing]:

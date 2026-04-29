@@ -158,7 +158,7 @@ def serve_from_cli(
     try:
         config, server = None, None
         config = config_from_args(args)
-        server = ThingServer.from_config(config, True if args.debug else False)
+        server = ThingServer(config, True if args.debug else False)
         if dry_run:
             return server
         uvicorn.run(server.app, host=args.host, port=args.port, ws="websockets-sansio")
