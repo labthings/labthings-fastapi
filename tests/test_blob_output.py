@@ -86,7 +86,7 @@ def client():
             "thing_two": ThingTwo,
         }
     )
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 

@@ -6,7 +6,6 @@ be helpful to have some more bottom-up unit testing in this file.
 
 import pytest
 import labthings_fastapi as lt
-from fastapi.testclient import TestClient
 from starlette.routing import Route
 
 from labthings_fastapi.example_things import MyThing
@@ -52,7 +51,7 @@ def test_server_thing_descriptions():
     ]
 
     server = lt.ThingServer(conf)
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         response = client.get("/api/thing_descriptions/")
     response.raise_for_status()
     thing_descriptions = response.json()
@@ -117,7 +116,7 @@ def test_things_endpoints():
             "thing_b": MyThing,
         }
     )
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Check the thing_descriptions endpoint
         response = client.get("/thing_descriptions/")
         response.raise_for_status()

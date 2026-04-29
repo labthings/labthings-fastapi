@@ -6,7 +6,6 @@ import tempfile
 from typing import Mapping
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
@@ -124,7 +123,7 @@ def test_start_async_task_soon(server, interface):
         # error.
         interface.start_async_task_soon(set_mutable, True)
 
-    with TestClient(server.app) as _:
+    with server.test_client() as _:
         # TestClient starts an event loop in the background
         # so this should work
         interface.start_async_task_soon(set_mutable, True)
@@ -149,7 +148,7 @@ def test_call_async_task(server, interface):
         # error.
         interface.call_async_task(async_shout, "foobar")
 
-    with TestClient(server.app) as _:
+    with server.test_client() as _:
         # TestClient starts an event loop in the background
         # so this should work
         assert interface.call_async_task(async_shout, "foobar") == "FOOBAR"

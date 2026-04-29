@@ -1,6 +1,5 @@
 import pytest
 import labthings_fastapi as lt
-from fastapi.testclient import TestClient
 
 
 class LifecycleThing(lt.Thing):
@@ -31,7 +30,7 @@ def thing(server):
 
 def test_thing_alive(server, thing):
     assert thing.alive is False
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         assert thing.alive is True
         r = client.get("/thing/alive")
         assert r.json() is True
@@ -44,10 +43,10 @@ def test_thing_alive_twice(server, thing):
     sure our lifecycle stuff is closing down cleanly and can restart.
     """
     assert thing.alive is False
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/alive")
         assert r.json() is True
     assert thing.alive is False
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/alive")
         assert r.json() is True

@@ -3,7 +3,6 @@ from typing import Callable, TypeVar, ParamSpec
 import functools
 from threading import RLock, Event, Thread
 
-from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
@@ -117,7 +116,7 @@ def test_locking_in_server():
     """Check the lock works within LabThings."""
     server = lt.ThingServer.from_things({"thing": LockedExample})
     thing = server.things["thing"]
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Start a long task
         r1 = client.post("/thing/wait_wrapper", json={})
         # Wait for it to start

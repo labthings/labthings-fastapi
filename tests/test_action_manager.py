@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 import pytest
 import httpx
 from .temp_client import poll_task
@@ -29,7 +28,7 @@ class CounterThing(lt.Thing):
 def client():
     """Yield a TestClient connected to a ThingServer."""
     server = lt.ThingServer.from_things({"thing": CounterThing})
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 

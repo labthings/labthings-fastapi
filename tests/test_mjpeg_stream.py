@@ -2,7 +2,6 @@ import io
 import threading
 import time
 from PIL import Image
-from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
 
@@ -47,7 +46,7 @@ class Telly(lt.Thing):
 def client():
     """Yield a test client connected to a ThingServer"""
     server = lt.ThingServer.from_things({"telly": Telly})
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 

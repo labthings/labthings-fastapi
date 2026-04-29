@@ -7,7 +7,6 @@ import pytest
 import os
 
 from pydantic import BaseModel
-from fastapi.testclient import TestClient
 
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
@@ -182,7 +181,7 @@ def test_functional_settings_save(tempdir):
     setting_file = _get_setting_file(server, "thing")
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # We write a new value to the property with a PUT request
         r = client.put("/thing/floatsetting", json=2.0)
         # A 201 return code means the operation succeeded (i.e.
@@ -211,7 +210,7 @@ def test_data_settings_save(tempdir):
     # The settings file should not be created yet - it's created the
     # first time we write to a setting.
     assert not os.path.isfile(setting_file)
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Change the value using a PUT request
         r = client.put("/thing/boolsetting", json=True)
         # Check the value was written successfully (201 response code)
@@ -237,7 +236,7 @@ def test_settings_dict_save(tempdir):
     assert isinstance(thing, ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
-    with TestClient(server.app):
+    with server.test_client():
         thing.dictsetting = {"c": 3}
         assert os.path.isfile(setting_file)
         with open(setting_file, "r", encoding="utf-8") as file_obj:
@@ -259,7 +258,7 @@ def test_settings_dict_internal_update(tempdir):
     assert isinstance(thing, ThingWithSettings)
     # No setting file created when first added
     assert not os.path.isfile(setting_file)
-    with TestClient(server.app):
+    with server.test_client():
         thing.dictsetting["a"] = 4
         # As only an internal member of the dictornary was set, the saving was not
         # triggered.

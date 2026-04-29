@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
@@ -62,7 +61,7 @@ def server():
 @pytest.fixture
 def client(server):
     """Yield a TestClient connected to the server."""
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 

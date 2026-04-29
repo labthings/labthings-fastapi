@@ -31,7 +31,7 @@ class ActionMan(lt.Thing):
 def client():
     """Yield a client connected to a ThingServer"""
     server = lt.ThingServer.from_things({"thing": MyThing})
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 
