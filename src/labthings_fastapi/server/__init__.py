@@ -65,16 +65,15 @@ class ThingServer:
     """
 
     @overload
-    def __init__(self, config: ThingServerConfig, debug: bool = False) -> None: ...
+    def __init__(self, config: ThingServerConfig, *, debug: bool = False) -> None: ...
 
     @overload
-    def __init__(
-        self, config: ThingsConfig, debug: bool = False, **kwargs: Any
-    ) -> None: ...
+    def __init__(self, *, debug: bool = False, **kwargs: Any) -> None: ...
 
     def __init__(
         self,
-        config: ThingServerConfig | ThingsConfig | None = None,
+        config: ThingServerConfig | None = None,
+        *,
         debug: bool = False,
         **kwargs: Any,
     ) -> None:
@@ -85,29 +84,57 @@ class ThingServer:
         by passing a `~lt.ThingServerConfig` object (or a dictionary that can
         be validated as a `~lt.ThingServerConfig` object).
 
-        For convenience, it's also possible to supply a dictionary mapping Thing
-        names to Thing configurations or classes. In this case, any extra keyword
-        arguments will be interpreted as additional keys in the server configuration.
+        For convenience and backwards compatibility, if `config` is `None` the keyword
+        arguments will be passed to `~lt.ThingServerConfig` instead. Keyword arguments
+        may not be used if the `config` argument is used, and may be removed in the
+        future.
 
         Setting up the `~lt.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
         set up and shut down the `~lt.Thing` instances), and configuring it
         to allow cross-origin requests.
 
-        :param config: A `~lt.ThingServerConfig` object that configures the server,
-            or a mapping of Thing names to `~lt.Thing` subclasses or
-            `~lt.ThingConfig` objects.
-        :param debug: If ``True``, set the log level for `~lt.Thing` instances to
+        :param config: a `~lt.ThingServerConfig` object that configures the server,
+            or something that may be converted to one.
+        :param debug: ff ``True``, set the log level for `~lt.Thing` instances to
             DEBUG.
-        :param \**kwargs: If keyword arguments are supplied, they will be passed
+        :param \**kwargs: ff keyword arguments are supplied, they will be passed
             to the constructor of `~lt.ThingServerConfig`\ . This is not allowed
             if `config` is a `~lt.ThingServerConfig` object.
+
+        :raises TypeError: if the value of `config` cannot be parsed as a
+            `~lt.ThingServerConfig`\ .
+        :raises ValueError: if keyword arguments are supplied together with `config`\ .
         """
         self.startup_failure: dict | None = None
         self._debug = debug
         # Note: this is safe to call multiple times.
         configure_thing_logger(logging.DEBUG if self._debug else None)
-        self._config = self.config_from_args(config, **kwargs)
+        if config is not None:
+            try:
+                self._config = ThingServerConfig.model_validate(config)
+            except ValidationError as e:
+                raise TypeError(
+                    "The value passed to `ThingServer()` could not be validated as "
+                    "a server configuration. If you are passing a dictionary of "
+                    "Things, this must be done using `ThingServer.from_things` instead."
+                ) from e
+            if kwargs != {}:
+                raise ValueError(
+                    f"Extra keyword arguments supplied to `ThingServer()`: {kwargs}. "
+                    "When a `ThingServerConfig` object is specified, no extra keyword "
+                    "arguments may be supplied."
+                )
+        else:
+            warnings.warn(
+                DeprecationWarning(
+                    "`ThingServer` should be initialised with the `config` parameter. "
+                    "Taking configuration options from keyword arguments will be "
+                    "removed in a future release."
+                ),
+                stacklevel=2,
+            )
+            self._config = ThingServerConfig(**kwargs)
         if self._config.settings_folder is None:
             self._config.settings_folder = "./settings"
         self.app = FastAPI(lifespan=self.lifespan)
@@ -126,60 +153,34 @@ class ThingServer:
         self._attach_things_to_server()
 
     @classmethod
-    def config_from_args(
+    def from_things(
         cls,
-        config: ThingServerConfig | ThingsConfig | None,
+        things: ThingsConfig,
+        debug: bool = False,
         **kwargs: Any,
-    ) -> ThingServerConfig:
-        r"""Parse the arguments to __init__ to generate a config instance.
+    ) -> Self:
+        r"""Create a ThingServer using a dictionary of `~lt.Thing` subclasses.
 
-        See the `__init__` docstring for details of valid arguments.
+        In test and example code, it's convenient to be able to pass server and
+        `Thing` configurations as keyword arguments rather than a config model.
 
-        :param config: The configuration model or the `things` dictionary.
-        :param \**kwargs: Additional keyword arguments.
-        :return: A valid server configuration.
+        This convenience method will turn its keyword arguments into a server
+        configuration and create a server based on it.
 
-        :raises ValueError: if no configuration is supplied, or if arguments
-            are inconsistent.
+        :param things: A mapping of names to `Thing` configurations. These may
+            be specified as a `~lt.ThingConfig` object, a `~lt.Thing` subclass,
+            or an import string referencing a `~lt.Thing` subclass.
+        :param debug: Whether to start the server in debug mode.
+        :param \**kwargs: Additional keyword arguments are passed to
+            `~lt.ThingServerConfig`\ .
+        :return: a `~lt.ThingServer` instance.
         """
-        # The next step is to figure out our config. We support a few different ways
-        # of specifying the config: see the docstring for details.
-        if isinstance(config, ThingServerConfig):
-            # If an instance of the config model is supplied, there should be no kwargs.
-            if kwargs != {}:
-                raise ValueError(
-                    f"Extra keyword arguments supplied to `ThingServer()`: {kwargs}. "
-                    "When a `ThingServerConfig` object is specified, no extra keyword "
-                    "arguments may be supplied."
-                )
-            return config
-        if kwargs == {} and config is not None:
-            # If there are not additional keyword arguments, attempt to validate the
-            # `config` argument as a config model. This allows a dictionary to be
-            # supplied instead of a model instance.
-            try:
-                return ThingServerConfig.model_validate(config)
-            except ValidationError:
-                pass
-        if config is None and "things" in kwargs:
-            # The first argument used to be called "things" so this adds backwards
-            # compatibility.
-            config = kwargs.pop("things")
-            warnings.warn(
-                DeprecationWarning(
-                    "The `things` argument has been renamed to `config`. See the "
-                    "documentation for `ThingServer()`."
-                ),
-                stacklevel=3,
-            )
-        if config is None:
-            # No config has been supplied, and no things argument either.
-            raise ValueError("No server configuration has been supplied.")
-        # If we get to here, the only remaining option is that we've been supplied a
-        # dictionary of Things, so we try to build a config model using that.
-        return ThingServerConfig(
-            things=config,
-            **kwargs,
+        return cls(
+            ThingServerConfig(
+                things=things,
+                **kwargs,
+            ),
+            debug=debug,
         )
 
     @classmethod
