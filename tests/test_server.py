@@ -198,8 +198,11 @@ def test_server_init():
         assert server._api_prefix == "/api/v3"
         assert server.debug == debug
 
+    # The type hint doesn't match a dict, but it works anyway.
     check_server(lt.ThingServer(config_dict))
+    # Supplying a model is the "right" way to do it
     check_server(lt.ThingServer(config_model))
+    # The old usage should use `from_things`
     check_server(
         lt.ThingServer.from_things(config_dict["things"], api_prefix="/api/v3")
     )
@@ -207,3 +210,15 @@ def test_server_init():
         lt.ThingServer.from_things(config_model.thing_configs, api_prefix="/api/v3")
     )
     check_server(lt.ThingServer(config_model, debug=True), debug=True)
+    # ThingServer.from_config is retired in favour of the constructor
+    with pytest.warns(DeprecationWarning, match="redundant"):
+        check_server(lt.ThingServer.from_config(config_model))
+    # `things` can still be passed as kwargs, but it's deprecated
+    with pytest.warns(DeprecationWarning, match="keyword arguments"):
+        check_server(lt.ThingServer(**config_dict))
+    # Supplying config and **kwargs is an error
+    with pytest.raises(ValueError, match="no extra keyword arguments"):
+        lt.ThingServer(config_model, settings_folder="./foo")
+    # Invalid configuration raises a TypeError, with upgrade message
+    with pytest.raises(TypeError, match="from_things"):
+        lt.ThingServer(config_dict["things"])
