@@ -59,7 +59,7 @@ The corresponding client code might look like this:
         img = Image.open(f)
     img.show()  # This will display the image in a window
 
-Another `.Thing` on the same server can also make use of this action, in which case the image data will not be copied:
+Another `~lt.Thing` on the same server can also make use of this action, in which case the image data will not be copied:
 
 .. code-block:: python
 

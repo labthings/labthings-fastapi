@@ -179,7 +179,7 @@ class ThingServer:
         r"""A string that prefixes all URLs in the application.
 
         This will either be empty, or start with a slash and not
-        end with a slash. Validation is performed in `.ThingServerConfig`\ .
+        end with a slash. Validation is performed in `~lt.ThingServerConfig`\ .
         """
         return self._config.api_prefix
 

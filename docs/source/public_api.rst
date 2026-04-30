@@ -292,10 +292,12 @@ This page summarises the parts of the LabThings API that should be most frequent
     
     Bases: :py:obj:`typing_extensions.TypedDict`
 
-    A typed dictionary to hold settings that determine how a `Thing` subclass interacts with LabThings.
+    A typed dictionary to hold settings that determine how a `Thing` subclass interacts with LabThings. This is used to control :ref:`optional_features`\ .
 
-    :py:attribute: validate_properties_on_set
+    .. py:attribute:: validate_properties_on_set
+
         :type: bool
+        :default: False
 
         Whether properties should be validated against their model when set from Python.
         Properties are always validated when set over HTTP.
