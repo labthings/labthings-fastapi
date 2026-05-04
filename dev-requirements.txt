@@ -374,7 +374,7 @@ urllib3==2.6.3
     #   requests
     #   sentry-sdk
     #   sphinx-prompt
-uvicorn==0.45.0
+uvicorn==0.46.0
     # via
     #   fastapi
     #   fastapi-cli
