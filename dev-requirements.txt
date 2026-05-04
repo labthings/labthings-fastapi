@@ -305,7 +305,7 @@ sphinx-prompt==1.9.0
     # via sphinx-toolbox
 sphinx-rtd-theme==3.1.0
     # via labthings-fastapi (pyproject.toml)
-sphinx-tabs==3.4.5
+sphinx-tabs==3.5.0
     # via sphinx-toolbox
 sphinx-toolbox==4.1.2
     # via labthings-fastapi (pyproject.toml)
