@@ -127,7 +127,7 @@ httpx==0.28.1
     #   labthings-fastapi (pyproject.toml)
     #   fastapi
     #   fastapi-cloud-cli
-idna==3.12
+idna==3.13
     # via
     #   anyio
     #   apeye-core
