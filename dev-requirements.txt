@@ -272,7 +272,7 @@ ruamel-yaml==0.18.16
     # via sphinx-toolbox
 ruamel-yaml-clib==0.2.15
     # via ruamel-yaml
-ruff==0.15.11
+ruff==0.15.12
     # via labthings-fastapi (pyproject.toml)
 sentry-sdk==2.58.0
     # via fastapi-cloud-cli
