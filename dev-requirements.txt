@@ -33,7 +33,7 @@ beautifulsoup4==4.14.3
     # via sphinx-toolbox
 cachecontrol==0.14.4
     # via sphinx-toolbox
-certifi==2026.2.25
+certifi==2026.4.22
     # via
     #   httpcore
     #   httpx
