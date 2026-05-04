@@ -91,7 +91,7 @@ fastapi==0.135.4
     # via labthings-fastapi (pyproject.toml)
 fastapi-cli==0.0.24
     # via fastapi
-fastapi-cloud-cli==0.17.0
+fastapi-cloud-cli==0.17.1
     # via fastapi-cli
 fastar==0.11.0
     # via fastapi-cloud-cli
