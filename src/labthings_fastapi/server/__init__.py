@@ -6,8 +6,10 @@ provides the tools to serve and manage `~lt.Thing` instances.
 See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
-from __future__ import annotations
-from typing import Any, AsyncGenerator, Optional, TypeVar
+import warnings
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 from typing_extensions import Self
 import os
 import logging
@@ -15,9 +17,10 @@ import logging
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from anyio.from_thread import BlockingPortal
-from contextlib import asynccontextmanager, AsyncExitStack
-from collections.abc import Mapping, Sequence
+from contextlib import asynccontextmanager, AsyncExitStack, contextmanager
+from collections.abc import Iterator, Mapping, Sequence
 from types import MappingProxyType
+import uvicorn
 
 from ..middleware.url_for import url_for_middleware
 from ..thing_slots import ThingSlot
@@ -61,50 +64,82 @@ class ThingServer:
       an `anyio.from_thread.BlockingPortal`.
     """
 
+    @overload
+    def __init__(self, config: ThingServerConfig, *, debug: bool = False) -> None: ...
+
+    @overload
+    def __init__(self, *, debug: bool = False, **kwargs: Any) -> None: ...
+
     def __init__(
         self,
-        things: ThingsConfig,
-        settings_folder: Optional[str] = None,
-        api_prefix: str = "",
-        application_config: Optional[Mapping[str, Any]] = None,
+        config: ThingServerConfig | None = None,
+        *,
         debug: bool = False,
+        **kwargs: Any,
     ) -> None:
         r"""Initialise a LabThings server.
+
+        The `~lt.ThingServer` is responsible for running the code in `~lt.Thing`
+        instances, and making them available over the network. It should be configured
+        by passing a `~lt.ThingServerConfig` object (or a dictionary that can
+        be validated as a `~lt.ThingServerConfig` object).
+
+        For convenience and backwards compatibility, if `config` is `None` the keyword
+        arguments will be passed to `~lt.ThingServerConfig` instead. Keyword arguments
+        may not be used if the `config` argument is used, and may be removed in the
+        future.
 
         Setting up the `~lt.ThingServer` involves creating the underlying
         `fastapi.FastAPI` app, setting its lifespan function (used to
         set up and shut down the `~lt.Thing` instances), and configuring it
         to allow cross-origin requests.
 
-        We also create the `.ActionManager` to manage :ref:`actions` and the
-        `.BlobManager` to manage the downloading of :ref:`blobs`.
+        :param config: a `~lt.ThingServerConfig` object that configures the server,
+            or something that may be converted to one.
+        :param debug: ff ``True``, set the log level for `~lt.Thing` instances to
+            DEBUG.
+        :param \**kwargs: ff keyword arguments are supplied, they will be passed
+            to the constructor of `~lt.ThingServerConfig`\ . This is not allowed
+            if `config` is a `~lt.ThingServerConfig` object.
 
-        :param things: A mapping of Thing names to `~lt.Thing` subclasses, or
-            `~lt.ThingConfig` objects specifying the subclass, its initialisation
-            arguments, and any connections to other `~lt.Thing`\ s.
-        :param settings_folder: the location on disk where `~lt.Thing`
-            settings will be saved.
-        :param api_prefix: A prefix for all API routes. This must either
-            be empty, or start with a slash and not end with a slash.
-        :param application_config: A mapping containing custom configuration for the
-            application. This is not processed by LabThings. Each `~lt.Thing` can
-            access this via the Thing-Server interface.
-        :param debug: If ``True``, set the log level for `~lt.Thing` instances to
-                      DEBUG.
+        :raises TypeError: if the value of `config` cannot be parsed as a
+            `~lt.ThingServerConfig`\ .
+        :raises ValueError: if keyword arguments are supplied together with `config`\ .
         """
         self.startup_failure: dict | None = None
+        self._debug = debug
         # Note: this is safe to call multiple times.
-        configure_thing_logger(logging.DEBUG if debug else None)
-        self._config = ThingServerConfig(
-            things=things,
-            settings_folder=settings_folder,
-            api_prefix=api_prefix,
-            application_config=application_config,
-        )
+        configure_thing_logger(logging.DEBUG if self._debug else None)
+        if config is not None:
+            try:
+                self._config = ThingServerConfig.model_validate(config)
+            except ValidationError as e:
+                raise TypeError(
+                    "The value passed to `ThingServer()` could not be validated as "
+                    "a server configuration. If you are passing a dictionary of "
+                    "Things, this must be done using `ThingServer.from_things` instead."
+                ) from e
+            if kwargs != {}:
+                raise ValueError(
+                    f"Extra keyword arguments supplied to `ThingServer()`: {kwargs}. "
+                    "When a `ThingServerConfig` object is specified, no extra keyword "
+                    "arguments may be supplied."
+                )
+        else:
+            warnings.warn(
+                DeprecationWarning(
+                    "`ThingServer` should be initialised with the `config` parameter. "
+                    "Taking configuration options from keyword arguments will be "
+                    "removed in a future release."
+                ),
+                stacklevel=2,
+            )
+            self._config = ThingServerConfig(**kwargs)
+        if self._config.settings_folder is None:
+            self._config.settings_folder = "./settings"
         self.app = FastAPI(lifespan=self.lifespan)
         self._set_cors_middleware()
         self._set_url_for_middleware()
-        self.settings_folder = settings_folder or "./settings"
         self.action_manager = ActionManager()
         self.app.include_router(self.action_manager.router(), prefix=self._api_prefix)
         self.app.include_router(blob.router, prefix=self._api_prefix)
@@ -118,17 +153,55 @@ class ThingServer:
         self._attach_things_to_server()
 
     @classmethod
+    def from_things(
+        cls,
+        things: ThingsConfig,
+        debug: bool = False,
+        **kwargs: Any,
+    ) -> Self:
+        r"""Create a ThingServer using a dictionary of `~lt.Thing` subclasses.
+
+        In test and example code, it's convenient to be able to pass server and
+        `Thing` configurations as keyword arguments rather than a config model.
+
+        This convenience method will turn its keyword arguments into a server
+        configuration and create a server based on it.
+
+        :param things: A mapping of names to `Thing` configurations. These may
+            be specified as a `~lt.ThingConfig` object, a `~lt.Thing` subclass,
+            or an import string referencing a `~lt.Thing` subclass.
+        :param debug: Whether to start the server in debug mode.
+        :param \**kwargs: Additional keyword arguments are passed to
+            `~lt.ThingServerConfig`\ .
+        :return: a `~lt.ThingServer` instance.
+        """
+        return cls(
+            ThingServerConfig(
+                things=things,
+                **kwargs,
+            ),
+            debug=debug,
+        )
+
+    @classmethod
     def from_config(cls, config: ThingServerConfig, debug: bool = False) -> Self:
         r"""Create a ThingServer from a configuration model.
 
-        This is equivalent to ``ThingServer(**dict(config))``\ .
+        This is equivalent to ``ThingServer(config, debug=debug)``\ .
 
         :param config: The configuration parameters for the server.
         :param debug: If ``True``, set the log level for `~lt.Thing` instances to
                       DEBUG.
         :return: A `~lt.ThingServer` configured as per the model.
         """
-        return cls(**dict(config), debug=debug)
+        warnings.warn(
+            DeprecationWarning(
+                "`ThingServer.from_config()` is redundant and will be removed in "
+                "a future release. Use `ThingServer()` instead."
+            ),
+            stacklevel=2,
+        )
+        return cls(config, debug=debug)
 
     def _set_cors_middleware(self) -> None:
         """Configure the server to allow requests from other origins.
@@ -156,6 +229,26 @@ class ThingServer:
         using FastAPI's `url_for` function.
         """
         self.app.middleware("http")(url_for_middleware)
+
+    @property
+    def debug(self) -> bool:
+        """Whether the server is in debug mode."""
+        return self._debug
+
+    @property
+    def settings_folder(self) -> str:
+        """The folder in which we will store `Thing` settings.
+
+        :raises RuntimeError: if there is no settings folder set.
+            This should never happen, as it's set in `__init__`.
+        """
+        if self._config.settings_folder is None:
+            raise RuntimeError(
+                "The settings folder should be set during initialisation. "
+                "This may indicate a LabThings bug, or incorrect subclassing "
+                "of `ThingServer`."
+            )
+        return self._config.settings_folder
 
     @property
     def things(self) -> Mapping[str, Thing]:
@@ -384,3 +477,39 @@ class ThingServer:
             }
 
         return router
+
+    def serve(self, host: str = "localhost", port: int = 5000) -> None:
+        r"""Run the server in `uvicorn`\ .
+
+        This method will run the server from Python, using `uvicorn.run`\ .
+        This is the most convenient way to run a LabThings server from Python, and
+        is identical to what happens when it is run from the command line.
+
+        :param host: The IP address or hostname on which to serve. By default, this
+            is ``localhost`` which is only accessible from your computer. To serve
+            over a network on all available IPv4 addresses, use ``"0.0.0.0"``.
+        :param port: The port on which to serve. This defaults to 5000.
+        """
+        uvicorn.run(self.app, host=host, port=port, ws="websockets-sansio")
+
+    @contextmanager
+    def test_client(self) -> Iterator[TestClient]:
+        """A context manager to test out a server without binding to a port.
+
+        This context manager will start up the server and run an event loop, but
+        instead of responding to requests on a network port, it uses
+        `fastapi.testclient.TestClient` to simulate HTTP requests.
+
+        This is provided to simplify test code, and should not be used in production.
+
+        :yields: a `fastapi.testclient.TestClient` to simulate HTTP requests.
+
+        .. warning::
+
+            Usually, a server is only started up and shut down once. Calling this
+            method multiple times may have unexpected results.
+
+            As a rule, only ever use this method in your test suite.
+        """
+        with TestClient(self.app) as client:
+            yield client

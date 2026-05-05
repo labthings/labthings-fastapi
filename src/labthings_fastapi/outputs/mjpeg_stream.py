@@ -456,7 +456,7 @@ class MJPEGStreamDescriptor:
                 stream = MJPEGStreamDescriptor()
 
 
-            server = lt.ThingServer({"camera": Camera})
+            server = lt.ThingServer.from_things({"camera": Camera})
 
         :param app: the `fastapi.FastAPI` application to which we are being added.
         :param thing: the host `~lt.Thing` instance.

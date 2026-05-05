@@ -229,29 +229,44 @@ This page summarises the parts of the LabThings API that should be most frequent
    :return: When used as intended, the result is an `.EndpointDescriptor`.
 
 
-.. py:class:: ThingServer(things: config_model.ThingsConfig, settings_folder: Optional[str] = None, application_config: Optional[collections.abc.Mapping[str, Any]] = None, debug: bool = False)
+.. py:class:: ThingServer(config: ThingServerConfig, debug: bool = False)
 
     The `ThingServer` sets up a `fastapi.FastAPI` application and uses it
     to expose the capabilities of `Thing` instances over HTTP.
 
-    Full documentation of how the class works is available at `labthings_fastpi.server.ThingServer`\ . Most of the attributes of `ThingServer` should not be accessed directly by `Thing` subclasses - instead they should use the `ThingServerInterface` for a cleaner way to access the server.
+    Full documentation of how the class works is available at `labthings_fastpi.server.ThingServer`\ .
+    Most of the attributes of `ThingServer` should not be accessed directly by `Thing` subclasses - instead they should use the `ThingServerInterface` for a cleaner way to access the server.
 
-    :param things: A mapping of Thing names to `~lt.Thing` subclasses, or
-        `ThingConfig` objects specifying the subclass, its initialisation
-        arguments, and any connections to other `~lt.Thing`\ s.
-    :param settings_folder: the location on disk where `~lt.Thing`
-        settings will be saved.
-    :param application_config: A mapping containing custom configuration for the
-        application. This is not processed by LabThings. Each `~lt.Thing` can access
-        application. This is not processed by LabThings. Each `~lt.Thing` can access
-        this via the Thing-Server interface.
-    :param debug: If ``True``, set the log level for `~lt.Thing` instances to
-                    DEBUG.
-        
+    :param config: a `ThingServerConfig` instance (or compatible dictionary) setting the server's configuration.
+    :param debug: sets the log level for `~lt.Thing` instances to DEBUG if it is set to `True`\ .
+    :param \**kwargs: for backwards compatibility, keyword arguments are used to create the server configuration if `config` is missing. This raises a `DeprecationWarning`\ .
 
-   .. automethod:: labthings_fastapi.server.ThingServer.from_config
-        :no-index:
+   .. py:method:: from_config(config: ThingServerConfig, debug: bool = False) -> ThingServer
 
+        This method of creating a `ThingServer` is deprecated, as it is equivalent to the constructor.
+
+        :return: a `ThingServer` with the supplied configuration.
+    
+    .. py:classmethod:: from_things(things: Mapping[str: ThingConfig | type[Thing] | str]) -> ThingServer
+
+        This class method allows a server to be created by passing in a mapping of Thing names to Thing configurations.
+        Thing configurations may be either a `Thing` subclass, or an import string (e.g. ``my.module:MyClass``), or a `ThingConfig` instance (or compatible dictionary).
+
+        .. code-block:: python
+
+            server = lt.ThingServer.from_things(
+                {
+                    "my_thing": MyThingSubclass,
+                    "their_thing": "their.module:TheirThing",
+                    "configured_thing": {
+                        "cls": MyThingSubclass,
+                        "kwargs": {"a": 10},
+                    },
+                }
+            )
+
+        :param things: a mapping of Thing names to Thing configurations.
+        :param \**kwargs: additional keyword arguments are passed to `ThingServerConfig`\ .
 
 
 .. py:class:: ThingServerInterface(server: ThingServer, name: str)

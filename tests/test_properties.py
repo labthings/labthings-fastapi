@@ -5,7 +5,6 @@ from typing import Any
 
 from annotated_types import Ge, Le, Gt, Lt, MultipleOf, MinLen, MaxLen
 from pydantic import BaseModel, RootModel, ValidationError
-from fastapi.testclient import TestClient
 import pytest
 
 import labthings_fastapi as lt
@@ -204,7 +203,9 @@ CONSTRAINED_PROPS = [
 @pytest.fixture
 def server():
     with TemporaryDirectory() as dirpath:
-        server = lt.ThingServer({"thing": PropertyTestThing}, settings_folder=dirpath)
+        server = lt.ThingServer.from_things(
+            {"thing": PropertyTestThing}, settings_folder=dirpath
+        )
         yield server
 
 
@@ -281,7 +282,7 @@ def test_property_get_and_set(server):
     to set a known value, and check it comes back when we read
     it with a GET request.
     """
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         test_str = "A silly test string"
         # Write to the property:
         response = client.put("/thing/stringprop", json=test_str)
@@ -298,7 +299,7 @@ def test_boolprop(server):
 
     PUT requests write to the property, and GET reads it.
     """
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/boolprop")
         assert r.status_code == 200  # Successful read
         assert r.json() is False  # Known initial value
@@ -311,7 +312,7 @@ def test_boolprop(server):
 
 def test_decorator_with_no_annotation(server):
     """Test a property made with an un-annotated function."""
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/undoc")
         assert r.status_code == 200  # Read the property OK
         assert r.json() is None  # The return value was None
@@ -321,7 +322,7 @@ def test_decorator_with_no_annotation(server):
 
 def test_readwrite_with_getter_and_setter(server):
     """Test floatprop can be read and written with a getter/setter."""
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/floatprop")
         assert r.status_code == 200  # Read the property OK
         assert r.json() == 1.0  # Got the expected value
@@ -340,7 +341,7 @@ def test_sync_action(server):
 
     This action doesn't start any extra threads.
     """
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Write to the property so it has a known value
         r = client.put("/thing/boolprop", json=False)
         assert r.status_code == 201  # successful write
@@ -368,7 +369,7 @@ def test_setting_from_thread(server):
 
     This checks there's nothing special about the action thread.
     """
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Reset boolprop to a known state
         r = client.put("/thing/boolprop", json=False)
         assert r.status_code == 201
@@ -389,7 +390,7 @@ def test_setting_without_event_loop():
     # This test may need to change, if we change the intended behaviour
     # Currently it should never be necessary to change properties from the
     # main thread, so we raise an error if you try to do so
-    server = lt.ThingServer({"thing": PropertyTestThing})
+    server = lt.ThingServer.from_things({"thing": PropertyTestThing})
     thing = server.things["thing"]
     assert isinstance(thing, PropertyTestThing)
     with pytest.raises(ServerNotRunningError):
@@ -465,7 +466,7 @@ def test_constrained_properties_http(server, prop_info):
 
     It also checks that the constraints propagate to the JSONSchema.
     """
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         r = client.get("/thing/")
         r.raise_for_status()
         thing_description = r.json()

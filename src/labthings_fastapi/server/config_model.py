@@ -8,6 +8,7 @@ files or strings.
 """
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     Field,
     ImportString,
@@ -118,9 +119,25 @@ class ThingConfig(BaseModel):  # type: ignore[no-redef]
     )
 
 
+RESERVED_THING_NAMES = ("things", "cls")
+
+
+def check_reserved_thing_names(name: str) -> str:
+    """Validate a Thing name by checking it's not in a list of banned names.
+
+    :param name: the name to check.
+    :return: the name, if valid.
+    :raises ValueError: if the name is not valid.
+    """
+    if name in RESERVED_THING_NAMES:
+        raise ValueError(f"{name} is not allowed as the name for a Thing.")
+    return name
+
+
 ThingName = Annotated[
     str,
     Field(min_length=1, pattern=r"^([a-zA-Z0-9\-_]+)$"),
+    AfterValidator(check_reserved_thing_names),
 ]
 
 

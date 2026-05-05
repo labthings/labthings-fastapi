@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, RootModel
 import numpy as np
-from fastapi.testclient import TestClient
 
 from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.types.numpy import NDArray, DenumpifyingDict
@@ -115,8 +114,8 @@ def test_rootmodel():
 
 def test_numpy_over_http():
     """Read numpy array over http."""
-    server = lt.ThingServer({"np_thing": MyNumpyThing})
-    with TestClient(server.app) as client:
+    server = lt.ThingServer.from_things({"np_thing": MyNumpyThing})
+    with server.test_client() as client:
         np_thing_client = lt.ThingClient.from_url("/np_thing/", client=client)
 
         arrayprop = np_thing_client.array_property

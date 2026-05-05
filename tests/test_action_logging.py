@@ -3,7 +3,6 @@ This tests the log that is returned in an action invocation
 """
 
 import logging
-from fastapi.testclient import TestClient
 import pytest
 from .temp_client import poll_task
 import labthings_fastapi as lt
@@ -34,8 +33,8 @@ class ThingThatLogsAndErrors(lt.Thing):
 @pytest.fixture
 def client():
     """Set up a Thing Server and yield a client to it."""
-    server = lt.ThingServer({"log_and_error_thing": ThingThatLogsAndErrors})
-    with TestClient(server.app) as client:
+    server = lt.ThingServer.from_things({"log_and_error_thing": ThingThatLogsAndErrors})
+    with server.test_client() as client:
         yield client
 
 

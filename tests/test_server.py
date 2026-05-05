@@ -6,16 +6,16 @@ be helpful to have some more bottom-up unit testing in this file.
 
 import pytest
 import labthings_fastapi as lt
-from fastapi.testclient import TestClient
 from starlette.routing import Route
 
 from labthings_fastapi.example_things import MyThing
+from labthings_fastapi.server.config_model import ThingServerConfig
 
 
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
     with pytest.raises(TypeError, match="not a Thing"):
-        lt.ThingServer.from_config(
+        lt.ThingServer(
             lt.ThingServerConfig(
                 things={"thingone": lt.ThingConfig(cls="builtins:object")}
             )
@@ -50,8 +50,8 @@ def test_server_thing_descriptions():
         "slowly_increase_counter",
     ]
 
-    server = lt.ThingServer.from_config(conf)
-    with TestClient(server.app) as client:
+    server = lt.ThingServer(conf)
+    with server.test_client() as client:
         response = client.get("/api/thing_descriptions/")
     response.raise_for_status()
     thing_descriptions = response.json()
@@ -80,7 +80,7 @@ def test_api_prefix(api_prefix):
     class Example(lt.Thing):
         """An example Thing"""
 
-    server = lt.ThingServer(things={"example": Example}, api_prefix=api_prefix)
+    server = lt.ThingServer.from_things({"example": Example}, api_prefix=api_prefix)
     paths = [route.path for route in server.app.routes if isinstance(route, Route)]
 
     # Dynamically generate expected paths based on the parametrized prefix
@@ -110,13 +110,13 @@ def test_api_prefix(api_prefix):
 
 def test_things_endpoints():
     """Test that the two endpoints for listing Things work."""
-    server = lt.ThingServer(
+    server = lt.ThingServer.from_things(
         {
             "thing_a": MyThing,
             "thing_b": MyThing,
         }
     )
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Check the thing_descriptions endpoint
         response = client.get("/thing_descriptions/")
         response.raise_for_status()
@@ -137,3 +137,88 @@ def test_things_endpoints():
         td = response.json()
         assert td["title"] == "MyThing"
         assert tds["thing_a"] == td
+
+
+@pytest.mark.parametrize(
+    ("input", "validated"),
+    [
+        (None, False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_debug_flag(input, validated):
+    """Check that the debug flag can be retrieved."""
+    kwargs = {}
+    if input is not None:
+        kwargs["debug"] = input
+    server = lt.ThingServer.from_things({}, **kwargs)
+    assert server.debug is validated
+    with pytest.raises(AttributeError):
+        server.debug = False
+
+
+def test_settings_folder():
+    """Check that the settings folder behaves correctly."""
+    # Without setting a value, it should take the default value
+    server = lt.ThingServer.from_things({})
+    assert server.settings_folder == "./settings"
+    server._config.settings_folder = None  # Deliberately induce error
+    with pytest.raises(RuntimeError):
+        # If the config object has None for the settings folder,
+        # an error should be raised. This is set to a string in
+        # __init__.
+        _ = server.settings_folder
+
+    # The settings folder should be settable from an argument or config
+    server = lt.ThingServer.from_things({}, settings_folder="./mysettings")
+    assert server.settings_folder == "./mysettings"
+
+    # The settings folder should be settable from an argument or config
+    server = lt.ThingServer(
+        lt.ThingServerConfig(things={}, settings_folder="./mysettings")
+    )
+    assert server.settings_folder == "./mysettings"
+
+
+def test_server_init():
+    """Check the various different ways in which the server may be initialised."""
+    config_dict = {
+        "things": {
+            "my_thing": MyThing,
+        },
+        "api_prefix": "/api/v3",
+    }
+    config_model = ThingServerConfig(**config_dict)
+
+    def check_server(server: lt.ThingServer, debug: bool = False):
+        """Make sure the server config is as expected."""
+        assert len(server.things) == 1
+        assert isinstance(server.things["my_thing"], MyThing)
+        assert server._api_prefix == "/api/v3"
+        assert server.debug == debug
+
+    # The type hint doesn't match a dict, but it works anyway.
+    check_server(lt.ThingServer(config_dict))
+    # Supplying a model is the "right" way to do it
+    check_server(lt.ThingServer(config_model))
+    # The old usage should use `from_things`
+    check_server(
+        lt.ThingServer.from_things(config_dict["things"], api_prefix="/api/v3")
+    )
+    check_server(
+        lt.ThingServer.from_things(config_model.thing_configs, api_prefix="/api/v3")
+    )
+    check_server(lt.ThingServer(config_model, debug=True), debug=True)
+    # ThingServer.from_config is retired in favour of the constructor
+    with pytest.warns(DeprecationWarning, match="redundant"):
+        check_server(lt.ThingServer.from_config(config_model))
+    # `things` can still be passed as kwargs, but it's deprecated
+    with pytest.warns(DeprecationWarning, match="keyword arguments"):
+        check_server(lt.ThingServer(**config_dict))
+    # Supplying config and **kwargs is an error
+    with pytest.raises(ValueError, match="no extra keyword arguments"):
+        lt.ThingServer(config_model, settings_folder="./foo")
+    # Invalid configuration raises a TypeError, with upgrade message
+    with pytest.raises(TypeError, match="from_things"):
+        lt.ThingServer(config_dict["things"])

@@ -4,7 +4,6 @@ This tests the log that is returned in an action invocation
 
 import uuid
 import pytest
-from fastapi.testclient import TestClient
 from .temp_client import poll_task, task_href
 import labthings_fastapi as lt
 import time
@@ -68,7 +67,7 @@ class CancellableCountingThing(lt.Thing):
 @pytest.fixture
 def server():
     """Create a server with a CancellableCountingThing added."""
-    server = lt.ThingServer({"counting_thing": CancellableCountingThing})
+    server = lt.ThingServer.from_things({"counting_thing": CancellableCountingThing})
     return server
 
 
@@ -80,7 +79,7 @@ def counting_thing(server):
 
 @pytest.fixture
 def client(server):
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 

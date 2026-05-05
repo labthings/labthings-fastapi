@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 from pydantic import BaseModel
 import labthings_fastapi as lt
 
@@ -24,9 +23,9 @@ class MyThing(lt.Thing):
 
 def test_endpoints():
     """Check endpoints may be added to the app and work as expected."""
-    server = lt.ThingServer({"thing": MyThing})
+    server = lt.ThingServer.from_things({"thing": MyThing})
     thing = server.things["thing"]
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         # Check the function works when used directly
         assert thing.path_from_name() == "path_from_name"
         # Check it works identically over HTTP. The path is

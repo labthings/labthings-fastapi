@@ -11,7 +11,6 @@ import logging
 from types import EllipsisType
 import pytest
 from uuid import UUID, uuid4
-from fastapi.testclient import TestClient
 from labthings_fastapi import logs
 from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.invocation_contexts import (
@@ -177,11 +176,12 @@ def test_configure_thing_logger():
         assert dest[0].msg == "Test"
 
 
-def test_cli_debug_flag():
+def test_cli_debug_flag(mocker):
     """
     Test that using the --debug flag sets the logger level to DEBUG,
     and that not using it leaves the logger level at INFO.
     """
+    mocker.patch("uvicorn.run")
     # Reset logger level to INFO
     reset_thing_logger()
 
@@ -189,26 +189,28 @@ def test_cli_debug_flag():
     logs.configure_thing_logger()
 
     # Run without --debug
-    # We use dry_run=True to avoid starting uvicorn
     # We need a dummy config
     dummy_json = '{"things": {}}'
-    serve_from_cli(["--json", dummy_json], dry_run=True)
+    server = serve_from_cli(["--json", dummy_json])
 
     assert logs.THING_LOGGER.level == logging.INFO
+    assert server.debug is False
 
     # Run with --debug
-    serve_from_cli(["--json", dummy_json, "--debug"], dry_run=True)
+    server = serve_from_cli(["--json", dummy_json, "--debug"])
 
     assert logs.THING_LOGGER.level == logging.DEBUG
+    assert server.debug is True
 
     # Reset back to INFO
     reset_thing_logger()
 
 
-def test_cli_debug_flag_with_thing(caplog):
+def test_cli_debug_flag_with_thing(caplog, mocker):
     """
     Test that using the --debug flag allows capturing debug logs during __init__.
     """
+    mocker.patch("uvicorn.run")
 
     # Reset logger level to INFO
     reset_thing_logger()
@@ -221,14 +223,16 @@ def test_cli_debug_flag_with_thing(caplog):
 
     # Run without --debug and capture logs
     with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
-        serve_from_cli(["--json", config_json], dry_run=True)
+        server = serve_from_cli(["--json", config_json])
+        assert server.debug is False
 
     # There are no logs
     assert len(caplog.messages) == 0
 
     # Run with --debug and capture logs
     with caplog.at_level(logging.DEBUG, logger="labthings_fastapi.things"):
-        serve_from_cli(["--json", config_json, "--debug"], dry_run=True)
+        server = serve_from_cli(["--json", config_json, "--debug"])
+        assert server.debug is True
 
     # Check that the debug message was captured
     assert "Debug message during __init__" in caplog.text
@@ -266,8 +270,8 @@ def test_add_thing_log_destination():
 
 def _call_action_can_get_logs():
     """Run `log_and_capture` as an action, Return the final HTTP response."""
-    server = lt.ThingServer({"logging_thing": ThingThatLogs})
-    with TestClient(server.app) as client:
+    server = lt.ThingServer.from_things({"logging_thing": ThingThatLogs})
+    with server.test_client() as client:
         response = client.post("/logging_thing/log_and_capture", json={"msg": "foobar"})
         response.raise_for_status()
         return poll_task(client, response.json())

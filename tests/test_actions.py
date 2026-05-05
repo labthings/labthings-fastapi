@@ -30,8 +30,8 @@ class ActionMan(lt.Thing):
 @pytest.fixture
 def client():
     """Yield a client connected to a ThingServer"""
-    server = lt.ThingServer({"thing": MyThing})
-    with TestClient(server.app) as client:
+    server = lt.ThingServer.from_things({"thing": MyThing})
+    with server.test_client() as client:
         yield client
 
 

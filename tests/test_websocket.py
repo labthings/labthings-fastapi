@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
@@ -55,14 +54,14 @@ class ThingWithProperties(lt.Thing):
 @pytest.fixture
 def server():
     """Create a server, and add a MyThing test Thing to it."""
-    server = lt.ThingServer({"thing": ThingWithProperties})
+    server = lt.ThingServer.from_things({"thing": ThingWithProperties})
     return server
 
 
 @pytest.fixture
 def client(server):
     """Yield a TestClient connected to the server."""
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         yield client
 
 
