@@ -6,7 +6,6 @@ import tempfile
 from typing import Mapping
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
 from labthings_fastapi.global_lock import GlobalLock
 import pytest
 
@@ -323,7 +322,7 @@ def test_mocking_slots():
 @pytest.mark.parametrize("enable", (False, True))
 def test_global_lock(enable):
     """Test that the global lock is accessible, if configured."""
-    server = lt.ThingServer({}, enable_global_lock=enable)
+    server = lt.ThingServer.from_things({}, enable_global_lock=enable)
     interface = lt.ThingServerInterface(server, "thing_name")
     if enable:
         assert isinstance(interface.global_lock, GlobalLock)
@@ -338,7 +337,7 @@ def test_mock_hold_global_lock(mock):
     if mock:
         interface = MockThingServerInterface("thing_name")
     else:
-        server = lt.ThingServer({})
+        server = lt.ThingServer.from_things({})
         interface = lt.ThingServerInterface(server, "thing_name")
     assert interface.global_lock is None
     # With no global lock, the context manager should be a no-op, unless we
@@ -355,7 +354,7 @@ def test_mock_hold_global_lock(mock):
     if mock:
         interface = MockThingServerInterface("thing_name", enable_global_lock=True)
     else:
-        server = lt.ThingServer({}, enable_global_lock=True)
+        server = lt.ThingServer.from_things({}, enable_global_lock=True)
         interface = ThingServerInterface(server, "thing_name")
     assert isinstance(interface.global_lock, GlobalLock)
     # That means the context manager should work for all three arguments.

@@ -412,7 +412,9 @@ def test_actions_and_properties_testclient_lock_enabled():
 
     This test uses a Thing instance directly, with locking enabled.
     """
-    server = lt.ThingServer({"checker": ConcurrencyChecker}, enable_global_lock=True)
+    server = lt.ThingServer.from_things(
+        {"checker": ConcurrencyChecker}, enable_global_lock=True
+    )
     with TestClient(server.app) as client:
         thing = lt.ThingClient.from_url("/checker/", client=client)
         with monitor_for_changes(thing, hold_lock=True):
@@ -426,7 +428,9 @@ def test_actions_and_properties_testclient_lock_disabled():
 
     This test uses a Thing instance directly, with locking disabled.
     """
-    server = lt.ThingServer({"checker": ConcurrencyChecker}, enable_global_lock=False)
+    server = lt.ThingServer.from_things(
+        {"checker": ConcurrencyChecker}, enable_global_lock=False
+    )
     with TestClient(server.app) as client:
         thing = lt.ThingClient.from_url("/checker/", client=client)
         with monitor_for_changes(thing, hold_lock=True):
