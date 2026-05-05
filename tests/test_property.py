@@ -14,13 +14,13 @@ same way.
 from dataclasses import dataclass
 import json
 from typing import Any
+import warnings
 
 import fastapi
 from fastapi.testclient import TestClient
 import pydantic
 import pytest
 from labthings_fastapi import properties
-from labthings_fastapi.feature_flags import FEATURE_FLAGS
 from labthings_fastapi.properties import (
     BaseProperty,
     DataProperty,
@@ -376,9 +376,6 @@ def test_propertyinfo(mocker):
     # Check that a broken `_model` raises the right error
     # See above for where we manually set badprop._model to something that's
     # not a rootmodel.
-    with FEATURE_FLAGS.set_temporarily(validate_properties_on_set=True):
-        with pytest.raises(TypeError):
-            example.badprop = 3  # Validation will fail here because of the bad model.
     with pytest.raises(TypeError):
         _ = example.properties["badprop"].model_instance
     with pytest.raises(TypeError):
@@ -418,9 +415,11 @@ def test_propertyinfo(mocker):
     # if this is used downstream, the downstream code should accept responsibility!
     bad_m = MyModel.model_construct(a="not an int", b=6)
     assert modelprop.validate(bad_m) is bad_m
-    with pytest.raises(pydantic.ValidationError):
-        # Check that passing the same data in as a dict fails validation.
-        modelprop.validate(bad_m.model_dump())
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", "Pydantic serializer warnings")
+        # Check that passing the same data in as a dict fails validation.#
+        with pytest.raises(pydantic.ValidationError):
+            modelprop.validate(bad_m.model_dump())
 
     # Check again for an odd rootmodel
     rootmodelprop = example.properties["rootmodelprop"]
@@ -438,6 +437,35 @@ def test_propertyinfo(mocker):
         # The RootModel gets re-validated, in contrast to the BaseModel above.
         with pytest.raises(pydantic.ValidationError):
             assert modelprop.validate(invalid_model) == invalid
+
+
+@pytest.mark.parametrize(
+    ("settings", "validates"),
+    [
+        ({"validate_properties_on_set": True}, True),
+        ({"validate_properties_on_set": False}, False),
+        ({}, False),
+    ],
+)
+def test_validate_properties_on_set(settings, validates):
+    """Check that the class setting to validate properties on set is honoured.
+
+    This tests for explicit setting (enabled/disabled) as well as the default
+    setting (disabled). This will need updating if the default is changed.
+    """
+
+    class MaybeValidates(lt.Thing):
+        _class_settings = settings
+        positive: int = lt.property(default=1, gt=0)
+        """A positive integer."""
+
+    thing = create_thing_without_server(MaybeValidates)
+    if validates:
+        with pytest.raises(pydantic.ValidationError):
+            thing.positive = -1
+    else:
+        thing.positive = -1
+        assert thing.positive == -1
 
 
 def test_readonly_metadata():

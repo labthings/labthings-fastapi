@@ -74,6 +74,18 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+filterwarnings = [
+    # This deliberately doesn't filter by class, because doing so confuses
+    # coverage - it results in labthings_fastapi being imported before
+    # the coverage plugin.
+    # Instead, we simply filter by message.
+    #
+    # There are many, many small Thing definitions in the test suite.
+    # These don't all opt in to new features for reasons of brevity: the
+    # DeprecationWarnings this would generate are unhelpful, so we suppress them
+    # with the line below.
+    "ignore:.get_validate_properties_on_set. will become .True. by default:DeprecationWarning",
+]
 
 [tool.ruff]
 target-version = "py310"

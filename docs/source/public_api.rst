@@ -39,6 +39,17 @@ This page summarises the parts of the LabThings API that should be most frequent
         :type:  ThingServerInterface
 
         Provide access to features of the server that this `~lt.Thing` is attached to.
+    
+    .. py:attribute:: _class_settings
+        :type: ThingClassSettings
+
+        Specify LabThings features used (or incompatible with) this `~lt.Thing`.
+        See documentation for `~lt.ThingClassSettings` for keys and their meanings.
+        This property may be set using a dictionary literal, and most type checkers or IDEs should help catch incorrect keys or types.
+        The keys and values are also validated when your class is defined.
+
+        This property should *only* be set during class definition: it should not be
+        modified after the class is defined.
 
     .. autoproperty:: labthings_fastapi.thing.Thing.name
         :no-index:
@@ -151,9 +162,6 @@ This page summarises the parts of the LabThings API that should be most frequent
 
    :param \**kwargs: Keyword arguments are passed to the constructor
        of `.ActionDescriptor`.
-
-
-
 
 
 .. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ...) -> Any
@@ -293,6 +301,23 @@ This page summarises the parts of the LabThings API that should be most frequent
 
    .. automethod:: labthings_fastapi.thing_server_interface.ThingServerInterface.get_thing_states
         :no-index:
+
+
+.. py:class:: ThingClassSettings
+    
+    Bases: :py:obj:`typing_extensions.TypedDict`
+
+    A typed dictionary to hold settings that determine how a `Thing` subclass interacts with LabThings. This is used to control :ref:`optional_features`\ .
+
+    .. py:attribute:: validate_properties_on_set
+
+        :type: bool
+        :default: False
+
+        Whether properties should be validated against their model when set from Python.
+        Properties are always validated when set over HTTP.
+        By default, no validation is performed when they are set from Python.
+        Setting this key to `True` will enable validation: this is likely to become the default in the future.
 
 
 .. py:class:: ThingConfig(/, **data: Any)

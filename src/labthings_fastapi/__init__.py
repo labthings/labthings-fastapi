@@ -27,10 +27,10 @@ code does not break if modules are rearranged.
 from .thing import Thing
 from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
+from .thing_class_settings import ThingClassSettings
 from .properties import property, setting, DataProperty, DataSetting
 from .actions import action
 from .endpoints import endpoint
-from .feature_flags import FEATURE_FLAGS
 from . import outputs
 from .outputs import blob
 from .server import ThingServer, cli
@@ -51,6 +51,7 @@ from .invocation_contexts import (
 __all__ = [
     "Thing",
     "ThingServerInterface",
+    "ThingClassSettings",
     "property",
     "setting",
     "DataProperty",
@@ -58,7 +59,6 @@ __all__ = [
     "action",
     "thing_slot",
     "endpoint",
-    "FEATURE_FLAGS",
     "outputs",
     "blob",
     "ThingServer",

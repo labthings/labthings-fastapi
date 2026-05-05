@@ -37,7 +37,14 @@ from weakref import WeakKeyDictionary, ref
 from typing_extensions import Self
 
 from .utilities.introspection import get_docstring, get_summary
-from .exceptions import MissingTypeError, InconsistentTypeError, NotBoundToInstanceError
+from .exceptions import (
+    MissingTypeError,
+    InconsistentTypeError,
+    NotBoundToInstanceError,
+    DescriptorNotAddedToClassError,
+    DescriptorAddedToClassTwiceError,
+    UnexpectedGarbageCollectionError,
+)
 
 if TYPE_CHECKING:
     from .thing import Thing
@@ -59,117 +66,6 @@ DescriptorInfoT = TypeVar("DescriptorInfoT", bound="BaseDescriptorInfo")
 
 OptionallyBoundInfoT = TypeVar("OptionallyBoundInfoT", bound="OptionallyBoundInfo")
 """The type of `OptionallyBoundInfo` returned by a descriptor."""
-
-
-class DescriptorNotAddedToClassError(RuntimeError):
-    """Descriptor has not yet been added to a class.
-
-    This error is raised if certain properties of descriptors are accessed
-    before ``__set_name__`` has been called on the descriptor.  ``__set_name__``
-    is part of the descriptor protocol, and is called when a class is defined
-    to notify the descriptor of its name and owning class.
-
-    If you see this error, it often means that a descriptor has been instantiated
-    but not attached to a class, for example:
-
-    .. code-block:: python
-
-        import labthings as lt
-
-
-        class Test(lt.Thing):
-            myprop: int = lt.property(default=0)  # This is OK
-
-
-        orphaned_prop: int = lt.property(default=0)  # Not OK
-
-        Test.myprop.model  # Evaluates to a pydantic model
-
-        orphaned_prop.model  # Raises this exception
-    """
-
-
-class DescriptorAddedToClassTwiceError(RuntimeError):
-    """A Descriptor has been added to a class more than once.
-
-    This error is raised if ``__set_name__`` is called more than once on a
-    descriptor. This happens when either the same descriptor instance is
-    used twice in one class definition, or if a descriptor instance is used
-    on more than one class.
-
-    .. note::
-
-        `.FunctionalProperty` includes a special case that will ignore the
-        ``__set_name__`` call corresponding to the setter. This allows the
-        property to be defined like ``prop4`` below, even though it does
-        assign the descriptor to two names. That behaviour is specific to
-        `.FunctionalProperty` and `.FunctionalSetting` and is not part of
-        `.BaseDescriptor` because `.BaseDescriptor` has no setter.
-
-        ``mypy`` does not allow custom property-like descriptors to follow the
-        syntax used by the built-in ``property`` of giving both the getter and
-        setter functions the same name: this causes an error because it is
-        a redefinition. We suggest using a different name for the setter to
-        work around this, hence the need for an exception.
-
-    .. code-block:: python
-
-        class MyDescriptor(BaseDescriptor):
-            "An example descriptor that inherits from BaseDescriptor."
-
-            def __init__(getter=None):
-                "Initialise the descriptor, allowing use as a decorator."
-                self._getter = getter
-
-            def setter(self, setter):
-                "Add a setter to the descriptor."
-                self._setter = setter
-                return self
-
-
-        class Example:
-            "An example class with descriptors."
-
-            # prop1 is fine - only used once.
-            prop1 = MyDescriptor()
-
-            # prop2 reuses the name ``prop2`` which may confuse ``mypy`` but
-            # will only call ``__set_name__`` once.
-            @MyDescriptor
-            def prop2(self):
-                "A dummy property"
-                return False
-
-            @prop2.setter
-            def prop2(self, val):
-                "Set the dummy property"
-                pass
-
-            # prop3a and prop3b will cause this error
-            prop3a = MyDescriptor()
-            prop3b = MyDescriptor()
-
-            # prop4 and set_prop4 will cause this error on BaseDescriptor
-            # but there is a specific exception in FunctionalProperty
-            # to allow this form.
-            @MyDescriptor
-            def prop4(self):
-                "An example property with two names"
-                return True
-
-            @prop4.setter
-            def _set_prop4(self, val):
-                "A setter for prop4 that is not named prop4."
-                pass
-
-    .. note::
-
-        Because this exception is raised in ``__set_name__`` it will not
-        appear to come from the descriptor assignment, but instead it will
-        be raised at the end of the class definition. The descriptor name(s)
-        should be in the error message.
-
-    """
 
 
 class OptionallyBoundInfo(Generic[Owner]):
@@ -488,6 +384,29 @@ class BaseDescriptor(Generic[Owner, Value]):
         return self._name
 
     @property
+    def owning_class(self) -> type[Owner]:
+        """The class on which this descriptor is defined.
+
+        :raises DescriptorNotAddedToClassError: if the owning
+            class is not set.
+        :raises UnexpectedGarbageCollectionError: if the owning class has been
+            finalized.
+        """
+        self.assert_set_name_called()
+        if self._owner_ref is None:  # pragma: no cover
+            raise DescriptorNotAddedToClassError("`_owner_ref` is missing.")
+        # The exception is mostly for typing: if `assert_set_name_called``
+        # doesn't raise an error, `BaseDescriptor.__set_name__` has been
+        # called and thus `self._owner_ref`` has been set.
+        cls = self._owner_ref()
+        if cls is None:
+            msg = f"The class owning the descriptor '{self.name}' was deleted."
+            raise UnexpectedGarbageCollectionError(msg)
+        # This should never happen: the class ought not to be deleted, and once
+        # it is, the descriptor should also not be accessible.
+        return cls
+
+    @property
     def title(self) -> str:
         """A human-readable title for the descriptor.
 
@@ -599,17 +518,11 @@ class BaseDescriptor(Generic[Owner, Value]):
         :param info_class: the `.BaseDescriptorInfo` subclass to return.
         :param obj: The `~lt.Thing` instance to which the return value is bound.
         :return: An object that may be used to refer to this descriptor.
-        :raises RuntimeError: if garbage collection occurs unexpectedly. This
-            should not happen and would indicate a LabThings bug.
         """
         if obj:
             return info_class(self, obj)
         else:
-            self.assert_set_name_called()
-            owning_class = self._owner_ref()
-            if owning_class is None:
-                raise RuntimeError("Class was unexpectedly deleted")
-            return info_class(self, None, owning_class)
+            return info_class(self, None, self.owning_class)
 
     def descriptor_info(
         self, owner: Owner | None = None
@@ -744,7 +657,7 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
             self._type = typing.get_args(self.__orig_class__)[1]
             if isinstance(self._type, typing.ForwardRef):
                 raise MissingTypeError(
-                    f"{owner}.{name} is a subscripted descriptor, where the "
+                    f"{owner.__name__}.{name} is a subscripted descriptor, where the "
                     f"subscript is a forward reference ({self._type}). Forward "
                     "references are not supported as subscripts."
                 )
@@ -791,22 +704,12 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
         :return: the type of the descriptor's value.
         :raises MissingTypeError: if the type is None, not resolvable, or not specified.
         """
+        # The two lines below should be outside the try: block, so their exceptions
+        # propagate rather than getting wrapped by a MissingTypeError.
         self.assert_set_name_called()
+        cls = self.owning_class
         if self._type is None and self._unevaluated_type_hint is not None:
             # We have a forward reference, so we need to resolve it.
-            if self._owner_ref is None:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name} because "
-                    "the class on which it was defined wasn't saved. This is a "
-                    "LabThings bug - please report it."
-                )
-            # `self._owner_ref` is set in `BaseDescriptor.__set_name__`.
-            owner = self._owner_ref()
-            if owner is None:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name} because "
-                    "the class on which it was defined has been garbage collected."
-                )
             try:
                 # Resolving a forward reference has quirks, and rather than tie us
                 # to undocumented implementation details of `typing` we just use
@@ -818,12 +721,12 @@ class FieldTypedBaseDescriptor(Generic[Owner, Value], BaseDescriptor[Owner, Valu
                 #
                 # Note that we already checked there was an annotation in
                 # __set_name__.
-                hints = typing.get_type_hints(owner, include_extras=True)
+                hints = typing.get_type_hints(cls, include_extras=True)
                 self._type = hints[self.name]
             except Exception as e:
-                raise MissingTypeError(
-                    f"Can't resolve forward reference for type of {self.name}."
-                ) from e
+                msg = "Can't resolve forward reference for type of "
+                msg += f"{cls.__name__}.{self.name}."
+                raise MissingTypeError(msg) from e
         if self._type is None:
             # We should never reach this line: if `__set_name__` was called, we'd
             # have raised an exception there if _type was None. If `__set_name__`

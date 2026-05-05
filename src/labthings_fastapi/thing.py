@@ -19,9 +19,6 @@ from fastapi import Request, WebSocket
 from anyio.abc import ObjectSendStream
 from anyio.to_thread import run_sync
 
-
-from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
-
 from .logs import THING_LOGGER
 from .properties import (
     BaseProperty,
@@ -30,6 +27,7 @@ from .properties import (
     SettingCollection,
 )
 from .actions import ActionCollection, ActionDescriptor
+from .base_descriptor import OptionallyBoundDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
@@ -38,6 +36,7 @@ from .websockets import websocket_endpoint
 from .exceptions import PropertyNotObservableError
 from .thing_server_interface import ThingServerInterface
 from .invocation_contexts import get_invocation_id
+from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
 
 if TYPE_CHECKING:
     from .server import ThingServer
@@ -83,6 +82,23 @@ class Thing:
     title: str
     """A human-readable description of the Thing"""
 
+    _class_settings: ThingClassSettings
+    r"""A dictionary of settings that affect how the Thing subclass works.
+
+    Valid keys are listed below:
+
+    ``validate_properties_on_set`` `bool`
+        If this key is set to `True`\ , property values will be validated when they are
+        set by Python code, as well as when they are set over HTTP. Currently, the
+        default behaviour is only to validate values sent over HTTP, not set directly
+        in Python. It is likely that validation in both cases will happen by default in
+        a future release.
+
+    .. note::
+
+        Class settings must not be changed after the class is defined.
+    """
+
     _thing_server_interface: ThingServerInterface
     """Provide access to features of the server that this `Thing` is attached to."""
 
@@ -103,6 +119,14 @@ class Thing:
         """
         self._thing_server_interface = thing_server_interface
         self._disable_saving_settings: bool = False
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        r"""Validate the class settings.
+
+        :param \**kwargs: are passed to the superclass.
+        """
+        super().__init_subclass__(**kwargs)
+        validate_thing_class_settings(cls)
 
     @property
     def path(self) -> str:
