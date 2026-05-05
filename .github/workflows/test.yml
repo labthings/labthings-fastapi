@@ -30,6 +30,15 @@ jobs:
         with:
           name: base-coverage.lcov
           path: ./base-coverage.lcov
+  
+  pip_audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: dev-requirements.txt
 
   test:
     runs-on: ubuntu-latest
