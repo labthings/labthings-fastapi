@@ -1,8 +1,8 @@
 """Test code for the global lock."""
 
 from collections.abc import Iterator
+import logging
 from threading import Thread, Event
-from fastapi.testclient import TestClient
 import pytest
 from contextlib import contextmanager
 
@@ -124,6 +124,7 @@ class ConcurrencyChecker(lt.Thing):
         """
         names = ["prop1", "prop2", "fprop1", "fprop2"]
         initial_values = {n: getattr(self, n) for n in names}
+        self.logger.info("Checking for changes")
         while self.keep_checking_for_changes:
             self._tick_event.wait(timeout=0.1)
             self._tick_event.clear()
@@ -133,12 +134,14 @@ class ConcurrencyChecker(lt.Thing):
                     self.changes_detected = True
                     setattr(self, n, initial_values[n])
             self._tock_event.set()
+        self.logger.info("Finished checking for changes.")
 
     check_for_changes_unlocked.use_global_lock = False
 
     @lt.action
     def check_for_changes_locked(self):
         """This runs `check_for_changes_unlocked` but acquires the lock."""
+        self.logger.info("Checking for changes and holding lock.")
         return self.check_for_changes_unlocked()
 
     @lt.action
@@ -209,6 +212,7 @@ def monitor_for_changes(thing: ConcurrencyChecker, hold_lock: bool) -> Iterator[
     thing.keep_checking_for_changes = True
     monitor_thread.start()
     try:
+        thing.tick()
         yield
 
         assert monitor_thread.is_alive()
@@ -415,7 +419,7 @@ def test_actions_and_properties_testclient_lock_enabled():
     server = lt.ThingServer.from_things(
         {"checker": ConcurrencyChecker}, enable_global_lock=True
     )
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         thing = lt.ThingClient.from_url("/checker/", client=client)
         with monitor_for_changes(thing, hold_lock=True):
             assertions_with_locking(thing)
@@ -431,7 +435,7 @@ def test_actions_and_properties_testclient_lock_disabled():
     server = lt.ThingServer.from_things(
         {"checker": ConcurrencyChecker}, enable_global_lock=False
     )
-    with TestClient(server.app) as client:
+    with server.test_client() as client:
         thing = lt.ThingClient.from_url("/checker/", client=client)
         with monitor_for_changes(thing, hold_lock=True):
             assertions_without_locking(thing)
@@ -448,3 +452,33 @@ def test_reuse_of_action_callables():
             func()
         with assert_changes(thing):
             func()
+
+
+def test_global_lock_log(caplog):
+    """Test that we get sensible errors when the lock is busy."""
+    server = lt.ThingServer.from_things(
+        {"checker": ConcurrencyChecker}, enable_global_lock=True
+    )
+    with server.test_client() as client:
+        checker = lt.ThingClient.from_url("/checker/", client=client)
+
+        with monitor_for_changes(checker, hold_lock=True):
+            # First, try a function that uses the global lock.
+            # This should fail with a message about the global
+            # lock, but no traceback.
+            caplog.clear()
+            with pytest.raises(ServerActionError, match="Global lock was busy"):
+                checker.increment_fprop2()
+            matches = [r for r in caplog.records if "Global lock was busy" in r.message]
+            assert len(matches) == 1
+            assert matches[0].levelno == logging.WARNING
+            assert "Traceback" not in caplog.text
+
+            # Next, try the same thing with an action that does
+            # not hold the global lock, but calls a property that
+            # does. This should print a stack trace, as the
+            # exception is not handled.
+            caplog.clear()
+            with pytest.raises(ServerActionError, match="GlobalLockBusyError"):
+                checker.increment_prop1()
+            assert "Traceback" in caplog.text

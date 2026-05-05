@@ -15,6 +15,8 @@ future.
 """
 
 from __future__ import annotations
+from collections.abc import Iterator
+from contextlib import contextmanager
 import datetime
 import logging
 from collections import deque
@@ -51,6 +53,7 @@ from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus
 from .exceptions import (
+    GlobalLockBusyError,
     InvocationCancelledError,
     InvocationError,
     NotConnectedToServerError,
@@ -289,19 +292,22 @@ class Invocation(Thread):
                     # occur.
                     raise RuntimeError("Cannot start an invocation without a Thing.")
 
-                with self._status_lock:
-                    self._status = InvocationStatus.RUNNING
-                    self._start_time = datetime.datetime.now()
-                    action.emit_changed_event(self.thing, self._status.value)
+                # The action's `context_for_func` context manager will acquire the
+                # global lock if needed.
+                with action.context_for_func(thing):
+                    with self._status_lock:
+                        self._status = InvocationStatus.RUNNING
+                        self._start_time = datetime.datetime.now()
+                        action.emit_changed_event(self.thing, self._status.value)
 
-                bound_method = action.__get__(thing)
-                # Actually run the action
-                ret = bound_method(**kwargs, **self.dependencies)
+                    # Actually run the action
+                    ret = action.func(thing, **kwargs, **self.dependencies)
 
-                with self._status_lock:
-                    self._return_value = ret
-                    self._status = InvocationStatus.COMPLETED
-                    action.emit_changed_event(self.thing, self._status.value)
+                    with self._status_lock:
+                        self._return_value = ret
+                        self._status = InvocationStatus.COMPLETED
+                        action.emit_changed_event(self.thing, self._status.value)
+
             except InvocationCancelledError:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
@@ -310,9 +316,17 @@ class Invocation(Thread):
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
                 if isinstance(e, InvocationError):
-                    # Log without traceback
+                    # Log without traceback for anticipated errors
                     logger.error(e)
+                elif (
+                    isinstance(e, GlobalLockBusyError)
+                    and self._status == InvocationStatus.PENDING
+                ):
+                    # The global lock timed out before the function started.
+                    # In this case, don't print a traceback.
+                    logger.warning(f"Global lock was busy: didn't run {action.name}.")
                 else:
+                    # Other exceptions show up in the log with a traceback
                     logger.exception(e)
                 # Then set status
                 with self._status_lock:
@@ -739,13 +753,37 @@ class ActionDescriptor(
                 f"'{self.func.__name__}'",
             )
 
-    def wrapped_func(
-        self, obj: OwnerT
-    ) -> Callable[Concatenate[OwnerT, ActionParams], ActionReturn]:
-        """Wrap the action function if necessary, so that it holds the global lock.
+    @contextmanager
+    def context_for_func(self, obj: OwnerT) -> Iterator[None]:
+        """Create context in which ``func`` runs.
 
-        If global locking is enabled and this action hasn't opted out, this function
-        will wrap `func` such that it holds the global lock while it is running.
+        This method is intended to create a hook for pre-run set-up and post-run
+        clean-up code. It should not perform slow or intensive tasks, and is mostly
+        intended as a good place to acquire and release locks and so on.
+
+        Currently, if global locking is enabled and this action hasn't opted out,
+        this context manager will hold the global lock for the duration of the
+        action.
+
+        :param obj: The object on which the method is being called.
+        :return: the function, wrapped if necessary.
+        """
+        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+            yield
+
+    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
+        """Return the function, bound to an object and wrapped in a context manager.
+
+        Accessing a regular Python method returns the method bound to the instance,
+        i.e. the `self` argument is supplied.
+
+        LabThings Actions work the same way, but they also wrap the function in a
+        context manager. Currently, this context manager will handle acquiring the
+        global lock if required.
+
+        If locking is disabled, the context manager does nothing.
+        If locking is enabled, we return a wrapped function that holds the
+        global lock while the action runs.
 
         .. note::
 
@@ -754,34 +792,19 @@ class ActionDescriptor(
             a function that's already bound to the instance, this shouldn't cause
             any problems.
 
-        :param obj: The object on which the method is being called.
-        :return: the function, wrapped if necessary.
-        """
-
-        @wraps(self.func)
-        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
-            """Acquire the lock then run `func` with supplied arguments."""
-            with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
-                return self.func(*args, **kwargs)
-
-        return wrapped
-
-    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
-        """Return the function, bound to an object as for a normal method.
-
-        This currently doesn't validate the arguments, though it may do so
-        in future. If locking is disabled this is equivalent to a regular
-        Python method, i.e. all we do is supply the first argument, `self`.
-
-        If locking is enabled, we return a wrapped function that holds the
-        global lock while the action runs.
-
         :param obj: the `~lt.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        return partial(self.wrapped_func(obj), obj)
+
+        @wraps(self.func)
+        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
+            """Acquire the lock then run `func` with supplied arguments."""
+            with self.context_for_func(obj):
+                return self.func(*args, **kwargs)
+
+        return partial(wrapped, obj)
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.
