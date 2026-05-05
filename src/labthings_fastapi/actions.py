@@ -669,7 +669,7 @@ class ActionDescriptor(
         retention_time: float = 300,
         use_global_lock: Literal[False] | None = None,
     ) -> None:
-        """Create a new action descriptor.
+        r"""Create a new action descriptor.
 
         The action descriptor wraps a method of a `~lt.Thing`. It may still be
         called from Python in the same way, but it will also be added to the
@@ -686,17 +686,16 @@ class ActionDescriptor(
             of the action.
         :param retention_time: how long, in seconds, the action should be kept
             for after it has completed.
-        :param use_global_lock: If the global lock is enabled in `lt.FEATURE_FLAGS`
-            this parameter may be used to opt out. When the global lock is enabled,
-            by default all actions acquire the global lock before starting, and
-            release it after they finish. That means only one action thread may
-            run at a time. The same lock is used to set properties.
+        :param use_global_lock: If the global lock is enabled,
+            this parameter may be used to opt out. See :ref:`global_locking`
+            for details of how the global lock is implemented.
 
             If this parameter is `False` then the lock will not be acquired, even
             if global locking is enabled. That is appropriate if the action does
             not have side effects that would cause problems for other actions, or
             if more nuanced locking behaviour is required meaning the lock is
-            acquired directly in the action code.
+            acquired directly in the action code, for example using
+            `~lt.ThingServerInterface.hold_global_lock`\ .
         """
         super().__init__()
         self.func = func
