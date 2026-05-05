@@ -693,3 +693,63 @@ def test_bad_reset_decorator():
             @myprop.resetter
             def myprop(self) -> None:
                 pass
+
+
+def test_on_set():
+    """Test that `on_set` works as expected."""
+
+    class Example(lt.Thing):
+        intprop: int = lt.property(default=0)
+
+        shadow: int = lt.property(default=0)
+
+        @lt.on_set("intprop")
+        def _on_set_intprop(self, val: int) -> int:
+            """A function to run when intprop is set."""
+            if val < 0:
+                raise ValueError("Can't be negative.")
+            self.shadow = val
+            return val
+
+    thing = create_thing_without_server(Example)
+    assert thing.shadow == 0
+    thing.intprop = 42
+    assert thing.shadow == 42
+    with pytest.raises(ValueError, match="Can't be negative"):
+        thing.intprop = -1
+
+
+def test_bad_on_set_definitions():
+    """Test that helpful errors are raise if `on_set` is used incorrectly."""
+    with raises_or_is_caused_by(AttributeError) as excinfo:
+
+        class Example2(lt.Thing):
+            @lt.on_set("missing")
+            def set_missing(self, value):
+                return value
+
+    assert "'missing' is not a data property" in str(excinfo)
+
+    with raises_or_is_caused_by(AttributeError) as excinfo:
+
+        class Example3(lt.Thing):
+            @lt.on_set("myprop")
+            def myprop(self, value):
+                return value
+
+    assert "On-set function 'myprop' overwrites its property" in str(excinfo)
+
+    with raises_or_is_caused_by(AttributeError) as excinfo:
+
+        class Example4(lt.Thing):
+            intprop: int = lt.property(default=0)
+
+            @lt.on_set("intprop")
+            def set_intprop(self, value):
+                return value
+
+            @lt.on_set("intprop")
+            def set_intprop2(self, value):
+                return value
+
+    assert "'intprop.on_set' has already been set" in str(excinfo)

@@ -48,6 +48,7 @@ Adding a "setter" to properties is optional, and makes them read-write.
 from __future__ import annotations
 import builtins
 from collections.abc import Mapping
+from functools import partial
 from types import EllipsisType
 from typing import (
     Annotated,
@@ -741,6 +742,13 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         )
         self.readonly = readonly
 
+    on_set_func: Callable[[Owner, Value], Value] | None = None
+    """A function that is called when the property is set.
+
+    This function must return the new value of the property. If it raises
+    an exception, the property's value will not change.
+    """
+
     def instance_get(self, obj: Owner) -> Value:
         """Return the property's value.
 
@@ -775,9 +783,10 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         ):
             if get_validate_properties_on_set(obj.__class__):
                 property_info = self.descriptor_info(obj)
-                obj.__dict__[self.name] = property_info.validate(value)
-            else:
-                obj.__dict__[self.name] = value
+                value = property_info.validate(value)
+            if self.on_set_func:
+                value = self.on_set_func(obj, value)
+            obj.__dict__[self.name] = value
             if emit_changed_event:
                 self.emit_changed_event(obj, value)
 
@@ -851,6 +860,102 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             await observer.send(
                 {"messageType": "propertyStatus", "data": {self._name: value}}
             )
+
+
+def on_set(
+    property_name: str,
+) -> Callable[[Callable[[Owner, Value], Value]], OnSetDescriptor[Owner, Value]]:
+    """Run a function when a data property is set.
+
+    This decorator causes a method to be called whenever a property
+    is set. The method must return the value (and may modify it), but
+    is not responsible for "remembering" the value: that's done by
+    the data property.
+
+    If the method raises an exception, the property will not change
+    its value, and the error will propagate.
+
+    Side effects should be brief: they are performed synchronously
+    during HTTP request handling, so should not exceed a fraction
+    of a second.
+
+    :param property_name: the name of the property to which we are
+        attaching a side effect.
+    :return: a descriptor object that will attach the method to the
+        property, once the class is fully defined.
+    """
+
+    def decorator(
+        func: Callable[[Owner, Value], Value],
+    ) -> OnSetDescriptor[Owner, Value]:
+        return OnSetDescriptor(property_name=property_name, func=func)
+
+    return decorator
+
+
+class OnSetDescriptor(Generic[Owner, Value]):
+    """A class to add side effects to data properties."""
+
+    def __init__(
+        self, property_name: str, func: Callable[[Owner, Value], Value]
+    ) -> None:
+        """Initialise an OnSetDescriptor.
+
+        :param property_name: the name of the property we're attaching a side-effect to.
+        :param func: the function to run when the property is set.
+        """
+        super().__init__()
+        self.property_name = property_name
+        self.func = func
+
+    def __set_name__(self, owner: type[Owner], name: str) -> None:
+        """Attach the function to the property.
+
+        ``__set_name__`` is part of the Descriptor protocol, and is where we
+        are notified of the owning class and our name.
+
+        :param owner: the class on which we are defined.
+        :param name: the name to which this descriptor is assigned.
+        :raises AttributeError: if the specified property name is missing,
+            not a data property, assigned to multiple times, or overwritten by
+            this descriptor.
+        """
+        if self.property_name == name:
+            msg = f"On-set function '{name}' overwrites its property: rename it."
+            raise AttributeError(msg)
+        prop = getattr(owner, self.property_name, None)
+        if not isinstance(prop, DataProperty):
+            msg = "On-set functions may only be attached to data properties. "
+            msg += f"'{self.property_name}' is not a data property"
+            raise AttributeError(msg)
+        if prop.on_set_func is not None:
+            raise AttributeError(f"'{self.property_name}.on_set' has already been set.")
+        prop.on_set_func = self.func
+
+    @overload
+    def __get__(self, obj: Owner) -> Callable[[Value], Value]: ...
+
+    @overload
+    def __get__(
+        self, obj: None, type: type[Owner]
+    ) -> Callable[[Owner, Value], Value]: ...
+
+    def __get__(
+        self, obj: Owner | None, type: type[Owner] | None = None
+    ) -> Callable[[Owner, Value], Value] | Callable[[Value], Value]:
+        """Return the function.
+
+        As for regular methods, we return the function if accessed on the class, and
+        a bound version if accessed on an instance.
+
+        :param obj: the instance, if accessed on an instance.
+        :param type: the class, if accessed on a class.
+        :return: the function, or a partial object binding the function to the object.
+        """
+        if obj is None:
+            return self.func
+        else:
+            return partial(self.func, obj)
 
 
 class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
