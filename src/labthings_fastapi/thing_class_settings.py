@@ -93,7 +93,7 @@ def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
         warnings.warn(
             DefaultWillChangeWarning(
                 "`get_validate_properties_on_set` will become `True` by default "
-                "in the future. Set this property to `True` in "
+                "in the future. Set this property explicitly to `True` or `False` in "
                 f"`{cls.__module__}.{cls.__name__}._class_settings` "
                 "to eliminate this warning."
             ),
