@@ -144,17 +144,6 @@ class MockThingServerInterface(ThingServerInterface):
         """Return a global lock."""
         return self._global_lock
 
-    @contextmanager
-    def hold_global_lock(self, enabled: bool | None = True) -> Iterator[None]:
-        """Hold the global lock while a block of code executes.
-
-        See `lt.ThingServerInterface.hold_global_lock` for full documentation.
-
-        :param enabled: whether or not the lock must be held.
-        """
-        with ThingServerInterface.hold_global_lock(self, enabled):
-            yield
-
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 

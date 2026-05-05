@@ -195,7 +195,9 @@ class ThingServerInterface:
         return self._get_server().global_lock
 
     @contextmanager
-    def hold_global_lock(self, enabled: bool | None = True) -> Iterator[None]:
+    def _optionally_hold_global_lock(
+        self, enabled: bool | None = True
+    ) -> Iterator[None]:
         """Hold the global lock, if required, as a context manager.
 
         This function will hold the global lock if necessary while a block of code runs.
@@ -225,3 +227,17 @@ class ThingServerInterface:
             else:
                 with self.global_lock:
                     yield
+
+    @contextmanager
+    def hold_global_lock(self, *, error_if_unavailable: bool = True) -> Iterator[None]:
+        """Hold the global lock for the duration of a with block.
+
+        This context manager will hold the global lock while a ``with:`` block runs.
+        By default, an exception will be raised if the global lock is not enabled.
+
+        :param error_if_unavailable: may be set to `False` to suppress errors if the
+            global lock is not enabled. This means the context manager silently does
+            nothing, if the global lock is not available.
+        """
+        with self._optionally_hold_global_lock(True if error_if_unavailable else None):
+            yield

@@ -768,7 +768,9 @@ class ActionDescriptor(
         :param obj: The object on which the method is being called.
         :return: the function, wrapped if necessary.
         """
-        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+        with obj._thing_server_interface._optionally_hold_global_lock(
+            self.use_global_lock
+        ):
             yield
 
     def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:

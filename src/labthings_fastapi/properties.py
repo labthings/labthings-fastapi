@@ -770,7 +770,9 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param value: the new value for the property.
         :param emit_changed_event: whether to emit a changed event.
         """
-        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+        with obj._thing_server_interface._optionally_hold_global_lock(
+            self.use_global_lock
+        ):
             if get_validate_properties_on_set(obj.__class__):
                 property_info = self.descriptor_info(obj)
                 obj.__dict__[self.name] = property_info.validate(value)
@@ -1033,7 +1035,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         if get_validate_properties_on_set(obj.__class__):
             property_info = self.descriptor_info(obj)
             value = property_info.validate(value)
-        with obj._thing_server_interface.hold_global_lock(self.use_global_lock):
+        with obj._thing_server_interface._optionally_hold_global_lock(
+            self.use_global_lock
+        ):
             self.fset(obj, value)
 
     @builtins.property

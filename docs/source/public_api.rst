@@ -307,11 +307,11 @@ This page summarises the parts of the LabThings API that should be most frequent
 
         A global lock object that is used to restrict concurrent execution of actions and setting of properties.
 
-   .. py:method:: hold_global_lock(enabled: bool | None = True)
+   .. py:method:: hold_global_lock(*, error_if_unavailable: bool = True)
 
-        A context manager that holds the global lock. The `enabled` parameter sets
-        whether the lock is held. `False` ignores the lock, `None` uses the lock if
-        available, and `True` uses the lock or raises an error if it is missing.    
+        A context manager that holds the global lock. By default, an exception is raised if the global lock
+        is not enabled. ``error_if_unavailable`` may be used to suppress that error, in which case the
+        context manager silently does nothing if there is no global lock to acquire.    
 
 
 .. py:class:: ThingClassSettings
