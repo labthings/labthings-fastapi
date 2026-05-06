@@ -351,8 +351,8 @@ class InvalidClassSettingsError(ValueError):
 class FeatureNotEnabledError(RuntimeError):
     """A feature is being used that is currently disabled.
 
-    Some new or optional features are only available if the relevant feature flag
-    is set. See `lt.FEATURE_FLAGS` for a list of features that may be enabled.
+    Some new or optional features must be enabled in the server settings or in
+    `~lt.Thing._class_settings` before they can be used.
     This error is raised if a feature is used when it is not enabled.
     """
 

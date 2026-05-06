@@ -755,15 +755,24 @@ class ActionDescriptor(
 
     @contextmanager
     def context_for_func(self, obj: OwnerT) -> Iterator[None]:
-        """Create context in which ``func`` runs.
-
-        This method is intended to create a hook for pre-run set-up and post-run
-        clean-up code. It should not perform slow or intensive tasks, and is mostly
-        intended as a good place to acquire and release locks and so on.
+        """Create the context in which ``func`` runs.
 
         Currently, if global locking is enabled and this action hasn't opted out,
         this context manager will hold the global lock for the duration of the
         action.
+
+        This method is intended to create a hook for pre-run set-up and post-run
+        clean-up code that may be customised by `Thing` implementations in the future,
+        such as acquiring locks or other resources.
+
+        When an action is run from Python code as ``thing.action()`` this context
+        manager is entered before executing `func` bound to the `Thing` instance.
+
+        When an action is run from HTTP, this context manager is entered while the
+        action's status is ``pending`` and the status changes to ``running`` just
+        before `func` (the function decorated by `~lt.action`) runs. This allows
+        some slightly nicer error handling, for example not cluttering the log with
+        stack traces if an action can't start because the global lock is in use.
 
         :param obj: The object on which the method is being called.
         :return: the function, wrapped if necessary.
