@@ -323,7 +323,7 @@ def test_mocking_slots():
 def test_global_lock(enable):
     """Test that the global lock is accessible, if configured."""
     server = lt.ThingServer.from_things({}, enable_global_lock=enable)
-    interface = lt.ThingServerInterface(server, "thing_name")
+    interface = ThingServerInterface(server, "thing_name")
     if enable:
         assert isinstance(interface.global_lock, GlobalLock)
     else:
@@ -338,7 +338,7 @@ def test_mock_hold_global_lock(mock):
         interface = MockThingServerInterface("thing_name")
     else:
         server = lt.ThingServer.from_things({})
-        interface = lt.ThingServerInterface(server, "thing_name")
+        interface = ThingServerInterface(server, "thing_name")
     assert interface.global_lock is None
     # With no global lock, the context manager should be a no-op, unless we
     # specify `enabled=True` at which point it errors.
