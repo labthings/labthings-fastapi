@@ -362,8 +362,8 @@ def test_invalid_return_values():
         with pytest.raises(
             ServerActionError,
             match=(
-                r"\[InvalidReturnValue\]: Could not serialise the return value from "
-                r"'make_random_int'."
+                r"The return value from 'naughty.make_random_int' failed to validate "
+                r"against its output model."
             ),
         ):
             tc.make_random_int()

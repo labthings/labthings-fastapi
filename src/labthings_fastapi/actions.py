@@ -323,9 +323,9 @@ class Invocation(Thread):
                 try:
                     output_model_instance = action.output_model.model_validate(ret)
                 except ValidationError as e:
-                    msg = f"Could not serialise the return value from '{action.name}'. "
-                    msg += f"The output model was '{action.output_model}' and the "
-                    msg += f"return value was '{ret}'."
+                    msg = f"The return value from '{self.thing.name}.{action.name}' "
+                    msg += "failed to validate against its output model "
+                    msg += f"'{action.output_model}'. The return value was '{ret}'."
                     raise InvalidReturnValue(msg) from e
 
                 with self._status_lock:
@@ -339,7 +339,7 @@ class Invocation(Thread):
                     action.emit_changed_event(self.thing, self._status.value)
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
-                if isinstance(e, InvocationError):
+                if isinstance(e, (InvocationError, InvalidReturnValue)):
                     # Log without traceback for anticipated errors
                     logger.error(e)
                 elif (
