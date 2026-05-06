@@ -36,6 +36,8 @@ def raises_or_is_caused_by(
 @contextmanager
 def assert_takes_time(min_t: float | None, max_t: float | None):
     """Assert that a code block takes a certain amount of time."""
+    if min_t is None and max_t is None:
+        raise ValueError("assert_takes_time(None, None) is meaningless!")
     before = time.time()
     yield
     after = time.time()
