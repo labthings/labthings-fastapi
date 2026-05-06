@@ -11,7 +11,14 @@ import traceback
 from typing import Optional, Any, Sequence, TypeVar, Generic
 import uuid
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    model_validator,
+    model_serializer,
+    SerializerFunctionWrapHandler,
+)
+from pydantic_core import PydanticSerializationError
 
 from labthings_fastapi.middleware.url_for import URLFor
 
@@ -104,6 +111,29 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     output: OutputT
     log: Sequence[LogRecordModel]
     links: Links = None
+
+    @model_serializer(mode="wrap")
+    def serialize_model(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> dict[str, object]:
+        """Give a more helpful error if the class fails to serialize.
+
+        :param handler: The Pydantic serializer.
+        :raises PydanticSerializationError: if the model fails to serialize. This
+            is wrapped to add the action and invocation ID.
+        :return: the serialized model, as a dictionary.
+        """
+        try:
+            return handler(self)
+        except PydanticSerializationError as e:
+            extra = ""
+            if self.output is not None:
+                extra = "This is often caused by an invalid return value. "
+            raise PydanticSerializationError(
+                f"Could not serialise invocation '{self.id}' of '{self.action}' "
+                f"({self.status.value}). {extra}"
+                f"Error: '{e}'"
+            ) from e
 
 
 InvocationModel = GenericInvocationModel[Any, Any]

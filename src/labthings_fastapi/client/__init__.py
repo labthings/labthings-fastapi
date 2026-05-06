@@ -101,15 +101,24 @@ def poll_invocation(
     :param first_interval: sets how long we wait before the first
         polling request. Often, it makes sense for this to be a short
         interval, in case the action fails (or returns) immediately.
-
+    :raises ServerActionError: if an HTTP error is found during polling.
     :return: the completed invocation as a dictionary.
     """
     first_time = True
     while invocation["status"] in ACTION_RUNNING_KEYWORDS:
         time.sleep(first_interval if first_time else interval)
-        r = client.get(invocation_href(invocation))
-        r.raise_for_status()
-        invocation = r.json()
+        response = client.get(invocation_href(invocation))
+        if response.is_error:
+            try:
+                message = response.json()["detail"]
+            except KeyError:
+                message = response.text
+            raise ServerActionError(
+                f"The server returned error {response.status_code} while polling "
+                f"action '{invocation['action']}' with id '{invocation['id']}'. "
+                f"The error message was:\n{message}."
+            )
+        invocation = response.json()
         first_time = False
     return invocation
 

@@ -22,7 +22,7 @@ import logging
 from collections import deque
 from functools import partial, wraps
 import inspect
-from threading import Thread, Lock
+from threading import Thread, Lock, RLock
 import uuid
 from typing import (
     TYPE_CHECKING,
@@ -144,7 +144,7 @@ class Invocation(Thread):
         self.expiry_time: Optional[datetime.datetime] = None
 
         # Private state properties
-        self._status_lock = Lock()  # This Lock protects properties below
+        self._status_lock = RLock()  # This Lock protects properties below
         self._status: InvocationStatus = InvocationStatus.PENDING  # Task status
         self._output_model_instance: Optional[BaseModel] = None  # Return value
         self._request_time: datetime.datetime = datetime.datetime.now()
@@ -248,19 +248,20 @@ class Invocation(Thread):
         ]
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
-        return self.action.invocation_model(  # type: ignore[attr-defined]
-            status=self.status,
-            id=self.id,
-            action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
-            href=URLFor("action_invocation", id=self.id),
-            timeStarted=self._start_time,
-            timeCompleted=self._end_time,
-            timeRequested=self._request_time,
-            input=self.input,
-            output=self.output_model_instance,
-            links=links,
-            log=self.log,
-        )
+        with self._status_lock:
+            return self.action.invocation_model(  # type: ignore[attr-defined]
+                status=self.status,
+                id=self.id,
+                action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
+                href=URLFor("action_invocation", id=self.id),
+                timeStarted=self._start_time,
+                timeCompleted=self._end_time,
+                timeRequested=self._request_time,
+                input=self.input,
+                output=self.output_model_instance,
+                links=links,
+                log=self.log,
+            )
 
     def run(self) -> None:
         """Run the action and track progress.
@@ -323,6 +324,9 @@ class Invocation(Thread):
                 try:
                     output_model_instance = action.output_model.model_validate(ret)
                 except ValidationError as e:
+                    # Generate a helpful error message. This will be handled below,
+                    # where it will cause the action to be marked as failed, and the
+                    # error will end up in the log.
                     msg = f"The return value from '{self.thing.name}.{action.name}' "
                     msg += "failed to validate against its output model "
                     msg += f"'{action.output_model}'. The return value was '{ret}'."

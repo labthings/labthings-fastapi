@@ -340,9 +340,6 @@ def test_action_docs():
 def test_invalid_return_values():
     """Test the errors raised when an action's return value can't be serialised."""
 
-    class Unjsonable:
-        pass
-
     class NaughtyThing(lt.Thing):
         @lt.action
         def make_random_int(self) -> int:
@@ -352,7 +349,7 @@ def test_invalid_return_values():
         @lt.action
         def make_unjsonable_any(self) -> Any:
             """A vaguely-typed action that won't serialise."""
-            return Unjsonable()
+            return object()
 
     server = lt.ThingServer.from_things({"naughty": NaughtyThing})
     with server.test_client() as client:
@@ -371,9 +368,7 @@ def test_invalid_return_values():
         # If a return type is not JSONable
         with pytest.raises(
             ServerActionError,
-            match=(
-                r"\[InvalidReturnValue\]: Could not serialise the return value from "
-                r"'make_unjsonable_any'."
-            ),
-        ):
+            match="Could not serialise invocation",
+        ) as excinfo:
             tc.make_unjsonable_any()
+        assert "make_unjsonable_any" in str(excinfo)
