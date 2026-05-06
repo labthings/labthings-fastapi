@@ -254,6 +254,23 @@ class NoInvocationContextError(RuntimeError):
     """
 
 
+class InvalidReturnValue(RuntimeError):
+    r"""The return value from a method cannot be serialised by LabThings.
+
+    This error is raised when an action returns a value that can't be serialised.
+    This usually means that either it doesn't match the declared return type of
+    the function, or the declared return type permits un-serialisable values.
+
+    If an action's return type is missing or `Any`\ , it's possible to return a
+    value that can't be serialised, which will cause this error.
+
+    The solution is usually to ensure that the return type of your action is
+    either a simple type that can be serialised to JSON, or a Pydantic model.
+    You should also check that the function's return value matches the declared
+    type, ideally by regularly running a type checker like `mypy` on your code.
+    """
+
+
 class LogConfigurationError(RuntimeError):
     """There is a problem with logging configuration.
 

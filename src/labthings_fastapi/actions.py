@@ -40,8 +40,7 @@ from typing import (
 from weakref import WeakSet
 import weakref
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Body, BackgroundTasks
-from pydantic import BaseModel, create_model
-
+from pydantic import BaseModel, create_model, ValidationError
 
 from .middleware.url_for import URLFor
 from .base_descriptor import (
@@ -50,10 +49,15 @@ from .base_descriptor import (
     DescriptorInfoCollection,
 )
 from .logs import add_thing_log_destination
-from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
+from .utilities import (
+    LabThingsRootModelWrapper,
+    model_to_dict,
+    wrap_plain_types_in_rootmodel,
+)
 from .invocations import InvocationModel, InvocationStatus
 from .exceptions import (
     GlobalLockBusyError,
+    InvalidReturnValue,
     InvocationCancelledError,
     InvocationError,
     NotConnectedToServerError,
@@ -142,7 +146,7 @@ class Invocation(Thread):
         # Private state properties
         self._status_lock = Lock()  # This Lock protects properties below
         self._status: InvocationStatus = InvocationStatus.PENDING  # Task status
-        self._return_value: Optional[Any] = None  # Return value
+        self._output_model_instance: Optional[BaseModel] = None  # Return value
         self._request_time: datetime.datetime = datetime.datetime.now()
         self._start_time: Optional[datetime.datetime] = None  # Task start time
         self._end_time: Optional[datetime.datetime] = None  # Task end time
@@ -158,7 +162,18 @@ class Invocation(Thread):
     def output(self) -> Any:
         """Return value of the Action. If the Action is still running, returns None."""
         with self._status_lock:
-            return self._return_value
+            if self._output_model_instance is None:
+                return None
+            if isinstance(self._output_model_instance, LabThingsRootModelWrapper):
+                return self._output_model_instance.model_dump()
+            else:
+                return self._output_model_instance
+
+    @property
+    def output_model_instance(self) -> BaseModel | None:
+        """Return value of the Action, as a model, or None."""
+        with self._status_lock:
+            return self._output_model_instance
 
     @property
     def log(self) -> list[logging.LogRecord]:
@@ -242,7 +257,7 @@ class Invocation(Thread):
             timeCompleted=self._end_time,
             timeRequested=self._request_time,
             input=self.input,
-            output=self.output,
+            output=self.output_model_instance,
             links=links,
             log=self.log,
         )
@@ -273,6 +288,8 @@ class Invocation(Thread):
         See `.Invocation.status` for status values.
 
         :raises RuntimeError: if there is no Thing associated with the invocation.
+        :raises InvalidReturnValue: if the action returns a value that can't
+            be validated by its output model.
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
@@ -303,11 +320,18 @@ class Invocation(Thread):
                     # Actually run the action
                     ret = action.func(thing, **kwargs, **self.dependencies)
 
-                    with self._status_lock:
-                        self._return_value = ret
-                        self._status = InvocationStatus.COMPLETED
-                        action.emit_changed_event(self.thing, self._status.value)
+                try:
+                    output_model_instance = action.output_model.model_validate(ret)
+                except ValidationError as e:
+                    msg = f"Could not serialise the return value from '{action.name}'. "
+                    msg += f"The output model was '{action.output_model}' and the "
+                    msg += f"return value was '{ret}'."
+                    raise InvalidReturnValue(msg) from e
 
+                with self._status_lock:
+                    self._output_model_instance = output_model_instance
+                    self._status = InvocationStatus.COMPLETED
+                    action.emit_changed_event(self.thing, self._status.value)
             except InvocationCancelledError:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
@@ -536,7 +560,7 @@ class ActionManager:
                 ):
                     # TODO: honour "accept" header
                     return invocation.output.response()
-                return invocation.output
+                return invocation.output_model_instance
 
         @router.delete(
             ACTION_INVOCATIONS_PATH + "/{id}",

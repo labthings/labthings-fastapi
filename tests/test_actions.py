@@ -1,5 +1,7 @@
+from typing import Any
 import uuid
 from fastapi.testclient import TestClient
+from labthings_fastapi.exceptions import ServerActionError
 from pydantic import BaseModel
 import pytest
 import functools
@@ -333,3 +335,45 @@ def test_action_docs():
     assert actions["long_docstring"].description.startswith(
         "It has multiple paragraphs."
     )
+
+
+def test_invalid_return_values():
+    """Test the errors raised when an action's return value can't be serialised."""
+
+    class Unjsonable:
+        pass
+
+    class NaughtyThing(lt.Thing):
+        @lt.action
+        def make_random_int(self) -> int:
+            """An action that should return an integer, but returns a float."""
+            return 4.2
+
+        @lt.action
+        def make_unjsonable_any(self) -> Any:
+            """A vaguely-typed action that won't serialise."""
+            return Unjsonable()
+
+    server = lt.ThingServer.from_things({"naughty": NaughtyThing})
+    with server.test_client() as client:
+        tc = lt.ThingClient.from_url("/naughty/", client=client)
+
+        # If a return type doesn't match the type hint, we get
+        with pytest.raises(
+            ServerActionError,
+            match=(
+                r"\[InvalidReturnValue\]: Could not serialise the return value from "
+                r"'make_random_int'."
+            ),
+        ):
+            tc.make_random_int()
+
+        # If a return type is not JSONable
+        with pytest.raises(
+            ServerActionError,
+            match=(
+                r"\[InvalidReturnValue\]: Could not serialise the return value from "
+                r"'make_unjsonable_any'."
+            ),
+        ):
+            tc.make_unjsonable_any()
