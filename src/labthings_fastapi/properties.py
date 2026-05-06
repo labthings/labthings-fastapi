@@ -781,11 +781,11 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         with obj._thing_server_interface._optionally_hold_global_lock(
             self.use_global_lock
         ):
+            if self.on_set_func:
+                value = self.on_set_func(obj, value)
             if get_validate_properties_on_set(obj.__class__):
                 property_info = self.descriptor_info(obj)
                 value = property_info.validate(value)
-            if self.on_set_func:
-                value = self.on_set_func(obj, value)
             obj.__dict__[self.name] = value
             if emit_changed_event:
                 self.emit_changed_event(obj, value)
