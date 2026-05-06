@@ -216,17 +216,19 @@ class ThingServerInterface:
             not enabled.
         """
         if self.global_lock is None:
-            if enabled is True:
+            if enabled:
                 msg = "The global lock is required, but is not enabled."
                 raise FeatureNotEnabledError(msg)
             # If we get here, the global lock is disabled so we do nothing.
             yield
         else:
-            if enabled is False:  # The lock is being explicitly skipped
-                yield
-            else:
+            if enabled is None or enabled:
+                # None means "use the lock if available", True means "use the lock".
                 with self.global_lock:
                     yield
+            else:
+                # enabled has been explicitly set to False, so skip the lock.
+                yield
 
     @contextmanager
     def hold_global_lock(self, *, error_if_unavailable: bool = True) -> Iterator[None]:
