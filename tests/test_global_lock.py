@@ -274,6 +274,24 @@ def test_global_lock_unthreaded():
     assert lock_is_available(lock)
 
 
+def test_global_lock_release_unacquired():
+    """Make sure the same error is raised as for RLock for spurious release."""
+    lock = GlobalLock()
+    with pytest.raises(RuntimeError):
+        lock.release()  # The lock was never acquired.
+
+
+def test_global_lock_identity():
+    """Ensure the property returns the exact same lock instance every time."""
+    server = lt.ThingServer.from_things({}, enable_global_lock=True)
+    interface = lt.ThingServerInterface(server, "thing_name")
+
+    lock_1 = interface.global_lock
+    lock_2 = interface.global_lock
+
+    assert lock_1 is lock_2, "The interface is generating multiple distinct locks!"
+
+
 def test_global_lock_timeout():
     """Check the global lock times out correctly."""
     lock = GlobalLock()
@@ -293,6 +311,12 @@ def test_global_lock_timeout():
         assert lock.acquire() is False
     with assert_takes_time(0.045, 0.1):
         assert lock.acquire(blocking=True) is False
+
+    # acquire() should respect the timeout argument
+    with assert_takes_time(None, 0.04):
+        assert lock.acquire(timeout=0) is False
+    with assert_takes_time(0.06, 0.12):
+        assert lock.acquire(timeout=0.1) is False
 
     # check non-blocking acquire() works
     with assert_takes_time(None, 0.001):
@@ -375,8 +399,11 @@ def assertions_with_locking(thing: ConcurrencyChecker):
         thing.increment_fprop2()
 
     # Actions may run if they're excluded from the lock.
-    # Note this is done twice to check for reuse of context managers
-    # (which will fail on the second attempt)
+    # Note this is done twice to check for reuse of context managers.
+    # (There is no expected failure, because we don't reuse the
+    # context manager. However, running the test below twice did
+    # fail, when a generator context manager was being inappropriately
+    # reused.)
     with assert_changes(thing):
         thing.increment_fprop2_unlocked()
     with assert_changes(thing):
@@ -414,7 +441,7 @@ def test_actions_and_properties_direct_lock_disabled():
 def test_actions_and_properties_testclient_lock_enabled():
     """Ensure the global lock stops multiple things happening at once.
 
-    This test uses a Thing instance directly, with locking enabled.
+    This test uses TestClient, with locking enabled.
     """
     server = lt.ThingServer.from_things(
         {"checker": ConcurrencyChecker}, enable_global_lock=True
@@ -430,7 +457,7 @@ def test_actions_and_properties_testclient_lock_enabled():
 def test_actions_and_properties_testclient_lock_disabled():
     """Ensure the global lock stops multiple things happening at once.
 
-    This test uses a Thing instance directly, with locking disabled.
+    This test uses a TestClient, with locking disabled.
     """
     server = lt.ThingServer.from_things(
         {"checker": ConcurrencyChecker}, enable_global_lock=False
