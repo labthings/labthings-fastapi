@@ -33,7 +33,7 @@ beautifulsoup4==4.14.3
     # via sphinx-toolbox
 cachecontrol==0.14.4
     # via sphinx-toolbox
-certifi==2026.2.25
+certifi==2026.4.22
     # via
     #   httpcore
     #   httpx
@@ -45,7 +45,7 @@ chardet==7.4.3
     # via encutils
 charset-normalizer==3.4.7
     # via requests
-click==8.3.2
+click==8.3.3
     # via
     #   pydoclint
     #   rich-toolkit
@@ -55,7 +55,7 @@ codespell==2.4.2
     # via labthings-fastapi (pyproject.toml)
 coverage==7.13.5
     # via pytest-cov
-cssutils==2.14.0
+cssutils==2.15.0
     # via dict2css
 dict2css==0.3.0.post1
     # via sphinx-toolbox
@@ -91,7 +91,7 @@ fastapi==0.135.4
     # via labthings-fastapi (pyproject.toml)
 fastapi-cli==0.0.24
     # via fastapi
-fastapi-cloud-cli==0.17.0
+fastapi-cloud-cli==0.17.1
     # via fastapi-cli
 fastar==0.11.0
     # via fastapi-cloud-cli
@@ -127,7 +127,7 @@ httpx==0.28.1
     #   labthings-fastapi (pyproject.toml)
     #   fastapi
     #   fastapi-cloud-cli
-idna==3.12
+idna==3.13
     # via
     #   anyio
     #   apeye-core
@@ -155,9 +155,9 @@ jsonschema==4.26.0
     #   sphobjinv
 jsonschema-specifications==2025.9.1
     # via jsonschema
-librt==0.9.0
+librt==0.10.0
     # via mypy
-markdown-it-py==4.0.0
+markdown-it-py==4.1.0
     # via rich
 markupsafe==3.0.3
     # via
@@ -179,11 +179,11 @@ natsort==8.4.0
     # via domdf-python-tools
 numpy==2.2.6
     # via labthings-fastapi (pyproject.toml)
-packaging==26.1
+packaging==26.2
     # via
     #   pytest
     #   sphinx
-pathspec==1.0.4
+pathspec==1.1.1
     # via mypy
 pillow==12.2.0
     # via labthings-fastapi (pyproject.toml)
@@ -195,14 +195,14 @@ pluggy==1.6.0
     #   pytest-cov
 pycodestyle==2.14.0
     # via flake8
-pydantic==2.13.3
+pydantic==2.13.4
     # via
     #   labthings-fastapi (pyproject.toml)
     #   fastapi
     #   fastapi-cloud-cli
     #   pydantic-extra-types
     #   pydantic-settings
-pydantic-core==2.46.3
+pydantic-core==2.46.4
     # via pydantic
 pydantic-extra-types==2.11.1
     # via fastapi
@@ -233,7 +233,7 @@ python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.26
+python-multipart==0.0.27
     # via fastapi
 pyyaml==6.0.3
     # via
@@ -272,9 +272,9 @@ ruamel-yaml==0.18.16
     # via sphinx-toolbox
 ruamel-yaml-clib==0.2.15
     # via ruamel-yaml
-ruff==0.15.11
+ruff==0.15.12
     # via labthings-fastapi (pyproject.toml)
-sentry-sdk==2.58.0
+sentry-sdk==2.59.0
     # via fastapi-cloud-cli
 shellingham==1.5.4
     # via typer
@@ -339,7 +339,7 @@ tomli==2.4.1
     #   pydoclint
     #   pytest
     #   sphinx
-typer==0.24.1
+typer==0.25.1
     # via
     #   fastapi-cli
     #   fastapi-cloud-cli
@@ -374,7 +374,7 @@ urllib3==2.6.3
     #   requests
     #   sentry-sdk
     #   sphinx-prompt
-uvicorn==0.45.0
+uvicorn==0.46.0
     # via
     #   fastapi
     #   fastapi-cli
