@@ -519,10 +519,6 @@ This page summarises the parts of the LabThings API that should be most frequent
 
     This is an alias of `labthings_fastapi.properties.DataSetting` but is not usually used: consider using `property` instead.
 
-.. py:attribute:: FEATURE_FLAGS
-
-    Feature flags are used to control optional features of LabThings. Setting the attributes of `FEATURE_FLAGS` enables or disables a feature. It is an instance of the dataclass `labthings_fastapi.feature_flags.LabThingsFeatureFlags` and the various available options are described there.
-
 .. py:attribute:: outputs
 
     This is an alias for `labthings_fastapi.outputs` and contains, for example `MJPEGStream`\ .
