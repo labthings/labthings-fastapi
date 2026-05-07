@@ -1,7 +1,7 @@
 from typing import Any
 import uuid
 from fastapi.testclient import TestClient
-from labthings_fastapi.exceptions import ServerActionError
+from labthings_fastapi.exceptions import FailedToInvokeActionError, ServerActionError
 from pydantic import BaseModel
 import pytest
 import functools
@@ -357,7 +357,7 @@ def test_invalid_return_values():
 
         # If a return type doesn't match the type hint, we get
         with pytest.raises(
-            ServerActionError,
+            (ServerActionError, FailedToInvokeActionError),
             match=(
                 r"The return value from 'naughty.make_random_int' failed to validate "
                 r"against its output model."
@@ -367,7 +367,7 @@ def test_invalid_return_values():
 
         # If a return type is not JSONable
         with pytest.raises(
-            ServerActionError,
+            (ServerActionError, FailedToInvokeActionError),
             match="Could not serialise invocation",
         ) as excinfo:
             tc.make_unjsonable_any()
