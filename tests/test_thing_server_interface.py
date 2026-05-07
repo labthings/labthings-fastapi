@@ -6,10 +6,15 @@ import tempfile
 from typing import Mapping
 from unittest.mock import Mock
 
+from labthings_fastapi.global_lock import GlobalLock
 import pytest
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import ServerNotRunningError, ThingNotConnectedError
+from labthings_fastapi.exceptions import (
+    FeatureNotEnabledError,
+    ServerNotRunningError,
+    ThingNotConnectedError,
+)
 from labthings_fastapi.thing_server_interface import (
     ThingServerInterface,
     ThingServerMissingError,
@@ -18,6 +23,8 @@ from labthings_fastapi.testing import (
     MockThingServerInterface,
     create_thing_without_server,
 )
+
+from .test_global_lock import lock_is_available
 
 NAME = "testname"
 EXAMPLE_THING_STATE = {"foo": "bar"}
@@ -310,3 +317,67 @@ def test_mocking_slots():
     # These should also be the thing names
     grouped_thing_names = {i.name for i in slotty.dif_grouped_things.values()}
     assert set(DIF_GROUPED_NAMES) == grouped_thing_names
+
+
+@pytest.mark.parametrize("enable", (False, True))
+def test_global_lock(enable):
+    """Test that the global lock is accessible, if configured."""
+    server = lt.ThingServer.from_things({}, enable_global_lock=enable)
+    interface = ThingServerInterface(server, "thing_name")
+    if enable:
+        assert isinstance(interface.global_lock, GlobalLock)
+    else:
+        assert interface.global_lock is None
+
+
+@pytest.mark.parametrize("mock", (False, True))
+def test_mock_hold_global_lock(mock):
+    """Test the `hold_global_lock` method, with and without a global lock."""
+    # By default, there is no global lock.
+    if mock:
+        interface = MockThingServerInterface("thing_name")
+    else:
+        server = lt.ThingServer.from_things({})
+        interface = ThingServerInterface(server, "thing_name")
+    assert interface.global_lock is None
+    # With no global lock, the context manager should be a no-op, unless we
+    # specify `enabled=True` at which point it errors.
+    with interface._optionally_hold_global_lock(False):
+        pass  # hold_global_lock should be a no-op
+    with interface._optionally_hold_global_lock(None):
+        pass  # hold_global_lock should be a no-op
+    with pytest.raises(FeatureNotEnabledError):
+        with interface._optionally_hold_global_lock(True):
+            pass  # hold_global_lock should error, as there's no lock
+    # The public API version only has two options - with error or without:
+    with pytest.raises(FeatureNotEnabledError):
+        with interface.hold_global_lock():
+            pass  # hold_global_lock should error by default
+    with pytest.raises(FeatureNotEnabledError):
+        with interface.hold_global_lock(error_if_unavailable=True):
+            pass  # hold_global_lock should error
+    with interface.hold_global_lock(error_if_unavailable=False):
+        pass  # The error was suppressed, so no errors here :)
+
+    # If specified, there will be a global lock.
+    if mock:
+        interface = MockThingServerInterface("thing_name", enable_global_lock=True)
+    else:
+        server = lt.ThingServer.from_things({}, enable_global_lock=True)
+        interface = ThingServerInterface(server, "thing_name")
+    assert isinstance(interface.global_lock, GlobalLock)
+    # That means the context manager should work for all three arguments.
+    with interface._optionally_hold_global_lock(False):
+        assert lock_is_available(interface.global_lock)
+    with interface._optionally_hold_global_lock(None):
+        assert not lock_is_available(interface.global_lock)
+    with interface._optionally_hold_global_lock(True):
+        assert not lock_is_available(interface.global_lock)
+    assert lock_is_available(interface.global_lock)
+    # Also the public API version should work even with errors enabled.
+    with interface.hold_global_lock():
+        assert not lock_is_available(interface.global_lock)
+    with interface.hold_global_lock(error_if_unavailable=True):
+        assert not lock_is_available(interface.global_lock)
+    with interface.hold_global_lock(error_if_unavailable=False):
+        assert not lock_is_available(interface.global_lock)

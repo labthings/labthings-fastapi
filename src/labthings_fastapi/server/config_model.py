@@ -222,6 +222,19 @@ class ThingServerConfig(BaseModel):
         ),
     )
 
+    enable_global_lock: bool = Field(
+        default=False,
+        description=(
+            """Whether a global lock should be used to simplify concurrency.
+
+            If this setting is `True`, actions will acquire a lock, meaning that
+            only one action can run at any time. The same applies to setting properties.
+            The intention here is that a running action shouldn't need to worry about
+            other code on the server changing things while it runs.
+            """
+        ),
+    )
+
     application_config: dict[str, Any] | None = Field(
         default=None,
         description=(

@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from typing import Iterator
+import time
 import pytest
 
 
@@ -30,3 +31,18 @@ def raises_or_is_caused_by(
         # already have failed.
         traceback = excinfo._excinfo[2]
         excinfo._excinfo = (exception_cls, excinfo.value.__cause__, traceback)
+
+
+@contextmanager
+def assert_takes_time(min_t: float | None, max_t: float | None):
+    """Assert that a code block takes a certain amount of time."""
+    if min_t is None and max_t is None:
+        raise ValueError("assert_takes_time(None, None) is meaningless!")
+    before = time.time()
+    yield
+    after = time.time()
+    duration = after - before
+    if min_t is not None:
+        assert duration >= min_t
+    if max_t is not None:
+        assert duration <= max_t

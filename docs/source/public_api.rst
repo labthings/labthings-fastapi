@@ -91,8 +91,8 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
 .. py:function:: property(getter: Callable[[Owner], Value]) -> FunctionalProperty[Owner, Value]
-                 property(*, default: Value, readonly: bool = False, **constraints: Any) -> Value
-                 property(*, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any) -> Value
+                 property(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None, **constraints: Any) -> Value
+                 property(*, default_factory: Callable[[], Value], readonly: bool = False,  use_global_lock: bool | None = None, **constraints: Any) -> Value
 
     This function may be used to define :ref:`properties` either by decorating a function, or marking an attribute. Full documentation is available at `labthings_fastapi.properties.property` and a more in-depth discussion is available at :ref:`properties`\ . This page focuses on the most frequently used examples.
 
@@ -143,14 +143,14 @@ This page summarises the parts of the LabThings API that should be most frequent
 
 
 .. py:function:: setting(getter: Callable[[Owner], Value]) -> FunctionalSetting[Owner, Value]
-                 setting(*, default: Value, readonly: bool = False, **constraints: Any) -> Value
-                 setting(*, default_factory: Callable[[], Value], readonly: bool = False, **constraints: Any) -> Value
+                 setting(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
+                 setting(*, default_factory: Callable[[], Value], readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
 
     A setting is a property that is saved to disk. It is defined in the same way as `property` but will be synchronised with the `Thing`\ 's settings file. Full documentation is available at `labthings_fastapi.properties.setting`
 
 
 .. py:decorator:: action
-                  action(**kwargs: Any)
+                  action(use_global_lock: bool | None = None, **kwargs: Any)
 
    Mark a method of a `~lt.Thing` as a LabThings Action.
 
@@ -302,6 +302,17 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. automethod:: labthings_fastapi.thing_server_interface.ThingServerInterface.get_thing_states
         :no-index:
 
+   .. py:property:: global_lock
+        :type GlobalLock | None:
+
+        A global lock object that is used to restrict concurrent execution of actions and setting of properties.
+
+   .. py:method:: hold_global_lock(*, error_if_unavailable: bool = True)
+
+        A context manager that holds the global lock. By default, an exception is raised if the global lock
+        is not enabled. ``error_if_unavailable`` may be used to suppress that error, in which case the
+        context manager silently does nothing if there is no global lock to acquire.    
+
 
 .. py:class:: ThingClassSettings
     
@@ -352,6 +363,9 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.settings_folder
+        :no-index:
+
+   .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.enable_global_lock
         :no-index:
 
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.application_config

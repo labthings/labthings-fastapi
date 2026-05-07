@@ -15,10 +15,12 @@ future.
 """
 
 from __future__ import annotations
+from collections.abc import Iterator
+from contextlib import contextmanager
 import datetime
 import logging
 from collections import deque
-from functools import partial
+from functools import partial, wraps
 import inspect
 from threading import Thread, Lock
 import uuid
@@ -29,6 +31,7 @@ from typing import (
     Callable,
     Concatenate,
     Generic,
+    Literal,
     Optional,
     ParamSpec,
     TypeVar,
@@ -38,6 +41,7 @@ from weakref import WeakSet
 import weakref
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
+
 
 from .middleware.url_for import URLFor
 from .base_descriptor import (
@@ -49,6 +53,7 @@ from .logs import add_thing_log_destination
 from .utilities import model_to_dict, wrap_plain_types_in_rootmodel
 from .invocations import InvocationModel, InvocationStatus
 from .exceptions import (
+    GlobalLockBusyError,
     InvocationCancelledError,
     InvocationError,
     NotConnectedToServerError,
@@ -287,19 +292,22 @@ class Invocation(Thread):
                     # occur.
                     raise RuntimeError("Cannot start an invocation without a Thing.")
 
-                with self._status_lock:
-                    self._status = InvocationStatus.RUNNING
-                    self._start_time = datetime.datetime.now()
-                    action.emit_changed_event(self.thing, self._status.value)
+                # The action's `context_for_func` context manager will acquire the
+                # global lock if needed.
+                with action.context_for_func(thing):
+                    with self._status_lock:
+                        self._status = InvocationStatus.RUNNING
+                        self._start_time = datetime.datetime.now()
+                        action.emit_changed_event(self.thing, self._status.value)
 
-                bound_method = action.__get__(thing)
-                # Actually run the action
-                ret = bound_method(**kwargs, **self.dependencies)
+                    # Actually run the action
+                    ret = action.func(thing, **kwargs, **self.dependencies)
 
-                with self._status_lock:
-                    self._return_value = ret
-                    self._status = InvocationStatus.COMPLETED
-                    action.emit_changed_event(self.thing, self._status.value)
+                    with self._status_lock:
+                        self._return_value = ret
+                        self._status = InvocationStatus.COMPLETED
+                        action.emit_changed_event(self.thing, self._status.value)
+
             except InvocationCancelledError:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
@@ -308,9 +316,17 @@ class Invocation(Thread):
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
                 if isinstance(e, InvocationError):
-                    # Log without traceback
+                    # Log without traceback for anticipated errors
                     logger.error(e)
+                elif (
+                    isinstance(e, GlobalLockBusyError)
+                    and self._status == InvocationStatus.PENDING
+                ):
+                    # The global lock timed out before the function started.
+                    # In this case, don't print a traceback.
+                    logger.warning(f"Global lock was busy: didn't run {action.name}.")
                 else:
+                    # Other exceptions show up in the log with a traceback
                     logger.exception(e)
                 # Then set status
                 with self._status_lock:
@@ -665,8 +681,9 @@ class ActionDescriptor(
         func: Callable[Concatenate[OwnerT, ActionParams], ActionReturn],
         response_timeout: float = 1,
         retention_time: float = 300,
+        use_global_lock: Literal[False] | None = None,
     ) -> None:
-        """Create a new action descriptor.
+        r"""Create a new action descriptor.
 
         The action descriptor wraps a method of a `~lt.Thing`. It may still be
         called from Python in the same way, but it will also be added to the
@@ -683,6 +700,16 @@ class ActionDescriptor(
             of the action.
         :param retention_time: how long, in seconds, the action should be kept
             for after it has completed.
+        :param use_global_lock: If the global lock is enabled,
+            this parameter may be used to opt out. See :ref:`global_locking`
+            for details of how the global lock is implemented.
+
+            If this parameter is `False` then the lock will not be acquired, even
+            if global locking is enabled. That is appropriate if the action does
+            not have side effects that would cause problems for other actions, or
+            if more nuanced locking behaviour is required meaning the lock is
+            acquired directly in the action code, for example using
+            `~lt.ThingServerInterface.hold_global_lock`\ .
         """
         super().__init__()
         self.func = func
@@ -692,6 +719,7 @@ class ActionDescriptor(
         name = func.__name__  # this is checked in __set_name__
         self.response_timeout = response_timeout
         self.retention_time = retention_time
+        self.use_global_lock = use_global_lock
         self.dependency_params = fastapi_dependency_params(func)
         self.input_model = input_model_from_signature(
             func,
@@ -725,19 +753,69 @@ class ActionDescriptor(
                 f"'{self.func.__name__}'",
             )
 
-    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
-        """Return the function, bound to an object as for a normal method.
+    @contextmanager
+    def context_for_func(self, obj: OwnerT) -> Iterator[None]:
+        """Create the context in which ``func`` runs.
 
-        This currently doesn't validate the arguments, though it may do so
-        in future. In its present form, this is equivalent to a regular
-        Python method, i.e. all we do is supply the first argument, `self`.
+        Currently, if global locking is enabled and this action hasn't opted out,
+        this context manager will hold the global lock for the duration of the
+        action.
+
+        This method is intended to create a hook for pre-run set-up and post-run
+        clean-up code that may be customised by `Thing` implementations in the future,
+        such as acquiring locks or other resources.
+
+        When an action is run from Python code as ``thing.action()`` this context
+        manager is entered before executing `func` bound to the `Thing` instance.
+
+        When an action is run from HTTP, this context manager is entered while the
+        action's status is ``pending`` and the status changes to ``running`` just
+        before `func` (the function decorated by `~lt.action`) runs. This allows
+        some slightly nicer error handling, for example not cluttering the log with
+        stack traces if an action can't start because the global lock is in use.
+
+        :param obj: The object on which the method is being called.
+        :return: the function, wrapped if necessary.
+        """
+        with obj._thing_server_interface._optionally_hold_global_lock(
+            self.use_global_lock
+        ):
+            yield
+
+    def instance_get(self, obj: OwnerT) -> Callable[ActionParams, ActionReturn]:
+        """Return the function, bound to an object and wrapped in a context manager.
+
+        Accessing a regular Python method returns the method bound to the instance,
+        i.e. the `self` argument is supplied.
+
+        LabThings Actions work the same way, but they also wrap the function in a
+        context manager. Currently, this context manager will handle acquiring the
+        global lock if required.
+
+        If locking is disabled, the context manager does nothing.
+        If locking is enabled, we return a wrapped function that holds the
+        global lock while the action runs.
+
+        .. note::
+
+            The returned function will hold a reference to both `obj` and `self`
+            (this descriptor). Given that accessing ``instance.method`` returns
+            a function that's already bound to the instance, this shouldn't cause
+            any problems.
 
         :param obj: the `~lt.Thing` to which we are attached. This will be
             the first argument supplied to the function wrapped by this
             descriptor.
         :return: the action function, bound to ``obj``.
         """
-        return partial(self.func, obj)
+
+        @wraps(self.func)
+        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
+            """Acquire the lock then run `func` with supplied arguments."""
+            with self.context_for_func(obj):
+                return self.func(*args, **kwargs)
+
+        return partial(wrapped, obj)
 
     def _observers_set(self, obj: Thing) -> WeakSet:
         """Return a set used to notify changes.

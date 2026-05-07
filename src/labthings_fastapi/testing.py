@@ -17,6 +17,8 @@ from typing import (
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock
 
+from labthings_fastapi.global_lock import GlobalLock
+
 from .utilities import class_attributes
 from .thing_slots import ThingSlot
 from .thing_server_interface import ThingServerInterface
@@ -44,18 +46,26 @@ class MockThingServerInterface(ThingServerInterface):
     * `get_thing_states` will return an empty dictionary.
     """
 
-    def __init__(self, name: str, settings_folder: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        settings_folder: str | None = None,
+        enable_global_lock: bool = False,
+    ) -> None:
         """Initialise a ThingServerInterface.
 
         :param name: The name of the Thing we're providing an interface to.
         :param settings_folder: The location where we should save settings.
             By default, this is a temporary directory.
+        :param enable_global_lock: Whether to create a global lock object, to
+            mock the server setting of the same name.
         """
         # We deliberately don't call super().__init__(), as it won't work without
         # a server.
         self._name: str = name
         self._settings_tempdir: TemporaryDirectory | None = None
         self._settings_folder = settings_folder
+        self._global_lock = GlobalLock() if enable_global_lock else None
         self._mocks: list[Mock] = []
 
     def start_async_task_soon(
@@ -129,6 +139,11 @@ class MockThingServerInterface(ThingServerInterface):
         """
         return None
 
+    @property
+    def global_lock(self) -> GlobalLock | None:
+        """Return a global lock."""
+        return self._global_lock
+
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")
 
@@ -138,6 +153,7 @@ def create_thing_without_server(
     *args: Any,
     settings_folder: str | None = None,
     mock_all_slots: bool = False,
+    enable_global_lock: bool = True,
     **kwargs: Any,
 ) -> ThingSubclass:
     r"""Create a `~lt.Thing` and supply a mock ThingServerInterface.
@@ -156,6 +172,7 @@ def create_thing_without_server(
         connected to each thing slot. It follows the default of the specified
         to the slot. So if an optional slot has a default of `None`, no mock
         will be provided.
+    :param enable_global_lock: Whether a global lock should be provided.
     :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
@@ -169,7 +186,11 @@ def create_thing_without_server(
         msg = "You may not supply a keyword argument called 'thing_server_interface'."
         raise ValueError(msg)
 
-    msi = MockThingServerInterface(name=name, settings_folder=settings_folder)
+    msi = MockThingServerInterface(
+        name=name,
+        settings_folder=settings_folder,
+        enable_global_lock=enable_global_lock,
+    )
     # Note: we must ignore misc typing errors above because mypy flags an error
     # that `thing_server_interface` is multiply specified.
     # This is a conflict with *args, if we had only **kwargs it would not flag
@@ -180,6 +201,20 @@ def create_thing_without_server(
     if mock_all_slots:
         _mock_slots(thing)
     return thing
+
+
+def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
+    """Create a mock Thing instance, with some important attributes.
+
+    :param spec: the Thing subclass we're mocking an instance of. Pass
+        `lt.Thing` if it doesn't matter.
+    :return: a Mock instance that pretends to be an instance of `spec`.
+    """
+    mock = Mock(spec=spec)
+    mock.__name__ = "Mock{spec.__name__}"
+    mock.__module__ = "mock_module"
+    mock._thing_server_interface = MockThingServerInterface(mock.__name__)
+    return mock
 
 
 def _mock_slots(thing: Thing) -> None:
