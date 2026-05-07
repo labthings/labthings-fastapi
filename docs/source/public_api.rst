@@ -365,6 +365,9 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.settings_folder
         :no-index:
 
+   .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.api_prefix
+        :no-index:
+
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.enable_global_lock
         :no-index:
 
@@ -515,10 +518,6 @@ This page summarises the parts of the LabThings API that should be most frequent
 .. py:class:: DataSetting
 
     This is an alias of `labthings_fastapi.properties.DataSetting` but is not usually used: consider using `property` instead.
-
-.. py:attribute:: FEATURE_FLAGS
-
-    Feature flags are used to control optional features of LabThings. Setting the attributes of `FEATURE_FLAGS` enables or disables a feature. It is an instance of the dataclass `labthings_fastapi.feature_flags.LabThingsFeatureFlags` and the various available options are described there.
 
 .. py:attribute:: outputs
 
