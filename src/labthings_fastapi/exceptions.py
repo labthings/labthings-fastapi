@@ -4,6 +4,8 @@
 # An __all__ for this module is less than helpful, unless we have an
 # automated check that everything's included.
 
+from collections.abc import Callable
+
 
 class NotConnectedToServerError(RuntimeError):
     """The Thing is not connected to a server.
@@ -254,7 +256,46 @@ class NoInvocationContextError(RuntimeError):
     """
 
 
-class InvalidReturnValue(RuntimeError):
+class CausedByUserCodeError(Exception):
+    """A mixin to allow exceptions to refer to downstream code."""
+
+    def _append_to_args(self, message: str) -> None:
+        """Add a message to the exception's arguments.
+
+        :param message: the message to append.
+        """
+        if len(self.args) == 1:
+            # If there's only one string, assume it's a message and append
+            self.args = (self.args[0] + "\n" + message,)
+        else:
+            # If there are multiple arguments, add this as a further one
+            self.args += (message,)
+
+    def set_source_function(self, func: Callable) -> None:
+        """Add the location of a user-supplied function to the error message.
+
+        :param func: the function that caused this error.
+        """
+        code = func.__code__
+        self._append_to_args(
+            f"This was likely caused by function '{code.co_name}' "
+            f"at {code.co_filename}:{code.co_firstlineno}"
+        )
+
+    def set_source_class(self, cls: type, attr: str | None = None) -> None:
+        """Add a reference to a class (and optionally attribute).
+
+        :param cls: the class that caused this error.
+        :param attr: the attribute name that caused this error.
+        """
+        self._append_to_args(
+            f"This was likely caused by '{cls.__module__}.{cls.__qualname__}.{attr}"
+            if attr
+            else "'."
+        )
+
+
+class InvalidReturnValueError(CausedByUserCodeError, RuntimeError):
     r"""The return value from a method cannot be serialised by LabThings.
 
     This error is raised when an action returns a value that can't be serialised.
@@ -268,6 +309,18 @@ class InvalidReturnValue(RuntimeError):
     either a simple type that can be serialised to JSON, or a Pydantic model.
     You should also check that the function's return value matches the declared
     type, ideally by regularly running a type checker like `mypy` on your code.
+    """
+
+
+class UnserializableTypeError(CausedByUserCodeError, TypeError):
+    r"""A type has been specified that can't be serialized to JSON.
+
+    This error generally means a property or action has a type that cannot be
+    serialized to JSON. This might be an instance of a custom class, or another
+    datatype that doesn't have a ready representation using JSON-compatible types.
+
+    This error can often be fixed using `pydantic` annotations, or by using simple
+    Python types instead of custom ones.
     """
 
 

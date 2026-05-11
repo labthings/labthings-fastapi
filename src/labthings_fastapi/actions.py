@@ -50,17 +50,17 @@ from .base_descriptor import (
 )
 from .logs import add_thing_log_destination
 from .utilities import (
-    LabThingsRootModelWrapper,
+    RootModelWrapper,
     model_to_dict,
-    wrap_plain_types_in_rootmodel,
 )
 from .invocations import InvocationModel, InvocationStatus
 from .exceptions import (
     GlobalLockBusyError,
-    InvalidReturnValue,
+    InvalidReturnValueError,
     InvocationCancelledError,
     InvocationError,
     NotConnectedToServerError,
+    UnserializableTypeError,
 )
 from . import invocation_contexts
 from .utilities.introspection import (
@@ -162,12 +162,7 @@ class Invocation(Thread):
     def output(self) -> Any:
         """Return value of the Action. If the Action is still running, returns None."""
         with self._status_lock:
-            if self._output_model_instance is None:
-                return None
-            if isinstance(self._output_model_instance, LabThingsRootModelWrapper):
-                return self._output_model_instance.model_dump()
-            else:
-                return self._output_model_instance
+            return RootModelWrapper.unwrap(self._output_model_instance)
 
     @property
     def output_model_instance(self) -> BaseModel | None:
@@ -289,7 +284,7 @@ class Invocation(Thread):
         See `.Invocation.status` for status values.
 
         :raises RuntimeError: if there is no Thing associated with the invocation.
-        :raises InvalidReturnValue: if the action returns a value that can't
+        :raises InvalidReturnValueError: if the action returns a value that can't
             be validated by its output model.
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
@@ -323,6 +318,10 @@ class Invocation(Thread):
 
                 try:
                     output_model_instance = action.output_model.model_validate(ret)
+                    output_model_instance._labthings_created_as = (
+                        f"the output from {thing.name}.{action.name} "
+                        f"invocation {self.id}."
+                    )
                 except ValidationError as e:
                     # Generate a helpful error message. This will be handled below,
                     # where it will cause the action to be marked as failed, and the
@@ -330,7 +329,7 @@ class Invocation(Thread):
                     msg = f"The return value from '{self.thing.name}.{action.name}' "
                     msg += "failed to validate against its output model "
                     msg += f"'{action.output_model}'. The return value was '{ret}'."
-                    raise InvalidReturnValue(msg) from e
+                    raise InvalidReturnValueError(msg) from e
 
                 with self._status_lock:
                     self._output_model_instance = output_model_instance
@@ -343,7 +342,7 @@ class Invocation(Thread):
                     action.emit_changed_event(self.thing, self._status.value)
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
-                if isinstance(e, (InvocationError, InvalidReturnValue)):
+                if isinstance(e, (InvocationError, InvalidReturnValueError)):
                     # Log without traceback for anticipated errors
                     logger.error(e)
                 elif (
@@ -738,6 +737,8 @@ class ActionDescriptor(
             if more nuanced locking behaviour is required meaning the lock is
             acquired directly in the action code, for example using
             `~lt.ThingServerInterface.hold_global_lock`\ .
+        :raises UnserializableTypeError: if the return type of the action cannot
+            be serialised to JSON by `pydantic`\ .
         """
         super().__init__()
         self.func = func
@@ -754,7 +755,13 @@ class ActionDescriptor(
             remove_first_positional_arg=True,
             ignore=[p.name for p in self.dependency_params],
         )
-        self.output_model = wrap_plain_types_in_rootmodel(return_type(func))
+        try:
+            self.output_model = RootModelWrapper.wrap_type(
+                return_type(func), name=f"{name.title()}Output"
+            )
+        except UnserializableTypeError as e:
+            e.set_source_function(func)
+            raise
         self.invocation_model = create_model(
             f"{name}_invocation",
             __base__=InvocationModel,

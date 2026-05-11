@@ -4,10 +4,24 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVar
 from weakref import WeakSet
-from pydantic import BaseModel, ConfigDict, Field, RootModel, create_model
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    create_model,
+    model_serializer,
+    SerializerFunctionWrapHandler,
+    PrivateAttr,
+    PydanticSchemaGenerationError,
+)
 from pydantic.dataclasses import dataclass
+from pydantic_core import PydanticSerializationError
 
-from labthings_fastapi.exceptions import UnsupportedConstraintError
+from labthings_fastapi.exceptions import (
+    UnsupportedConstraintError,
+    UnserializableTypeError,
+)
 from .introspection import EmptyObject
 
 if TYPE_CHECKING:
@@ -17,9 +31,9 @@ if TYPE_CHECKING:
 __all__ = [
     "class_attributes",
     "attributes",
+    "RootModelWrapper",
     "LabThingsObjectData",
     "labthings_data",
-    "wrap_plain_types_in_rootmodel",
     "model_to_dict",
 ]
 
@@ -97,7 +111,7 @@ def labthings_data(obj: Thing) -> LabThingsObjectData:
 WrappedT = TypeVar("WrappedT")
 
 
-class LabThingsRootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
+class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
     """A RootModel subclass for automatically-wrapped types.
 
     There are several places where LabThings needs a model, but may only
@@ -105,52 +119,106 @@ class LabThingsRootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
     a type has been automatically wrapped, and will need to be unwrapped
     in order for the value to have the correct type.
 
-    It has no additional functionality.
+    It also provides methods to automatically wrap types if they are not
+    already `pydantic.BaseModel` subclasses, and to unwrap them again, and
+    there is provision to add metadata that makes it easier to locate errors
+    if serialisation fails.
     """
 
+    _labthings_created_as: str | None = PrivateAttr(default=None)
 
-def wrap_plain_types_in_rootmodel(
-    model: type, constraints: Mapping[str, Any] | None = None
-) -> type[BaseModel]:
-    """Ensure a type is a subclass of BaseModel.
+    @classmethod
+    def wrap_type(
+        cls,
+        model: type,
+        constraints: Mapping[str, Any] | None = None,
+        name: str | None = None,
+    ) -> type[BaseModel]:
+        r"""Ensure a type is a subclass of BaseModel.
 
-    If a `pydantic.BaseModel` subclass is passed to this function, we will pass it
-    through unchanged. Otherwise, we wrap the type in a `pydantic.RootModel`.
-    In the future, we may explicitly check that the argument is a type
-    and not a model instance.
+        If a `pydantic.BaseModel` subclass is passed to this function, we will pass it
+        through unchanged. Otherwise, we wrap the type in a `pydantic.RootModel`.
+        In the future, we may explicitly check that the argument is a type
+        and not a model instance.
 
-    :param model: A Python type or `pydantic` model.
-    :param constraints: is passed as keyword arguments to `pydantic.Field`
-        to add validation constraints to the property.
+        :param model: A Python type or `pydantic` model.
+        :param constraints: is passed as keyword arguments to `pydantic.Field`
+            to add validation constraints to the property.
+        :param name: the name to use for the dynamically created model.
 
-    :return: A `pydantic` model, wrapping Python types in a ``RootModel`` if needed.
+        :return: A `pydantic` model, wrapping Python types in a ``RootModel`` if needed.
 
-    :raises UnsupportedConstraintError: if constraints are provided for an
-        unsuitable type, for example `allow_inf_nan` for an `int` property, or
-        any constraints for a `BaseModel` subclass.
-    :raises RuntimeError: if other errors prevent Pydantic from creating a schema
-        for the generated model.
-    """
-    try:  # This needs to be a `try` as basic types are not classes
-        if issubclass(model, BaseModel):
-            if constraints:
-                raise UnsupportedConstraintError(
-                    "Constraints may only be applied to plain types, not Models."
-                )
-            return model
-    except TypeError:
-        pass  # some plain types aren't classes and that's OK - they still get wrapped.
-    constraints = constraints or {}
-    try:
-        return create_model(
-            f"{model!r}",
-            root=(model, Field(**constraints)),
-            __base__=LabThingsRootModelWrapper,
-        )
-    except RuntimeError as e:
-        if "Unable to apply constraint" in str(e):
-            raise UnsupportedConstraintError(str(e)) from e
-        raise e
+        :raises UnsupportedConstraintError: if constraints are provided for an
+            unsuitable type, for example `allow_inf_nan` for an `int` property, or
+            any constraints for a `BaseModel` subclass.
+        :raises UnserializableTypeError: if the type being wrapped is not able
+            to be serialized by `pydantic`\ .
+        :raises RuntimeError: if other errors prevent Pydantic from creating a schema
+            for the generated model.
+        """
+        try:  # This needs to be a `try` as basic types are not classes
+            if issubclass(model, BaseModel):
+                if constraints:
+                    raise UnsupportedConstraintError(
+                        "Constraints may only be applied to plain types, not Models."
+                    )
+                return model
+        except TypeError:
+            pass  # some types aren't classes and that's OK - they still get wrapped.
+        constraints = constraints or {}
+        try:
+            # Dynamically create a subclass of RootModelWrapper for the supplied type.
+            return create_model(
+                f"{name or cls.__name__}[{model!r}]",
+                root=(model, Field(**constraints)),
+                __base__=cls,
+            )
+        except PydanticSchemaGenerationError as e:
+            raise UnserializableTypeError(
+                f"LabThings does not know how to serialize {model!r} to JSON."
+            ) from e
+        except RuntimeError as e:
+            if "Unable to apply constraint" in str(e):
+                raise UnsupportedConstraintError(str(e)) from e
+            raise e
+
+    @classmethod
+    def unwrap(cls, value: BaseModel | None) -> Any:
+        r"""If the supplied value is a `RootModelWrapper`, unwrap it.
+
+        :param value: a model instance.
+        :return: the root value, if ``value`` is a `RootModelWrapper`\ , or ``value``
+            if not.
+        """
+        if value is None:
+            return None
+        if isinstance(value, cls):
+            return value.root
+        return value
+
+    @model_serializer(mode="wrap")
+    def add_context_to_serialization(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> Any:
+        """Ensure that serialization errors are accompanied by context.
+
+        This wraps Pydantic's serialization error in a custom error that makes it clear
+        where the problematic model originated.
+
+        :param handler: the underlying Pydantic serializer.
+        :return: a JSONable value.
+        :raises ValueError: if the serialization fails. This wraps the underlying
+            `pydantic` error to provide additional context.
+        """
+        try:
+            return handler(self)
+        except PydanticSerializationError as e:
+            purpose = self._labthings_created_as
+            raise ValueError(
+                f"There was an error serializing {self!r}, created as {purpose} "
+                if purpose
+                else ". The serialization error was '{e}'."
+            ) from e
 
 
 def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:

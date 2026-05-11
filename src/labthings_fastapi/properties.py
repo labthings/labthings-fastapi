@@ -81,9 +81,8 @@ from .thing_description._model import (
     PropertyOp,
 )
 from .utilities import (
-    LabThingsRootModelWrapper,
+    RootModelWrapper,
     labthings_data,
-    wrap_plain_types_in_rootmodel,
 )
 from .utilities.introspection import return_type
 from .base_descriptor import (
@@ -97,6 +96,7 @@ from .exceptions import (
     PropertyRedefinitionError,
     ReadOnlyPropertyError,
     MissingTypeError,
+    UnserializableTypeError,
     UnsupportedConstraintError,
 )
 from .thing_class_settings import get_validate_properties_on_set
@@ -464,12 +464,19 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         subclass, this returns it unchanged.
 
         :return: a Pydantic model for the property's type.
+        :raises UnserializableTypeError: if the property can't be serialized
+            by `pydantic` to JSON.
         """
         if self._model is None:
-            self._model = wrap_plain_types_in_rootmodel(
-                self.value_type,
-                constraints=self.constraints,
-            )
+            try:
+                self._model = RootModelWrapper.wrap_type(
+                    self.value_type,
+                    constraints=self.constraints,
+                    name=f"{self.name.title()}Value",
+                )
+            except UnserializableTypeError as e:
+                e.set_source_class(self.owning_class, self.name)
+                raise
         return self._model
 
     def get_default(self, obj: Owner | None) -> Value:
@@ -1256,7 +1263,7 @@ class PropertyInfo(
             with its value type. This should never happen.
         """
         try:
-            if issubclass(self.model, LabThingsRootModelWrapper):
+            if issubclass(self.model, RootModelWrapper):
                 # If a plain type has been wrapped in a RootModel, use that to validate
                 # and then set the property to the root value.
                 model = self.model.model_validate(value)
@@ -1269,7 +1276,7 @@ class PropertyInfo(
                 return self.value_type.model_validate(value)
 
             # This should be unreachable, because `model` is a
-            # `LabThingsRootModelWrapper` wrapping the value type, or the value type
+            # `RootModelWrapper` wrapping the value type, or the value type
             # should be a BaseModel.
             msg = f"Property {self.name} has an inconsistent model. This is "
             msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
