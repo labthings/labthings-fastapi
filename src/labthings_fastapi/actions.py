@@ -318,10 +318,6 @@ class Invocation(Thread):
 
                 try:
                     output_model_instance = action.output_model.model_validate(ret)
-                    output_model_instance._labthings_created_as = (
-                        f"the output from {thing.name}.{action.name} "
-                        f"invocation {self.id}."
-                    )
                 except ValidationError as e:
                     # Generate a helpful error message. This will be handled below,
                     # where it will cause the action to be marked as failed, and the

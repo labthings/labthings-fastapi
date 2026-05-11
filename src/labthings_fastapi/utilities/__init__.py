@@ -207,17 +207,17 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
 
         :param handler: the underlying Pydantic serializer.
         :return: a JSONable value.
-        :raises ValueError: if the serialization fails. This wraps the underlying
-            `pydantic` error to provide additional context.
+        :raises PydanticSerializationError: if the serialization fails. This wraps the
+            underlying `pydantic` error to provide additional context.
         """
         try:
             return handler(self)
         except PydanticSerializationError as e:
             purpose = self._labthings_created_as
-            raise ValueError(
+            raise PydanticSerializationError(
                 f"There was an error serializing {self!r}, created as {purpose} "
                 if purpose
-                else ". The serialization error was '{e}'."
+                else f". The serialization error was '{e}'."
             ) from e
 
 

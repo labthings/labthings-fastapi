@@ -48,6 +48,7 @@ Adding a "setter" to properties is optional, and makes them read-write.
 from __future__ import annotations
 import builtins
 from collections.abc import Mapping
+import inspect
 from types import EllipsisType
 from typing import (
     Annotated,
@@ -62,7 +63,8 @@ from typing import (
 from typing_extensions import Self, TypedDict
 from weakref import WeakSet
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Response
+from fastapi.responses import JSONResponse
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -72,6 +74,7 @@ from pydantic import (
     create_model,
     with_config,
 )
+from pydantic_core import PydanticSerializationError
 
 from .thing_description import type_to_dataschema
 from .thing_description._model import (
@@ -566,8 +569,42 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             summary=self.title,
             description=f"## {self.title}\n\n{self.description or ''}",
         )
-        def get_property() -> Any:
-            return self.__get__(thing)
+        def get_property() -> Response:
+            try:
+                value = self.__get__(thing)
+                model = self.model.model_validate(value)
+            except ValidationError as e:
+                filename = inspect.getsourcefile(self.owning_class)
+                msg = f"Could not validate the value of {thing.name}.{self.name} "
+                msg += "against its model.\n"
+                msg += f"The value was '{value}' and the model was {self.model!r}\n"
+                msg += f"The validation error was {e}.\n"
+                msg += f"See '{self.owning_class.__qualname__}.{self.name}' "
+                msg += f"defined in {filename}."
+                thing.logger.error(msg)
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": msg},
+                )
+            try:
+                return Response(
+                    content=model.model_dump_json(),
+                    status_code=200,
+                    media_type="application/json",
+                )
+            except PydanticSerializationError as e:
+                filename = inspect.getsourcefile(self.owning_class)
+                msg = f"Could not serialise the value of {thing.name}.{self.name} "
+                msg += "to JSON.\n"
+                msg += f"It was validated as {model!r}.\n"
+                msg += f"The serialization error was {e}.\n"
+                msg += f"See '{self.owning_class.__qualname__}.{self.name}' "
+                msg += f"defined in {filename}."
+                thing.logger.error(msg)
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": msg},
+                )
 
         if self.is_resettable(thing):
 
