@@ -146,9 +146,9 @@ class ThingServer:
         self._set_url_for_middleware()
         self._add_exception_handlers()
         self.action_manager = ActionManager()
-        self.app.include_router(self.action_manager.router(), prefix=self._api_prefix)
-        self.app.include_router(blob.router, prefix=self._api_prefix)
-        self.app.include_router(self._things_view_router(), prefix=self._api_prefix)
+        self.app.include_router(self.action_manager.router(), prefix=self.api_prefix)
+        self.app.include_router(blob.router, prefix=self.api_prefix)
+        self.app.include_router(self._things_view_router(), prefix=self.api_prefix)
         self.blocking_portal: Optional[BlockingPortal] = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
@@ -270,10 +270,7 @@ class ThingServer:
 
     @property
     def things(self) -> Mapping[str, Thing]:
-        """Return a dictionary of all the things.
-
-        :return: a dictionary mapping thing paths to `~lt.Thing` instances.
-        """
+        """A read-only mapping of names to `~lt.Thing` instances."""
         return MappingProxyType(self._things)
 
     @property
@@ -286,7 +283,7 @@ class ThingServer:
         return self._config.application_config
 
     @property
-    def _api_prefix(self) -> str:
+    def api_prefix(self) -> str:
         r"""A string that prefixes all URLs in the application.
 
         This will either be empty, or start with a slash and not
@@ -337,7 +334,7 @@ class ThingServer:
         """
         if name not in self._things:
             raise KeyError(f"No thing named {name} has been added to this server.")
-        return f"{self._api_prefix}/{name}/"
+        return f"{self.api_prefix}/{name}/"
 
     def _create_things(self) -> Mapping[str, Thing]:
         r"""Create the Things, add them to the server, and connect them up if needed.
@@ -475,7 +472,7 @@ class ThingServer:
             """
             return {
                 name: thing.thing_description(
-                    path=f"{self._api_prefix}/{name}/", base=str(request.base_url)
+                    path=f"{self.api_prefix}/{name}/", base=str(request.base_url)
                 )
                 for name, thing in thing_server.things.items()
             }
