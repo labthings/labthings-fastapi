@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from collections.abc import Mapping
+import logging
+from types import FunctionType
 from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVar
 from weakref import WeakSet
 from pydantic import (
@@ -10,15 +12,16 @@ from pydantic import (
     Field,
     RootModel,
     create_model,
-    model_serializer,
-    SerializerFunctionWrapHandler,
-    PrivateAttr,
     PydanticSchemaGenerationError,
+    ValidationError,
 )
 from pydantic.dataclasses import dataclass
 from pydantic_core import PydanticSerializationError
+from fastapi import Response
+from fastapi.responses import JSONResponse
 
 from labthings_fastapi.exceptions import (
+    InvalidReturnValueError,
     UnsupportedConstraintError,
     UnserializableTypeError,
 )
@@ -120,12 +123,8 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
     in order for the value to have the correct type.
 
     It also provides methods to automatically wrap types if they are not
-    already `pydantic.BaseModel` subclasses, and to unwrap them again, and
-    there is provision to add metadata that makes it easier to locate errors
-    if serialisation fails.
+    already `pydantic.BaseModel` subclasses, and to unwrap them again.
     """
-
-    _labthings_created_as: str | None = PrivateAttr(default=None)
 
     @classmethod
     def wrap_type(
@@ -196,29 +195,135 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
             return value.root
         return value
 
-    @model_serializer(mode="wrap")
-    def add_context_to_serialization(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> Any:
-        """Ensure that serialization errors are accompanied by context.
 
-        This wraps Pydantic's serialization error in a custom error that makes it clear
-        where the problematic model originated.
+def refer_to_user_code(
+    code: FunctionType | tuple[type, str] | None = None, suffix: str = "\n"
+) -> str:
+    r"""Refer to a user-supplied function or property.
 
-        :param handler: the underlying Pydantic serializer.
-        :return: a JSONable value.
-        :raises PydanticSerializationError: if the serialization fails. This wraps the
-            underlying `pydantic` error to provide additional context.
-        """
-        try:
-            return handler(self)
-        except PydanticSerializationError as e:
-            purpose = self._labthings_created_as
-            raise PydanticSerializationError(
-                f"There was an error serializing {self!r}, created as {purpose} "
-                if purpose
-                else f". The serialization error was '{e}'."
-            ) from e
+    This function generates a human-readable error string that should enable someone
+    to find a problem in downstream code.
+
+    If `code` is `None` the empty string will be returned. This is intended to simplify
+    the construction of error messages that may or may not include a code location.
+
+    :param code: the code that generated `value`\ . This may be either a function,
+        a tuple consisting of a class and an attribute name, or a string (which
+        should describe how to find the user code that generated the value).
+    :param suffix: a string that terminates the message, by default a newline. This
+        is not used if `code` is None, and instead the empty string is returned.
+    :return: a string referring to the user code, for use in an error message, or
+        the empty string if no user code is specified.
+    """
+    if isinstance(code, FunctionType):
+        co = code.__code__
+        return (
+            f"This value was returned by '{co.co_name}' "
+            f"at {co.co_filename}:{co.co_firstlineno}.{suffix}"
+        )
+    elif isinstance(code, tuple) and len(code) == 2:
+        cls, attr = code
+        return (
+            "You may want to check the definition of "
+            f"{cls.__module__}.{cls.__qualname__}.{attr}.{suffix}"
+        )
+    else:
+        return ""
+
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
+
+
+def validate_from_user_code(
+    model: type[ModelT],
+    value: Any,
+    description: str,
+    code: FunctionType | tuple[type, str] | None = None,
+) -> ModelT:
+    r"""Validate a return value from user code, with error handling.
+
+    This wraps ``return model.model_validate(value)`` in error handling code.
+    It is intended to help LabThings generate better errors when models fail
+    to validate, in particular making clear where in the user's code the value
+    was generated, and why it didn't validate.
+
+    :param model: the `pydantic` model to use for validation.
+    :param value: the value passed to ``model.model_validate()``\ .
+    :param description: a description of the value, e.g. "the output of {action}".
+    :param code: the code that generated `value`\ .
+        This will be passed to `refer_to_user_code` - see that function for details.
+
+    :return: a validated model instance.
+    :raises InvalidReturnValueError: if the model failed to validate.
+    """
+    try:
+        return model.model_validate(value)
+    except ValidationError as e:
+        msg = (
+            f"Error validating {description} against its model.\n"
+            f"The value was '{value}' and the model was {model}.\n"
+            f"{refer_to_user_code(code)}"
+            f"The validation error was:\n{e}\n"
+        )
+        raise InvalidReturnValueError(msg) from e
+
+
+def response_from_user_code(
+    model: type[ModelT],
+    value: Any,
+    description: str,
+    logger: logging.Logger,
+    code: FunctionType | tuple[type, str] | None = None,
+) -> Response:
+    r"""Return a value from a `~lt.Thing` method, with appropriate error handling.
+
+    This function implements very similar logic to FastAPI's default behaviour when
+    an endpoint function is typed as returning a `pydantic.BaseModel` instance:
+
+    * First, a model instance is constructed by calling ``model_validate()`` on the
+        return value.
+    * Second, the validated model instance is serialised to JSON by calling
+        ``model_dump_json()`` on the model instance.
+
+    If either of these steps fails, an unhelpful stack trace is dumped, which has many
+    frames referring to FastAPI/Pydantic/Starlette internals and nothing to indicate
+    where the problematic value actually came from.
+
+    This function wraps both the steps described above in error handling code that
+    should ensure that, if either fails, we write a helpful error into the log and
+    return a `500` response with the same message in its body.
+
+    :param model: the `pydantic` model to use for validation.
+    :param value: the value passed to ``model.model_validate()``\ .
+    :param description: a description of the value, e.g. "the output of {action}".
+    :param logger: the logger to use for any error messages.
+    :param code: the code that generated `value`\ .
+        This will be passed to `refer_to_user_code` - see that function for details.
+    :return: a `fastapi.Response` object containing a 200 code and the serialised
+        value or a 500 code and the error message.
+    """
+    try:
+        model_instance = validate_from_user_code(model, value, description, code)
+    except InvalidReturnValueError as exc:
+        # Log the error, but we don't want a stack trace - it won't tell
+        # the user anything about where in their code the problem is.
+        logger.error(str(exc))
+        return JSONResponse(status_code=500, content={"detail": str(exc)})
+    try:
+        return Response(
+            content=model_instance.model_dump_json(),
+            status_code=200,
+            media_type="application/json",
+        )
+    except PydanticSerializationError as exc:
+        msg = (
+            f"Error serializing {description} to JSON.\n"
+            f"The value was validated as {repr(model_instance)}.\n"
+            f"The serialization error was '{exc}'.\n"
+            f"{refer_to_user_code(code)}"
+        )
+        logger.error(msg)
+        return JSONResponse(status_code=500, content={"detail": msg})
 
 
 def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
