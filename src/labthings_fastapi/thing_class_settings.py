@@ -89,17 +89,19 @@ def get_validate_properties_on_set(cls: "type[Thing]") -> bool:
     :return: whether validation should be performed.
     """
     settings = get_class_settings(cls)
-    if "validate_properties_on_set" not in settings:
+    value = settings.get(
+        "validate_properties_on_set",
+        False,
+    )
+    if not value:
         warnings.warn(
             DefaultWillChangeWarning(
                 "`get_validate_properties_on_set` will become `True` by default "
-                "in the future. Set this property explicitly to `True` or `False` in "
+                "in the future, and may become the only option. "
+                "Set this property to `True` in "
                 f"`{cls.__module__}.{cls.__name__}._class_settings` "
                 "to eliminate this warning."
             ),
             stacklevel=3,
         )
-    return settings.get(
-        "validate_properties_on_set",
-        False,
-    )
+    return value
