@@ -328,7 +328,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         Whether properties should be validated against their model when set from Python.
         Properties are always validated when set over HTTP.
         By default, no validation is performed when they are set from Python.
-        Setting this key to `True` will enable validation: this is likely to become the default in the future.
+        Setting this key to `True` will enable validation: this will become the default in the future.
 
 
 .. py:class:: ThingConfig(/, **data: Any)
