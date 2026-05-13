@@ -101,6 +101,7 @@ class InvocationSummary(BaseModel):
     timeStarted: Optional[datetime]
     timeRequested: Optional[datetime]
     timeCompleted: Optional[datetime]
+    links: Links = None
 
 
 InputT = TypeVar("InputT")
@@ -119,7 +120,6 @@ class GenericInvocationModel(InvocationSummary, Generic[InputT, OutputT]):
     input: InputT
     output: OutputT
     log: Sequence[LogRecordModel]
-    links: Links = None
 
 
 InvocationModel = GenericInvocationModel[Any, Any]

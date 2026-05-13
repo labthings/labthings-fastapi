@@ -233,6 +233,12 @@ class Invocation(Thread):
 
         :return: a `InvocationSummary` representing this `Invocation`.
         """
+        links = [
+            LinkElement(rel="self", href=URLFor("action_invocation", id=self.id)),
+            LinkElement(
+                rel="output", href=URLFor("action_invocation_output", id=self.id)
+            ),
+        ]
         with self._status_lock:
             return InvocationSummary(
                 status=self.status,
@@ -242,6 +248,7 @@ class Invocation(Thread):
                 timeStarted=self._start_time,
                 timeCompleted=self._end_time,
                 timeRequested=self._request_time,
+                links=links,
             )
 
     def response(self) -> InvocationModel:
@@ -253,12 +260,6 @@ class Invocation(Thread):
 
         :return: an `.InvocationModel` representing this `.Invocation`.
         """
-        links = [
-            LinkElement(rel="self", href=URLFor("action_invocation", id=self.id)),
-            LinkElement(
-                rel="output", href=URLFor("action_invocation_output", id=self.id)
-            ),
-        ]
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
         with self._status_lock:
@@ -266,7 +267,6 @@ class Invocation(Thread):
                 **dict(self.summary_model()),
                 input=self.input,
                 output=self.output_model_instance,
-                links=links,
                 log=self.log,
             )
 
