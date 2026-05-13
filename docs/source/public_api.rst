@@ -249,7 +249,7 @@ This page summarises the parts of the LabThings API that should be most frequent
     :param debug: sets the log level for `~lt.Thing` instances to DEBUG if it is set to `True`\ .
     :param \**kwargs: for backwards compatibility, keyword arguments are used to create the server configuration if `config` is missing. This raises a `DeprecationWarning`\ .
 
-   .. py:method:: from_config(config: ThingServerConfig, debug: bool = False) -> ThingServer
+    .. py:classmethod:: from_config(config: ThingServerConfig, debug: bool = False) -> ThingServer
 
         This method of creating a `ThingServer` is deprecated, as it is equivalent to the constructor.
 
@@ -275,6 +275,36 @@ This page summarises the parts of the LabThings API that should be most frequent
 
         :param things: a mapping of Thing names to Thing configurations.
         :param \**kwargs: additional keyword arguments are passed to `ThingServerConfig`\ .
+
+    .. py:property:: things
+      :type: collections.abc.Mapping[str, Thing]
+
+      A read-only mapping of names to `~lt.Thing` instances, for every `~lt.Thing` attached to the server.
+
+      :return: a mapping of names to `~lt.Thing` instances.
+
+   .. py:property:: application_config
+      :type: collections.abc.Mapping[str, Any] | None
+
+      Return the application configuration from the config file.
+
+      :return: The custom configuration as specified in the configuration
+          file.
+
+   .. py:property:: api_prefix
+      :type: str
+
+      A string that prefixes all URLs in the application. Endpoints associated with a `Thing` will appear under ``{api_prefix}/{thing_name}/``. This is validated in `ThingServerConfig` and must either be empty, or start with ``/`` and not end with ``/``\ .
+
+   .. py:property:: settings_folder
+      :type: str
+
+      The path to the folder used to store settings for each `Thing`\ . This will default to ``./settings/`` if not specified in the server's configuration.
+
+    .. py:property:: debug
+        :type: bool
+        
+        Whether the server is in debug mode.
 
 
 .. py:class:: ThingServerInterface(server: ThingServer, name: str)

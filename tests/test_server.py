@@ -195,7 +195,7 @@ def test_server_init():
         """Make sure the server config is as expected."""
         assert len(server.things) == 1
         assert isinstance(server.things["my_thing"], MyThing)
-        assert server._api_prefix == "/api/v3"
+        assert server.api_prefix == "/api/v3"
         assert server.debug == debug
 
     # The type hint doesn't match a dict, but it works anyway.
