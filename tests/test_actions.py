@@ -363,6 +363,18 @@ def test_invalid_return_values():
         ):
             tc.make_random_int()
 
+        # The action should still have run, so check that we can get the
+        # invocation.
+        actions = client.get("/naughty/make_random_int/").json()
+        assert len(actions) == 1
+        invocation = client.get(actions[0]["href"]).json()
+        assert invocation["output"] is None
+        assert invocation["status"] == "error"
+        first_invocation_id = invocation["id"]
+        assert "Error validating the output" in invocation["log"][-1]["message"]
+        response = client.get(invocation["links"][1]["href"])
+        assert response.status_code == 503  # There's no output as it failed.
+
         # Here, the type hint is vague so it validates OK, but it can't
         # serialize.
         with pytest.raises(
@@ -371,3 +383,23 @@ def test_invalid_return_values():
         ) as excinfo:
             tc.make_unjsonable_any()
         assert "make_unjsonable_any" in str(excinfo)
+
+        # Get the last invocation
+        actions = client.get("/naughty/make_unjsonable_any/").json()
+
+        # The action should still have run, so check that we can get the
+        # invocation.
+        actions = client.get("/naughty/make_unjsonable_any/").json()
+        assert len(actions) == 1
+        second_invocation_id = actions[0]["id"]
+        response = client.get(actions[0]["href"])
+        assert response.status_code == 500
+        assert "Error serializing" in response.json()["detail"]
+        # Try the direct link to the action's output
+        response = client.get(actions[0]["links"][1]["href"])
+        assert response.status_code == 500  # The output won't serialize
+        assert "Error serializing" in response.json()["detail"]
+
+        # Check the overall invocations endpoint isn't broken
+        actions = client.get("/action_invocations/").json()
+        assert {a["id"] for a in actions} == {first_invocation_id, second_invocation_id}

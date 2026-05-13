@@ -9,13 +9,19 @@ import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
+    ClientPropertyError,
     NotBoundToInstanceError,
     ServerNotRunningError,
+    UnserializableTypeError,
     UnsupportedConstraintError,
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server, mock_thing_instance
 from .temp_client import poll_task
+
+
+class Unjsonable:
+    """A class that pydantic can't serialize."""
 
 
 class PropertyTestThing(lt.Thing):
@@ -612,3 +618,43 @@ def test_title_and_description(name, title, description):
         description = title
     # If a description is present, ignore any trailing whitespace.
     assert (prop.description.rstrip() if prop.description else None) == description
+
+
+def test_bad_type():
+    """Test an obviously un-serializable type raises an error."""
+
+    class BrokenThing(lt.Thing):
+        broken: Unjsonable | None = lt.property(default=None)
+
+    with pytest.raises(UnserializableTypeError, match="BrokenThing.broken"):
+        _ = BrokenThing.properties["broken"].model
+
+
+def test_bad_values():
+    """Ensure bad values in properties generate sensible HTTP errors."""
+
+    class BrokenThing(lt.Thing):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            # Set bad values here because we shouldn't have invalid defaults.
+            self.__dict__["intprop"] = 4.2
+            self.__dict__["anyprop"] = Unjsonable()
+
+        intprop: int = lt.property(default=0)
+        anyprop: Any = lt.property(default=None)
+
+    server = lt.ThingServer.from_things({"broken": BrokenThing})
+    with server.test_client() as client:
+        tc = lt.ThingClient.from_url("/broken/", client=client)
+
+        # The first property won't validate
+        with pytest.raises(
+            ClientPropertyError, match="Error validating broken.intprop"
+        ):
+            _ = tc.intprop
+
+        # The second property won't serialize
+        with pytest.raises(
+            ClientPropertyError, match="Error serializing broken.anyprop"
+        ):
+            _ = tc.anyprop
