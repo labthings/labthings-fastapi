@@ -145,7 +145,7 @@ class ThingServer:
             self._config = ThingServerConfig(**kwargs)
         if self._config.settings_folder is None:
             self._config.settings_folder = "./settings"
-        self.app = FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan, separate_input_output_schemas=False)
         self._set_cors_middleware()
         self._set_url_for_middleware()
         self._add_exception_handlers()
