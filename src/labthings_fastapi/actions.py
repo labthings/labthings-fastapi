@@ -1022,7 +1022,7 @@ class ActionDescriptor(
 
         @app.get(
             thing.path + self.name,
-            response_model=list[InvocationSummary],  # type: ignore
+            response_model=list[InvocationSummary],
             # MyPy doesn't like the line above - but it works for FastAPI
             # to generate a response model.
             response_description=f"A list of every invocation of {self.name}.",
