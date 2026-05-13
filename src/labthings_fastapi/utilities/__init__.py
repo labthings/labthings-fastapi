@@ -1,8 +1,7 @@
 """Utility functions used by LabThings-FastAPI."""
 
 from __future__ import annotations
-from collections.abc import Mapping
-import logging
+from collections.abc import Callable, Mapping
 from types import FunctionType
 from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVar
 from weakref import WeakSet
@@ -18,7 +17,6 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import PydanticSerializationError
 from fastapi import Response
-from fastapi.responses import JSONResponse
 
 from labthings_fastapi.exceptions import (
     InvalidReturnValueError,
@@ -197,7 +195,7 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
 
 
 def refer_to_user_code(
-    code: FunctionType | tuple[type, str] | None = None, suffix: str = "\n"
+    code: Callable | tuple[type, str] | None = None, suffix: str = "\n"
 ) -> str:
     r"""Refer to a user-supplied function or property.
 
@@ -215,12 +213,17 @@ def refer_to_user_code(
     :return: a string referring to the user code, for use in an error message, or
         the empty string if no user code is specified.
     """
-    if isinstance(code, FunctionType):
-        co = code.__code__
-        return (
-            f"This value was returned by '{co.co_name}' "
-            f"at {co.co_filename}:{co.co_firstlineno}.{suffix}"
-        )
+    if callable(code):
+        if isinstance(code, FunctionType):
+            # As a rule, we'll pass a function and this code works.
+            co = code.__code__
+            return (
+                f"This value was returned by '{co.co_name}' "
+                f"at {co.co_filename}:{co.co_firstlineno}.{suffix}"
+            )
+        else:
+            # As a fallback (not currently used), just dump the object to string.
+            return f"This value was returned by {repr(code)}.{suffix}"
     elif isinstance(code, tuple) and len(code) == 2:
         cls, attr = code
         return (
@@ -238,7 +241,7 @@ def validate_from_user_code(
     model: type[ModelT],
     value: Any,
     description: str,
-    code: FunctionType | tuple[type, str] | None = None,
+    code: Callable | tuple[type, str] | None = None,
 ) -> ModelT:
     r"""Validate a return value from user code, with error handling.
 
@@ -268,51 +271,37 @@ def validate_from_user_code(
         raise InvalidReturnValueError(msg) from e
 
 
-def response_from_user_code(
-    model: type[ModelT],
-    value: Any,
+def serialize_from_user_code(
+    model_instance: BaseModel,
     description: str,
-    logger: logging.Logger,
-    code: FunctionType | tuple[type, str] | None = None,
+    status_code: int = 200,
+    code: Callable | tuple[type, str] | None = None,
 ) -> Response:
-    r"""Return a value from a `~lt.Thing` method, with appropriate error handling.
+    r"""Return a value from a model instance, with appropriate error handling.
 
     This function implements very similar logic to FastAPI's default behaviour when
-    an endpoint function is typed as returning a `pydantic.BaseModel` instance:
+    an endpoint function is typed as returning a `pydantic.BaseModel` instance.
+    The validated model instance is serialised to JSON by calling
+    ``model_dump_json()`` on the model instance, and the resulting string is returned
+    in a `Response` object. This uses `pydantic` serialization, written in Rust,
+    and outperforms the native `json` library significantly.
 
-    * First, a model instance is constructed by calling ``model_validate()`` on the
-        return value.
-    * Second, the validated model instance is serialised to JSON by calling
-        ``model_dump_json()`` on the model instance.
+    If the model can't be serialized, we raise an exception with information about
+    the place in the user code where the problem occurred.
 
-    If either of these steps fails, an unhelpful stack trace is dumped, which has many
-    frames referring to FastAPI/Pydantic/Starlette internals and nothing to indicate
-    where the problematic value actually came from.
-
-    This function wraps both the steps described above in error handling code that
-    should ensure that, if either fails, we write a helpful error into the log and
-    return a `500` response with the same message in its body.
-
-    :param model: the `pydantic` model to use for validation.
-    :param value: the value passed to ``model.model_validate()``\ .
+    :param model_instance: the `pydantic` model to use for validation.
     :param description: a description of the value, e.g. "the output of {action}".
-    :param logger: the logger to use for any error messages.
+    :param status_code: an HTTP status code to use.
     :param code: the code that generated `value`\ .
         This will be passed to `refer_to_user_code` - see that function for details.
     :return: a `fastapi.Response` object containing a 200 code and the serialised
         value or a 500 code and the error message.
+    :raises InvalidReturnValueError: if the model can't be serialised.
     """
-    try:
-        model_instance = validate_from_user_code(model, value, description, code)
-    except InvalidReturnValueError as exc:
-        # Log the error, but we don't want a stack trace - it won't tell
-        # the user anything about where in their code the problem is.
-        logger.error(str(exc))
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
     try:
         return Response(
             content=model_instance.model_dump_json(),
-            status_code=200,
+            status_code=status_code,
             media_type="application/json",
         )
     except PydanticSerializationError as exc:
@@ -322,8 +311,7 @@ def response_from_user_code(
             f"The serialization error was '{exc}'.\n"
             f"{refer_to_user_code(code)}"
         )
-        logger.error(msg)
-        return JSONResponse(status_code=500, content={"detail": msg})
+        raise InvalidReturnValueError(msg) from exc
 
 
 def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:

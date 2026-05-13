@@ -355,20 +355,19 @@ def test_invalid_return_values():
     with server.test_client() as client:
         tc = lt.ThingClient.from_url("/naughty/", client=client)
 
-        # If a return type doesn't match the type hint, we get
+        # Here, the return type doesn't match the type hint, so it should fail
+        # to validate.
         with pytest.raises(
             (ServerActionError, FailedToInvokeActionError),
-            match=(
-                r"The return value from 'naughty.make_random_int' failed to validate "
-                r"against its output model."
-            ),
+            match="Error validating the output of 'naughty.make_random_int'",
         ):
             tc.make_random_int()
 
-        # If a return type is not JSONable
+        # Here, the type hint is vague so it validates OK, but it can't
+        # serialize.
         with pytest.raises(
             (ServerActionError, FailedToInvokeActionError),
-            match="Could not serialise invocation",
+            match="Error serializing invocation ",
         ) as excinfo:
             tc.make_unjsonable_any()
         assert "make_unjsonable_any" in str(excinfo)

@@ -62,7 +62,7 @@ from typing import (
 from typing_extensions import Self, TypedDict
 from weakref import WeakSet
 
-from fastapi import Body, FastAPI, Response
+from fastapi import Body, FastAPI, Response, HTTPException
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -83,7 +83,8 @@ from .thing_description._model import (
 from .utilities import (
     RootModelWrapper,
     labthings_data,
-    response_from_user_code,
+    serialize_from_user_code,
+    validate_from_user_code,
 )
 from .utilities.introspection import return_type
 from .base_descriptor import (
@@ -93,6 +94,7 @@ from .base_descriptor import (
 )
 from .exceptions import (
     FeatureNotAvailableError,
+    InvalidReturnValueError,
     NotConnectedToServerError,
     PropertyRedefinitionError,
     ReadOnlyPropertyError,
@@ -568,13 +570,24 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             description=f"## {self.title}\n\n{self.description or ''}",
         )
         def get_property() -> Response:
-            return response_from_user_code(
-                model=self.model,
-                value=self.__get__(thing),
-                description=f"{thing.name}.{self.name}",
-                logger=thing.logger,
-                code=(self.owning_class, self.name),
-            )
+            try:
+                instance = validate_from_user_code(
+                    model=self.model,
+                    value=self.__get__(thing),
+                    description=f"{thing.name}.{self.name}",
+                    code=(self.owning_class, self.name),
+                )
+                return serialize_from_user_code(
+                    model_instance=instance,
+                    description=f"{thing.name}.{self.name}",
+                    code=(self.owning_class, self.name),
+                )
+            except InvalidReturnValueError as e:
+                thing.logger.error(e)
+                raise HTTPException(
+                    status_code=500,
+                    detail=str(e),
+                ) from e
 
         if self.is_resettable(thing):
 

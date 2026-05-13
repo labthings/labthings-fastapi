@@ -15,10 +15,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     model_validator,
-    model_serializer,
-    SerializerFunctionWrapHandler,
 )
-from pydantic_core import PydanticSerializationError
 
 from labthings_fastapi.middleware.url_for import URLFor
 
@@ -87,17 +84,14 @@ class LogRecordModel(BaseModel):
         return data
 
 
-InputT = TypeVar("InputT")
-OutputT = TypeVar("OutputT")
+class InvocationSummary(BaseModel):
+    """A model to represent `.Invocation` objects over HTTP.
 
+    This version of the model does not include logs our action outputs, and is intended
+    for use in endpoints that might list several invocations.
 
-class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
-    """A model to serialise `.Invocation` objects when they are polled over HTTP.
-
-    The input and output models are generic parameters, to allow this model to
-    be used for specific Actions. These are usually set to `Any` because the
-    invocation endpoint is not specific to any one Action, and thus the types
-    are not known in advance.
+    See `GenericInvocationModel` for the full representation, to be used in
+    endpoints referring to one specific invocation.
     """
 
     status: InvocationStatus
@@ -107,33 +101,25 @@ class GenericInvocationModel(BaseModel, Generic[InputT, OutputT]):
     timeStarted: Optional[datetime]
     timeRequested: Optional[datetime]
     timeCompleted: Optional[datetime]
+
+
+InputT = TypeVar("InputT")
+OutputT = TypeVar("OutputT")
+
+
+class GenericInvocationModel(InvocationSummary, Generic[InputT, OutputT]):
+    """A model to serialise `.Invocation` objects when they are polled over HTTP.
+
+    The input and output models are generic parameters, to allow this model to
+    be used for specific Actions. These are usually set to `Any` because the
+    invocation endpoint is not specific to any one Action, and thus the types
+    are not known in advance.
+    """
+
     input: InputT
     output: OutputT
     log: Sequence[LogRecordModel]
     links: Links = None
-
-    @model_serializer(mode="wrap")
-    def serialize_model(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> dict[str, object]:
-        """Give a more helpful error if the class fails to serialize.
-
-        :param handler: The Pydantic serializer.
-        :raises PydanticSerializationError: if the model fails to serialize. This
-            is wrapped to add the action and invocation ID.
-        :return: the serialized model, as a dictionary.
-        """
-        try:
-            return handler(self)
-        except PydanticSerializationError as e:
-            extra = ""
-            if self.output is not None:
-                extra = "This is often caused by an invalid return value. "
-            raise PydanticSerializationError(
-                f"Could not serialise invocation '{self.id}' of '{self.action}' "
-                f"({self.status.value}). {extra}"
-                f"Error: '{e}'"
-            ) from e
 
 
 InvocationModel = GenericInvocationModel[Any, Any]

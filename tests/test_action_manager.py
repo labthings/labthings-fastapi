@@ -74,4 +74,7 @@ def test_actions_list(client):
     r2 = client.get(ACTION_INVOCATIONS_PATH)
     r2.raise_for_status()
     invocations = r2.json()
+    # Some keys aren't present in the list for performance/safety reasons
+    for k in ["input", "output", "log", "links"]:
+        del invocation[k]
     assert invocations == [invocation]

@@ -39,8 +39,8 @@ from typing import (
 )
 from weakref import WeakSet
 import weakref
-from fastapi import APIRouter, FastAPI, HTTPException, Request, Body, BackgroundTasks
-from pydantic import BaseModel, create_model, ValidationError
+from fastapi import APIRouter, FastAPI, HTTPException, Response, Body, BackgroundTasks
+from pydantic import BaseModel, create_model
 
 from .middleware.url_for import URLFor
 from .base_descriptor import (
@@ -52,8 +52,10 @@ from .logs import add_thing_log_destination
 from .utilities import (
     RootModelWrapper,
     model_to_dict,
+    serialize_from_user_code,
+    validate_from_user_code,
 )
-from .invocations import InvocationModel, InvocationStatus
+from .invocations import InvocationSummary, InvocationModel, InvocationStatus
 from .exceptions import (
     GlobalLockBusyError,
     InvalidReturnValueError,
@@ -226,6 +228,22 @@ class Invocation(Thread):
         """
         self.cancel_hook.set()
 
+    def summary_model(self) -> InvocationSummary:
+        """Generate a summary of the invocation suitable for HTTP.
+
+        :return: a `InvocationSummary` representing this `Invocation`.
+        """
+        with self._status_lock:
+            return InvocationSummary(
+                status=self.status,
+                id=self.id,
+                action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
+                href=URLFor("action_invocation", id=self.id),
+                timeStarted=self._start_time,
+                timeCompleted=self._end_time,
+                timeRequested=self._request_time,
+            )
+
     def response(self) -> InvocationModel:
         """Generate a representation of the invocation suitable for HTTP.
 
@@ -245,13 +263,7 @@ class Invocation(Thread):
         # object (i.e. we don't call __get__ on the descriptor).
         with self._status_lock:
             return self.action.invocation_model(  # type: ignore[attr-defined]
-                status=self.status,
-                id=self.id,
-                action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
-                href=URLFor("action_invocation", id=self.id),
-                timeStarted=self._start_time,
-                timeCompleted=self._end_time,
-                timeRequested=self._request_time,
+                **dict(self.summary_model()),
                 input=self.input,
                 output=self.output_model_instance,
                 links=links,
@@ -284,8 +296,6 @@ class Invocation(Thread):
         See `.Invocation.status` for status values.
 
         :raises RuntimeError: if there is no Thing associated with the invocation.
-        :raises InvalidReturnValueError: if the action returns a value that can't
-            be validated by its output model.
         """
         # self.action evaluates to an ActionDescriptor. This confuses mypy,
         # which thinks we are calling ActionDescriptor.__get__.
@@ -316,16 +326,12 @@ class Invocation(Thread):
                     # Actually run the action
                     ret = action.func(thing, **kwargs, **self.dependencies)
 
-                try:
-                    output_model_instance = action.output_model.model_validate(ret)
-                except ValidationError as e:
-                    # Generate a helpful error message. This will be handled below,
-                    # where it will cause the action to be marked as failed, and the
-                    # error will end up in the log.
-                    msg = f"The return value from '{self.thing.name}.{action.name}' "
-                    msg += "failed to validate against its output model "
-                    msg += f"'{action.output_model}'. The return value was '{ret}'."
-                    raise InvalidReturnValueError(msg) from e
+                output_model_instance = validate_from_user_code(
+                    model=action.output_model,
+                    value=ret,
+                    description=f"the output of '{self.thing.name}.{action.name}'",
+                    code=action.func,
+                )
 
                 with self._status_lock:
                     self._output_model_instance = output_model_instance
@@ -435,11 +441,10 @@ class ActionManager:
         self,
         action: Optional[ActionDescriptor] = None,
         thing: Optional[Thing] = None,
-        request: Optional[Request] = None,
-    ) -> list[InvocationModel]:
+    ) -> list[InvocationSummary]:
         """All of the invocations currently managed.
 
-        Returns a list of `.InvocationModel` instances representing all the
+        Returns a list of `InvocationSummary` instances representing all the
         invocations that are currently running, or have recently completed and
         not yet expired.
 
@@ -450,16 +455,11 @@ class ActionManager:
         :param thing: returns only invocations of actions on a particular `~lt.Thing`.
             This will often be combined with filtering by ``action`` to give the
             list of invocations returned by a GET request on an action endpoint.
-        :param request: is used to pass a `fastapi.Request` object to the
-            `.Invocation.response` method. Doing so ensures the URL returned as
-            ``href`` in the response matches the address used to communicate with
-            the server (i.e. it uses `fastapi.Request.url_for` instead of a path
-            generated from a string).
 
         :return: A list of invocations, optionally filtered by Thing and/or Action.
         """
         return [
-            i.response()
+            i.summary_model()
             for i in self.invocations
             if thing is None or i.thing == thing
             if action is None or i.action == action
@@ -484,20 +484,19 @@ class ActionManager:
         """
         router = APIRouter()
 
-        @router.get(ACTION_INVOCATIONS_PATH, response_model=list[InvocationModel])
-        def list_all_invocations(request: Request) -> list[InvocationModel]:
-            return self.list_invocations(request=request)
+        @router.get(ACTION_INVOCATIONS_PATH)
+        def list_all_invocations() -> list[InvocationSummary]:
+            return self.list_invocations()
 
         @router.get(
             ACTION_INVOCATIONS_PATH + "/{id}",
+            response_model=InvocationModel,
             responses={404: {"description": "Invocation ID not found"}},
         )
-        def action_invocation(id: uuid.UUID, request: Request) -> InvocationModel:
+        def action_invocation(id: uuid.UUID) -> Response:
             """Return a description of a specific action.
 
             :param id: The action's ID (from the path).
-            :param request: FastAPI dependency for the request object, used to
-                find URLs via ``url_for``.
 
             :return: Details of the invocation.
 
@@ -505,12 +504,22 @@ class ActionManager:
                 found.
             """
             try:
-                with self._invocations_lock:
-                    return self._invocations[id].response()
+                invocation = self.get_invocation(id)
+                return serialize_from_user_code(
+                    model_instance=invocation.response(),
+                    description=f"invocation '{id}' of ",
+                    code=invocation.action.func,  # type: ignore[attr-defined]
+                )
             except KeyError as e:
                 raise HTTPException(
                     status_code=404,
                     detail="No action invocation found with ID {id}",
+                ) from e
+            except InvalidReturnValueError as e:
+                invocation.thing.logger.error(e)
+                raise HTTPException(
+                    status_code=500,
+                    detail=str(e),
                 ) from e
 
         @router.get(
@@ -527,7 +536,7 @@ class ActionManager:
                 503: {"description": "No result is available for this invocation"},
             },
         )
-        def action_invocation_output(id: uuid.UUID) -> Any:
+        def action_invocation_output(id: uuid.UUID) -> Response:
             """Get the output of an action invocation.
 
             This returns just the "output" component of the action invocation. If the
@@ -559,7 +568,18 @@ class ActionManager:
                 ):
                     # TODO: honour "accept" header
                     return invocation.output.response()
-                return invocation.output_model_instance
+                try:
+                    return serialize_from_user_code(
+                        model_instance=invocation.output_model_instance,
+                        description=f"the output of {invocation}",
+                        code=invocation.action.func,
+                    )
+                except InvalidReturnValueError as e:
+                    invocation.thing.logger.error(e)
+                    raise HTTPException(
+                        status_code=500,
+                        detail=str(e),
+                    ) from e
 
         @router.delete(
             ACTION_INVOCATIONS_PATH + "/{id}",
@@ -841,7 +861,7 @@ class ActionDescriptor(
         """
 
         @wraps(self.func)
-        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC
+        def wrapped(*args: Any, **kwargs: Any) -> Any:  # noqa: DOC101, DOC103, DOC201
             """Acquire the lock then run `func` with supplied arguments."""
             with self.context_for_func(obj):
                 return self.func(*args, **kwargs)
@@ -931,16 +951,25 @@ class ActionDescriptor(
             body: Any,  # This annotation will be overwritten below.
             background_tasks: BackgroundTasks,
             **dependencies: Any,
-        ) -> InvocationModel:
+        ) -> Response:
             action_manager = thing._thing_server_interface._action_manager
-            action = action_manager.invoke_action(
+            invocation = action_manager.invoke_action(
                 action=self,
                 thing=thing,
                 input=body,
                 dependencies=dependencies,
             )
             background_tasks.add_task(action_manager.expire_invocations)
-            return action.response()
+            try:
+                return serialize_from_user_code(
+                    model_instance=invocation.response(),
+                    description=f"{invocation}",
+                    status_code=201,
+                    code=self.func,
+                )
+            except InvalidReturnValueError as e:
+                thing.logger.error(e)
+                raise HTTPException(status_code=500, detail=str(e)) from e
 
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)
@@ -983,9 +1012,9 @@ class ActionDescriptor(
             )
         app.post(
             thing.path + self.name,
-            response_model=self.invocation_model,
             status_code=201,
             response_description="Action has been invoked (and may still be running).",
+            response_model=self.invocation_model,
             description=f"## {self.title}\n\n {self.description} {ACTION_POST_NOTICE}",
             summary=self.title,
             responses=responses,
@@ -993,7 +1022,7 @@ class ActionDescriptor(
 
         @app.get(
             thing.path + self.name,
-            response_model=list[self.invocation_model],  # type: ignore
+            response_model=list[InvocationSummary],  # type: ignore
             # MyPy doesn't like the line above - but it works for FastAPI
             # to generate a response model.
             response_description=f"A list of every invocation of {self.name}.",
@@ -1002,7 +1031,7 @@ class ActionDescriptor(
             ),
             summary=f"All invocations of {self.name}.",
         )
-        def list_invocations() -> list[InvocationModel]:
+        def list_invocations() -> list[InvocationSummary]:
             action_manager = thing._thing_server_interface._action_manager
             return action_manager.list_invocations(self, thing)
 
