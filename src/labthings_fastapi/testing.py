@@ -270,3 +270,19 @@ def use_dummy_url_for() -> Iterator[None]:
     """Use the dummy URL for function in the context variable."""
     with set_url_for_context(dummy_url_for):
         yield
+
+
+def manually_connect_thing_slot(
+    host: Thing,
+    slot_name: str,
+    target: Thing,
+) -> None:
+    """Manually connect a thing_slot.
+
+    :param host: the `~lt.Thing` on which the slot is defined.
+    :param slot_name: the name of the `~lt.thing_slot`.
+    :param target: the `~lt.Thing` it should be connected to.
+    """
+    slot = getattr(host.__class__, slot_name)
+    things = {target.name: target}
+    slot.connect(host, target=target.name, things=things)
