@@ -174,6 +174,8 @@ async def fallback_route() -> bool:
     """Return True, this is a LabThings Fallback Server.
 
     Use this to check over the API if this is a LabThings Fallback Server.
+
+    :return: returns True. This is a LabThings Fallback Server.
     """
     return True
 
