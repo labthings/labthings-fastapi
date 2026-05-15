@@ -16,6 +16,7 @@ from traceback import format_exception
 from typing import Any, TYPE_CHECKING
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, BaseLoader, select_autoescape
 from starlette.responses import RedirectResponse
@@ -149,6 +150,15 @@ class FallbackApp(FastAPI):
 
 app = FallbackApp()
 
+# Add middleware so contacting the the fallback server doesn't throw CORS errors.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 async def root() -> HTMLResponse:
@@ -157,6 +167,15 @@ async def root() -> HTMLResponse:
     :return: a response that serves the error as an HTML page.
     """
     return app.fallback_page()
+
+
+@app.get("/labthings_fallback")
+async def fallback_route() -> bool:
+    """Return True, this is a LabThings Fallback Server.
+
+    Use this to check over the API if this is a LabThings Fallback Server.
+    """
+    return True
 
 
 def _format_error_and_traceback(context: FallbackContext) -> tuple[str, str]:
