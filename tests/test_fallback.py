@@ -158,6 +158,14 @@ def test_fallback_with_log():
         assert "Fake log content" in html
 
 
+def test_fallback_identification():
+    """Test the server identifies as a fallback server."""
+    app.set_context(FallbackContext())
+    with TestClient(app) as client:
+        response = client.get("/labthings_fallback")
+        assert response.json() is True
+
+
 def test_actual_server_fallback():
     """Test that the the server configures its startup failure correctly.
 
