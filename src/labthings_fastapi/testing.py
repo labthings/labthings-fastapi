@@ -287,18 +287,20 @@ def manually_connect_thing_slot(
 
     :param host: the `~lt.Thing` on which the slot is defined.
     :param slot_name: the name of the `~lt.thing_slot`.
-    :param target: the `~lt.Thing` it should be connected to.
+    :param target: the `~lt.Thing` or sequence of Things it should be connected to.
+        If a sequence of multiple Thing are passed, their names are used to create a
+        mapping.
     :raises KeyError: if multiple targets are specified, but they do not
         have unique names.
     """
     if not isinstance(target, Sequence):
-        names = target.name
-        target = [target]
+        names: str | Sequence[str] = target.name
+        things = {target.name: target}
     else:
         names = [t.name for t in target]
         if len(set(names)) != len(names):
             msg = f"Thing slot targets {names} are not uniquely named."
             raise KeyError(msg)
+        things = {t.name: t for t in target}
     slot = getattr(host.__class__, slot_name)
-    things = {t.name: t for t in target}
     slot.connect(host, target=names, things=things)
