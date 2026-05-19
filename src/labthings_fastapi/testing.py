@@ -1,7 +1,7 @@
 """Test harnesses to help with writitng tests for things.."""
 
 from __future__ import annotations
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from contextlib import contextmanager
 from typing import (
@@ -270,3 +270,37 @@ def use_dummy_url_for() -> Iterator[None]:
     """Use the dummy URL for function in the context variable."""
     with set_url_for_context(dummy_url_for):
         yield
+
+
+def manually_connect_thing_slot(
+    host: Thing,
+    slot_name: str,
+    target: Thing | Sequence[Thing],
+) -> None:
+    """Manually connect a thing_slot.
+
+    This will accept either a single `Thing` instance or a sequence
+    of `Thing` instances. If `Mock` instances are used, note that they
+    must pass an `isinstance` test, so should use the ``spec`` argument
+    to specify the correct class for the `~lt.thing_slot` being mocked.
+    Mock instances must also provide a unique ``name`` attribute.
+
+    :param host: the `~lt.Thing` on which the slot is defined.
+    :param slot_name: the name of the `~lt.thing_slot`.
+    :param target: the `~lt.Thing` or sequence of Things it should be connected to.
+        If a sequence of multiple Thing are passed, their names are used to create a
+        mapping.
+    :raises KeyError: if multiple targets are specified, but they do not
+        have unique names.
+    """
+    if not isinstance(target, Sequence):
+        names: str | Sequence[str] = target.name
+        things = {target.name: target}
+    else:
+        names = [t.name for t in target]
+        if len(set(names)) != len(names):
+            msg = f"Thing slot targets {names} are not uniquely named."
+            raise KeyError(msg)
+        things = {t.name: t for t in target}
+    slot = getattr(host.__class__, slot_name)
+    slot.connect(host, target=names, things=things)
