@@ -98,7 +98,6 @@ from .exceptions import (
     NotConnectedToServerError,
     PropertyRedefinitionError,
     ReadOnlyPropertyError,
-    MissingTypeError,
     UnserialisableTypeError,
     UnsupportedConstraintError,
 )
@@ -910,8 +909,6 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param use_global_lock: may be set to `False` to disable the global lock
             for setting this property. By default, if global locking is enabled,
             we hold the global lock while setting the property.
-
-        :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__(constraints=constraints, use_global_lock=use_global_lock)
         self._fget = fget
@@ -920,23 +917,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             # If there is a docstring on the getter, use it as the property's docstring.
             # BaseDescriptor parses __doc__ to generate the title and description.
             self.__doc__ = fget.__doc__
-        if self._type is None:
-            msg = (
-                f"{fget} does not have a valid type. "
-                "Return type annotations are required for property getters."
-            )
-            raise MissingTypeError(msg)
         self._fset: Callable[[Owner, Value], None] | None = None  # setter function
         # `_freset` should reset the property to its default value.
-        self._freset: (
-            Callable[
-                [
-                    Owner,
-                ],
-                None,
-            ]
-            | None
-        ) = None
+        self._freset: Callable[[Owner], None] | None = None
         # `_default_factory` should return a default value.
         self._default_factory: Callable[[], Value] | None = None
         self.readonly: bool = True
