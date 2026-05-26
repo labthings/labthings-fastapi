@@ -2,10 +2,16 @@
 
 import re
 
+import httpx
 import pytest
 import labthings_fastapi as lt
 
-from labthings_fastapi.exceptions import ClientPropertyError, FailedToInvokeActionError
+from labthings_fastapi.client import poll_invocation
+from labthings_fastapi.exceptions import (
+    ClientPropertyError,
+    FailedToInvokeActionError,
+    ServerActionError,
+)
 
 
 class ThingToTest(lt.Thing):
@@ -271,3 +277,30 @@ def test_call_that_errors(thing_client):
         r'File ".*test_thing_client\.py", line \d+, in throw_value_error',
         full_message,
     )
+
+
+def test_poll_invocation_errors(mocker):
+    """Test for errors that may occur when polling a task."""
+    invocation = {
+        "links": [{"href": "http://fake/", "rel": "self"}],
+        "status": "running",
+        "action": "example_action_name",
+        "id": 0,
+    }
+    # This error conforms to "problem_details" format
+    client = mocker.Mock(spec=httpx.Client)
+    response = mocker.Mock(spec=httpx.Response)
+    response.is_error = True
+    response.status_code = 500
+    response.json = mocker.MagicMock(return_value={"detail": "expected error text"})
+    client.get = mocker.MagicMock(return_value=response)
+    with pytest.raises(ServerActionError, match="expected error text") as excinfo:
+        poll_invocation(client, invocation)
+    assert "detail" not in str(excinfo)
+
+    # An error not conforming to that format should be dumped as text
+    response.json = mocker.MagicMock(return_value={})
+    response.text = "direct from response.text"
+    with pytest.raises(ServerActionError, match="direct from response.text") as excinfo:
+        poll_invocation(client, invocation)
+    assert "detail" not in str(excinfo)
