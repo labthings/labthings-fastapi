@@ -379,10 +379,12 @@ def test_invalid_return_values():
         # serialise.
         with pytest.raises(
             (ServerActionError, FailedToInvokeActionError),
-            match="Error serialising invocation ",
+            match="Error serialising ",
         ) as excinfo:
             tc.make_unjsonable_any()
         assert "make_unjsonable_any" in str(excinfo)
+        func = NaughtyThing.make_unjsonable_any.func.__code__
+        assert f"{func.co_filename}:{func.co_firstlineno}" in str(excinfo)
 
         # Get the last invocation
         actions = client.get("/naughty/make_unjsonable_any/").json()
