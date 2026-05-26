@@ -12,7 +12,7 @@ from labthings_fastapi.exceptions import (
     ClientPropertyError,
     NotBoundToInstanceError,
     ServerNotRunningError,
-    UnserializableTypeError,
+    UnserialisableTypeError,
     UnsupportedConstraintError,
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
@@ -638,7 +638,7 @@ def test_bad_type():
     class BrokenThing(lt.Thing):
         broken: Unjsonable | None = lt.property(default=None)
 
-    with pytest.raises(UnserializableTypeError, match="BrokenThing.broken"):
+    with pytest.raises(UnserialisableTypeError, match="BrokenThing.broken"):
         _ = BrokenThing.properties["broken"].model
 
 
@@ -652,8 +652,13 @@ def test_bad_values():
             self.__dict__["intprop"] = 4.2
             self.__dict__["anyprop"] = Unjsonable()
 
+        # The first property won't validate it's initial value of 4.2
+        # This will result in a validation error, which should be handled.
         intprop: int = lt.property(default=0)
-        # The second property won't serialise
+
+        # The second property won't serialise, but will validate as it's
+        # typed as `Any`.
+        anyprop: Any = lt.property(default=None)
 
     server = lt.ThingServer.from_things({"broken": BrokenThing})
     with server.test_client() as client:
@@ -665,8 +670,8 @@ def test_bad_values():
         ):
             _ = tc.intprop
 
-        # The second property won't serialize
+        # The second property won't serialise
         with pytest.raises(
-            ClientPropertyError, match="Error serializing broken.anyprop"
+            ClientPropertyError, match="Error serialising broken.anyprop"
         ):
             _ = tc.anyprop

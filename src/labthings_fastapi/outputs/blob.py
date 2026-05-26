@@ -558,7 +558,7 @@ class Blob:
     so it should only be serialised in a request handler function. This
     functionality is intended for use by LabThings library functions only.
     Validation and serialisation behaviour is described in the docstrings of
-    `.Blob._validate` and `.Blob._serialize`.
+    `.Blob._validate` and `.Blob._serialise`.
     """
 
     media_type: str = "*/*"
@@ -602,7 +602,7 @@ class Blob:
         We tell `pydantic` to base its handling of `Blob` on the
         `.BlobModel` schema, with custom validation and serialisation.
         Validation and serialisation behaviour is described in the docstrings
-        of `.Blob._validate` and `.Blob._serialize`.
+        of `.Blob._validate` and `.Blob._serialise`.
 
         The JSONSchema is generated for `.BlobModel` but is then refined
         in `__get_pydantic_json_schema__` to include the ``media_type``
@@ -616,7 +616,7 @@ class Blob:
             cls._validate,
             BlobModel.__pydantic_core_schema__,
             serialization=core_schema.wrap_serializer_function_ser_schema(
-                cls._serialize,
+                cls._serialise,
                 is_field_serializer=False,
                 info_arg=False,
                 when_used="always",
@@ -688,7 +688,7 @@ class Blob:
             raise ValueError(f"Blob ID {id} wasn't found on this server.") from error
 
     @classmethod
-    def _serialize(
+    def _serialise(
         cls, obj: Self, handler: Callable[[BlobModel], Mapping[str, str]]
     ) -> Mapping[str, str]:
         """Serialise the Blob to a dictionary.

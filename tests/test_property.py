@@ -418,7 +418,7 @@ def test_propertyinfo(mocker):
     bad_m = MyModel.model_construct(a="not an int", b=6)
     assert modelprop.validate(bad_m) is bad_m
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", "Pydantic serializer warnings")
+        warnings.filterwarnings("ignore", "Pydantic serialiser warnings")
         # Check that passing the same data in as a dict fails validation.#
         with pytest.raises(pydantic.ValidationError):
             modelprop.validate(bad_m.model_dump())

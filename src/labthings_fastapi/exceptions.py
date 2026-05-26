@@ -312,7 +312,7 @@ class InvalidReturnValueError(CausedByUserCodeError, RuntimeError):
     """
 
 
-class UnserializableTypeError(CausedByUserCodeError, TypeError):
+class UnserialisableTypeError(CausedByUserCodeError, TypeError):
     r"""A type has been specified that can't be serialised to JSON.
 
     This error generally means a property or action has a type that cannot be

@@ -52,7 +52,7 @@ from .logs import add_thing_log_destination
 from .utilities import (
     RootModelWrapper,
     model_to_dict,
-    serialize_from_user_code,
+    serialise_from_user_code,
     validate_from_user_code,
 )
 from .invocations import InvocationSummary, InvocationModel, InvocationStatus
@@ -62,7 +62,7 @@ from .exceptions import (
     InvocationCancelledError,
     InvocationError,
     NotConnectedToServerError,
-    UnserializableTypeError,
+    UnserialisableTypeError,
 )
 from . import invocation_contexts
 from .utilities.introspection import (
@@ -505,7 +505,7 @@ class ActionManager:
             """
             try:
                 invocation = self.get_invocation(id)
-                return serialize_from_user_code(
+                return serialise_from_user_code(
                     model_instance=invocation.response(),
                     description=f"invocation '{id}' of ",
                     code=invocation.action.func,  # type: ignore[attr-defined]
@@ -569,7 +569,7 @@ class ActionManager:
                     # TODO: honour "accept" header
                     return invocation.output.response()
                 try:
-                    return serialize_from_user_code(
+                    return serialise_from_user_code(
                         model_instance=invocation.output_model_instance,
                         description=f"the output of {invocation}",
                         code=invocation.action.func,
@@ -753,7 +753,7 @@ class ActionDescriptor(
             if more nuanced locking behaviour is required meaning the lock is
             acquired directly in the action code, for example using
             `~lt.ThingServerInterface.hold_global_lock`\ .
-        :raises UnserializableTypeError: if the return type of the action cannot
+        :raises UnserialisableTypeError: if the return type of the action cannot
             be serialised to JSON by `pydantic`\ .
         """
         super().__init__()
@@ -775,7 +775,7 @@ class ActionDescriptor(
             self.output_model = RootModelWrapper.wrap_type(
                 return_type(func), name=f"{name.title()}Output"
             )
-        except UnserializableTypeError as e:
+        except UnserialisableTypeError as e:
             e.set_source_function(func)
             raise
         self.invocation_model = create_model(
@@ -961,7 +961,7 @@ class ActionDescriptor(
             )
             background_tasks.add_task(action_manager.expire_invocations)
             try:
-                return serialize_from_user_code(
+                return serialise_from_user_code(
                     model_instance=invocation.response(),
                     description=f"{invocation}",
                     status_code=201,

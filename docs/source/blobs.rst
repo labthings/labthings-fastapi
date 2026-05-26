@@ -143,12 +143,12 @@ On the client, we can use the `capture_image` action directly (as before), or we
 
     Currently, `.Blob` objects are only retained on the server as part of the output of the action that created them. This means they will expire after a timeout (by default, a few minutes). This mechanism is likely to change in future releases: the use of `.Blob` objects as inputs should be considered experimental.
 
-HTTP interface and serialization
+HTTP interface and serialisation
 --------------------------------
 
-`.Blob` objects can be serialized to JSON and deserialized from JSON. When this happens, the `.Blob` is represented as a JSON object with ``href`` and ``content_type`` fields. The ``href`` field is a link to the data. The ``content_type`` field is a string representing the MIME type of the data. It is worth noting that models may be nested: this means an action may return many `.Blob` objects in its output, either as a list or as fields in a `pydantic.BaseModel` subclass. Each `.Blob` in the output will be serialized to JSON with its URL and content type, and the client can then download the data from the URL, one download per `.Blob` object.
+`.Blob` objects can be serialised to JSON and deserialised from JSON. When this happens, the `.Blob` is represented as a JSON object with ``href`` and ``content_type`` fields. The ``href`` field is a link to the data. The ``content_type`` field is a string representing the MIME type of the data. It is worth noting that models may be nested: this means an action may return many `.Blob` objects in its output, either as a list or as fields in a `pydantic.BaseModel` subclass. Each `.Blob` in the output will be serialised to JSON with its URL and content type, and the client can then download the data from the URL, one download per `.Blob` object.
 
-When a `.Blob` is serialized, the URL is generated with a unique ID to allow it to be downloaded. The URL is not guaranteed to be permanent, and should not be used as a long-term reference to the data. For `.Blob` objects that are part of the output of an action, the URL will expire after 5 minutes (or the retention time set for the action), and the data will no longer be available for download after that time.
+When a `.Blob` is serialised, the URL is generated with a unique ID to allow it to be downloaded. The URL is not guaranteed to be permanent, and should not be used as a long-term reference to the data. For `.Blob` objects that are part of the output of an action, the URL will expire after 5 minutes (or the retention time set for the action), and the data will no longer be available for download after that time.
 
 In order to run an action and download the data, currently an HTTP client must:
 
@@ -168,7 +168,7 @@ Memory management and retention
 
 Management of `.Blob` objects is currently very basic: when a `.Blob` object is returned in the output of an Action that has been called via the HTTP interface, it will be retained as long as the action's output. This may be set on each action, and defaults to 5 minutes. This should be improved in the future to avoid memory management issues. 
 
-When a `.Blob` is serialized, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the `.Blob`. Once an Action has finished running, the only strong reference to the `.Blob` should be held by the output property of the action invocation. The `.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.
+When a `.Blob` is serialised, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the `.Blob`. Once an Action has finished running, the only strong reference to the `.Blob` should be held by the output property of the action invocation. The `.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.
 
 The behaviour is different when actions are called from other actions. If `action_a` calls `action_b`, and `action_b` returns a `.Blob`, that `.Blob` will be subject to Python's usual garbage collection rules when `action_a` ends - i.e. it will not be retained unless it is included in the output of `action_a`.
 

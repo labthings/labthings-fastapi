@@ -9,7 +9,7 @@ the correct ``url_for`` function for the current request.
 Under the hood, this module defines a `url_for` function that performs the
 conversion. This function may only be run in certain places in the code, as
 it relies on a context variable. As a rule of thumb, it's OK to call
-`url_for` from a serializer of a `pydantic` model, but you should not call
+`url_for` from a serialiser of a `pydantic` model, but you should not call
 it from within an Action or Property.
 
 There are several places in LabThings where we need to be able to include URLs

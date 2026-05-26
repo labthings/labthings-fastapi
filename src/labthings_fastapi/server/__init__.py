@@ -253,11 +253,11 @@ class ThingServer:
             )
 
         @self.app.exception_handler(PydanticSerializationError)
-        async def serialization_error_handler(
+        async def serialisation_error_handler(
             request: Request, exc: PydanticSerializationError
         ) -> JSONResponse:
             LOGGER.error(
-                f"Couldn't serialize response to {request.url} because of error: \n"
+                f"Couldn't serialise response to {request.url} because of error: \n"
                 f"{exc}"
             )
             return JSONResponse(status_code=500, content={"detail": str(exc)})

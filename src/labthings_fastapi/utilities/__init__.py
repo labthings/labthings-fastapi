@@ -21,7 +21,7 @@ from fastapi import Response
 from labthings_fastapi.exceptions import (
     InvalidReturnValueError,
     UnsupportedConstraintError,
-    UnserializableTypeError,
+    UnserialisableTypeError,
 )
 from .introspection import EmptyObject
 
@@ -148,7 +148,7 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
         :raises UnsupportedConstraintError: if constraints are provided for an
             unsuitable type, for example `allow_inf_nan` for an `int` property, or
             any constraints for a `BaseModel` subclass.
-        :raises UnserializableTypeError: if the type being wrapped is not able
+        :raises UnserialisableTypeError: if the type being wrapped is not able
             to be serialised by `pydantic`\ .
         :raises RuntimeError: if other errors prevent Pydantic from creating a schema
             for the generated model.
@@ -171,7 +171,7 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
                 __base__=cls,
             )
         except PydanticSchemaGenerationError as e:
-            raise UnserializableTypeError(
+            raise UnserialisableTypeError(
                 f"LabThings does not know how to serialise {model!r} to JSON."
             ) from e
         except RuntimeError as e:
@@ -271,7 +271,7 @@ def validate_from_user_code(
         raise InvalidReturnValueError(msg) from e
 
 
-def serialize_from_user_code(
+def serialise_from_user_code(
     model_instance: BaseModel,
     description: str,
     status_code: int = 200,

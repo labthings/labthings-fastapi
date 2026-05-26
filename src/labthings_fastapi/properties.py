@@ -83,7 +83,7 @@ from .thing_description._model import (
 from .utilities import (
     RootModelWrapper,
     labthings_data,
-    serialize_from_user_code,
+    serialise_from_user_code,
     validate_from_user_code,
 )
 from .utilities.introspection import return_type
@@ -99,7 +99,7 @@ from .exceptions import (
     PropertyRedefinitionError,
     ReadOnlyPropertyError,
     MissingTypeError,
-    UnserializableTypeError,
+    UnserialisableTypeError,
     UnsupportedConstraintError,
 )
 from .thing_class_settings import get_validate_properties_on_set
@@ -467,7 +467,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         subclass, this returns it unchanged.
 
         :return: a Pydantic model for the property's type.
-        :raises UnserializableTypeError: if the property can't be serialized
+        :raises UnserialisableTypeError: if the property can't be serialised
             by `pydantic` to JSON.
         """
         if self._model is None:
@@ -477,7 +477,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
                     constraints=self.constraints,
                     name=f"{self.name.title()}Value",
                 )
-            except UnserializableTypeError as e:
+            except UnserialisableTypeError as e:
                 e.set_source_class(self.owning_class, self.name)
                 raise
         return self._model
@@ -577,7 +577,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
                     description=f"{thing.name}.{self.name}",
                     code=(self.owning_class, self.name),
                 )
-                return serialize_from_user_code(
+                return serialise_from_user_code(
                     model_instance=instance,
                     description=f"{thing.name}.{self.name}",
                     code=(self.owning_class, self.name),

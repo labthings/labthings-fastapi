@@ -379,7 +379,7 @@ def test_invalid_return_values():
         # serialise.
         with pytest.raises(
             (ServerActionError, FailedToInvokeActionError),
-            match="Error serializing invocation ",
+            match="Error serialising invocation ",
         ) as excinfo:
             tc.make_unjsonable_any()
         assert "make_unjsonable_any" in str(excinfo)
@@ -394,11 +394,11 @@ def test_invalid_return_values():
         second_invocation_id = actions[0]["id"]
         response = client.get(actions[0]["href"])
         assert response.status_code == 500
-        assert "Error serializing" in response.json()["detail"]
+        assert "Error serialising" in response.json()["detail"]
         # Try the direct link to the action's output
         response = client.get(actions[0]["links"][1]["href"])
-        assert response.status_code == 500  # The output won't serialize
-        assert "Error serializing" in response.json()["detail"]
+        assert response.status_code == 500  # The output won't serialise
+        assert "Error serialising" in response.json()["detail"]
 
         # Check the overall invocations endpoint isn't broken
         actions = client.get("/action_invocations/").json()
