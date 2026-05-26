@@ -867,17 +867,26 @@ def on_set(
 ) -> Callable[[Callable[[Owner, Value], Value]], OnSetDescriptor[Owner, Value]]:
     """Run a function when a data property is set.
 
+    See the description at :ref:`properties_on_set` for an example.
+
     This decorator causes a method to be called whenever a property
     is set. The method must return the value (and may modify it), but
     is not responsible for "remembering" the value: that's done by
     the data property.
+
+    `on_set` methods should have only ``self`` and the property value as arguments,
+    and must either return a valid value for the property, or raise an exception.
+    They are intended to allow validation and coercion of values, as well as
+    allowing synchronisation, for example synchronising the value of a setting with
+    a piece of hardware.
 
     If the method raises an exception, the property will not change
     its value, and the error will propagate.
 
     Side effects should be brief: they are performed synchronously
     during HTTP request handling, so should not exceed a fraction
-    of a second.
+    of a second. This is similar to the constraint on functional property setters:
+    anything likely to take a long time should be done in an action instead.
 
     :param property_name: the name of the property to which we are
         attaching a side effect.

@@ -90,9 +90,9 @@ This page summarises the parts of the LabThings API that should be most frequent
     .. automethod:: labthings_fastapi.thing.Thing.get_current_invocation_logs
         :no-index:
 
-.. py:function:: property(getter: Callable[[Owner], Value]) -> FunctionalProperty[Owner, Value]
-                 property(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None, **constraints: Any) -> Value
+.. py:function:: property(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None, **constraints: Any) -> Value
                  property(*, default_factory: Callable[[], Value], readonly: bool = False,  use_global_lock: bool | None = None, **constraints: Any) -> Value
+                 @lt.property
 
     This function may be used to define :ref:`properties` either by decorating a function, or marking an attribute. Full documentation is available at `labthings_fastapi.properties.property` and a more in-depth discussion is available at :ref:`properties`\ . This page focuses on the most frequently used examples.
 
@@ -142,12 +142,37 @@ This page summarises the parts of the LabThings API that should be most frequent
     For a full listing of attributes that may be modified, see `DataProperty`\ .
 
 
-.. py:function:: setting(getter: Callable[[Owner], Value]) -> FunctionalSetting[Owner, Value]
-                 setting(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
+.. py:function:: setting(default: Value, readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
                  setting(*, default_factory: Callable[[], Value], readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
+                 @lt.setting
 
     A setting is a property that is saved to disk. It is defined in the same way as `property` but will be synchronised with the `Thing`\ 's settings file. Full documentation is available at `labthings_fastapi.properties.setting`
 
+.. py:decorator:: on_set(property_name: str)
+
+    Decorate a method to run when a data `~lt.property` is set.
+
+    This decorator causes a method to be called whenever a property
+    is set. The method must return the value (and may modify it), but
+    is not responsible for "remembering" the value: that's done by
+    the data property.
+
+    `on_set` methods should have only ``self`` and the property value as arguments,
+    and must either return a valid value for the property, or raise an exception.
+    They are intended to allow validation and coercion of values, as well as
+    allowing synchronisation, for example synchronising the value of a setting with
+    a piece of hardware.
+
+    If the method raises an exception, the property will not change
+    its value, and the error will propagate.
+
+    Side effects should be brief: they are performed synchronously
+    during HTTP request handling, so should not exceed a fraction
+    of a second. This is similar to the constraint on functional property setters:
+    anything likely to take a long time should be done in an action instead.
+
+    :param property_name: the name of the property to which we are
+        attaching a side effect.
 
 .. py:decorator:: action
                   action(use_global_lock: bool | None = None, **kwargs: Any)
@@ -277,7 +302,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         :param \**kwargs: additional keyword arguments are passed to `ThingServerConfig`\ .
 
     .. py:property:: things
-      :type: collections.abc.Mapping[str, Thing]
+      :type: collections.abc.Mapping[str, lt.Thing]
 
       A read-only mapping of names to `~lt.Thing` instances, for every `~lt.Thing` attached to the server.
 
@@ -333,6 +358,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
    .. py:property:: global_lock
+
         :type GlobalLock | None:
 
         A global lock object that is used to restrict concurrent execution of actions and setting of properties.
