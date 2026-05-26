@@ -21,7 +21,7 @@ from .temp_client import poll_task
 
 
 class Unjsonable:
-    """A class that pydantic can't serialize."""
+    """A class that pydantic can't serialise."""
 
 
 class PropertyTestThing(lt.Thing):
@@ -621,7 +621,19 @@ def test_title_and_description(name, title, description):
 
 
 def test_bad_type():
-    """Test an obviously un-serializable type raises an error."""
+    """Test an obviously un-serialisable type raises an error.
+
+    Because type hints may be deferred, we don't attempt to build the model for a
+    property until it's needed. The ``broken`` property is typed as
+    ``Unjsonable | None`` and ``Unjsonable`` is not a class that `pydantic` can
+    serialise. We should therefore get an error when we attempt to build the model,
+    telling us that serialisation will fail.
+
+    We could type the property as `typing.Any` which would not cause a problem
+    in this test, but would then fail later when we attempt to serialise the value.
+
+    This is tested in `test_bad_values` below.
+    """
 
     class BrokenThing(lt.Thing):
         broken: Unjsonable | None = lt.property(default=None)
@@ -641,7 +653,7 @@ def test_bad_values():
             self.__dict__["anyprop"] = Unjsonable()
 
         intprop: int = lt.property(default=0)
-        anyprop: Any = lt.property(default=None)
+        # The second property won't serialise
 
     server = lt.ThingServer.from_things({"broken": BrokenThing})
     with server.test_client() as client:

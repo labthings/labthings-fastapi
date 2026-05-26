@@ -231,7 +231,7 @@ class Invocation(Thread):
     def summary_model(self) -> InvocationSummary:
         """Generate a summary of the invocation suitable for HTTP.
 
-        :return: a `InvocationSummary` representing this `Invocation`.
+        :return: an `InvocationSummary` representing this `Invocation`.
         """
         links = [
             LinkElement(rel="self", href=URLFor("action_invocation", id=self.id)),

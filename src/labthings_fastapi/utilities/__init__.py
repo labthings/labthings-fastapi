@@ -149,7 +149,7 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
             unsuitable type, for example `allow_inf_nan` for an `int` property, or
             any constraints for a `BaseModel` subclass.
         :raises UnserializableTypeError: if the type being wrapped is not able
-            to be serialized by `pydantic`\ .
+            to be serialised by `pydantic`\ .
         :raises RuntimeError: if other errors prevent Pydantic from creating a schema
             for the generated model.
         """
@@ -172,7 +172,7 @@ class RootModelWrapper(RootModel[WrappedT], Generic[WrappedT]):
             )
         except PydanticSchemaGenerationError as e:
             raise UnserializableTypeError(
-                f"LabThings does not know how to serialize {model!r} to JSON."
+                f"LabThings does not know how to serialise {model!r} to JSON."
             ) from e
         except RuntimeError as e:
             if "Unable to apply constraint" in str(e):
@@ -283,10 +283,10 @@ def serialize_from_user_code(
     an endpoint function is typed as returning a `pydantic.BaseModel` instance.
     The validated model instance is serialised to JSON by calling
     ``model_dump_json()`` on the model instance, and the resulting string is returned
-    in a `Response` object. This uses `pydantic` serialization, written in Rust,
+    in a `Response` object. This uses `pydantic` serialisation, written in Rust,
     and outperforms the native `json` library significantly.
 
-    If the model can't be serialized, we raise an exception with information about
+    If the model can't be serialised, we raise an exception with information about
     the place in the user code where the problem occurred.
 
     :param model_instance: the `pydantic` model to use for validation.
@@ -306,9 +306,9 @@ def serialize_from_user_code(
         )
     except PydanticSerializationError as exc:
         msg = (
-            f"Error serializing {description} to JSON.\n"
+            f"Error serialising {description} to JSON.\n"
             f"The value was validated as {repr(model_instance)}.\n"
-            f"The serialization error was '{exc}'.\n"
+            f"The serialisation error was '{exc}'.\n"
             f"{refer_to_user_code(code)}"
         )
         raise InvalidReturnValueError(msg) from exc

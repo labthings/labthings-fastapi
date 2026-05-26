@@ -376,7 +376,7 @@ def test_invalid_return_values():
         assert response.status_code == 503  # There's no output as it failed.
 
         # Here, the type hint is vague so it validates OK, but it can't
-        # serialize.
+        # serialise.
         with pytest.raises(
             (ServerActionError, FailedToInvokeActionError),
             match="Error serializing invocation ",

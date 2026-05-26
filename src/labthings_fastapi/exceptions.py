@@ -268,7 +268,7 @@ class CausedByUserCodeError(Exception):
             # If there's only one string, assume it's a message and append
             self.args = (self.args[0] + "\n" + message,)
         else:
-            # If there are multiple arguments, add this as a further one
+            # If there are multiple or no arguments, add this as a further one
             self.args += (message,)
 
     def set_source_function(self, func: Callable) -> None:
@@ -313,10 +313,10 @@ class InvalidReturnValueError(CausedByUserCodeError, RuntimeError):
 
 
 class UnserializableTypeError(CausedByUserCodeError, TypeError):
-    r"""A type has been specified that can't be serialized to JSON.
+    r"""A type has been specified that can't be serialised to JSON.
 
     This error generally means a property or action has a type that cannot be
-    serialized to JSON. This might be an instance of a custom class, or another
+    serialised to JSON. This might be an instance of a custom class, or another
     datatype that doesn't have a ready representation using JSON-compatible types.
 
     This error can often be fixed using `pydantic` annotations, or by using simple
