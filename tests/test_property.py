@@ -12,8 +12,10 @@ same way.
 """
 
 from dataclasses import dataclass
+import functools
 import json
 from typing import Any
+import types
 import warnings
 
 import fastapi
@@ -718,6 +720,13 @@ def test_on_set():
     with pytest.raises(ValueError, match="Can't be negative"):
         thing.intprop = -1
 
+    # Accessing the function on a class should return the function
+    assert isinstance(Example._on_set_intprop, types.FunctionType)
+    assert Example._on_set_intprop.__name__ == "_on_set_intprop"
+    # Accessing it on an instance should return a bound partial object
+    assert isinstance(thing._on_set_intprop, functools.partial)
+    assert thing._on_set_intprop.args == (thing,)
+
 
 def test_bad_on_set_definitions():
     """Test that helpful errors are raise if `on_set` is used incorrectly."""
@@ -730,7 +739,7 @@ def test_bad_on_set_definitions():
 
     assert "'missing' is not a data property" in str(excinfo)
 
-    with raises_or_is_caused_by(AttributeError) as excinfo:
+    with raises_or_is_caused_by(PropertyRedefinitionError) as excinfo:
 
         class Example3(lt.Thing):
             @lt.on_set("myprop")
@@ -739,7 +748,7 @@ def test_bad_on_set_definitions():
 
     assert "On-set function 'myprop' overwrites its property" in str(excinfo)
 
-    with raises_or_is_caused_by(AttributeError) as excinfo:
+    with raises_or_is_caused_by(PropertyRedefinitionError) as excinfo:
 
         class Example4(lt.Thing):
             intprop: int = lt.property(default=0)

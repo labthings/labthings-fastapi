@@ -912,8 +912,17 @@ class OnSetDescriptor(Generic[Owner, Value]):
 
         :param property_name: the name of the property we're attaching a side-effect to.
         :param func: the function to run when the property is set.
+        :raises PropertyRedefinitionError: if the `lt.on_set` function has the same name
+            as its property. This is not allowed, as it will cause the property to be
+            overwritten.
         """
         super().__init__()
+        if func.__name__ == property_name:
+            # Note: this is also checked in __set_name__, but it raises a more helpful
+            # error if it's checked here.
+            msg = f"On-set function '{property_name}' overwrites its property: "
+            msg += "rename it."
+            raise PropertyRedefinitionError(msg)
         self.property_name = property_name
         self.func = func
 
@@ -925,20 +934,19 @@ class OnSetDescriptor(Generic[Owner, Value]):
 
         :param owner: the class on which we are defined.
         :param name: the name to which this descriptor is assigned.
-        :raises AttributeError: if the specified property name is missing,
-            not a data property, assigned to multiple times, or overwritten by
-            this descriptor.
+        :raises AttributeError: if the specified property name is missing or
+            not a data property.
+        :raises PropertyRedefinitionError: if the specified property already has
+            an `lt.on_set` method.
         """
-        if self.property_name == name:
-            msg = f"On-set function '{name}' overwrites its property: rename it."
-            raise AttributeError(msg)
         prop = getattr(owner, self.property_name, None)
         if not isinstance(prop, DataProperty):
             msg = "On-set functions may only be attached to data properties. "
             msg += f"'{self.property_name}' is not a data property"
             raise AttributeError(msg)
         if prop.on_set_func is not None:
-            raise AttributeError(f"'{self.property_name}.on_set' has already been set.")
+            msg = f"'{self.property_name}.on_set' has already been set."
+            raise PropertyRedefinitionError(msg)
         prop.on_set_func = self.func
 
     @overload

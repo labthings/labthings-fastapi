@@ -75,7 +75,7 @@ To do this, you should use the `lt.on_set` decorator as shown below:
         """A property that holds an integer value."""
 
         @lt.on_set("my_property")
-        def _my_property_was_set(self, value: int):
+        def _on_set_my_property(self, value: int):
             """Take action because my_property was set."""
             self._hardware.set_my_property(value)
             return value
@@ -88,6 +88,7 @@ There are a few important points to note when using `lt.on_set` in your code:
 * It's ok to communicate with hardware, but you are likely to need to acquire any locks you need manually.
 * If global locking is enabled, the global lock will already have been acquired when your function is run: there's no need to acquire it again.
 * You do not need to "remember" the value as you would for a regular Python property - the data property already takes care of that.
+* You must not use the name of the property as the name of the function: this will overwrite the property and cause an error.
 
 Functional properties
 -------------------------
