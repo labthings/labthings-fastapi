@@ -262,14 +262,11 @@ class CausedByUserCodeError(Exception):
     def _append_to_args(self, message: str) -> None:
         """Add a message to the exception's arguments.
 
+        The message will be appended to the first (and usually only) argument.
+
         :param message: the message to append.
         """
-        if len(self.args) == 1:
-            # If there's only one string, assume it's a message and append
-            self.args = (self.args[0] + "\n" + message,)
-        else:
-            # If there are multiple or no arguments, add this as a further one
-            self.args += (message,)
+        self.args = (self.args[0] + "\n" + message,) + self.args[1:]
 
     def set_source_function(self, func: Callable) -> None:
         """Add the location of a user-supplied function to the error message.
@@ -288,11 +285,10 @@ class CausedByUserCodeError(Exception):
         :param cls: the class that caused this error.
         :param attr: the attribute name that caused this error.
         """
-        self._append_to_args(
-            f"This was likely caused by '{cls.__module__}.{cls.__qualname__}.{attr}"
-            if attr
-            else "'."
-        )
+        name = f"{cls.__module__}.{cls.__qualname__}"
+        if attr:
+            name += f".{attr}"
+        self._append_to_args(f"\nThis was likely caused by '{name}'.")
 
 
 class InvalidReturnValueError(CausedByUserCodeError, RuntimeError):
