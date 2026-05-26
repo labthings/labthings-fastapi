@@ -697,11 +697,16 @@ def test_bad_reset_decorator():
                 pass
 
 
-def test_on_set():
-    """Test that `on_set` works as expected."""
+@pytest.mark.parametrize("prop_or_setting", [lt.property, lt.setting])
+def test_on_set(prop_or_setting):
+    """Test that `on_set` works as expected.
+
+    Note that this test is parametrised so that it checks both properties
+    and settings.
+    """
 
     class Example(lt.Thing):
-        intprop: int = lt.property(default=0)
+        intprop: int = prop_or_setting(default=0)
 
         shadow: int = lt.property(default=0)
 
