@@ -27,6 +27,7 @@ from labthings_fastapi.testing import (
 from .test_global_lock import lock_is_available
 
 NAME = "testname"
+CLASS_NAME = "TestThingClass"
 EXAMPLE_THING_STATE = {"foo": "bar"}
 
 
@@ -85,13 +86,13 @@ def server():
 @pytest.fixture
 def interface(server):
     """Return a ThingServerInterface, connected to a server."""
-    return ThingServerInterface(server, NAME)
+    return ThingServerInterface(server, NAME, CLASS_NAME)
 
 
 @pytest.fixture
 def mockinterface():
     """Return a MockThingServerInterface."""
-    return MockThingServerInterface(NAME)
+    return MockThingServerInterface(NAME, CLASS_NAME)
 
 
 def test_get_server(server, interface):
@@ -109,7 +110,7 @@ def test_get_server_error():
     ever occurred, but it's worth checking.
     """
     server = lt.ThingServer.from_things(things={})
-    interface = ThingServerInterface(server, NAME)
+    interface = ThingServerInterface(server, NAME, CLASS_NAME)
     assert interface._get_server() is server
     del server
     gc.collect()
@@ -169,7 +170,7 @@ def test_settings_folder(server, interface):
 def test_settings_file_path(server, interface):
     """Check the settings file path is as expected."""
     assert interface.settings_file_path == os.path.join(
-        server.settings_folder, NAME, "settings.json"
+        server.settings_folder, NAME, f"{CLASS_NAME}-Settings.json"
     )
 
 
@@ -225,7 +226,9 @@ def test_mock_settings_folder(mockinterface):
     assert mockinterface._settings_tempdir is None
     f = mockinterface.settings_folder
     assert f == mockinterface._settings_tempdir.name
-    assert mockinterface.settings_file_path == os.path.join(f, "settings.json")
+    assert mockinterface.settings_file_path == os.path.join(
+        f, f"{CLASS_NAME}-Settings.json"
+    )
 
 
 def test_mock_path(mockinterface):
@@ -244,6 +247,12 @@ def test_mock_action_manager(mockinterface):
         _ = mockinterface._action_manager
 
 
+def test_mock_get_server(mockinterface):
+    """Check that attempting to access the server raises an error."""
+    with pytest.raises(NotImplementedError):
+        mockinterface._get_server()
+
+
 def test_create_thing_without_server():
     """Check the test harness for creating things without a server."""
     example = create_thing_without_server(ExampleThing)
@@ -255,7 +264,7 @@ def test_create_thing_without_server():
     with tempfile.TemporaryDirectory() as folder:
         ex2 = create_thing_without_server(ExampleThing, settings_folder=folder)
         assert ex2._thing_server_interface.settings_file_path == os.path.join(
-            folder, "settings.json"
+            folder, "ExampleThing-Settings.json"
         )
 
     # We can't supply the interface as a kwarg
@@ -323,7 +332,7 @@ def test_mocking_slots():
 def test_global_lock(enable):
     """Test that the global lock is accessible, if configured."""
     server = lt.ThingServer.from_things({}, enable_global_lock=enable)
-    interface = ThingServerInterface(server, "thing_name")
+    interface = ThingServerInterface(server, "thing_name", "ThingClass")
     if enable:
         assert isinstance(interface.global_lock, GlobalLock)
     else:
@@ -335,10 +344,10 @@ def test_mock_hold_global_lock(mock):
     """Test the `hold_global_lock` method, with and without a global lock."""
     # By default, there is no global lock.
     if mock:
-        interface = MockThingServerInterface("thing_name")
+        interface = MockThingServerInterface("thing_name", "ThingClass")
     else:
         server = lt.ThingServer.from_things({})
-        interface = ThingServerInterface(server, "thing_name")
+        interface = ThingServerInterface(server, "thing_name", "ThingClass")
     assert interface.global_lock is None
     # With no global lock, the context manager should be a no-op, unless we
     # specify `enabled=True` at which point it errors.
@@ -361,10 +370,12 @@ def test_mock_hold_global_lock(mock):
 
     # If specified, there will be a global lock.
     if mock:
-        interface = MockThingServerInterface("thing_name", enable_global_lock=True)
+        interface = MockThingServerInterface(
+            "thing_name", "ThingClass", enable_global_lock=True
+        )
     else:
         server = lt.ThingServer.from_things({}, enable_global_lock=True)
-        interface = ThingServerInterface(server, "thing_name")
+        interface = ThingServerInterface(server, "thing_name", "ThingClass")
     assert isinstance(interface.global_lock, GlobalLock)
     # That means the context manager should work for all three arguments.
     with interface._optionally_hold_global_lock(False):

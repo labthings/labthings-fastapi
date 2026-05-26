@@ -307,7 +307,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         Whether the server is in debug mode.
 
 
-.. py:class:: ThingServerInterface(server: ThingServer, name: str)
+.. py:class:: ThingServerInterface(server: ThingServer, name: str, class_name: str)
 
    An interface for Things to interact with their server. This is available as `Thing._thing_server_interface` and should not normally be created except by the `ThingServer`\ .
 
