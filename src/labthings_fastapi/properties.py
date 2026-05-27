@@ -924,20 +924,6 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         """The setter function."""
         return self._fset
 
-    def getter(self, fget: Callable[[Owner], Value]) -> Self:
-        """Set the getter function of the property.
-
-        This function returns the descriptor, so it may be used as a decorator.
-        If the function has a docstring, it will be used as the property docstring.
-
-        :param fget: The new getter function.
-        :return: this descriptor (i.e. ``self``). This allows use as a decorator.
-        """
-        self._fget = fget
-        self._type = return_type(self._fget)
-        self.__doc__ = fget.__doc__
-        return self
-
     def setter(self, fset: Callable[[Owner, Value], None]) -> Self:
         r"""Set the setter function of the property.
 
