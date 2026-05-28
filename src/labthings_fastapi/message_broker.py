@@ -4,7 +4,8 @@ Both properties and actions can emit events that may be observed. This module ha
 all the pub-sub messaging in LabThings.
 """
 
-from dataclasses import dataclass
+import anyio
+from pydantic.dataclasses import dataclass
 from typing import Any, Literal
 from weakref import WeakSet
 
@@ -17,6 +18,9 @@ class Message:
 
     This is the message that is sent when a property or action generates
     an event.
+
+    This is a pydantic dataclass, so we validate the message. This might
+    change in the future for performance reasons.
 
     :param thing: The name of the Thing generating the event.
     :param affordance: The name of the affordance generating the event.
@@ -103,3 +107,16 @@ class MessageBroker:
             return  # No subscribers for this thing.
         for stream in subscriptions:
             await stream.send(message)
+
+    async def close_streams(self) -> None:
+        """Close all streams that are subscribed to receive messages.
+
+        This should be called when the server shuts down.
+        """
+        # We use a task group so we shut down all streams concurrently, rather
+        # than waiting for each one to close.
+        async with anyio.create_task_group() as tg:
+            for thing_subs in self._subscriptions.values():
+                for subs in thing_subs.values():
+                    for stream in subs:
+                        tg.start_soon(stream.aclose)

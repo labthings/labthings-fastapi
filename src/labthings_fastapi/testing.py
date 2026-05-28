@@ -18,6 +18,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock
 
 from labthings_fastapi.global_lock import GlobalLock
+from labthings_fastapi.message_broker import Message
 
 from .utilities import class_attributes
 from .thing_slots import ThingSlot
@@ -104,6 +105,12 @@ class MockThingServerInterface(ThingServerInterface):
         f: Future[ReturnType] = Future()
         f.cancel()
         return f
+
+    def publish(self, message: Message) -> None:
+        """Silently ignore published events.
+
+        :param message: a message to publish.
+        """
 
     @property
     def settings_folder(self) -> str:
@@ -230,9 +237,10 @@ def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
     """
     mock = Mock(spec=spec)
     mock.__name__ = "Mock{spec.__name__}"
+    mock.name = mock.__name__.lower()
     mock.__module__ = "mock_module"
     mock._thing_server_interface = MockThingServerInterface(
-        mock.__name__.lower(), mock.__name__
+        mock.name, mock.__name__
     )
     return mock
 
