@@ -18,6 +18,7 @@ from typing import (
 from weakref import ref, ReferenceType
 
 from labthings_fastapi.global_lock import GlobalLock
+from labthings_fastapi.message_broker import Message
 
 from .exceptions import FeatureNotEnabledError, ServerNotRunningError
 
@@ -138,6 +139,22 @@ class ThingServerInterface:
         if portal is None:
             raise ServerNotRunningError("Can't run async code without an event loop.")
         return portal.call(async_function, *args)
+
+    def publish(self, message: Message) -> None:
+        """Publish an event.
+
+        Use the async event loop to notify subscribers that something has
+        happened. The message should contain the name of the `~lt.Thing` and affordance.
+
+        Note that this function will do nothing if the event loop is not yet running.
+
+        :param message: the message being published.
+        """
+        try:
+            broker = self._get_server().message_broker
+            self.start_async_task_soon(broker.publish, message)
+        except ServerNotRunningError:
+            pass  # If the server isn't running yet, we can't publish events.
 
     @property
     def settings_folder(self) -> str:

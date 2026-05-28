@@ -37,10 +37,12 @@ from typing import (
     TypeVar,
     overload,
 )
-from weakref import WeakSet
 import weakref
 from fastapi import APIRouter, FastAPI, HTTPException, Response, Body, BackgroundTasks
 from pydantic import BaseModel, create_model
+
+from labthings_fastapi.message_broker import Message
+
 
 from .middleware.url_for import URLFor
 from .base_descriptor import (
@@ -74,7 +76,6 @@ from .utilities.introspection import (
 )
 from .thing_description import type_to_dataschema
 from .thing_description._model import ActionAffordance, ActionOp, Form, LinkElement
-from .utilities import labthings_data
 
 
 if TYPE_CHECKING:
@@ -270,6 +271,20 @@ class Invocation(Thread):
                 log=self.log,
             )
 
+    def _publish_status(self) -> None:
+        """Publish a status change event to any observers.
+
+        This should be called after each change to ``self._status``
+        """
+        self.thing._thing_server_interface.publish(
+            Message(
+                thing=self.thing.name,
+                affordance=self.action.name,  # type: ignore[attr-defined]
+                message_type="action",
+                payload=self._status.value,
+            )
+        )
+
     def run(self) -> None:
         """Run the action and track progress.
 
@@ -305,7 +320,7 @@ class Invocation(Thread):
         add_thing_log_destination(self.id, self._log)
         with invocation_contexts.set_invocation_id(self.id):
             try:
-                action.emit_changed_event(self.thing, self._status.value)
+                self._publish_status()
 
                 thing = self.thing
                 kwargs = model_to_dict(self.input)
@@ -321,7 +336,7 @@ class Invocation(Thread):
                     with self._status_lock:
                         self._status = InvocationStatus.RUNNING
                         self._start_time = datetime.datetime.now()
-                        action.emit_changed_event(self.thing, self._status.value)
+                        self._publish_status()
 
                     # Actually run the action
                     ret = action.func(thing, **kwargs, **self.dependencies)
@@ -336,12 +351,12 @@ class Invocation(Thread):
                 with self._status_lock:
                     self._output_model_instance = output_model_instance
                     self._status = InvocationStatus.COMPLETED
-                    action.emit_changed_event(self.thing, self._status.value)
+                    self._publish_status()
             except InvocationCancelledError:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
                     self._status = InvocationStatus.CANCELLED
-                    action.emit_changed_event(self.thing, self._status.value)
+                    self._publish_status()
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
                 if isinstance(e, (InvocationError, InvalidReturnValueError)):
@@ -361,7 +376,7 @@ class Invocation(Thread):
                 with self._status_lock:
                     self._status = InvocationStatus.ERROR
                     self._exception = e
-                    action.emit_changed_event(self.thing, self._status.value)
+                    self._publish_status()
             finally:
                 with self._status_lock:
                     self._end_time = datetime.datetime.now()
@@ -867,63 +882,6 @@ class ActionDescriptor(
                 return self.func(*args, **kwargs)
 
         return partial(wrapped, obj)
-
-    def _observers_set(self, obj: Thing) -> WeakSet:
-        """Return a set used to notify changes.
-
-        Note that we need to supply the `~lt.Thing` we are looking at, as in
-        general there may be more than one object of the same type, and
-        descriptor instances are shared between all instances of their class.
-
-        :param obj: The `~lt.Thing` on which the action is being observed.
-
-        :return: a weak set of callables to notify on changes to the action.
-            This is used by websocket endpoints.
-        """
-        ld = labthings_data(obj)
-        if self.name not in ld.action_observers:
-            ld.action_observers[self.name] = WeakSet()
-        return ld.action_observers[self.name]
-
-    def emit_changed_event(self, obj: Thing, status: str) -> None:
-        """Notify subscribers that the action status has changed.
-
-        This function is run from within the `.Invocation` thread that
-        is created when an action is called. It must be run from a thread
-        as it is communicating with the event loop via an `asyncio` blocking
-        portal. Async code must not use the blocking portal as it can deadlock
-        the event loop.
-
-        :param obj: The `~lt.Thing` on which the action is being observed.
-        :param status: The status of the action, to be sent to observers.
-        """
-        obj._thing_server_interface.start_async_task_soon(
-            self.emit_changed_event_async,
-            obj,
-            status,
-        )
-
-    async def emit_changed_event_async(self, obj: Thing, value: Any) -> None:
-        """Notify subscribers that the action status has changed.
-
-        This is an async function that must be run in the `anyio` event loop.
-        It will send messages to each observer to notify them that something
-        has changed.
-
-        :param obj: The `~lt.Thing` on which the action is defined.
-            `.ActionDescriptor` objects are unique to the class, but there may
-            be more than one `~lt.Thing` attached to a server with the same class.
-            We use ``obj`` to look up the observers of the current `~lt.Thing`.
-        :param value: The action status to communicate to the observers.
-        """
-        action_name = self.name
-        for observer in self._observers_set(obj):
-            await observer.send(
-                {
-                    "messageType": "actionStatus",
-                    "data": {"action name": action_name, "status": value},
-                }
-            )
 
     def add_to_fastapi(self, app: FastAPI, thing: Thing) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.

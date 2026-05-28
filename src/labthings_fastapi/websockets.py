@@ -25,11 +25,14 @@ import logging
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from typing import TYPE_CHECKING, Literal
+
+from labthings_fastapi.message_broker import Message, MessageBroker
 from .exceptions import PropertyNotObservableError
 
 if TYPE_CHECKING:
     from .thing import Thing
 
+LOGGER = logging.getLogger(__file__)
 
 WEBTHING_ERROR_URL = "https://w3c.github.io/web-thing-protocol/errors"
 
@@ -76,7 +79,7 @@ def observation_error_response(
 
 
 async def relay_notifications_to_websocket(
-    websocket: WebSocket, receive_stream: ObjectReceiveStream
+    websocket: WebSocket, receive_stream: ObjectReceiveStream[Message]
 ) -> None:
     """Relay objects from a stream to a websocket as JSON.
 
@@ -90,11 +93,45 @@ async def relay_notifications_to_websocket(
     """
     async with receive_stream:
         async for item in receive_stream:
-            await websocket.send_json(jsonable_encoder(item))
+            if item.message_type == "action":
+                msg = {
+                    "messageType": "actionStatus",
+                    "data": {"action name": item.affordance, "status": item.payload},
+                }
+            elif item.message_type == "property":
+                msg = {
+                    "messageType": "propertyStatus",
+                    "data": {item.affordance: jsonable_encoder(item.payload)},
+                }
+            else:
+                LOGGER.error(f"Could not relay '{item}' to websocket - bad type.")
+            await websocket.send_json(msg)
+
+
+def assert_property_is_observable(thing: Thing, property: str) -> bool:
+    """Check that a Thing has a particular property and it is observable.
+
+    :param thing: the `~lt.Thing` instance being observed.
+    :param property: the name of the property.
+    :raises KeyError: if the property does not exist.
+    :raises PropertyNotObservableError: if the property isn't observable.
+    :returns: `True` if an exception wasn't raised.
+    """
+    try:
+        prop = thing.properties[property]  # raises KeyError if it doesn't exist
+    except KeyError:
+        raise
+    if not prop.is_observable:
+        msg = f"'{thing.name}.{property}' is not observable."
+        raise PropertyNotObservableError(msg)
+    return True
 
 
 async def process_messages_from_websocket(
-    websocket: WebSocket, send_stream: ObjectSendStream, thing: Thing
+    websocket: WebSocket,
+    send_stream: ObjectSendStream[Message],
+    broker: MessageBroker,
+    thing: Thing,
 ) -> None:
     r"""Process messages received from a websocket.
 
@@ -105,6 +142,7 @@ async def process_messages_from_websocket(
     :param send_stream: an `anyio.abc.ObjectSendStream` that we
         use to register for events, i.e. data sent to that stream will
         be sent through this websocket, by `.relay_notifications_to_websocket`\ .
+    :param broker: the message broker to use for subscriptions.
     :param thing: the `~lt.Thing` we are attached to. The websocket is specific to
         one `~lt.Thing`, and this is it.
     """
@@ -117,20 +155,24 @@ async def process_messages_from_websocket(
         if data["messageType"] == "addPropertyObservation":
             try:
                 for k in data["data"].keys():
-                    thing.observe_property(k, send_stream)
+                    assert_property_is_observable(thing, k)
+                    broker.subscribe(thing.name, k, send_stream)
             except (KeyError, PropertyNotObservableError) as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
-                await send_stream.send(observation_error_response(k, "property", e))
+                await websocket.send_json(observation_error_response(k, "property", e))
         if data["messageType"] == "addActionObservation":
             try:
                 for k in data["data"].keys():
-                    thing.observe_action(k, send_stream)
+                    _ = thing.actions[k]  # raise a KeyError if the action doesn't exist
+                    broker.subscribe(thing.name, k, send_stream)
             except KeyError as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
-                await send_stream.send(observation_error_response(k, "action", e))
+                await websocket.send_json(observation_error_response(k, "action", e))
 
 
-async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
+async def websocket_endpoint(
+    thing: Thing, websocket: WebSocket, broker: MessageBroker
+) -> None:
     r"""Handle communication to a client via websocket.
 
     This function handles a websocket connection to a `~lt.Thing`\ 's websocket
@@ -139,9 +181,12 @@ async def websocket_endpoint(thing: Thing, websocket: WebSocket) -> None:
 
     :param thing: the `~lt.Thing` the websocket is attached to.
     :param websocket: the web socket that has been created.
+    :param broker: the message broker to use for subscriptions.
     """
     await websocket.accept()
-    send_stream, receive_stream = create_memory_object_stream[dict]()
+    send_stream, receive_stream = create_memory_object_stream[Message]()
     async with create_task_group() as tg:
         tg.start_soon(relay_notifications_to_websocket, websocket, receive_stream)
-        tg.start_soon(process_messages_from_websocket, websocket, send_stream, thing)
+        tg.start_soon(
+            process_messages_from_websocket, websocket, send_stream, broker, thing
+        )

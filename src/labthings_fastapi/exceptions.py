@@ -43,7 +43,7 @@ class ReadOnlyPropertyError(AttributeError):
 class PropertyNotObservableError(RuntimeError):
     """The property is not observable.
 
-    This exception is raised when `~lt.Thing.observe_property` is called with a
+    This exception is raised when trying to observe
     property that is not observable. Currently, only data properties are
     observable: functional properties (using a getter/setter) may not be
     observed.
