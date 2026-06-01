@@ -67,10 +67,12 @@ class MessageBroker:
         :param thing: The name of the `.Thing` being subscribed to.
         :param affordance: The name of the affordance being subscribed to.
         :param stream: A stream to send the messages to.
-        :raises TypeError: if the `thing` argument is not a string.
+        :raises TypeError: if the `thing` or `affordance` argument is not a string.
         """
         if not isinstance(thing, str):
-            raise TypeError(f"The `thing` argument should be a string, not {thing}.")
+            raise TypeError(f"`thing` must be a string, not '{thing}'.")
+        if not isinstance(affordance, str):
+            raise TypeError("`affordance` must be a string, not '{affordance}'.")
         affordances = self._subscriptions.setdefault(thing, {})
         streams = affordances.setdefault(affordance, WeakSet())
         streams.add(stream)
@@ -84,10 +86,12 @@ class MessageBroker:
         :param affordance: The name of the affordance being unsubscribed from.
         :param stream: The stream to unsubscribe.
         :raises KeyError: if there is no such subscription.
-        :raises TypeError: if the `thing` argument is not a string.
+        :raises TypeError: if the `thing` or `affordance` argument is not a string.
         """
         if not isinstance(thing, str):
-            raise TypeError(f"The `thing` argument should be a string, not {thing}.")
+            raise TypeError(f"`thing` must be a string, not '{thing}'.")
+        if not isinstance(affordance, str):
+            raise TypeError("`affordance` must be a string, not '{affordance}'.")
         try:
             self._subscriptions[thing][affordance].discard(stream)
         except KeyError as e:

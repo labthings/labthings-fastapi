@@ -74,12 +74,16 @@ def test_subscribe_unsubscribe():
     broker.unsubscribe("thing_name", "prop", send_stream)
     assert len(broker._subscriptions["thing_name"]["prop"]) == 0
 
-    # We do check that the "thing" key is a string, not a `Thing` instance
-    # (because that's a likely mistake).
+    # We do check that the `thing` and `affordance` are strings, because it would
+    # be very easy to pass a `Thing` by accident otherwise.
     with pytest.raises(TypeError):
         broker.subscribe(Unjsonable(), "whatever", send_stream)  # type: ignore
     with pytest.raises(TypeError):
         broker.unsubscribe(Unjsonable(), "whatever", send_stream)  # type: ignore
+    with pytest.raises(TypeError):
+        broker.subscribe("whatever", Unjsonable(), send_stream)  # type: ignore
+    with pytest.raises(TypeError):
+        broker.unsubscribe("whatever", Unjsonable(), send_stream)  # type: ignore
 
 
 async def append_messages(
