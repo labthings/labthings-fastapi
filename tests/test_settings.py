@@ -108,6 +108,10 @@ class ThingWithSettings(lt.Thing):
         t.start()
 
 
+class SubclassOfThingWithSettings(ThingWithSettings):
+    """A subclass, so we can check it doesn't share settings with its parent."""
+
+
 def _get_setting_file(server: lt.ThingServer, name: str):
     """Find the location of the settings file for a given Thing on a server."""
     path = server.things[name]._thing_server_interface.settings_file_path
@@ -374,3 +378,49 @@ def test_try_loading_setting_file_without_mapping(tempdir, caplog):
         assert caplog.records[0].name == "labthings_fastapi.things.thing"
         expected_msg = "The file does not contain a Mapping"
         assert expected_msg in caplog.records[0].message
+
+
+@pytest.mark.parametrize(
+    ("cls", "cls_name"),
+    [
+        (ThingWithSettings, "ThingWithSettings"),
+        (SubclassOfThingWithSettings, "SubclassOfThingWithSettings"),
+    ],
+)
+def test_class_name_appears_in_settings_filename(tempdir, cls, cls_name):
+    """Check that the class name is included in the settings file name."""
+    server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
+    assert _get_setting_file(server, "thing").endswith(f"Settings-{cls_name}.json")
+
+
+def test_classes_dont_share_settings(tempdir):
+    """Check that Things don't share settings between classes.
+
+    If the class of a Thing is changed, it should not load the settings from
+    the config file. This is achieved by the filename being different between
+    the two classes.
+
+    This test verifies that the settings are reset. It doesn't test the filename
+    directly, that's done by the previous test.
+    """
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
+    with server.test_client():
+        assert server.things["thing"].stringsetting == "foo"  # starts at default
+        server.things["thing"].stringsetting = "changed"  # should save to file
+    del server  # protect against typos in later bits of this test using `server`
+
+    server2 = lt.ThingServer.from_things(
+        {"thing": SubclassOfThingWithSettings}, settings_folder=tempdir
+    )
+    with server2.test_client():
+        # This server should ignore the previous settings file
+        assert server2.things["thing"].stringsetting == "foo"
+    del server2  # protect against typos
+
+    server3 = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
+    with server3.test_client():
+        assert server3.things["thing"].stringsetting == "changed"  # loads from file
