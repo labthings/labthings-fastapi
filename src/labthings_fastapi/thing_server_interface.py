@@ -148,7 +148,7 @@ class ThingServerInterface:
     @property
     def settings_file_path(self) -> str:
         """The path where settings should be loaded and saved as JSON."""
-        return os.path.join(self.settings_folder, f"{self._class_name}-Settings.json")
+        return os.path.join(self.settings_folder, f"Settings-{self._class_name}.json")
 
     @property
     def name(self) -> str:
