@@ -70,11 +70,9 @@ class MessageBroker:
         """
         if not isinstance(thing, str):
             raise TypeError(f"The `thing` argument should be a string, not {thing}.")
-        if thing not in self._subscriptions:
-            self._subscriptions[thing] = {}
-        if affordance not in self._subscriptions[thing]:
-            self._subscriptions[thing][affordance] = WeakSet()
-        self._subscriptions[thing][affordance].add(stream)
+        affordances = self._subscriptions.setdefault(thing, {})
+        streams = affordances.setdefault(affordance, WeakSet())
+        streams.add(stream)
 
     def unsubscribe(
         self, thing: str, affordance: str, stream: ObjectSendStream[Message]
