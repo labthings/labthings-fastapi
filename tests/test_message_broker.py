@@ -152,5 +152,17 @@ def test_message_passing():
     assert message_lists["a_prop2_dup"][2] == [message_a2] * 3
 
 
-if __name__ == "__main__":
-    test_message_passing()
+def test_close_streams():
+    """Verify that close_streams actually closes the subscribed streams."""
+    broker = MessageBroker()
+    send_stream, receive_stream = anyio.create_memory_object_stream[Message]()
+
+    broker.subscribe("thing_a", "prop", send_stream)
+    anyio.run(broker.close_streams)
+
+    # Check the send stream was closed
+    assert send_stream._closed is True
+
+    # Check this propagates to the receive stream
+    with pytest.raises(anyio.EndOfStream):
+        anyio.run(receive_stream.receive)
