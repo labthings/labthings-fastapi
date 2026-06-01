@@ -24,12 +24,13 @@ class Message:
 
     :param thing: The name of the Thing generating the event.
     :param affordance: The name of the affordance generating the event.
-    :param message: The message to send.
+    :param message_type: The kind of affordance from which the event originates.
+    :param payload: Data specific to the event (e.g. property value, action status).
     """
 
     thing: str
     affordance: str
-    message_type: Literal["property", "action", "event"]
+    message_type: Literal["property", "action"]
     payload: Any
 
 

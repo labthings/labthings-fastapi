@@ -19,7 +19,7 @@ class Unjsonable:
         ("test_thing", "prop", "property", 42),
         ("test_thing", "prop", "property", Unjsonable()),
         ("test_thing", "do_it", "action", None),
-        ("test_thing", "notify", "event", {"key": "value"}),
+        ("test_thing", "notify", "action", {"key": "value"}),
     ],
 )
 def test_message_valid(message):
