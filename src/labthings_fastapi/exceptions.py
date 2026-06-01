@@ -263,10 +263,23 @@ class CausedByUserCodeError(Exception):
         """Add a message to the exception's arguments.
 
         The message will be appended to the first (and usually only) argument.
+        If the first argument isn't a string, we'll append another argument with the
+        message.
+
+        If there's no argument, or the argument is an empty string, it will be replaced
+        by the message.
 
         :param message: the message to append.
         """
-        self.args = (self.args[0] + "\n" + message,) + self.args[1:]
+        # The line below ensures () and ("", ) are treated equivalently.
+        first_arg = self.args[0] if len(self.args) > 0 else ""
+        if isinstance(first_arg, str):
+            if len(first_arg) > 0:
+                first_arg += "\n"
+            # Note: the second term is an empty tuple if len(self.args) < 2
+            self.args = (first_arg + message,) + self.args[1:]
+        else:
+            self.args += (message,)
 
     def set_source_function(self, func: Callable) -> None:
         """Add the location of a user-supplied function to the error message.

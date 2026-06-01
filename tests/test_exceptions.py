@@ -27,9 +27,16 @@ class ExampleClass:
 
 
 @pytest.mark.parametrize("cls", EXCEPTIONS)
-@pytest.mark.parametrize("args", [("message",), ("arg_1", "arg_2")])
+@pytest.mark.parametrize(
+    "args",
+    [("message",), ("arg_1", "arg_2"), (42,), (42, "message"), ("",), (), (None,)],
+)
 def test_appending_exception_data(cls, args):
-    """Check that we can append user code to an exception."""
+    """Check that we can append user code to an exception.
+
+    ``args`` is the set of (positional) arguments passed to the exception constructor.
+    ``()`` is the empty tuple, i.e. no arguments, or ``CausedByUserCodeError()``.
+    """
     exc: exceptions.CausedByUserCodeError = cls(*args)
     exc.set_source_class(ExampleClass)
     assert "test_exceptions.ExampleClass" in str(exc)
