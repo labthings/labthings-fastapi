@@ -93,7 +93,7 @@ class MessageBroker:
         if not isinstance(affordance, str):
             raise TypeError("`affordance` must be a string, not '{affordance}'.")
         try:
-            self._subscriptions[thing][affordance].discard(stream)
+            self._subscriptions[thing][affordance].remove(stream)
         except KeyError as e:
             raise e
 

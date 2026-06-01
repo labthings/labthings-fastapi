@@ -71,7 +71,8 @@ def test_subscribe_unsubscribe():
     # list of subscriptions. That means the following should work, even though
     # we're not currently subscribed:
     assert len(broker._subscriptions["thing_name"]["prop"]) == 0
-    broker.unsubscribe("thing_name", "prop", send_stream)
+    with pytest.raises(KeyError):
+        broker.unsubscribe("thing_name", "prop", send_stream)
     assert len(broker._subscriptions["thing_name"]["prop"]) == 0
 
     # We do check that the `thing` and `affordance` are strings, because it would
