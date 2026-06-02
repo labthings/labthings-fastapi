@@ -87,7 +87,7 @@ There are a few important points to note when using `lt.on_set` in your code:
 * Your function will run every time the property is set, meaning it should complete quickly. If this function takes longer than a second, it is likely to cause HTTP timeouts.
 * It's ok to communicate with hardware, but you are likely to need to acquire any locks you need manually.
 * If global locking is enabled, the global lock will already have been acquired when your function is run: there's no need to acquire it again.
-* You do not need to "remember" the value as you would for a regular Python property - the data property already takes care of that.
+* There is no need to store the value in a private attribute or provide a getter function.
 * You must not use the name of the property as the name of the function: this will overwrite the property and cause an error.
 
 Functional properties
