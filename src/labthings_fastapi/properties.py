@@ -870,8 +870,8 @@ def on_set(
     See the description at :ref:`properties_on_set` for an example.
 
     This decorator causes a method to be called whenever a property
-    is set. The method must return the value (and may modify it), but
-    is not responsible for "remembering" the value: that's done by
+    is set. The method must return the value (and may modify it), or raise an exception,
+    but is not responsible for "remembering" the value: that's done by
     the data property.
 
     `on_set` methods should have only ``self`` and the property value as arguments,
@@ -920,9 +920,9 @@ class OnSetDescriptor(Generic[Owner, Value]):
         if func.__name__ == property_name:
             # Note: this is also checked in __set_name__, but it raises a more helpful
             # error if it's checked here.
-            msg = f"On-set function '{property_name}' overwrites its property: "
-            msg += "rename it."
-            raise PropertyRedefinitionError(msg)
+            raise PropertyRedefinitionError(
+                f"On-set function '{property_name}' overwrites its property: rename it."
+            )
         self.property_name = property_name
         self.func = func
 
@@ -941,9 +941,10 @@ class OnSetDescriptor(Generic[Owner, Value]):
         """
         prop = getattr(owner, self.property_name, None)
         if not isinstance(prop, DataProperty):
-            msg = "On-set functions may only be attached to data properties. "
-            msg += f"'{self.property_name}' is not a data property"
-            raise AttributeError(msg)
+            raise AttributeError(
+                "On-set functions may only be attached to data properties. "
+                f"'{self.property_name}' is not a data property"
+            )
         if prop.on_set_func is not None:
             msg = f"'{self.property_name}.on_set' has already been set."
             raise PropertyRedefinitionError(msg)

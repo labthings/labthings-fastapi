@@ -709,6 +709,13 @@ def test_on_set(prop_or_setting):
         intprop: int = prop_or_setting(default=0)
 
         shadow: int = lt.property(default=0)
+        """A property that takes the same value as `intprop`.
+        
+        This property gets updated by the `on_set` function attached to
+        `intprop` such that the two properties always have the same value.
+        
+        It allows us to check that `_on_set_intprop` was run.
+        """
 
         @lt.on_set("intprop")
         def _on_set_intprop(self, val: int) -> int:
@@ -724,6 +731,9 @@ def test_on_set(prop_or_setting):
     assert thing.shadow == 42
     with pytest.raises(ValueError, match="Can't be negative"):
         thing.intprop = -1
+    # The previous value should remain if the `on_set` function errored.
+    assert thing.intprop == 42
+    assert thing.shadow == 42
 
     # Accessing the function on a class should return the function
     assert isinstance(Example._on_set_intprop, types.FunctionType)
@@ -736,6 +746,8 @@ def test_on_set(prop_or_setting):
 def test_bad_on_set_definitions():
     """Test that helpful errors are raise if `on_set` is used incorrectly."""
     with raises_or_is_caused_by(AttributeError) as excinfo:
+        # If the property name doesn't exist or isn't a data property, we will
+        # get an error: it must refer to a data property.
 
         class Example2(lt.Thing):
             @lt.on_set("missing")
@@ -745,6 +757,9 @@ def test_bad_on_set_definitions():
     assert "'missing' is not a data property" in str(excinfo)
 
     with raises_or_is_caused_by(PropertyRedefinitionError) as excinfo:
+        # The on_set function can't have the same name as the property.
+        # If it does, we'll overwrite the property and delete it, so we
+        # check for this and raise an error in the decorator.
 
         class Example3(lt.Thing):
             @lt.on_set("myprop")
@@ -754,6 +769,8 @@ def test_bad_on_set_definitions():
     assert "On-set function 'myprop' overwrites its property" in str(excinfo)
 
     with raises_or_is_caused_by(PropertyRedefinitionError) as excinfo:
+        # You can only have on `on_set` function: decorating a second function
+        # will result in an error.
 
         class Example4(lt.Thing):
             intprop: int = lt.property(default=0)
