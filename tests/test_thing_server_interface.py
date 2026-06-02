@@ -170,7 +170,7 @@ def test_settings_folder(server, interface):
 def test_settings_file_path(server, interface):
     """Check the settings file path is as expected."""
     assert interface.settings_file_path == os.path.join(
-        server.settings_folder, NAME, f"{CLASS_NAME}-Settings.json"
+        server.settings_folder, NAME, f"Settings-{CLASS_NAME}.json"
     )
 
 
@@ -227,7 +227,7 @@ def test_mock_settings_folder(mockinterface):
     f = mockinterface.settings_folder
     assert f == mockinterface._settings_tempdir.name
     assert mockinterface.settings_file_path == os.path.join(
-        f, f"{CLASS_NAME}-Settings.json"
+        f, f"Settings-{CLASS_NAME}.json"
     )
 
 
@@ -264,7 +264,7 @@ def test_create_thing_without_server():
     with tempfile.TemporaryDirectory() as folder:
         ex2 = create_thing_without_server(ExampleThing, settings_folder=folder)
         assert ex2._thing_server_interface.settings_file_path == os.path.join(
-            folder, "ExampleThing-Settings.json"
+            folder, "Settings-ExampleThing.json"
         )
 
     # We can't supply the interface as a kwarg
