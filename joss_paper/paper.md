@@ -46,10 +46,10 @@ Describe existing tools for Web of Things, and any tools specific to hardware or
 * Explain why `labthings-fastapi` was created instead of contributing to existing work
 * Explain the gaps in the field closed by `labthings-fastapi`
 
-# Implementation and the Web of Things Specification/ Software Design
+# Software Design
 ### Richard/Joel/Julian
 
-[1-2 paragraphs detailing the architecture]
+[1-2 paragraphs detailing the Implementation and the Web of Things Specification/architecture]
 Detail how `labthings-fastapi` relates to the W3C Web of Things (WoT) Thing Description specification. 
 * Explain how the framework maps Python objects and hardware states to the WoT JSON-LD formats.
 * Briefly mention the advantages of using FastAPI (e.g., automatic OpenAPI documentation, asynchronous performance) for this specific application.
@@ -60,6 +60,9 @@ Detail how `labthings-fastapi` relates to the W3C Web of Things (WoT) Thing Desc
 [1-3 paragraphs describing the impact `labthings-fastapi` has had on research]
 * Use in OpenFlexure Microscope
 * Microscope Farm case study
+
+# AI Usage Disclosure
+No AI tools were used in the creation of this software, documentation, or paper.
 
 # Acknowledgements
 

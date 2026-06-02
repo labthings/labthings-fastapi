@@ -6,7 +6,7 @@ JOSS requires clear documentation that allows a new user to understand and use t
 - [ ] Verify Installation Instructions: Ensure the pip install instructions are clear and account for any system-level dependencies.
     - [ ] Add additional instructions for Windows specific installation as there are additional requirements
 
-- [ ] Usage Examples / Tutorials: Ensure the docs include a basic "getting started" tutorial that walks a user through spinning up a simple LabThings server.
+- [ ] Usage Examples / Tutorials: Reviewers need to see examples of how to use the software to solve real-world problems. Ensure the ReadTheDocs includes a clear, executable example of spinning up a Thing and interacting with it.
 
 - [ ] API Reference: Confirm that the top-level API summary (lt.*) and Pydantic models are fully rendered and easily navigable.
 
@@ -26,7 +26,10 @@ JOSS reviewers will look closely at the testing framework to ensure the software
 ## Community & Repository Health
 JOSS requires evidence of open development practices and a welcoming environment for external contributors.
 
-- [ ] Add a CONTRIBUTING.md file: We currently have "Developer notes" in the README, but JOSS strongly prefers a dedicated CONTRIBUTING.md file outlining how users can submit issues, run tests, and open pull requests.
+- [ ] Add a CONTRIBUTING.md file: We currently have "Developer notes" in the README, but JOSS strongly prefers a dedicated CONTRIBUTING.md file outlining how users can submit issues, run tests, and open pull requests. This file should include how to:
+    - [ ] Contribute to the software (code/docs).
+    - [ ] Report issues or bugs.
+    - [ ] Seek support.
 
 - [ ] Verify Issue Tracker Activity: JOSS requires evidence of iterative development over time. With over 1,000 commits over the last 3 years and active PRs/Issues, we should easily pass this gate.
 
