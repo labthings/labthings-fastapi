@@ -1,7 +1,11 @@
 from typing import Any
 import uuid
 from fastapi.testclient import TestClient
-from labthings_fastapi.exceptions import FailedToInvokeActionError, ServerActionError
+from labthings_fastapi.exceptions import (
+    FailedToInvokeActionError,
+    ServerActionError,
+    UnserialisableTypeError,
+)
 from pydantic import BaseModel
 import pytest
 import functools
@@ -27,6 +31,10 @@ class ActionMan(lt.Thing):
     def say_hello(self) -> str:
         """Return a string."""
         return "Hello World."
+
+
+class Unjsonable:
+    """A dummy class that pydantic can't serialise."""
 
 
 @pytest.fixture
@@ -405,3 +413,17 @@ def test_invalid_return_values():
         # Check the overall invocations endpoint isn't broken
         actions = client.get("/action_invocations/").json()
         assert {a["id"] for a in actions} == {first_invocation_id, second_invocation_id}
+
+
+def test_invalid_return_type():
+    """Check an error is raised if an action has an unserialisable type."""
+    with pytest.raises(UnserialisableTypeError) as excinfo:
+
+        @lt.action
+        def foo(self) -> Unjsonable:
+            return Unjsonable()
+
+    # The error should tell us the name and location of the function.
+    # Testing for a line number is hard - that's checked above.
+    assert "foo" in str(excinfo)
+    assert __file__ in str(excinfo)
