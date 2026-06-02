@@ -8,8 +8,15 @@ import anyio
 from pydantic.dataclasses import dataclass
 from typing import Any, Literal
 from weakref import WeakSet
+import logging
+import warnings
 
-from anyio.abc import ObjectSendStream
+from anyio.streams.memory import MemoryObjectSendStream
+
+from labthings_fastapi.exceptions import MessageDroppedWarning
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,16 +60,16 @@ class MessageBroker:
         # Note that we use a weak set below, so that when a websocket disconnects,
         # its stream is removed automatically.
         self._subscriptions: dict[
-            str, dict[str, WeakSet[ObjectSendStream[Message]]]
+            str, dict[str, WeakSet[MemoryObjectSendStream[Message]]]
         ] = {}
 
-    def subscribe(
-        self, thing: str, affordance: str, stream: ObjectSendStream[Message]
+    async def subscribe(
+        self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
     ) -> None:
         """Subscribe to messages from a particular affordance.
 
-        Note that this method is not async - it just registers the stream and so
-        can be run from any thread.
+        Note that this method must be called from the event loop, as the message
+        broker is deliberately not thread safe.
 
         :param thing: The name of the `.Thing` being subscribed to.
         :param affordance: The name of the affordance being subscribed to.
@@ -77,10 +84,15 @@ class MessageBroker:
         streams = affordances.setdefault(affordance, WeakSet())
         streams.add(stream)
 
-    def unsubscribe(
-        self, thing: str, affordance: str, stream: ObjectSendStream[Message]
+    async def unsubscribe(
+        self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
     ) -> None:
         """Unsubscribe a stream from messages from a particular affordance.
+
+        This function is often not necessary: streams will be unsubscribed automatically
+        if they are closed or finalised. As the message broker only keeps a weak
+        reference to the stream, that means it will be finalized and unsubscribed
+        when the code that created it goes out of scope.
 
         :param thing: The name of the `.Thing` being unsubscribed from.
         :param affordance: The name of the affordance being unsubscribed from.
@@ -108,8 +120,22 @@ class MessageBroker:
             subscriptions = self._subscriptions[message.thing][message.affordance]
         except KeyError:
             return  # No subscribers for this thing.
+        subscriptions_to_remove = set()
         for stream in subscriptions:
-            await stream.send(message)
+            try:
+                stream.send_nowait(message)
+            except (anyio.ClosedResourceError, anyio.BrokenResourceError):
+                # Streams that have been closed will be automatically unsubscribed.
+                # They can't be reopened, so they won't be reused.
+                subscriptions_to_remove.add(stream)
+            except anyio.WouldBlock:
+                msg = f"Could not pass notification to {stream} as it was full."
+                LOGGER.warning(msg)
+                warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
+        for stream in subscriptions_to_remove:
+            # discard rather than remove, so that if the stream has been finalized
+            # since it was closed, we don't get an error.
+            subscriptions.discard(stream)
 
     async def close_streams(self) -> None:
         """Close all streams that are subscribed to receive messages.

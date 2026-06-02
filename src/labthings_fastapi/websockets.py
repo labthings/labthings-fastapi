@@ -20,7 +20,7 @@ with a single Thing instance. This may change in the future.
 
 from __future__ import annotations
 from anyio import create_memory_object_stream, create_task_group
-from anyio.abc import ObjectReceiveStream, ObjectSendStream
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 import logging
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
@@ -79,7 +79,7 @@ def observation_error_response(
 
 
 async def relay_notifications_to_websocket(
-    websocket: WebSocket, receive_stream: ObjectReceiveStream[Message]
+    websocket: WebSocket, receive_stream: MemoryObjectReceiveStream[Message]
 ) -> None:
     """Relay objects from a stream to a websocket as JSON.
 
@@ -88,7 +88,7 @@ async def relay_notifications_to_websocket(
     queue and passes them to the websocket.
 
     :param websocket: the WebSocket we are communicating over.
-    :param receive_stream: an `anyio.abc.ObjectReceiveStream` that will
+    :param receive_stream: a stream that will
         yield objects that we send over the websocket.
     """
     async with receive_stream:
@@ -129,7 +129,7 @@ def assert_property_is_observable(thing: Thing, property: str) -> bool:
 
 async def process_messages_from_websocket(
     websocket: WebSocket,
-    send_stream: ObjectSendStream[Message],
+    send_stream: MemoryObjectSendStream[Message],
     broker: MessageBroker,
     thing: Thing,
 ) -> None:
@@ -156,7 +156,7 @@ async def process_messages_from_websocket(
             try:
                 for k in data["data"].keys():
                     assert_property_is_observable(thing, k)
-                    broker.subscribe(thing.name, k, send_stream)
+                    await broker.subscribe(thing.name, k, send_stream)
             except (KeyError, PropertyNotObservableError) as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
                 await websocket.send_json(observation_error_response(k, "property", e))
@@ -164,7 +164,7 @@ async def process_messages_from_websocket(
             try:
                 for k in data["data"].keys():
                     _ = thing.actions[k]  # raise a KeyError if the action doesn't exist
-                    broker.subscribe(thing.name, k, send_stream)
+                    await broker.subscribe(thing.name, k, send_stream)
             except KeyError as e:
                 logging.error(f"Got a bad websocket message: {data}, caused {e!r}.")
                 await websocket.send_json(observation_error_response(k, "action", e))
@@ -184,7 +184,11 @@ async def websocket_endpoint(
     :param broker: the message broker to use for subscriptions.
     """
     await websocket.accept()
-    send_stream, receive_stream = create_memory_object_stream[Message]()
+    # We use a small, buffer size for the stream: the message broker will drop
+    # messages if the buffer fills up, and the default is no buffer. While we
+    # should always clear the buffer quickly, a small buffer should avoid
+    # dropping any messages.
+    send_stream, receive_stream = create_memory_object_stream[Message](5)
     async with create_task_group() as tg:
         tg.start_soon(relay_notifications_to_websocket, websocket, receive_stream)
         tg.start_soon(

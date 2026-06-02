@@ -460,3 +460,16 @@ class GlobalLockBusyError(TimeoutError):
     it. It indicates that the LabThings server is busy running another action or
     property setter.
     """
+
+
+class MessageDroppedWarning(RuntimeWarning):
+    """A message was dropped by the message broker.
+
+    This warning is emitted when a message can't be sent to a subscribed stream
+    because the stream's buffer is full. The message broker won't block, as
+    doing so could result in a potentially infinite number of stalled tasks.
+
+    If you see this warning, it means that a stream has been subscribed to
+    messages, but is not being read. Most likely, this means the stream was
+    not closed or deleted properly.
+    """
