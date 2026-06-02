@@ -743,6 +743,30 @@ def test_on_set(prop_or_setting):
     assert thing._on_set_intprop.args == (thing,)
 
 
+def test_on_set_none_warning(caplog):
+    """Check that an on_set function returning `None` raises a warning."""
+
+    class Example(lt.Thing):
+        intprop: int = lt.property(default=0)
+
+        @lt.on_set("intprop")
+        def _on_set_intprop(self, val) -> int:
+            """A function to run when intprop is set."""
+            pass  # deliberately missing a return statement
+
+    example = create_thing_without_server(Example)
+    example.intprop = 42
+
+    assert example.intprop is None
+    assert caplog.record_tuples == [
+        (
+            "labthings_fastapi.things.example",
+            30,
+            "intprop.on_set modified the value from '42' to None.",
+        )
+    ]
+
+
 def test_bad_on_set_definitions():
     """Test that helpful errors are raise if `on_set` is used incorrectly."""
     with raises_or_is_caused_by(AttributeError) as excinfo:
@@ -751,7 +775,7 @@ def test_bad_on_set_definitions():
 
         class Example2(lt.Thing):
             @lt.on_set("missing")
-            def set_missing(self, value):
+            def set_missing(self, value) -> Any:
                 return value
 
     assert "'missing' is not a data property" in str(excinfo)
@@ -763,7 +787,7 @@ def test_bad_on_set_definitions():
 
         class Example3(lt.Thing):
             @lt.on_set("myprop")
-            def myprop(self, value):
+            def myprop(self, value) -> Any:
                 return value
 
     assert "On-set function 'myprop' overwrites its property" in str(excinfo)
@@ -776,11 +800,24 @@ def test_bad_on_set_definitions():
             intprop: int = lt.property(default=0)
 
             @lt.on_set("intprop")
-            def set_intprop(self, value):
+            def set_intprop(self, value) -> int:
                 return value
 
             @lt.on_set("intprop")
-            def set_intprop2(self, value):
+            def set_intprop2(self, value) -> int:
                 return value
 
     assert "'intprop.on_set' has already been set" in str(excinfo)
+
+    with raises_or_is_caused_by(MissingTypeError) as excinfo:
+        # on_set functions must have a type hint, as this encourages mypy
+        # to ensure they do return a value.
+
+        class Example5(lt.Thing):
+            intprop: int = lt.property(default=0)
+
+            @lt.on_set("intprop")
+            def set_intprop(self, value):
+                pass
+
+    assert "On-set function 'set_intprop' does not have a return type" in str(excinfo)

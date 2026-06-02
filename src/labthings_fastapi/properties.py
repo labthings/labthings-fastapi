@@ -49,6 +49,7 @@ from __future__ import annotations
 import builtins
 from collections.abc import Mapping
 from functools import partial
+import inspect
 from types import EllipsisType
 from typing import (
     Annotated,
@@ -782,7 +783,15 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             self.use_global_lock
         ):
             if self.on_set_func:
+                original_value = value
                 value = self.on_set_func(obj, value)
+                # This warning tries to make it easier to spot if the on_set
+                # function has forgotten to return a value.
+                if value is None and original_value is not None:
+                    obj.logger.warning(
+                        f"{self.name}.on_set modified the value from "
+                        f"'{original_value}' to None."
+                    )
             if get_validate_properties_on_set(obj.__class__):
                 property_info = self.descriptor_info(obj)
                 value = property_info.validate(value)
@@ -915,6 +924,9 @@ class OnSetDescriptor(Generic[Owner, Value]):
         :raises PropertyRedefinitionError: if the `lt.on_set` function has the same name
             as its property. This is not allowed, as it will cause the property to be
             overwritten.
+        :raises MissingTypeError: if there's no type hint for the return value. This is
+            the closest we can get to checking that the function returns a value,
+            which is required for `~lt.on_set` to work properly.
         """
         super().__init__()
         if func.__name__ == property_name:
@@ -922,6 +934,13 @@ class OnSetDescriptor(Generic[Owner, Value]):
             # error if it's checked here.
             raise PropertyRedefinitionError(
                 f"On-set function '{property_name}' overwrites its property: rename it."
+            )
+        sig = inspect.signature(func)
+        if sig.return_annotation == inspect.Signature.empty:
+            raise MissingTypeError(
+                f"On-set function '{func.__name__}' does not have a return type "
+                "annotation. On-set functions must return a value, so an annotation "
+                "is required."
             )
         self.property_name = property_name
         self.func = func
