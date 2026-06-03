@@ -26,6 +26,7 @@ from .middleware.url_for import set_url_for_context, dummy_url_for
 
 if TYPE_CHECKING:
     from .thing import Thing
+    from .server import ThingServer
     from .actions import ActionManager
 
 Params = ParamSpec("Params")
@@ -49,12 +50,15 @@ class MockThingServerInterface(ThingServerInterface):
     def __init__(
         self,
         name: str,
+        class_name: str,
         settings_folder: str | None = None,
         enable_global_lock: bool = False,
     ) -> None:
         """Initialise a ThingServerInterface.
 
         :param name: The name of the Thing we're providing an interface to.
+        :param class_name: The name of the class of the Thing, used as part of the
+            settings filename.
         :param settings_folder: The location where we should save settings.
             By default, this is a temporary directory.
         :param enable_global_lock: Whether to create a global lock object, to
@@ -66,7 +70,16 @@ class MockThingServerInterface(ThingServerInterface):
         self._settings_tempdir: TemporaryDirectory | None = None
         self._settings_folder = settings_folder
         self._global_lock = GlobalLock() if enable_global_lock else None
-        self._mocks: list[Mock] = []
+        self._mocks: list[Thing] = []
+        self._class_name = class_name
+
+    def _get_server(self) -> ThingServer:
+        """Raise `NotImplementedError` as this is not mocked.
+
+        :return: the server to which we are connected.
+        :raises NotImplementedError: because this function is not mocked.
+        """
+        raise NotImplementedError("`_get_server` is not mocked.")
 
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
@@ -188,6 +201,7 @@ def create_thing_without_server(
 
     msi = MockThingServerInterface(
         name=name,
+        class_name=cls.__name__,
         settings_folder=settings_folder,
         enable_global_lock=enable_global_lock,
     )
@@ -206,6 +220,10 @@ def create_thing_without_server(
 def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
     """Create a mock Thing instance, with some important attributes.
 
+    This provides ``__name__``, ``__module__``, and ``_thing_server_interface``
+    properties that work correctly, which is convenient when mocking `lt.thing_slot`
+    connections.
+
     :param spec: the Thing subclass we're mocking an instance of. Pass
         `lt.Thing` if it doesn't matter.
     :return: a Mock instance that pretends to be an instance of `spec`.
@@ -213,7 +231,9 @@ def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
     mock = Mock(spec=spec)
     mock.__name__ = "Mock{spec.__name__}"
     mock.__module__ = "mock_module"
-    mock._thing_server_interface = MockThingServerInterface(mock.__name__)
+    mock._thing_server_interface = MockThingServerInterface(
+        mock.__name__.lower(), mock.__name__
+    )
     return mock
 
 

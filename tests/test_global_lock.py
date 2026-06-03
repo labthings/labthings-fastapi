@@ -284,7 +284,7 @@ def test_global_lock_release_unacquired():
 def test_global_lock_identity():
     """Ensure the property returns the exact same lock instance every time."""
     server = lt.ThingServer.from_things({}, enable_global_lock=True)
-    interface = lt.ThingServerInterface(server, "thing_name")
+    interface = lt.ThingServerInterface(server, "thing_name", "ThingClass")
 
     lock_1 = interface.global_lock
     lock_2 = interface.global_lock

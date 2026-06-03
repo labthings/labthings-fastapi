@@ -47,7 +47,7 @@ class ThingServerInterface:
     as ``self._thing_server_interface``\ .
     """
 
-    def __init__(self, server: ThingServer, name: str) -> None:
+    def __init__(self, server: ThingServer, name: str, class_name: str) -> None:
         """Initialise a ThingServerInterface.
 
         The ThingServerInterface sits between a Thing and its ThingServer,
@@ -62,8 +62,11 @@ class ThingServerInterface:
             This will be retained as a weak reference.
         :param name: the name of the `~lt.Thing` instance this interface
             is provided for.
+        :param class_name: The name of the class of the Thing, used as part of the
+            settings filename.
         """
         self._name: str = name
+        self._class_name: str = class_name
         self._server: ReferenceType[ThingServer] = ref(server)
 
     def _get_server(self) -> ThingServer:
@@ -145,7 +148,7 @@ class ThingServerInterface:
     @property
     def settings_file_path(self) -> str:
         """The path where settings should be loaded and saved as JSON."""
-        return os.path.join(self.settings_folder, "settings.json")
+        return os.path.join(self.settings_folder, f"Settings-{self._class_name}.json")
 
     @property
     def name(self) -> str:

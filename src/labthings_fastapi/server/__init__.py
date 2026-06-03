@@ -354,7 +354,9 @@ class ThingServer:
         for name, config in self._config.thing_configs.items():
             if not issubclass(config.cls, Thing):
                 raise TypeError(f"{config.cls} is not a Thing subclass.")
-            interface = ThingServerInterface(name=name, server=self)
+            interface = ThingServerInterface(
+                name=name, class_name=config.cls.__name__, server=self
+            )
             os.makedirs(interface.settings_folder, exist_ok=True)
             # This is where we instantiate the Thing
             things[name] = config.cls(

@@ -1,4 +1,8 @@
-"""Test the `testing` module."""
+r"""Test the `testing` module.
+
+Note that some tests are in other modules - e.g. `MockThingServerInterface` is tested
+alongside `ThingServerInterface`\ .
+"""
 
 from collections.abc import Mapping
 
