@@ -91,7 +91,7 @@ class MessageBroker:
 
         This function is often not necessary: streams will be unsubscribed automatically
         if they are closed or finalised. As the message broker only keeps a weak
-        reference to the stream, that means it will be finalized and unsubscribed
+        reference to the stream, that means it will be finalised and unsubscribed
         when the code that created it goes out of scope.
 
         :param thing: The name of the `.Thing` being unsubscribed from.
@@ -103,7 +103,7 @@ class MessageBroker:
         if not isinstance(thing, str):
             raise TypeError(f"`thing` must be a string, not '{thing}'.")
         if not isinstance(affordance, str):
-            raise TypeError("`affordance` must be a string, not '{affordance}'.")
+            raise TypeError(f"`affordance` must be a string, not '{affordance}'.")
         try:
             self._subscriptions[thing][affordance].remove(stream)
         except KeyError as e:
@@ -133,7 +133,7 @@ class MessageBroker:
                 LOGGER.warning(msg)
                 warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
         for stream in subscriptions_to_remove:
-            # discard rather than remove, so that if the stream has been finalized
+            # discard rather than remove, so that if the stream has been finalised
             # since it was closed, we don't get an error.
             subscriptions.discard(stream)
 

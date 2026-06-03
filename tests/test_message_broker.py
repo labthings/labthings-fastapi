@@ -246,11 +246,6 @@ async def test_sending_to_full_stream(caplog):
 async def test_weakset_garbage_collection():
     """Check we can't cause a problem by garbage-collecting streams mid-send.
 
-    This tests behaviour of Python and the garbage collector - it's not very clear to
-    me from the Python docs when garbage collection may happen, or whether `WeakSet` is
-    robust to it. This test checks I've understood that behaviour correctly, and should
-    fail if Python's behaviour changes in a problematic way.
-
     The test iterates over a set of four objects, but deletes the strong references
     during the first iteration - if this were a regular set, it would cause an error.
     """
@@ -264,4 +259,4 @@ async def test_weakset_garbage_collection():
         del items  # There are now no references except to the one in `iterated`
     assert len(iterated) == 1  # We only iterated once, but there wasn't an error.
     # If we complete the test, it confirms we don't need to worry about streams being
-    # finalized during iteration.
+    # finalised during iteration.
