@@ -28,7 +28,7 @@ from .thing import Thing
 from .thing_slots import thing_slot
 from .thing_server_interface import ThingServerInterface
 from .thing_class_settings import ThingClassSettings
-from .properties import property, setting, DataProperty, DataSetting
+from .properties import property, setting, on_set, DataProperty, DataSetting
 from .actions import action
 from .endpoints import endpoint
 from . import outputs
@@ -54,6 +54,7 @@ __all__ = [
     "ThingClassSettings",
     "property",
     "setting",
+    "on_set",
     "DataProperty",
     "DataSetting",
     "action",

@@ -56,6 +56,40 @@ The example above will have its default value set to the empty list, as that's w
 
 Data properties may be *observed*, which means notifications will be sent when the property is written to (see below).
 
+.. _properties_on_set:
+
+Data properties with setters
+----------------------------
+
+It is possible to add a method that will be called each time a data property (or setting) is set. This may be useful in several situations:
+
+* You want to do some validation or coercion that's not done by the type hint and constraints.
+* There should be a side-effect of setting the property, like updating a setting on some hardware.
+
+To do this, you should use the `lt.on_set` decorator as shown below:
+
+.. code-block:: python
+
+    class MyThing(lt.Thing):
+        my_property: int = lt.property(default=42, readonly=True)
+        """A property that holds an integer value."""
+
+        @lt.on_set("my_property")
+        def _on_set_my_property(self, value: int):
+            """Take action because my_property was set."""
+            self._hardware.set_my_property(value)
+            return value
+
+There are a few important points to note when using `lt.on_set` in your code:
+
+* Your function *must* return a value, which will be used as the property's value. This allows `lt.on_set` to coerce values to valid ones.
+* If your function raises an exception, the value will *not* be set, and the property will keep its previous value. This allows invalid values to be rejected.
+* Your function will run every time the property is set, meaning it should complete quickly. If this function takes longer than a second, it is likely to cause HTTP timeouts.
+* It's ok to communicate with hardware, but you are likely to need to acquire any locks you need manually.
+* If global locking is enabled, the global lock will already have been acquired when your function is run: there's no need to acquire it again.
+* There is no need to store the value in a private attribute or provide a getter function.
+* You must not use the name of the property as the name of the function: this will overwrite the property and cause an error.
+
 Functional properties
 -------------------------
 
