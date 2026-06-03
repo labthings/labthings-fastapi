@@ -9,6 +9,7 @@ import pytest
 
 from pydantic import ValidationError
 
+from labthings_fastapi.exceptions import MessageDroppedWarning
 from labthings_fastapi.message_broker import Message, MessageBroker
 
 
@@ -224,7 +225,8 @@ async def test_sending_to_full_stream(caplog):
     assert len(caplog.records) == 0
 
     # Send a third message, which should fail and log a warning
-    await broker.publish(message)
+    with pytest.warns(MessageDroppedWarning):
+        await broker.publish(message)
     assert len(caplog.records) == 1
     msg = caplog.records[0].getMessage()
     assert msg.startswith("Could not pass notification to")
