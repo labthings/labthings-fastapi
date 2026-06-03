@@ -81,14 +81,15 @@ async def test_subscribe_unsubscribe():
 
     # We do check that the `thing` and `affordance` are strings, because it would
     # be very easy to pass a `Thing` by accident otherwise.
-    with pytest.raises(TypeError):
-        await broker.subscribe(Unjsonable(), "whatever", send_stream)  # type: ignore
-    with pytest.raises(TypeError):
-        await broker.unsubscribe(Unjsonable(), "whatever", send_stream)  # type: ignore
-    with pytest.raises(TypeError):
-        await broker.subscribe("whatever", Unjsonable(), send_stream)  # type: ignore
-    with pytest.raises(TypeError):
-        await broker.unsubscribe("whatever", Unjsonable(), send_stream)  # type: ignore
+    msg_suffix = " must be a string, not '42'"
+    with pytest.raises(TypeError, match="`thing`" + msg_suffix):
+        await broker.subscribe(42, "whatever", send_stream)  # type: ignore
+    with pytest.raises(TypeError, match="`thing`" + msg_suffix):
+        await broker.unsubscribe(42, "whatever", send_stream)  # type: ignore
+    with pytest.raises(TypeError, match="`affordance`" + msg_suffix):
+        await broker.subscribe("whatever", 42, send_stream)  # type: ignore
+    with pytest.raises(TypeError, match="`affordance`" + msg_suffix):
+        await broker.unsubscribe("whatever", 42, send_stream)  # type: ignore
 
 
 async def append_messages(
