@@ -9,6 +9,7 @@ See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 import warnings
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
 from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 from fastapi.responses import JSONResponse
 from typing_extensions import Self
@@ -48,6 +49,9 @@ __all__ = ["ThingServer"]
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ThingServer:
@@ -141,7 +145,7 @@ class ThingServer:
             self._config = ThingServerConfig(**kwargs)
         if self._config.settings_folder is None:
             self._config.settings_folder = "./settings"
-        self.app = FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan, separate_input_output_schemas=False)
         self._set_cors_middleware()
         self._set_url_for_middleware()
         self._add_exception_handlers()
@@ -247,6 +251,16 @@ class ThingServer:
                 status_code=409,
                 content={"detail": repr(exc)},
             )
+
+        @self.app.exception_handler(PydanticSerializationError)
+        async def serialisation_error_handler(
+            request: Request, exc: PydanticSerializationError
+        ) -> JSONResponse:
+            LOGGER.error(
+                f"Couldn't serialise response to {request.url} because of error: \n"
+                f"{exc}"
+            )
+            return JSONResponse(status_code=500, content={"detail": str(exc)})
 
     @property
     def debug(self) -> bool:

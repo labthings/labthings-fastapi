@@ -126,7 +126,7 @@ def denumpify(v: Any) -> Any:
         return v
 
 
-def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
+def denumpify_serialiser(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
     """Denumpify mappings before serialization.
 
     This is intended for use as a "wrap serialiser" in `pydantic`, and
@@ -145,5 +145,5 @@ def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
 class DenumpifyingDict(RootModel):
     """A `pydantic` model for a dictionary that converts arrays to lists."""
 
-    root: Annotated[Mapping, WrapSerializer(denumpify_serializer)]
+    root: Annotated[Mapping, WrapSerializer(denumpify_serialiser)]
     model_config = ConfigDict(arbitrary_types_allowed=True)

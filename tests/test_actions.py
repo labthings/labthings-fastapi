@@ -1,5 +1,11 @@
+from typing import Any
 import uuid
 from fastapi.testclient import TestClient
+from labthings_fastapi.exceptions import (
+    FailedToInvokeActionError,
+    ServerActionError,
+    UnserialisableTypeError,
+)
 from pydantic import BaseModel
 import pytest
 import functools
@@ -25,6 +31,10 @@ class ActionMan(lt.Thing):
     def say_hello(self) -> str:
         """Return a string."""
         return "Hello World."
+
+
+class Unjsonable:
+    """A dummy class that pydantic can't serialise."""
 
 
 @pytest.fixture
@@ -333,3 +343,90 @@ def test_action_docs():
     assert actions["long_docstring"].description.startswith(
         "It has multiple paragraphs."
     )
+
+
+def test_invalid_return_values():
+    """Test the errors raised when an action's return value can't be serialised."""
+
+    class NaughtyThing(lt.Thing):
+        @lt.action
+        def make_random_int(self) -> int:
+            """An action that should return an integer, but returns a float."""
+            return 4.2
+
+        @lt.action
+        def make_unjsonable_any(self) -> Any:
+            """A vaguely-typed action that won't serialise."""
+            return object()
+
+    server = lt.ThingServer.from_things({"naughty": NaughtyThing})
+    with server.test_client() as client:
+        tc = lt.ThingClient.from_url("/naughty/", client=client)
+
+        # Here, the return type doesn't match the type hint, so it should fail
+        # to validate.
+        with pytest.raises(
+            (ServerActionError, FailedToInvokeActionError),
+            match="Error validating the output of 'naughty.make_random_int'",
+        ):
+            tc.make_random_int()
+
+        # The action should still have run, so check that we can get the
+        # invocation.
+        actions = client.get("/naughty/make_random_int/").json()
+        assert len(actions) == 1
+        invocation = client.get(actions[0]["href"]).json()
+        assert invocation["output"] is None
+        assert invocation["status"] == "error"
+        first_invocation_id = invocation["id"]
+        assert "Error validating the output" in invocation["log"][-1]["message"]
+        response = client.get(invocation["links"][1]["href"])
+        assert response.status_code == 503  # There's no output as it failed.
+
+        # Here, the type hint is vague so it validates OK, but it can't
+        # serialise.
+        with pytest.raises(
+            (ServerActionError, FailedToInvokeActionError),
+            match="Error serialising ",
+        ) as excinfo:
+            tc.make_unjsonable_any()
+        assert "make_unjsonable_any" in str(excinfo)
+        func = NaughtyThing.make_unjsonable_any.func.__code__
+        assert f"{func.co_filename}:{func.co_firstlineno}" in str(excinfo)
+
+        # Get the last invocation
+        actions = client.get("/naughty/make_unjsonable_any/").json()
+
+        # The action should still have run, so check that we can get the
+        # invocation.
+        actions = client.get("/naughty/make_unjsonable_any/").json()
+        assert len(actions) == 1
+        second_invocation_id = actions[0]["id"]
+        response = client.get(actions[0]["href"])
+        assert response.status_code == 500
+        assert "Error serialising" in response.json()["detail"]
+        # Try the direct link to the action's output
+        response = client.get(actions[0]["links"][1]["href"])
+        assert response.status_code == 500  # The output won't serialise
+        assert "Error serialising" in response.json()["detail"]
+
+        # Check the overall invocations endpoint isn't broken
+        actions = client.get("/action_invocations/").json()
+        assert {a["id"] for a in actions} == {first_invocation_id, second_invocation_id}
+
+
+def test_invalid_return_type():
+    """Check an error is raised if an action has an unserialisable type."""
+
+    def foo(self) -> Unjsonable:
+        """A function that returns an unserialisable type."""
+        return Unjsonable()
+
+    with pytest.raises(UnserialisableTypeError) as excinfo:
+        lt.action(foo)  # This is equivalent to decorating `foo` with `@lt.action`.
+        # The function definition is separated from the `lt.action` call so we can
+        # extract its file and line number to check the error message.
+
+    # The error should tell us the name and location of the function.
+    assert "foo" in str(excinfo)
+    assert f"{foo.__code__.co_filename}:{foo.__code__.co_firstlineno}" in str(excinfo)

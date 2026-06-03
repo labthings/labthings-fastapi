@@ -314,6 +314,32 @@ def test_premature_api_and_affordance(mocker):
         Example.prop.property_affordance(example, None)
 
 
+def test_functionalproperty_initialisation():
+    """Tests for `FunctionalProperty.__init__` including errors."""
+
+    def intgetter(self: lt.Thing) -> int:
+        """An integer getter with a docstring."""
+        pass
+
+    # Check we can make a property, and that it picks up type and docstring
+    class Example:
+        prop = FunctionalProperty(intgetter)
+
+    assert Example.prop.value_type is int
+    assert Example.prop.__doc__ and "integer getter" in Example.prop.__doc__
+
+    def untyped(self: lt.Thing):
+        """A function without a return type."""
+
+    # Check that missing type annotations are `Any`
+    class Example2:
+        prop = FunctionalProperty(untyped)
+
+    assert Example2.prop._type is Any
+    assert Example2.prop.value_type is Any
+    assert "Any" in str(Example2.prop.model)
+
+
 def test_propertyinfo(mocker):
     """Test out the PropertyInfo class."""
 
@@ -418,7 +444,7 @@ def test_propertyinfo(mocker):
     bad_m = MyModel.model_construct(a="not an int", b=6)
     assert modelprop.validate(bad_m) is bad_m
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", "Pydantic serializer warnings")
+        warnings.filterwarnings("ignore", "Pydantic serialiser warnings")
         # Check that passing the same data in as a dict fails validation.#
         with pytest.raises(pydantic.ValidationError):
             modelprop.validate(bad_m.model_dump())
