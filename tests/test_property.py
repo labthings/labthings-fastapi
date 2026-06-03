@@ -810,7 +810,7 @@ def test_bad_on_set_definitions():
     assert "'intprop.on_set' has already been set" in str(excinfo)
 
     with raises_or_is_caused_by(MissingTypeError) as excinfo:
-        # on_set functions must have a type hint, as this encourages mypy
+        # on_set functions must have a return type hint, as this encourages mypy
         # to ensure they do return a value.
 
         class Example5(lt.Thing):
