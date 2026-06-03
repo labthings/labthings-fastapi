@@ -79,7 +79,7 @@ class MessageBroker:
         if not isinstance(thing, str):
             raise TypeError(f"`thing` must be a string, not '{thing}'.")
         if not isinstance(affordance, str):
-            raise TypeError("`affordance` must be a string, not '{affordance}'.")
+            raise TypeError(f"`affordance` must be a string, not '{affordance}'.")
         affordances = self._subscriptions.setdefault(thing, {})
         streams = affordances.setdefault(affordance, WeakSet())
         streams.add(stream)
