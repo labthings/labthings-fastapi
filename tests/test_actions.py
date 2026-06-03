@@ -417,13 +417,16 @@ def test_invalid_return_values():
 
 def test_invalid_return_type():
     """Check an error is raised if an action has an unserialisable type."""
-    with pytest.raises(UnserialisableTypeError) as excinfo:
 
-        @lt.action
-        def foo(self) -> Unjsonable:
-            return Unjsonable()
+    def foo(self) -> Unjsonable:
+        """A function that returns an unserialisable type."""
+        return Unjsonable()
+
+    with pytest.raises(UnserialisableTypeError) as excinfo:
+        lt.action(foo)  # This is equivalent to decorating `foo` with `@lt.action`.
+        # The function definition is separated from the `lt.action` call so we can
+        # extract its file and line number to check the error message.
 
     # The error should tell us the name and location of the function.
-    # Testing for a line number is hard - that's checked above.
     assert "foo" in str(excinfo)
-    assert __file__ in str(excinfo)
+    assert f"{foo.__code__.co_filename}:{foo.__code__.co_firstlineno}" in str(excinfo)
