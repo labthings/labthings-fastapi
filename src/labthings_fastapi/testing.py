@@ -239,9 +239,7 @@ def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
     mock.__name__ = "Mock{spec.__name__}"
     mock.name = mock.__name__.lower()
     mock.__module__ = "mock_module"
-    mock._thing_server_interface = MockThingServerInterface(
-        mock.name, mock.__name__
-    )
+    mock._thing_server_interface = MockThingServerInterface(mock.name, mock.__name__)
     return mock
 
 
