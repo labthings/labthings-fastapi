@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import Any, Optional, Union
+from typing import Any, Generic, Optional, TypeVar
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -328,83 +328,64 @@ class PropertyClientDescriptor:
     path: str
 
 
-def property_descriptor(
-    property_name: str,
-    model: Union[type, BaseModel],
-    description: Optional[str] = None,
-    readable: bool = True,
-    writeable: bool = True,
-    property_path: Optional[str] = None,
-) -> PropertyClientDescriptor:
-    """Create a correctly-typed descriptor that gets and/or sets a property.
+Value = TypeVar("Value")
 
-    The returned `.PropertyClientDescriptor` will have ``__get__`` and
-    (optionally) ``__set__`` methods that are typed according to the
-    supplied ``model``. The descriptor should be added to a `~lt.ThingClient`
-    subclass and used to access the relevant property via
-    `.ThingClient.get_property` and `.ThingClient.set_property`.
 
-    :param property_name: should be the name of the property (i.e. the
-        name it takes in the thing description, and also the name it is
-        assigned to in the class).
-    :param model: the Python ``type`` or a ``pydantic.BaseModel`` that
-        represents the datatype of the property.
-    :param description: text to use for a docstring.
-    :param readable: whether the property may be read (i.e. has ``__get__``).
-    :param writeable: whether the property may be written to.
-    :param property_path: the URL of the ``getproperty`` and ``setproperty``
-        HTTP endpoints. Currently these must both be the same. These are
-        relative to the ``base_url``, i.e. the URL of the Thing Description.
+class ClientProperty(Generic[Value]):
+    """A descriptor to make properties of ThingClient objects work."""
 
-    :return: a descriptor allowing access to the specified property.
-    """
+    def __init__(
+        self,
+        name: str,
+        readable: bool = True,
+        writeable: bool = True,
+        doc: str | None = None,
+    ) -> None:
+        """Initialise a ClientProperty.
 
-    class P(PropertyClientDescriptor):
-        name = property_name
-        type = model
-        path = property_path or property_name
+        :param name: The name of the property.
+        :param writeable: whether the property should be writeable.
+        """
+        self._name = name
+        self._readable = readable
+        self._writeable = writeable
+        if doc:
+            self.__doc__ = doc
 
-    if readable:
+    def __get__(
+        self, obj: ThingClient | None, cls: type[ThingClient] | None = None
+    ) -> Value | Self:
+        """Retrieve the property.
 
-        def __get__(
-            self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
-        ) -> Any:
-            if obj is None:
-                return self
-            return obj.get_property(self.name)
-    else:
-
-        def __get__(
-            self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
-        ) -> Any:
+        :param obj: The client object on which the property is accessed.
+        """
+        if obj is None:
+            return self
+        if self._readable:
+            return obj.get_property(self._name)
+        else:
             raise ClientPropertyError("This property may not be read.")
 
-    __get__.__annotations__["return"] = model
-    P.__get__ = __get__  # type: ignore[attr-defined]
+    def __set__(self, obj: ThingClient, value: Value) -> None | Self:
+        """Retrieve the property.
 
-    # Set __set__ method based on whether writable
-    if writeable:
-
-        def __set__(
-            self: PropertyClientDescriptor, obj: ThingClient, value: Any
-        ) -> None:
-            obj.set_property(self.name, value)
-    else:
-
-        def __set__(
-            self: PropertyClientDescriptor, obj: ThingClient, value: Any
-        ) -> None:
+        :param obj: The client object on which the property is accessed.
+        """
+        if self._writeable:
+            return obj.set_property(self._name, value)
+        else:
             raise ClientPropertyError("This property may not be set.")
 
-    __set__.__annotations__["value"] = model
-    P.__set__ = __set__  # type: ignore[attr-defined]
-    if description:
-        P.__doc__ = description
-    return P()
+
+def client_property(
+    name: str, doc: str | None, writeable: bool = True, readable: bool = True
+) -> Any:
+    return ClientProperty(
+        name=name,
+        doc=doc,
+        writeable=writeable,
+        readable=readable,
+    )
 
 
 def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
@@ -447,13 +428,13 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
     :param property: a dictionary representing the property, in :ref:`wot_td`
         format.
     """
+    annotation = property.get("type", Any)
     setattr(
         cls,
         property_name,
-        property_descriptor(
-            property_name,
-            property.get("type", Any),
-            description=property.get("description", None),
+        ClientProperty[annotation](
+            name=property_name,
+            doc=property.get("description", None),
             writeable=not property.get("readOnly", False),
             readable=not property.get("writeOnly", False),
         ),
