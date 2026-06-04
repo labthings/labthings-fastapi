@@ -86,6 +86,7 @@ filterwarnings = [
     # with the line below.
     "ignore:.get_validate_properties_on_set. will become .True. by default:DeprecationWarning",
 ]
+anyio_mode = "auto"
 
 [tool.ruff]
 target-version = "py310"

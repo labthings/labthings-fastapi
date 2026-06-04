@@ -3,18 +3,15 @@
 from __future__ import annotations
 from collections.abc import Callable, Mapping
 from types import FunctionType
-from typing import Any, Dict, Generic, Iterable, TYPE_CHECKING, Optional, TypeVar
-from weakref import WeakSet
+from typing import Any, Dict, Generic, Iterable, Optional, TypeVar
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     RootModel,
     create_model,
     PydanticSchemaGenerationError,
     ValidationError,
 )
-from pydantic.dataclasses import dataclass
 from pydantic_core import PydanticSerializationError
 from fastapi import Response
 
@@ -25,16 +22,10 @@ from labthings_fastapi.exceptions import (
 )
 from .introspection import EmptyObject
 
-if TYPE_CHECKING:
-    from ..thing import Thing
-
-
 __all__ = [
     "class_attributes",
     "attributes",
     "RootModelWrapper",
-    "LabThingsObjectData",
-    "labthings_data",
     "model_to_dict",
 ]
 
@@ -67,46 +58,6 @@ def attributes(cls: Any) -> Iterable[tuple[str, Any]]:
         if name.startswith("__"):
             continue
         yield name, getattr(cls, name)
-
-
-LABTHINGS_DICT_KEY = "__labthings"
-
-
-@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
-class LabThingsObjectData:
-    r"""Data used by LabThings, stored on each `~lt.Thing`.
-
-    This `pydantic.dataclass` groups together some properties used
-    by LabThings descriptors, to avoid cluttering the namespace of the
-    `~lt.Thing` subclass on which they are defined.
-    """
-
-    property_observers: Dict[str, WeakSet] = Field(default_factory=dict)
-    r"""The observers added to each property.
-
-    Keys are property names, values are weak sets used by `~lt.DataProperty`\ .
-    """
-    action_observers: Dict[str, WeakSet] = Field(default_factory=dict)
-    r"""The observers added to each action.
-
-    Keys are action names, values are weak sets used by
-    `.ActionDescriptor`\ .
-    """
-
-
-def labthings_data(obj: Thing) -> LabThingsObjectData:
-    """Get (or create) a dictionary for LabThings properties.
-
-    Ensure there is a `.LabThingsObjectData` dataclass attached to
-    a particular `~lt.Thing`, and return it.
-
-    :param obj: The `~lt.Thing` we are looking for the dataclass on.
-
-    :return: a `.LabThingsObjectData` instance attached to ``obj``.
-    """
-    if LABTHINGS_DICT_KEY not in obj.__dict__:
-        obj.__dict__[LABTHINGS_DICT_KEY] = LabThingsObjectData()
-    return obj.__dict__[LABTHINGS_DICT_KEY]
 
 
 WrappedT = TypeVar("WrappedT")

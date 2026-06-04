@@ -16,24 +16,20 @@ import os
 from json.decoder import JSONDecodeError
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request, WebSocket
-from anyio.abc import ObjectSendStream
 from anyio.to_thread import run_sync
 
 from .logs import THING_LOGGER
 from .properties import (
-    BaseProperty,
-    DataProperty,
     PropertyCollection,
     SettingCollection,
 )
-from .actions import ActionCollection, ActionDescriptor
+from .actions import ActionCollection
 from .base_descriptor import OptionallyBoundDescriptor
 from .thing_description._model import ThingDescription, NoSecurityScheme
 from .utilities import class_attributes
 from .thing_description import validation
 from .utilities.introspection import get_summary, get_docstring
 from .websockets import websocket_endpoint
-from .exceptions import PropertyNotObservableError
 from .thing_server_interface import ThingServerInterface
 from .invocation_contexts import get_invocation_id
 from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
@@ -210,7 +206,7 @@ class Thing:
 
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket) -> None:
-            await websocket_endpoint(self, ws)
+            await websocket_endpoint(self, ws, server.message_broker)
 
     def _read_settings_file(self) -> Mapping[str, Any] | None:
         """Read the settings file and return a mapping of saved settings or None.
@@ -281,7 +277,7 @@ class Thing:
                 try:
                     setting = self.settings[name]
                     # Load the key from the JSON file using the setting's model
-                    setting.set_without_emit(setting.validate(value))
+                    setting.set(setting.validate(value))
                 except ValidationError:
                     self.logger.warning(
                         f"Could not load setting {name} from settings file "
@@ -429,36 +425,6 @@ class Thing:
         td: ThingDescription = self.thing_description(path=path, base=base)
         td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
-
-    def observe_property(self, property_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive property change notifications.
-
-        :param property_name: the property to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        :raise PropertyNotObservableError: if the property is not observable.
-        """
-        prop = getattr(self.__class__, property_name, None)
-        if not isinstance(prop, BaseProperty):
-            raise KeyError(f"{property_name} is not a LabThings Property")
-        if not isinstance(prop, DataProperty):
-            raise PropertyNotObservableError(f"{property_name} is not observable.")
-        prop._observers_set(self).add(stream)
-
-    def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive action status change notifications.
-
-        :param action_name: the action to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        """
-        action = getattr(self.__class__, action_name, None)
-        if not isinstance(action, ActionDescriptor):
-            raise KeyError(f"{action_name} is not an LabThings Action")
-        observers = action._observers_set(self)
-        observers.add(stream)
 
     def get_current_invocation_logs(self) -> list[logging.LogRecord]:
         """Get the log records for an on going action.

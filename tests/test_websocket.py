@@ -5,6 +5,7 @@ from labthings_fastapi.exceptions import (
     InvocationCancelledError,
 )
 from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.websockets import assert_property_is_observable
 
 
 class ThingWithProperties(lt.Thing):
@@ -85,19 +86,6 @@ def thing():
     return create_thing_without_server(ThingWithProperties)
 
 
-def test_observing_dataprop(thing, mocker):
-    """Check `observe_property` is OK on a data property.
-
-    This checks that something is added to the set of observers.
-    We don't check for events, as there's no event loop: this is
-    tested in `test_observing_dataprop_with_ws` below.
-    """
-    observers_set = ThingWithProperties.dataprop._observers_set(thing)
-    fake_observer = mocker.Mock()
-    thing.observe_property("dataprop", fake_observer)
-    assert fake_observer in observers_set
-
-
 @pytest.mark.parametrize(
     argnames=["name", "exception"],
     argvalues=[
@@ -109,10 +97,10 @@ def test_observing_dataprop(thing, mocker):
         ("missing", KeyError),
     ],
 )
-def test_observing_errors(thing, mocker, name, exception):
+def test_observing_errors(thing, name, exception):
     """Check errors are raised if we observe an unsuitable property."""
     with pytest.raises(exception):
-        thing.observe_property(name, mocker.Mock())
+        assert assert_property_is_observable(thing, name)
 
 
 def test_observing_dataprop_with_ws(client, ws):
@@ -169,27 +157,6 @@ def test_observing_dataprop_error_with_ws(ws, name, title, status):
     message = ws.receive_json(mode="text")
     assert message["error"]["title"] == title
     assert message["error"]["status"] == status
-
-
-def test_observing_action(thing, mocker):
-    """Check observing an action is successful.
-
-    This verifies we've added an observer to the set, but doesn't test for
-    notifications: that would require an event loop.
-    """
-    observers_set = ThingWithProperties.increment_dataprop._observers_set(thing)
-    fake_observer = mocker.Mock()
-    thing.observe_action("increment_dataprop", fake_observer)
-    assert fake_observer in observers_set
-
-
-@pytest.mark.parametrize(
-    "name", ["non_property", "python_property", "undecorated", "dataprop"]
-)
-def test_observing_action_error(thing, mocker, name):
-    """Check observing an attribute that's not an action raises an error."""
-    with pytest.raises(KeyError):
-        thing.observe_action(name, mocker.Mock())
 
 
 @pytest.mark.parametrize(

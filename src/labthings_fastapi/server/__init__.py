@@ -25,6 +25,7 @@ from types import MappingProxyType
 import uvicorn
 
 from labthings_fastapi.exceptions import GlobalLockBusyError
+from labthings_fastapi.message_broker import MessageBroker
 
 from ..middleware.url_for import url_for_middleware
 from ..thing_slots import ThingSlot
@@ -150,6 +151,7 @@ class ThingServer:
         self._set_url_for_middleware()
         self._add_exception_handlers()
         self.action_manager = ActionManager()
+        self.message_broker = MessageBroker()
         self.app.include_router(self.action_manager.router(), prefix=self.api_prefix)
         self.app.include_router(blob.router, prefix=self.api_prefix)
         self.app.include_router(self._things_view_router(), prefix=self.api_prefix)

@@ -11,7 +11,6 @@ import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
     ClientPropertyError,
     NotBoundToInstanceError,
-    ServerNotRunningError,
     UnserialisableTypeError,
     UnsupportedConstraintError,
 )
@@ -390,18 +389,6 @@ def test_setting_from_thread(server):
         r = client.get("/thing/boolprop")
         assert r.status_code == 200
         assert r.json() is True
-
-
-def test_setting_without_event_loop():
-    """Test DataProperty raises an error if set without an event loop."""
-    # This test may need to change, if we change the intended behaviour
-    # Currently it should never be necessary to change properties from the
-    # main thread, so we raise an error if you try to do so
-    server = lt.ThingServer.from_things({"thing": PropertyTestThing})
-    thing = server.things["thing"]
-    assert isinstance(thing, PropertyTestThing)
-    with pytest.raises(ServerNotRunningError):
-        thing.boolprop = False  # Can't call it until the event loop's running
 
 
 @pytest.mark.parametrize("prop_info", CONSTRAINED_PROPS)

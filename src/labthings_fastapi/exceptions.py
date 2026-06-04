@@ -43,7 +43,7 @@ class ReadOnlyPropertyError(AttributeError):
 class PropertyNotObservableError(RuntimeError):
     """The property is not observable.
 
-    This exception is raised when `~lt.Thing.observe_property` is called with a
+    This exception is raised when trying to observe a
     property that is not observable. Currently, only data properties are
     observable: functional properties (using a getter/setter) may not be
     observed.
@@ -459,4 +459,17 @@ class GlobalLockBusyError(TimeoutError):
     This exception is raised when code needs the global lock but cannot acquire
     it. It indicates that the LabThings server is busy running another action or
     property setter.
+    """
+
+
+class MessageDroppedWarning(RuntimeWarning):
+    """A message was dropped by the message broker.
+
+    This warning is emitted when a message can't be sent to a subscribed stream
+    because the stream's buffer is full. The message broker won't block, as
+    doing so could result in a potentially infinite number of stalled tasks.
+
+    If you see this warning, it means that a stream has been subscribed to
+    messages, but is not being read. Most likely, this means the stream was
+    not closed or deleted properly.
     """
