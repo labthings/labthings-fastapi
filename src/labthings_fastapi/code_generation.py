@@ -125,6 +125,66 @@ def _constant(value: str | bool | int | float | EllipsisType | None) -> ast.Cons
     return ast.Constant(value=value)
 
 
+def _class(name: str, bases: list[ast.expr], body: list[ast.stmt]) -> ast.ClassDef:
+    """Define a new class.
+
+    :param name: the name of the new class.
+    :param bases: the base class(es).
+    :param body: the body of the class definition.
+    :return: an `ast` class definition.
+    """
+    if sys.version_info < (3, 12):
+        return ast.ClassDef(
+            name=name,
+            bases=bases,
+            keywords=[],
+            body=body,
+            decorator_list=[],
+        )
+    else:
+        # Since 3.12, we need to add type_params
+        return ast.ClassDef(
+            name=name,
+            bases=bases,
+            keywords=[],
+            body=body,
+            decorator_list=[],
+            type_params=[],
+        )
+
+
+def _function(
+    name: str, args: ast.arguments, body: list[ast.stmt], returns: ast.expr | None
+) -> ast.FunctionDef:
+    """Define a new function.
+
+    :param name: the name of the function.
+    :param args: the arguments.
+    :param body: the function body, as a list of statements.
+    :param returns: a return type annotation.
+    :return: a function definition object.
+    """
+    if sys.version_info < (3, 12):
+        return ast.FunctionDef(
+            name=name,
+            args=args,
+            body=body,
+            decorator_list=[],
+            returns=returns,
+            type_comment=None,
+        )
+    else:
+        return ast.FunctionDef(
+            name=name,
+            args=args,
+            body=body,
+            decorator_list=[],
+            returns=returns,
+            type_comment=None,
+            type_params=[],
+        )
+
+
 def _import_from(module: str, names: list[str]) -> ast.ImportFrom:
     r"""Import names from a module.
 
@@ -349,12 +409,10 @@ class DataSchemaConverter:
         # We need to make a new model definition
         name = self.make_unique_model_name(schema)
         self.model_definitions.append(
-            ast.ClassDef(
+            _class(
                 name=name,
                 bases=[_name("BaseModel")],
-                keywords=[],
                 body=class_body,
-                decorator_list=[],
             )
         )
         return _name(name)
@@ -545,23 +603,20 @@ def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.M
             )
         )
         class_body.append(
-            ast.FunctionDef(
+            _function(
                 name=aname,
                 args=args,
                 body=function_body,
-                decorator_list=[],
                 returns=rtype,
             )
         )
 
     # The class definition is here: this includes `class_body` defined above, with the
     # actions/properties.
-    class_definition = ast.ClassDef(
+    class_definition = _class(
         name=class_name,
         bases=[_name("ThingClient")],
-        keywords=[],
         body=class_body,
-        decorator_list=[],
     )
 
     # The module we want to create starts here, with the module docstring:
