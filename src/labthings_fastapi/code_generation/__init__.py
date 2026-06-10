@@ -11,19 +11,43 @@ a module to a file, allowing static analysis.
 
 import ast
 import re
-from inspect import cleandoc
-from types import NoneType
-from typing import Optional, Sequence
+import sys
+import tempfile
+import warnings
+from collections.abc import Mapping
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+from types import EllipsisType, NoneType
+from typing import TYPE_CHECKING, Literal, Sequence
+from uuid import uuid4
 
 from labthings_fastapi.thing_description._model import (
     DataSchema,
+    InteractionAffordance,
     ThingDescription,
     Type,
 )
 
+if TYPE_CHECKING:
+    from labthings_fastapi.client import ThingClient
+
 
 def title_to_snake_case(title: str) -> str:
-    """Convert text to snake_case."""
+    r"""Convert text to snake_case.
+
+    Identify the words in a string (i.e. made up of letters and numbers)
+    and join them with underscore characters.
+    ``CamelCase`` words are split, so also gain underscores before each
+    capital letter within the word.
+
+    This function is suitable for operation on arbitrary strings. Each
+    sequence of non-word characters within the string will be converted
+    to a single underscore. Initial or final non-word characters are
+    ignored.
+
+    :param title: the ``CamelCase`` text to convert.
+    :return: the text, in ``snake_case``\ .
+    """
     # First, look for CamelCase so it doesn't get ignored:
     uncameled = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", title)
     words = re.findall(r"[a-zA-Z0-9]+", uncameled)
@@ -31,57 +55,86 @@ def title_to_snake_case(title: str) -> str:
 
 
 def snake_to_camel_case(snake: str) -> str:
-    """Convert snake_case to CamelCase."""
+    r"""Convert snake_case to CamelCase.
+
+    :param snake: the ``snake_case`` text to convert.
+    :return: the text, in ``CamelCase``\ .
+    """
     words = snake.split("_")
     return "".join(word.capitalize() for word in words)
 
 
 def title_to_camel_case(title: str) -> str:
-    """Convert text to CamelCase."""
+    r"""Convert text to CamelCase.
+
+    :param title: the text, in title case.
+    :return: the text, in ``camel_case``\ .
+    """
     return snake_to_camel_case(title_to_snake_case(title))
 
 
-def clean_code(code: str, prefix: str = "") -> str:
-    """Clean up code by removing leading/trailing whitespace and empty lines."""
-    lines = cleandoc(code).split("\n")
-    return "\n".join([prefix + line for line in lines])
+def _name(name: str, ctx: Literal["load", "store"] = "load") -> ast.Name:
+    r"""Generate a Name object (shorthand for `ast.Name`).
 
+    Return an `ast.Name` object, with ``id`` set to the ``name``
+    argument and the context set to ``ast.Load()`` or ``ast.Store()`` as
+    appropriate.
 
-def quoted_docstring(docstring: Optional[str], indent: int = 4) -> str:
-    """Wrap a docstring in triple quotes."""
-    if docstring is None:
-        return ""
-    prefix = " " * indent
-    lines = docstring.split("\n")
-    lines[0] = f'"""{lines[0]}'
-    lines.append('"""')
-    return "".join([f"{prefix}{line}\n" for line in lines])
+    This is primarily provided as a shorthand, to simplify some of the longer
+    expressions in code generation.
 
-
-def _name(name: str) -> ast.Name:
-    """Generate a Name object (shorthand for `ast.Name`)."""
-    return ast.Name(id=name, ctx=ast.Load())
+    :param name: the string to be used as a name.
+    :param ctx: the context (``"load"`` or ``"store"``).
+    :return: an `ast.Name` object.
+    """
+    return ast.Name(id=name, ctx=ast.Store() if ctx == "store" else ast.Load())
 
 
 def _subscript(value: ast.expr, subscript: ast.expr) -> ast.Subscript:
-    """Generate a Subscript object (shorthand for `ast.Subscript`)."""
+    """Generate a Subscript object (shorthand for `ast.Subscript`).
+
+    :param value: the quantity before the square brackets.
+    :param subscript: the quantity in the square brackets.
+    :return: an `ast.Subscript` object, using the "load" context.
+    """
     return ast.Subscript(value, subscript, ctx=ast.Load())
 
 
 def _tuple(*elements: ast.expr) -> ast.Tuple:
-    """Generate a Tuple (shorthand for `ast.Tuple`)."""
+    r"""Generate a Tuple (shorthand for `ast.Tuple`).
+
+    This function provides a convenient shorthand for `ast.Tuple`\ .
+
+    :param \*elements: positional arguments become the elements of the tuple.
+    :return: an `ast.Tuple` instance, using the "load" context.
+    """
     return ast.Tuple(elts=list(elements), ctx=ast.Load())
 
 
-def _constant(value: str | bool | int | float | NoneType) -> ast.Constant:
-    """Check a value may be rendered as a constant, and return it."""
-    if not isinstance(value, (str, bool, int, float, NoneType)):
+def _constant(value: str | bool | int | float | EllipsisType | None) -> ast.Constant:
+    """Check a value may be rendered as a constant, and return it.
+
+    This is shorthand for `ast.Constant` and also includes a runtime type check.
+
+    :param value: the value of the constant.
+    :return: an `ast.Constant` wrapping the value.
+    :raises TypeError: if the type of ``value`` can't be a constant.
+    """
+    if not isinstance(value, (str, bool, int, float, NoneType, EllipsisType)):
         raise TypeError("Don't know how to return this as a constant!")
     return ast.Constant(value=value)
 
 
 def _import_from(module: str, names: list[str]) -> ast.ImportFrom:
-    """Import names from a module."""
+    r"""Import names from a module.
+
+    This is shorthand for an `ast.ImportFrom` object. It should be
+    a safer equivalent to ``f"from {module} import {", ".join(names)}"``\ .
+
+    :param module: the module to import from
+    :param names: the names to import
+    :return: an `ast.ImportFrom` object.
+    """
     return ast.ImportFrom(
         module=module,
         names=[ast.alias(name=name) for name in names],
@@ -89,181 +142,340 @@ def _import_from(module: str, names: list[str]) -> ast.ImportFrom:
     )
 
 
-def dataschema_to_type(
-    schema: DataSchema, models: list[ast.ClassDef], name: str = "anonymous"
-) -> ast.expr:
-    """Convert a DataSchema to a Python type."""
-    if isinstance(schema.oneOf, Sequence) and len(schema.oneOf) > 0:
-        types = [dataschema_to_type(s, models) for s in schema.oneOf]
-        return _subscript(_name("Union"), _tuple(*types))
-    if schema.type == Type.string:
-        return _name("str")
-    elif schema.type == Type.integer:
-        return _name("int")
-    elif schema.type == Type.number:
-        return _name("float")
-    elif schema.type == Type.boolean:
-        return _name("bool")
-    elif schema.type == Type.array:
-        if schema.items is None:
-            # A dataschema with no `items` member gets typed as a plain list
-            return _name("list")
-        if isinstance(schema.items, Sequence):
-            # The WoT spec is based on JSONSchema 2019
-            # If `items` is a sequence, it behaves as `prefixItems` in the 2023
-            # draft, i.e. it describes a tuple.
-            # https://json-schema.org/understanding-json-schema/reference/array#tupleValidation
-            types = [dataschema_to_type(s, models) for s in schema.items]
-            return _subscript(_name("tuple"), _tuple(*types))
-        return _subscript(_name("list"), dataschema_to_type(schema.items, models))
-    elif schema.type == Type.object:
-        # If the object has no properties, return a generic dict
-        if not schema.properties:
-            return _subscript(_name("dict"), _name("Any"))
-        # Objects with properties are converted to Pydantic models
-        if schema.title:
-            model_name = title_to_camel_case(schema.title + "_model")
-        else:
-            model_name = snake_to_camel_case(name + "_model")
-        model_names = [m.name for m in models]
-        if model_name in model_names:
-            i = 0
-            while f"{model_name}_{i}" in models:
-                i += 1
-            model_name = f"{model_name}_{i}"
-        models.append(dataschema_to_model(schema, models, model_name))
-        return _name(model_name)
-    else:
-        return _name("Any")
-
-
-def dataschema_to_model(
-    schema: DataSchema, models: list[ast.ClassDef], name: str
-) -> ast.ClassDef:
-    """Convert a DataSchema to a Pydantic model."""
-    if schema.properties is None:
-        msg = f"Can't generate a model from schema '{schema}' as it has no properties."
-        raise TypeError(msg)
-
-    # The class body will consist of one line setting `_model_config` and
-    # then one annotated assignment for each property.
-    class_body: list[ast.stmt] = []
-    class_body.append(
-        ast.Assign(
-            targets=[ast.Name(id="_model_config", ctx=ast.Store())],
-            value=ast.Dict(keys=[_constant("extra")], values=[_constant("allow")]),
-        )
-    )
-    for pname, prop in schema.properties.items():
-        # The fields of the model will appear as assignments. If there's no default,
-        # it's still an assignment as far as `ast` is concerned, but there's no
-        # value (or equals sign).
-        has_default = "default" in prop.model_fields_set
-        class_body.append(
-            ast.AnnAssign(
-                target=ast.Name(id=pname, ctx=ast.Store()),
-                annotation=dataschema_to_type(prop, models, name),
-                value=_constant(prop.default) if has_default else None,
-                simple=1,
-            )
-        )
-    return ast.ClassDef(
-        name=name,
-        bases=[_name("BaseModel")],
-        keywords=[],
-        body=class_body,
-        decorator_list=[],
-    )
-
-
-def property_to_argument(
-    name: str,
-    property: DataSchema,
-    models: list[ast.ClassDef],
-) -> tuple[ast.arg, ast.expr | None]:
-    """Convert a property to a function argument and default."""
-    dtype = dataschema_to_type(property, models, name)
-    arg = ast.arg(arg=name, annotation=dtype)
-    if "default" in property.model_fields_set:
-        if property.default is None:
-            default = ast.Constant(None)
-        elif isinstance(property.default, (str, bool, int, float)):
-            default = ast.Constant(property.default)
-        else:
-            raise NotImplementedError(f"Unsupported default value: {property.default}")
-    else:
-        default = None
-    return arg, default
-
-
 NO_ARGUMENTS = ast.arguments(
     posonlyargs=[],
-    args=[],
+    args=[ast.arg("self")],
     vararg=None,
     kwonlyargs=[],
-    kwarg=None,
+    kwarg=ast.arg("kwargs", _name("Any")),
     defaults=[],
     kw_defaults=[],
 )
+"""A shortcut to specify that a function takes no arguments."""
 
 
-def input_model_to_arguments(
-    model: DataSchema, models: list[ast.ClassDef]
-) -> ast.arguments:
-    """Convert an input model to an arguments object.
+class DataSchemaConverter:
+    """A class that converts `DataSchema` objects to Python types."""
 
-    :param model: A DataSchema describing the input (of an action).
-    :param models: A dictionary of Pydantic model definitions we'll need.
-    :return: an arguments object describing the properties of `model` as 
-        keyword-only arguments.
+    def __init__(self, max_depth: int = 10, warn_on_fallback: bool = True) -> None:
+        """Initialise a DataSchemaConverter.
+
+        :param max_depth: the maximum recursion depth. Set this to zero to disable
+            the generation of Pydantic models for ``"object"`` types, unless they
+            are at top level.
+        :param warn_on_fallback: whether to raise a warning when we return `typing.Any`
+            if a schema can't be converted.
+        """
+        self.model_definitions: list[ast.ClassDef] = []
+        self.max_depth = max_depth
+        self.warn_on_fallback = warn_on_fallback
+
+    def convert(self, schema: DataSchema, recursion_depth: int = 0) -> ast.expr:
+        r"""Convert a DataSchema to a Python type.
+
+        This maps types described by a Thing Description `DataSchema` onto Python
+        types, returning an `ast.expr` object suitable for use as an annotation.
+
+        The value of the ``type`` property of the ``schema`` (which is a string)
+        determines the type we generate:
+
+        ``"string"``
+            is mapped to the `str` builtin.
+
+        ``"integer"``
+            is mapped to the `int` builtin.
+
+        ``"number"``
+            is mapped to the `float` builtin.
+
+        ``"boolean"``
+            is mapped to the `bool` builtin.
+
+        ``"null"``
+            is mapped to the `None` builtin.
+
+        ``"array"``
+            is mapped to a `list` or a `tuple`\ . As Thing Description is based on
+            the 2019 draft of JSONSchema, there are three possible ways to describe
+            an array:
+
+            * If the array has no ``items`` keyword, it is mapped to a plain `list`\ .
+            * If the array has an ``items`` keyword that is a `DataSchema`\ , it will be
+              rendered as ``list[T]`` where ``T`` is generated from the ``items`` value
+              (recursively).
+            * If the array has an ``items`` keyword that is a sequence of `DataSchema`
+              objects, it is rendered as a tuple, where the type of each element is
+              given by the corresponding element of the ``items`` value. This has been
+              changed in the most recent draft of JSONSchema. See
+              `Tuple Validation <tuple_validation>`_
+
+        ``"object"``
+            is either mapped to `dict` or to a generated `pydantic.BaseModel` subclass,
+            depending on whether the ``properties`` key is set.
+
+        :param schema: the `DataSchema` to convert.
+        :param recursion_depth: how many levels of recursion we've currently worked
+            down.
+        :return: an expression that may be used as a type annotation.
+
+        .. _tuple_validation: https://json-schema.org/understanding-json-schema/reference/array#tupleValidation
+        """
+        if recursion_depth > self.max_depth:
+            # If we've exceeded the maximum recursion depth, fall back to `Any`
+            warnings.warn(
+                f"Recursion depth exceeded, turning {schema} into `Any`",
+                stacklevel=1,
+            )
+            return _name("Any")
+        if isinstance(schema.oneOf, Sequence) and len(schema.oneOf) > 0:
+            types = [self.convert(s) for s in schema.oneOf]
+            return _subscript(_name("Union"), _tuple(*types))
+        if schema.type == Type.string:
+            return _name("str")
+        elif schema.type == Type.integer:
+            return _name("int")
+        elif schema.type == Type.number:
+            return _name("float")
+        elif schema.type == Type.boolean:
+            return _name("bool")
+        elif schema.type == Type.null:
+            return _name("None")
+        elif schema.type == Type.array:
+            if isinstance(schema.items, Sequence):
+                # The WoT spec is based on JSONSchema 2019
+                # If `items` is a sequence, it behaves as `prefixItems` in the 2023
+                # draft, i.e. it describes a tuple.
+                # https://json-schema.org/understanding-json-schema/reference/array#tupleValidation
+                types = [self.convert(s, recursion_depth + 1) for s in schema.items]
+                return _subscript(_name("tuple"), _tuple(*types))
+            if isinstance(schema.items, DataSchema):
+                # If a single item type is specified (including if it's a union), return
+                # a specifically-typed list.
+                return _subscript(
+                    _name("list"), self.convert(schema.items, recursion_depth + 1)
+                )
+            if schema.items is None:
+                # A dataschema with no `items` member gets typed as a plain list
+                return _name("list")
+        elif schema.type == Type.object:
+            # If the object has no properties, return a generic dict
+            if isinstance(schema.properties, Mapping):
+                return self.convert_to_model(schema, recursion_depth=recursion_depth)
+            return _name("dict")
+        if self.warn_on_fallback:
+            warnings.warn(
+                f"Could not convert {schema} to a Python type, falling back to `Any`.",
+                stacklevel=1,
+            )
+        return _name("Any")
+
+    def convert_to_model(self, schema: DataSchema, recursion_depth: int) -> ast.Name:
+        """Convert a DataSchema to a Pydantic model.
+
+        This will iterate through the required and optional ``properties`` of the
+        `DataSchema` and build a class definition for a `pydantic.BaseModel` subclass.
+
+        We will then check to see if an equivalent model has been built already: if so,
+        we will reference it. We built the model first, so that we can check based on
+        the generated model, rather than the input schema or the name.
+
+        If the model we've just built is unique, we'll add it to
+        ``self.model_definitions`` with a unique name, and return a reference to the
+        new model.
+
+        :param schema: the DataSchema instance.
+        :param recursion_depth: how deep we are within a nested type.
+        :return: an `ast.Name` object referencing the generated model.
+        :raises TypeError: if there is no ``properties`` field.
+        :raises KeyError: if the schema requires a property that doesn't exist in
+            ``properties``.
+        """
+        if schema.properties is None:
+            msg = f"Can't generate a model from schema '{schema}' without properties."
+            raise TypeError(msg)
+
+        # The class body will consist of a docstring,
+        # one line setting `_model_config` and
+        # one annotated assignment for each property.
+        class_body: list[ast.stmt] = []
+        if schema.description:  # Add a docstring, if there is a description
+            class_body.append(ast.Expr(_constant(schema.description)))
+        class_body.append(
+            ast.Assign(
+                targets=[_name("_model_config", "store")],
+                value=ast.Dict(keys=[_constant("extra")], values=[_constant("allow")]),
+            )
+        )
+        # Start with the required properties - these look like ``pname: type``
+        required = schema.required or []
+        for pname in required:
+            try:
+                prop = schema.properties[pname]
+            except KeyError as e:
+                msg = f"Schema requires a non-existent property '{pname}': {schema}"
+                raise KeyError(msg) from e
+            class_body.append(
+                ast.AnnAssign(  # Note there is no value, because it's a required field.
+                    target=_name(pname, "store"),
+                    annotation=self.convert(prop, recursion_depth + 1),
+                    simple=1,
+                )
+            )
+        # Now the optional ones: these look like
+        # ``pname: type = Field(default_factory=optional)``
+        # Note that ``optional`` will return `...` so we must always serialise with
+        # ``exclude_unset=True`` or we'll get an error.
+        for pname, prop in schema.properties.items():
+            if pname in required:
+                continue  # we already dealt with required properties above.
+            class_body.append(
+                ast.AnnAssign(
+                    target=_name(pname, "store"),
+                    annotation=self.convert(prop, recursion_depth + 1),
+                    value=ast.Call(
+                        _name("Field"),
+                        [],
+                        [ast.keyword("default_factory", _name("_optional"))],
+                    ),
+                    simple=1,
+                )
+            )
+
+        # Deduplicate: if a model with this body already exists, return that name.
+        existing_name = self.find_model_definition_by_body(class_body)
+        if existing_name:
+            return existing_name
+
+        # We need to make a new model definition
+        name = self.make_unique_model_name(schema)
+        self.model_definitions.append(
+            ast.ClassDef(
+                name=name,
+                bases=[_name("BaseModel")],
+                keywords=[],
+                body=class_body,
+                decorator_list=[],
+            )
+        )
+        return _name(name)
+
+    def find_model_definition_by_body(self, body: list[ast.stmt]) -> ast.Name | None:
+        r"""Locate a model definition with the supplied class body, or return `None`\ .
+
+        :param body: the body of the model definition.
+        :return: the name, as an `ast.Name` object, or `None` if the supplied body is
+            new.
+        """
+        for model in self.model_definitions:
+            if model.body == body:
+                return _name(model.name)
+        return None
+
+    def make_unique_model_name(
+        self, schema: DataSchema, name: str = "UnnamedModel"
+    ) -> str:
+        """Generate a unique name for a schema.
+
+        :param schema: the schema we're naming.
+        :param name: a name for the schema, used if it has no title.
+        :return: a unique name.
+        """
+        if schema.title:
+            model_name = title_to_camel_case(schema.title + "_model")
+        else:
+            model_name = title_to_camel_case(name)
+        model_names = [m.name for m in self.model_definitions]
+        # Append a number to the model name until it's unique.
+        i = 0
+        while model_name in model_names:
+            i += 1
+            model_name = f"{model_name}{i}"
+        return model_name
+
+    def input_model_to_arguments(self, model: DataSchema) -> ast.arguments:
+        """Convert an input model to an arguments object.
+
+        :param model: A DataSchema describing the input (of an action).
+        :return: an arguments object describing the properties of `model` as
+            keyword-only arguments.
+
+        :raises TypeError: if the model doesn't describe an object.
+        """
+        if model.type is None:
+            return NO_ARGUMENTS
+        if model.type != Type.object:
+            print(f"model.type: {model.type}")
+            raise TypeError("Only object models are supported")
+        if not model.properties:
+            return NO_ARGUMENTS
+        kwargs = []
+        kwdefaults: list[ast.expr | None] = []
+        # Make sure required (i.e. no default) arguments come first.
+        arg_names = list(model.properties.keys())
+        required_names = model.required or []
+        for name in required_names:
+            arg_names.remove(name)
+        arg_names = required_names + arg_names
+        for pname, property in model.properties.items():
+            kwargs.append(ast.arg(pname, self.convert(property)))
+            kwdefaults.append(None if pname in required_names else _constant(...))
+        return ast.arguments(
+            kwonlyargs=kwargs,
+            kw_defaults=kwdefaults,
+            posonlyargs=[ast.arg("self")],
+            args=[],
+            vararg=None,
+            kwarg=ast.arg("kwargs", _name("Any")),
+            defaults=[],
+        )
+
+
+def _affordance_docstring(affordance: InteractionAffordance) -> str | None:
+    r"""Extract a docstring from an affordance description.
+
+    :param affordance: the affordance description.
+    :return: a docstring or `None`\ .
     """
-    if model.type is None:
-        return NO_ARGUMENTS
-    if model.type != Type.object:
-        print(f"model.type: {model.type}")
-        raise TypeError("Only object models are supported")
-    if not model.properties:
-        return NO_ARGUMENTS
-    kwargs = []
-    kwdefaults = []
-    # Make sure required (i.e. no default) arguments come first.
-    arg_names = list(model.properties.keys())
-    required_names = model.required or []
-    for name in required_names:
-        arg_names.remove(name)
-    arg_names = required_names + arg_names
-    for name, property in model.properties.items():
-        property = model.properties[name]
-        arg, default = property_to_argument(name, property, models)
-        kwargs.append(arg)
-        # It's possible for required args to have defaults in the schema,
-        # but we remove these from the method signature.
-        kwdefaults.append(None if name in required_names else default)
-    return ast.arguments(
-        kwonlyargs=kwargs,
-        kw_defaults=kwdefaults,
-        posonlyargs=[],
-        args=[],
-        vararg=None,
-        kwarg=None,
-        defaults=[],
-    )
+    if affordance.description or affordance.title:
+        if affordance.description and affordance.title:
+            return f"{affordance.title}\n\n{affordance.description}"
+        else:
+            return affordance.title or affordance.description
+    return None
 
 
-def generate_client(thing_description: ThingDescription) -> ast.Module:
+def _append_docstring_if_present(
+    body: list[ast.stmt], affordance: InteractionAffordance
+) -> None:
+    """Append a docstring, if relevant information is included.
+
+    :param body: a list of expressions to append to.
+    :param affordance: an affordance to built the docstring from.
+    """
+    doc = _affordance_docstring(affordance)
+    if doc:
+        body.append(ast.Expr(_constant(doc)))
+
+
+def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.Module]:
     """Generate a client from a Thing Description.
-    
+
+    This function returns an abstract syntax tree (which may either be executed
+    directly, or dumped to a module on disk) and the name of an autogenerated client
+    class.
+
     :param thing_description: the Thing Description to use.
+    :return: a tuple of a class name and the abstract syntax tree of a Python module.
     """
-    # We'll populate this dictionary with auto-generated Pydantic models,
-    # needed for `DataSchema`s that are typed as `object`
-    models: list[ast.ClassDef] = []
+    class_name = title_to_camel_case(thing_description.title) + "Client"
 
-    class_name = title_to_camel_case(thing_description.title)
-
-    # We create the body of the class as a list of statments. This will be
+    # We create the body of the class as a list of statements. This will be
     # included in the class definition later.
     class_body: list[ast.stmt] = []
+
+    # The converter is responsible for turning DataSchema into types, and
+    # keeping track of any models we will need to define.
+    converter = DataSchemaConverter()
 
     if thing_description.description:
         doc = thing_description.description
@@ -277,28 +489,27 @@ def generate_client(thing_description: ThingDescription) -> ast.Module:
     properties = thing_description.properties or {}
     for name, property in properties.items():
         pname = title_to_snake_case(name)
-        dtype = dataschema_to_type(property, models=models)
+        dtype = converter.convert(property)
         class_body.append(
             ast.AnnAssign(
-                target=ast.Name(id=name, ctx=ast.Store()),
+                target=_name(pname, "store"),
                 annotation=dtype,
                 value=ast.Call(
                     func=_name("client_property"),
                     args=[],
                     keywords=[
-                        ast.keyword(arg="name", value=_constant(pname)),
-                        ast.keyword(arg="doc", value=_constant(property.description)),
                         ast.keyword(
-                            arg="readable", value=_constant(not property.readOnly)
+                            arg="read_only", value=_constant(property.readOnly)
                         ),
                         ast.keyword(
-                            arg="writeable", value=_constant(not property.writeOnly)
+                            arg="write_only", value=_constant(property.writeOnly)
                         ),
                     ],
                 ),
                 simple=1,
             )
         )
+        _append_docstring_if_present(class_body, property)
 
     # Each action will be a method definition, with appropriately typed arguments and
     # return values. These are then passed straight through to `self.invoke_action`
@@ -306,15 +517,17 @@ def generate_client(thing_description: ThingDescription) -> ast.Module:
     for name, action in actions.items():
         aname = title_to_snake_case(name)
         if action.input:
-            args = input_model_to_arguments(action.input, models)
+            args = converter.input_model_to_arguments(action.input)
         else:
             args = NO_ARGUMENTS
         if action.output:
-            rtype = dataschema_to_type(action.output, models)
+            rtype = converter.convert(action.output)
         else:
             rtype = _name("Any")
         # The function body simply passes the arguments through to `invoke_action`.
-        function_body: list[ast.stmt] = [
+        function_body: list[ast.stmt] = []
+        _append_docstring_if_present(function_body, action)
+        function_body.append(
             ast.Return(
                 value=ast.Call(
                     func=ast.Attribute(
@@ -324,10 +537,13 @@ def generate_client(thing_description: ThingDescription) -> ast.Module:
                     keywords=[
                         ast.keyword(arg=arg.arg, value=_name(arg.arg))
                         for arg in args.kwonlyargs
+                    ]
+                    + [
+                        ast.keyword(value=_name("kwargs"))  # pass additional kwargs
                     ],
                 )
             )
-        ]
+        )
         class_body.append(
             ast.FunctionDef(
                 name=aname,
@@ -341,24 +557,78 @@ def generate_client(thing_description: ThingDescription) -> ast.Module:
     # The class definition is here: this includes `class_body` defined above, with the
     # actions/properties.
     class_definition = ast.ClassDef(
-        name=f"{class_name}Client",
+        name=class_name,
         bases=[_name("ThingClient")],
         keywords=[],
         body=class_body,
         decorator_list=[],
     )
 
-    # The module we want to create starts here:
+    # The module we want to create starts here, with the module docstring:
+    code: list[ast.stmt] = [
+        ast.Expr(_constant(f"A client for the {thing_description.title} Thing."))
+    ]
     # Import the symbols we'll need
-    code: list[ast.stmt] = []
     code.append(
-        _import_from("labthings_fastapi.client", ["ThingClient", "client_property"])
+        _import_from(
+            "labthings_fastapi.client",
+            ["ThingClient", "client_property", "_optional"],
+        )
     )
     code.append(_import_from("typing", ["Any", "Union"]))
-    code.append(_import_from("pydantic", ["BaseModel"]))
+    code.append(_import_from("pydantic", ["BaseModel", "Field"]))
 
-    code += models
+    code += converter.model_definitions
 
     code.append(class_definition)
 
-    return ast.Module(body=code, type_ignores=[])
+    tree = ast.Module(body=code, type_ignores=[])
+    # location attributes would point to lines in source code, if they existed.
+    # these are left as None, which causes errors later on - the line below
+    # populates them with dummy data so we can, for example, use `ast.unparse`
+    # or `compile`.
+    ast.fix_missing_locations(tree)
+    return class_name, tree
+
+
+def generate_client_class(thing_description: ThingDescription) -> "type[ThingClient]":
+    """Generate a `~lt.ThingClient` subclass for a particular Thing.
+
+    :param thing_description: the description of the Thing we're working with.
+    :return: a client class for that particular Thing.
+    :raises RuntimeError: if the generated module can't be loaded.
+    """
+    cls_name, tree = generate_client_ast(thing_description)
+    # Now, use `ast.unparse` to write this to a file, which we can then import.
+    with tempfile.TemporaryDirectory() as dir:
+        fname = Path(dir) / "generated_client.py"
+        with open(fname, mode="w") as f:
+            f.write(ast.unparse(tree))
+        # We import the dynamically-generated code to create a class.
+        # Running dynamically-generated code is potentially dangerous, if user input
+        # could lead to code execution.
+        #
+        # The code that generates this
+        # client class is very careful only to pass through user values as (1) names or
+        # (2) string constants. The use of `ast` to do this ensures that we don't fall
+        # foul of string escaping issues, and names are constrained only ever to work as
+        # names.
+        module_name = f"labthings_fastapi.generated_clients.{cls_name}.{uuid4()}"
+        spec = spec_from_file_location(module_name, fname)
+        if spec is None:
+            raise RuntimeError("Couldn't generate a spec to load the generated module.")
+        module = module_from_spec(spec)
+        if spec.loader is None:
+            raise RuntimeError("Spec.loader was None when autogenerating a client.")
+        # Temporarily add the module to `sys.modules` so that `BaseDescriptor` can
+        # retrieve the docstrings.
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            del sys.modules[module_name]
+        # Note that we need to keep the temp file until after executing the module,
+        # so the file still exists. It will be deleted at the end of this indented
+        # block.
+    # Finally, access the class in the now-executed module.
+    return getattr(module, cls_name)
