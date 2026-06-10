@@ -415,6 +415,7 @@ class DataSchemaConverter:
                 body=class_body,
             )
         )
+        ast.fix_missing_locations(self.model_definitions[-1])
         return _name(name)
 
     def find_model_definition_by_body(self, body: list[ast.stmt]) -> ast.Name | None:
@@ -424,8 +425,12 @@ class DataSchemaConverter:
         :return: the name, as an `ast.Name` object, or `None` if the supplied body is
             new.
         """
+        for statement in body:
+            ast.fix_missing_locations(statement)
+        body_statements = [ast.unparse(s) for s in body]
         for model in self.model_definitions:
-            if model.body == body:
+            model_statements = [ast.unparse(s) for s in model.body]
+            if model_statements == body_statements:
                 return _name(model.name)
         return None
 
