@@ -161,21 +161,24 @@ def test_property_descriptor_errors(mocker):
                 "writeOnly": False,
                 "readOnly": False,
                 "type": "integer",
-                "forms": [],
+                "forms": [
+                    {"op": "readproperty", "href": "http://whatever/"},
+                    {"op": "writeproperty", "href": "http://whatever/"},
+                ],
             },
             "readonly": {
                 "title": "test",
                 "writeOnly": False,
                 "readOnly": True,
                 "type": "integer",
-                "forms": [],
+                "forms": [{"op": "readproperty", "href": "http://whatever/"}],
             },
             "writeonly": {
                 "title": "test",
                 "writeOnly": True,
                 "readOnly": False,
                 "type": "integer",
-                "forms": [],
+                "forms": [{"op": "writeproperty", "href": "http://whatever/"}],
             },
         },
         "actions": {},
@@ -245,12 +248,23 @@ def test_call_action_with_args_and_return(thing_client_and_thing):
     assert thing.int_prop == 6
 
 
-def test_call_action_wrong_arg(thing_client):
-    """Test calling an action with wrong argument."""
-    err = "Error when invoking action increment_by_input: 'value' - Field required"
+def test_call_action_wrong_arg(mocker, thing_client):
+    """Test calling an action with wrong argument.
 
+    This should pick up a missing argument before sending anything to
+    the server - but if we force it to send bad input to the server, it should
+    relay the validation error.
+    """
+    # First, check that missing arguments raise a TypeError
+    mocker.spy(thing_client, "invoke_action")
+    err = "missing 1 required keyword-only argument: 'value'"
+    with pytest.raises(TypeError, match=err):
+        thing_client.increment_by_input()
+    assert thing_client.invoke_action.call_count == 0  # No request was made
+
+    err = "Error when invoking action increment_by_input: 'value' - Field required"
     with pytest.raises(FailedToInvokeActionError, match=err):
-        thing_client.increment_by_input(input=5)
+        thing_client.invoke_action("increment_by_input", input=5)
 
 
 def test_call_action_wrong_type(thing_client):
