@@ -499,12 +499,11 @@ def _affordance_docstring(affordance: InteractionAffordance) -> str | None:
     :param affordance: the affordance description.
     :return: a docstring or `None`\ .
     """
-    if affordance.description or affordance.title:
-        if affordance.description and affordance.title:
+    if affordance.description and affordance.title:
+        if not affordance.description.startswith(affordance.title):
+            # If there's a title and description, combine them.
             return f"{affordance.title}\n\n{affordance.description}"
-        else:
-            return affordance.title or affordance.description
-    return None
+    return affordance.title or affordance.description
 
 
 def _append_docstring_if_present(
