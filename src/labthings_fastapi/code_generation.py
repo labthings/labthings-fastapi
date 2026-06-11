@@ -9,6 +9,9 @@ using `ast` and then evaluating it. The same code may also be used to write
 a module to a file, allowing static analysis.
 """
 
+# Ruff flags subprocess as insecure: there's a comment next to where
+# `run` is used explaining reasoning on security. That requires us to
+# ignore the S404 code when we import from subprocess.
 import ast
 import re
 import sys
@@ -17,7 +20,8 @@ import warnings
 from collections.abc import Mapping
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from types import EllipsisType, NoneType
+from subprocess import DEVNULL, run  # noqa: S404
+from types import EllipsisType, ModuleType, NoneType
 from typing import TYPE_CHECKING, Literal, Sequence
 from uuid import uuid4
 
@@ -27,6 +31,15 @@ from labthings_fastapi.thing_description._model import (
     ThingDescription,
     Type,
 )
+
+# We have a soft dependency on Ruff.
+try:
+    import ruff  # type: ignore[import-untyped]
+
+    RUFF_BINARY = ruff.find_ruff_bin()
+except ImportError:
+    RUFF_BINARY = None
+
 
 if TYPE_CHECKING:
     from labthings_fastapi.client import ThingClient
@@ -650,14 +663,19 @@ def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.M
     return class_name, tree
 
 
-def generate_client_class(thing_description: ThingDescription) -> "type[ThingClient]":
-    """Generate a `~lt.ThingClient` subclass for a particular Thing.
+def load_ast_as_module(cls_name: str, tree: ast.Module) -> ModuleType:
+    r"""Generate a `~lt.ThingClient` subclass for a particular Thing.
 
-    :param thing_description: the description of the Thing we're working with.
-    :return: a client class for that particular Thing.
+    This writes the generated code to a temporary file and imports it.
+    It is *temporarily* added to `sys.modules` in order to allow inspection
+    of the docstrings by code in `BaseDescriptor`\ .
+
+    :param cls_name: the name of the generated class, used as part of
+        the module path.
+    :param tree: the generated abstract syntax tree.
+    :return: a module, which has been imported.
     :raises RuntimeError: if the generated module can't be loaded.
     """
-    cls_name, tree = generate_client_ast(thing_description)
     # Now, use `ast.unparse` to write this to a file, which we can then import.
     with tempfile.TemporaryDirectory() as dir:
         fname = Path(dir) / "generated_client.py"
@@ -690,4 +708,77 @@ def generate_client_class(thing_description: ThingDescription) -> "type[ThingCli
         # so the file still exists. It will be deleted at the end of this indented
         # block.
     # Finally, access the class in the now-executed module.
+    return module
+
+
+def generate_client_class(thing_description: ThingDescription) -> "type[ThingClient]":
+    """Generate a `~lt.ThingClient` subclass for a particular Thing.
+
+    :param thing_description: the description of the Thing we're working with.
+    :return: a client class for that particular Thing.
+    :raises RuntimeError: if the generated module can't be loaded.
+    """
+    cls_name, tree = generate_client_ast(thing_description)
+    try:
+        module = load_ast_as_module(cls_name, tree)
+    except RuntimeError:
+        raise
     return getattr(module, cls_name)
+
+
+def write_client_module(
+    thing_description: ThingDescription, destination: str, use_ruff: bool = True
+) -> tuple[str, Path]:
+    r"""Generate a client for a Thing, and write it as a Python file.
+
+    This uses `ast.unparse` to generate Python code from the output of
+    `generate_client_ast`, writes it to a file, and attempts to improve the
+    formatting using ``ruff``.
+
+    Note that ``ruff`` will currently only be found if it is importable (i.e.
+    installed in the current environment): system-level ``ruff`` binaries will
+    not (yet) be found.
+
+    Using ``ruff`` results in no unused imports, and better-formatted docstrings.
+    Formatting is still not ideal: property docstrings are not rendered
+    as triple-quoted constants.
+
+    :param thing_description: the `ThingDescription` of the Thing we're generating
+        a client for.
+    :param destination: the location of the generated module. This should either
+        be a Python file (i.e. ending in `.py`) or a folder. If it is a folder,
+        the folder must exist and we'll create a file named as the (lower-case)
+        class name.
+    :param use_ruff: whether to attempt to format the generated code with Ruff.
+    :return: a tuple of ``(name, destination)`` where ``name`` is the name of the
+        generated client class, and ``destination`` is the output file path.
+    :raises ValueError: if the destination path isn't a Python file or a folder.
+    """
+    cls_name, tree = generate_client_ast(thing_description)
+    dest = Path(destination)
+    if dest.is_dir():
+        dest /= f"{cls_name.lower()}.py"
+    if not dest.suffix == ".py":
+        msg = f"The output path must be a Python file or a folder. Got '{dest}'."
+        raise ValueError(msg)
+    with open(dest, "w") as f:
+        f.write(ast.unparse(tree))
+    # Optionally tidy up the source with `ruff`
+    # Tidy up generated code with `ruff`
+    if use_ruff and RUFF_BINARY is None:
+        warnings.warn(
+            "Can't locate `ruff` so code won't be neatly formatted.",
+            stacklevel=1,
+        )
+    if use_ruff and RUFF_BINARY:
+        # Note: we ignore S603 here as it's just a reminder to check we're not passing
+        # untrusted input to commands: we're not, the only variable is a file we've just
+        # written, and `ruff` won't execute that file.
+        # Tidy up docstrings and unused imports
+        run(  # noqa: S603
+            [RUFF_BINARY, "check", dest, "--select", "D209,F401", "--fix"],
+            stdout=DEVNULL,
+        )
+        # Format the file nicely
+        run([RUFF_BINARY, "format", dest], stdout=DEVNULL)  # noqa: S603
+    return cls_name, dest
