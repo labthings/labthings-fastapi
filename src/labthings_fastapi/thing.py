@@ -23,7 +23,7 @@ from typing_extensions import Self
 from labthings_fastapi.actions import ActionCollection
 from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
 from labthings_fastapi.invocation_contexts import get_invocation_id
-from labthings_fastapi.logs import THING_LOGGER
+from labthings_fastapi.logs import THING_LOGGER, LoggerWithUser
 from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
@@ -143,9 +143,16 @@ class Thing:
         return self._thing_server_interface.name
 
     @property
-    def logger(self) -> logging.Logger:
-        """A logger, named after this Thing."""
-        return THING_LOGGER.getChild(self.name)
+    def logger(self) -> LoggerWithUser:
+        r"""A logger, named after this Thing.
+
+        :raises TypeError: if the logger is missing the ``user`` method to
+            log messages at a level between ``INFO`` and ``WARNING``\ .
+        """
+        logger = THING_LOGGER.getChild(self.name)
+        if not isinstance(logger, LoggerWithUser):
+            raise TypeError("LabThings custom log level is missing!")
+        return logger
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.

@@ -33,6 +33,7 @@ from labthings_fastapi.invocation_contexts import (
     cancellable_sleep,
     raise_if_cancelled,
 )
+from labthings_fastapi.logs import get_thing_logger
 from labthings_fastapi.outputs import blob
 from labthings_fastapi.properties import DataProperty, DataSetting, property, setting
 from labthings_fastapi.server import ThingServer, cli
@@ -64,6 +65,7 @@ __all__ = [
     "cancellable_sleep",
     "cli",
     "endpoint",
+    "get_thing_logger",
     "outputs",
     "property",
     "raise_if_cancelled",

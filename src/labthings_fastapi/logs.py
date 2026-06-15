@@ -2,17 +2,70 @@
 
 This module currently contains code that allows us to filter out logs by invocaton
 ID, so that they may be returned when invocations are queried.
+
+It also defines the `USER` loglevel, which should be used for messages that are
+intended to be visible to the user in e.g. a graphical interface.
 """
 
 import logging
 from collections.abc import MutableSequence
+from typing import Any
 from uuid import UUID
 from weakref import WeakValueDictionary
 
 from labthings_fastapi.exceptions import LogConfigurationError, NoInvocationContextError
 from labthings_fastapi.invocation_contexts import get_invocation_id
 
+# Add the custom USER loglevel.
+USER = logging.INFO + 5
+logging.addLevelName(USER, "USER")
+
+
+class LoggerWithUser(logging.getLoggerClass()):
+    """A subclass of `logging.Logger` with an extra `user` level."""
+
+    def user(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        r"""Log 'msg % args' with severity 'INFO'.
+
+        To pass exception information, use the keyword argument exc_info with
+        a true value, e.g.
+
+        .. code-block:: python
+
+            logger.info("Houston, we have a %s", "interesting problem", exc_info=1)
+
+        :param msg: The message to log, including `%` placeholders if desired.
+        :param \*args: Additional arguments can be used to customise ``msg``\ .
+        :param \**kwargs: Keyword arguments may be used to customise ``msg``\ .
+        """
+        if self.isEnabledFor(USER):
+            self._log(USER, msg, args, **kwargs)
+
+
+# We tell `logging` to use our new class, so `user` is available to all
+# loggers obtained with `logging.getLogger`
+# We do this before defining THING_LOGGER so that it gets the new level
+logging.setLoggerClass(LoggerWithUser)
+
+
+# Note that this is done **after** defining the new level, so that it's
+# of the correct class.
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
+
+
+def get_thing_logger() -> LoggerWithUser:
+    """Return the Thing Logger.
+
+    `lt.Thing.logger` will return a child of this logger, and any messages
+    logged to this logger will be picked up by invocation logs, if they are
+    logged from an invocation thread/context.
+
+    :return: the parent logger of all the `lt.Thing.logger` instances.
+    :raises TypeError: if the logger is missing the ``user`` level.
+    """
+    if not isinstance(THING_LOGGER, LoggerWithUser):
+        raise TypeError("Customisations to `logging.Logger` have been lost.")
+    return THING_LOGGER
 
 
 def inject_invocation_id(record: logging.LogRecord) -> bool:
