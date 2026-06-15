@@ -350,6 +350,15 @@ class NoBlobManagerError(RuntimeError):
     """
 
 
+class MediaTypeMismatchError(ValueError):
+    """Raised if a `Blob` is created with a media type that doesn't match its class.
+
+    This error indicates that a `Blob` instance has been created that doesn't match
+    its host class. This may mean that the binary data downloaded doesn't match the
+    API documentation.
+    """
+
+
 class NoUrlForContextError(RuntimeError):
     """Raised if URLFor is serialised without a url_for context variable being set.
 
