@@ -23,10 +23,11 @@ def test_server_from_config_non_thing_error():
 
 
 def test_server_thing_descriptions():
-    """Check the server ThingDescriptions.
+    """Check the server `/thing_descriptions/` endpoint.
 
     Check the expected Action and Properties and their URLS are in the server
-    thing_descriptions.
+    thing_descriptions. This checks the endpoint that returns all of the
+    Thing Descriptions in one big JSON object.
     """
     conf = {
         "things": {
@@ -109,7 +110,15 @@ def test_api_prefix(api_prefix):
 
 
 def test_things_endpoints():
-    """Test that the two endpoints for listing Things work."""
+    """Test that the two endpoints for listing Things work.
+
+    This checks for consistency between `/things/` and `/thing_descriptions`
+    (the former should map Thing names to URLs, while the latter should map
+    Thing names to Thing Descriptions).
+
+    This includes downloading the Thing Description from each URL and verifying
+    it matches the object included in the `/thing_descriptions/` response.
+    """
     server = lt.ThingServer.from_things(
         {
             "thing_a": MyThing,
@@ -131,12 +140,13 @@ def test_things_endpoints():
         assert "thing_a" in things
         assert "thing_b" in things
 
-        # Fetch a thing description from the URL in `things`
-        response = client.get(things["thing_a"])
-        response.raise_for_status()
-        td = response.json()
-        assert td["title"] == "MyThing"
-        assert tds["thing_a"] == td
+        # Fetch thing descriptions from the URL in `things`
+        for name in things.keys():
+            response = client.get(things[name])
+            response.raise_for_status()
+            td = response.json()
+            assert td["title"] == "MyThing"
+            assert tds[name] == td
 
 
 @pytest.mark.parametrize(
