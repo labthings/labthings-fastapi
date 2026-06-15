@@ -469,7 +469,11 @@ class BlobModel(BaseModel):
     """A model for JSON-serialised `.Blob` objects.
 
     This model describes the JSON representation of a `.Blob`
-    and does not offer any useful functionality.
+    and is used to describe the `.Blob` object in JSON responses.
+
+    The binary data may be retrieved with a ``GET`` request to the URL
+    specified in ``href`` which should return it directly in the body of
+    the response.
     """
 
     href: str
