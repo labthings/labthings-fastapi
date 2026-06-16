@@ -92,7 +92,7 @@ class DequeByInvocationIDHandler(logging.Handler):
 
     def __init__(
         self,
-        level: int = logging.INFO,
+        level: int = logging.NOTSET,
     ) -> None:
         """Set up a log handler that appends messages to a deque.
 
@@ -101,8 +101,10 @@ class DequeByInvocationIDHandler(logging.Handler):
             the list. It's best to use a `deque` with a finite capacity
             to avoid memory leaks.
 
-        :param level: sets the level of the logger. For most invocations,
-            a log level of `logging.INFO` is appropriate.
+        :param level: sets the level of the handler. Usually
+            a log level of `logging.NOTSET` is appropriate. This does not
+            do any extra filtering, and so will use the log level of the
+            logger to which it is attached.
         """
         super().__init__()
         self.setLevel(level)

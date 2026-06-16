@@ -8,7 +8,7 @@ files or strings.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Annotated, Any, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import (
     AfterValidator,
@@ -233,6 +233,14 @@ class ThingServerConfig(BaseModel):
             The intention here is that a running action shouldn't need to worry about
             other code on the server changing things while it runs.
             """
+        ),
+    )
+
+    global_lock_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="DEBUG",
+        description=(
+            "The log level to use when an action can't start due to the global lock "
+            "being busy."
         ),
     )
 
