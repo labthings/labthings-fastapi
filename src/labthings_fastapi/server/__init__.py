@@ -307,6 +307,14 @@ class ThingServer:
         """
         return self._config.api_prefix
 
+    @property
+    def global_lock_log_level(self) -> int:
+        """The level at which to log when the global lock is busy."""
+        # Note that the config entry below is validated by the config
+        # model, to be one of DEBUG, INFO, WARNING or ERROR.
+        levelname = self._config.global_lock_log_level
+        return getattr(logging, levelname)
+
     ThingInstance = TypeVar("ThingInstance", bound=Thing)
 
     def things_by_class(self, cls: type[ThingInstance]) -> Sequence[ThingInstance]:
