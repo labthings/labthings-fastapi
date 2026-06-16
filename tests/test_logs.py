@@ -130,7 +130,7 @@ def test_inject_invocation_id_withcontext():
 def test_dequebyinvocationidhandler():
     """Check the custom log handler works as expected."""
     handler = logs.DequeByInvocationIDHandler()
-    assert handler.level == logging.INFO
+    assert handler.level == logging.NOTSET
 
     destinations = {
         uuid4(): deque(),

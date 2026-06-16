@@ -481,10 +481,14 @@ def test_reuse_of_action_callables():
             func()
 
 
-def test_global_lock_log(caplog):
+@pytest.mark.parametrize("loglevel", ["DEBUG", "INFO", "WARNING", "ERROR"])
+def test_global_lock_log(caplog, loglevel):
     """Test that we get sensible errors when the lock is busy."""
     server = lt.ThingServer.from_things(
-        {"checker": ConcurrencyChecker}, enable_global_lock=True
+        {"checker": ConcurrencyChecker},
+        enable_global_lock=True,
+        global_lock_log_level=loglevel,
+        debug=(loglevel == "DEBUG"),
     )
     with server.test_client() as client:
         checker = lt.ThingClient.from_url("/checker/", client=client)
@@ -501,7 +505,7 @@ def test_global_lock_log(caplog):
                 checker.increment_fprop2()
             matches = [r for r in caplog.records if "Global lock was busy" in r.message]
             assert len(matches) == 1
-            assert matches[0].levelno == logging.WARNING
+            assert matches[0].levelno == getattr(logging, loglevel)
             assert "Traceback" not in caplog.text
 
             # Next, try the same thing with an action that does
