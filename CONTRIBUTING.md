@@ -55,14 +55,19 @@ We use several tools to maintain code quality. All of these run in CI with [GitH
   flake8 src
   ```
 
-* **Type Checking:** We use [`mypy`] for static type checking.
+* **Spelling:** We use [`codespell`] to prevent common spelling mistakes in code and documentation.
   ```bash
-  mypy src
+  codespell .
   ```
 
-* **Testing:** We use [`pytest`] for our test suite. Ensure all tests pass locally.
+* **Type Checking:** We use [`mypy`] for static type checking.
   ```bash
-  pytest
+  mypy
+  ```
+
+* **Testing:** We use [`pytest`] for our test suite and test coverage. Ensure all tests pass locally.
+  ```bash
+  pytest --cov=src
   ```
 
 ### 3. Managing Dependencies
@@ -77,12 +82,25 @@ uv pip compile --extra dev pyproject.toml --output-file dev-requirements.txt
 
 ### 4. Submitting a Pull Request (PR)
 
-All changes to the codebase must go via pull requests.
+All changes to the codebase must go via pull requests. Unless you are a core maintainer with write access, please use the standard fork-and-branch workflow:
 
-1. Create a new branch for your feature or bugfix (`git checkout -b feature-name`).
-2. Commit your changes with clear, descriptive commit messages.
-3. Push your branch to your fork or the main repository.
-4. Open a Pull Request against the `main` branch.
+1. **Fork the repository** to your own GitHub account using the "Fork" button at the top of the repository page.
+2. **Clone your fork** locally and set up the upstream remote:
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/labthings-fastapi.git
+   cd labthings-fastapi
+   git remote add upstream https://github.com/labthings/labthings-fastapi.git
+   ```
+3. **Create a new branch** for your feature or bugfix:
+   ```bash
+   git checkout -b feature-name
+   ```
+4. **Commit your changes** with clear, descriptive commit messages.
+5. **Push your branch** up to your fork:
+   ```bash
+   git push origin feature-name
+   ```
+6. **Open a Pull Request** against the `main` branch of the `labthings/labthings-fastapi` repository.
 
 **Pull Request Guidelines:**
 
