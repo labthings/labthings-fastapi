@@ -145,8 +145,6 @@ jobs:
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
 
       - name: Update Coverage Badge
-        # Only run this on the main branch so PRs don't overwrite the main badge
-        if: github.ref == 'refs/heads/main'
         uses: Schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
