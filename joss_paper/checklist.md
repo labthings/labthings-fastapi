@@ -17,9 +17,9 @@ JOSS requires clear documentation that allows a new user to understand and use t
 ## Testing & Continuous Integration (CI)
 JOSS reviewers will look closely at the testing framework to ensure the software is reliable.
 
-- [ ] Test Coverage: We already have pytest, mypy, ruff, and codecov running via GitHub Actions. Check the Codecov reports to ensure you have high coverage of the core logic, particularly the FastAPI routing and hardware interfacing.
+- [ ] Test Coverage: We already have pytest, mypy, ruff, and codecov running via GitHub Actions. Check the Codecov reports to ensure you have high coverage of the core logic, particularly the FastAPI routing and hardware interfacing. (MR #368)
 
-- [ ] Local Test Instructions: Ensure there are clear instructions for reviewers to run the test suite locally (e.g., pytest tests/).
+- [ ] Local Test Instructions: Ensure there are clear instructions for reviewers to run the test suite locally (e.g., pytest tests/). (MR #368)
 
 - [ ] Create PR merge checklist and release checklist
 
