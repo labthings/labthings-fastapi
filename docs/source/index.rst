@@ -5,7 +5,7 @@ Documentation for LabThings-FastAPI
    :maxdepth: 2
    :caption: Contents:
 
-   CONTRIBUTING.md
+   contributing.md
    quickstart/quickstart.rst
    tutorial/index.rst
    structure.rst
