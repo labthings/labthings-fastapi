@@ -77,13 +77,15 @@ jobs:
         run: flake8 src
 
       - name: Test with pytest
-        run: pytest --cov=src --cov-report=lcov
+        run: pytest --cov=src --cov-report=lcov --cov-report=json
 
       - name: Upload code coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python }}
-          path: ./coverage.lcov
+          path: |
+            ./coverage.lcov
+            ./coverage.json
       
       - name: Analyse with MyPy
         run: mypy
@@ -136,6 +138,24 @@ jobs:
         with:
           name: coverage-3.12
 
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Update Coverage Badge
+        # Only run this on the main branch so PRs don't overwrite the main badge
+        if: github.ref == 'refs/heads/main'
+        uses: Schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 936bcec8e1815a49d1e7f947924ffa3f
+          filename: labthings-fastapi-coverage.json
+          label: coverage
+          message: ${{ steps.get-coverage.outputs.coverage }}%
+          color: green
+
       - name: Download code coverage report for base branch
         id: download-base-coverage
         continue-on-error: true
@@ -167,13 +187,6 @@ jobs:
           minimum-ratio: 0
           send-summary-comment: true
           show-annotations: "warning"
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.lcov
-          fail_ci_if_error: false
 
   test-against-ofm-v3:
     runs-on: ubuntu-latest
