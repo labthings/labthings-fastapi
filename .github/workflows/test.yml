@@ -168,6 +168,13 @@ jobs:
           send-summary-comment: true
           show-annotations: "warning"
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.lcov
+          fail_ci_if_error: false
+
   test-against-ofm-v3:
     runs-on: ubuntu-latest
     defaults:
