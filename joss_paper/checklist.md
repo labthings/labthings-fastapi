@@ -21,7 +21,7 @@ JOSS reviewers will look closely at the testing framework to ensure the software
 
 - [ ] Local Test Instructions: Ensure there are clear instructions for reviewers to run the test suite locally (e.g., pytest tests/). (MR #368)
 
-- [ ] Create PR merge checklist and release checklist
+- [ ] Create PR merge checklist and release checklist (as well as making them in GitHub templates, I may also add them to contributing.md once #367 is merged)
 
 ## Community & Repository Health
 JOSS requires evidence of open development practices and a welcoming environment for external contributors.
