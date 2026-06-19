@@ -25,4 +25,20 @@ then install labthings with:
 
 It is also possible to install LabThings from source, by cloning the GitHub repository and running ``pip install -e .[dev]``, but this is only recommended if you intend to alter the LabThings-FastAPI library; it is best to use the published package unless you have a good reason not to.
 
+
+Installation Notes
+++++++++++++++++++
+
+``labthings-fastapi`` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current ``pydantic-core`` dependencies.
+
+.. note::
+   **Windows Installations**
+
+   Installing on Windows requires `Visual Studio`_ with the **"Desktop development with C++"** workload enabled. This is necessary because ``pydantic`` relies on Rust_, which in turn requires C++ build tools to compile.
+
+   *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
+
+
 .. _PyPI: https://pypi.org/project/labthings-fastapi/
+.. _Visual Studio: https://visualstudio.microsoft.com/
+.. _Rust: https://www.rust-lang.org/

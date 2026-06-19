@@ -11,6 +11,17 @@ Documentation, including install instructions, is available on [readthedocs].
 
 See [readthedocs] for installation instructions that are automatically tested. You can install this package with `pip install labthings-fastapi`.
 
+
+### Installation Notes
+
+`labthings-fastapi` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current `pydantic-core` dependencies.
+
+> **Note: Windows Installations**
+>
+> Installing on Windows requires Visual Studio with the **"Desktop development with C++"** workload enabled. This is necessary because `pydantic` relies on Rust, which in turn requires C++ build tools to compile.
+>
+> *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
+
 ## Developer notes
 
 For the latest development version, clone this repository and run `pip install -e .[dev]`. 
