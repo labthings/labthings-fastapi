@@ -42,6 +42,7 @@ dev = [
   "sphinx-autoapi",
   "sphinx-toolbox",
   "sphobjinv",
+  "myst-parser",
   "tomli; python_version < '3.11'",
   "codespell",
 ]
