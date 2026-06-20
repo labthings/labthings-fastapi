@@ -461,6 +461,8 @@ class GlobalLockBusyError(TimeoutError):
     property setter.
     """
 
+    status_code = 409
+
 
 class MessageDroppedWarning(RuntimeWarning):
     """A message was dropped by the message broker.

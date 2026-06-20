@@ -42,6 +42,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Response, Body, Backgroun
 from pydantic import BaseModel, create_model
 
 from labthings_fastapi.message_broker import Message
+from labthings_fastapi.problem_details import ProblemDetails
 
 
 from .middleware.url_for import URLFor
@@ -189,6 +190,15 @@ class Invocation(Thread):
             return self._status
 
     @property
+    def error_model(self) -> ProblemDetails | None:
+        """A description of the error, if an error has happened."""
+        with self._status_lock:
+            if not self._exception:
+                return None
+            else:
+                return ProblemDetails.from_exception(self._exception)
+
+    @property
     def action(self) -> ActionDescriptor:
         """The `.ActionDescriptor` object running in this thread.
 
@@ -269,6 +279,7 @@ class Invocation(Thread):
                 input=self.input,
                 output=self.output_model_instance,
                 log=self.log,
+                error=self.error_model,
             )
 
     def _publish_status(self) -> None:
