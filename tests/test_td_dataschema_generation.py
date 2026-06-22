@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, WithJsonSchema
+from pydantic_core import ValidationError
 
-from labthings_fastapi.thing_description import type_to_dataschema
+from labthings_fastapi.thing_description import convert_prefixitems, type_to_dataschema
 from labthings_fastapi.thing_description._model import DataSchema
 
 
@@ -71,6 +72,15 @@ def ds_json_dict(ds: DataSchema) -> dict:
             {
                 "type": "array",
                 "items": {"oneOf": [{"type": "integer"}, {"type": "string"}]},
+            },
+        ),
+        (
+            tuple[int, str],  # A tuple also becomes an array, but with defined items.
+            {
+                "type": "array",
+                "items": [{"type": "integer"}, {"type": "string"}],
+                "maxItems": 2,
+                "minItems": 2,
             },
         ),
         # a dictionary should be represented as a JSON object.
@@ -158,3 +168,47 @@ def test_types(python_type, schema_dict):
     """Check the schemas generated for a collection of simple types."""
     ds = type_to_dataschema(python_type)
     assert ds_json_dict(ds) == schema_dict
+
+
+def test_recursive_type():
+    """Check that a recursive model fails with a `RecursionError`."""
+
+    class Recursive(BaseModel):
+        child: "Recursive"
+
+    with pytest.raises(RecursionError):
+        type_to_dataschema(Recursive)
+
+
+def test_prefixitems_overwrite():
+    """Check the error if ``items`` and ``prefixItems`` are both present.
+
+    This is very unlikely to happen for any Python datatype I can think of.
+    """
+    json_schema: dict[str, Any] = {
+        "type": "array",
+        "prefixItems": [{"type": "string"}, {"type": "number"}],
+        "items": "int",
+    }
+    with pytest.raises(KeyError):
+        convert_prefixitems(json_schema)
+
+
+def test_invalid_jsonschema():
+    """Check the error if a type generates an invalid JSON Schema."""
+
+    class MyType:
+        @classmethod
+        def model_json_schema(cls):
+            return {"type": "invented"}
+
+    # Just providing `model_json_schema` is a hangover from pydantic v1
+    # that we may decide to remove at some point. We should still test it
+    # so long as it's in the library.
+    with pytest.raises(ValidationError, match="type\n  Input should be "):
+        type_to_dataschema(MyType)
+
+    # The annotated type below does the same thing, using newer mechanisms
+    # in `pydantic` to customise the JSONSchema.
+    with pytest.raises(ValidationError, match="type\n  Input should be "):
+        type_to_dataschema(Annotated[int, WithJsonSchema({"type": "invalid"})])

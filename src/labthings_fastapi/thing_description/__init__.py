@@ -149,12 +149,12 @@ def check_recursion(depth: int, limit: int) -> None:
     :param depth: the current recursion depth.
     :param limit: the maximum recursion depth.
 
-    :raise ValueError: if we exceed the recursion depth.
+    :raise RecursionError: if we exceed the recursion depth.
     """
     if depth > limit:
-        raise ValueError(
+        raise RecursionError(
             f"Recursion depth of {limit} exceeded - perhaps there is a circular "
-            "reference?"
+            "reference in a `pydantic` model?"
         )
 
 
