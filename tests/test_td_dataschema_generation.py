@@ -74,12 +74,18 @@ def ds_json_dict(ds: DataSchema) -> dict:
             },
         ),
         # a dictionary should be represented as a JSON object.
-        (dict, {"type": "object"}),
-        (dict[int, str], {"type": "object"}),  # at present, type subscripts get ignored
-        pytest.param(
+        (dict, {"type": "object", "additionalProperties": True}),
+        (
+            dict[int, str],  # Note that non-string keys are unsupported, and ignored.
+            {"type": "object", "additionalProperties": {"type": "string"}},
+        ),
+        (
             dict[Literal["a", "b"], int],
-            {},
-            marks=pytest.mark.xfail(reason="Issue #355"),
+            {
+                "type": "object",
+                "additionalProperties": {"type": "integer"},
+                "propertyNames": {"enum": ["a", "b"]},
+            },
         ),
         # A model also becomes an "object" but it has defined "properties".
         (
@@ -143,8 +149,7 @@ def ds_json_dict(ds: DataSchema) -> dict:
                 "properties": {"a": {"title": "A", "type": "integer"}},
                 "required": ["a"],
                 "type": "object",
-                # Currently, there's no indication of whether extra properties
-                # are allowed or not.
+                "additionalProperties": True,  # Extra properties are allowed
             },
         ),
     ],

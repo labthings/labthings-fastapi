@@ -180,7 +180,7 @@ class DataSchema(BaseModel):
     contentEncoding: Optional[str] = None
     contentMediaType: Optional[str] = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
 
 class Response(BaseModel):

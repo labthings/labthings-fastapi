@@ -80,37 +80,6 @@ def look_up_reference(reference: str, d: JSONSchema) -> JSONSchema:
         ) from ke
 
 
-def is_an_object(d: JSONSchema) -> bool:
-    """Determine whether a JSON schema dict is an object.
-
-    :param d: a chunk of JSONSchema describing a datatype.
-
-    :return: ``True`` if the ``type`` is ``object``.
-    """
-    return "type" in d and d["type"] == "object"
-
-
-def convert_object(d: JSONSchema) -> JSONSchema:
-    """Convert an object from JSONSchema to Thing Description.
-
-    Convert JSONSchema objects to Thing Description datatypes.
-
-    Currently, this deletes the ``additionalProperties`` keyword, which is
-    not supported by Thing Description.
-
-    :param d: the JSONSchema object.
-
-    :return: a copy of ``d``, with ``additionalProperties`` deleted.
-    """
-    out: JSONSchema = d.copy()
-    # AdditionalProperties is not supported by Thing Description, and it is ambiguous
-    # whether this implies it's false or absent. I will, for now, ignore it, so we
-    # delete the key below.
-    if "additionalProperties" in out:
-        del out["additionalProperties"]
-    return out
-
-
 def convert_anyof(d: JSONSchema) -> JSONSchema:
     """Convert the anyof key to oneof.
 
@@ -133,18 +102,27 @@ def convert_anyof(d: JSONSchema) -> JSONSchema:
 
 
 def convert_prefixitems(d: JSONSchema) -> JSONSchema:
-    """Convert the prefixitems key to items.
+    r"""Convert the prefixitems key to items.
 
-    JSONSchema 2019 (as used by thing description) used
-    `items` with a list of values in the same way that JSONSchema
-    now uses `prefixitems`.
+    The ``items`` key in an ArraySchema_ may work in two ways:
 
-    JSONSchema 2020 uses `items` to mean the same as `additionalItems`
-    in JSONSchema 2019 - but Thing Description doesn't support the
-    `additionalItems` keyword. This will result in us overwriting
-    additional items, and we raise a ValueError if that happens.
+    * If it is a `DataSchema` instance, then it specifies the schema for
+      all items in the array. This would apply to ``list[int]`` for example.
+    * If it is a sequence of `DataSchema` instances, then we are describing
+      a `tuple` with a defined number of elements, each with a defined type,
+      for example `tuple[int, str]`\ .
 
-    This behaviour may be relaxed in the future.
+    JSONSchema 2020 uses `items` to mean the type of subsequent items (i.e.
+    ``list[...]``), so it's only ever a single type. When describing a `tuple`
+    it will use ``prefixItems`` to give the type of each element.
+
+    JSONSchema 2019 (on which ArraySchema_ is based) has a different definition
+    again, using ``items`` and ``additionalItems``\ .
+
+    We are converting from JSONSchema 2020 (which is what `pydantic` generates)
+    to ArraySchema_ so we will convert ``prefixItems`` into ``items``\ . If
+    both keys are present, we will raise an error, as that's not currently
+    supported.
 
     :param d: the JSONSchema object.
 
@@ -152,6 +130,8 @@ def convert_prefixitems(d: JSONSchema) -> JSONSchema:
 
     :raise KeyError: if we would overwrite an existing ``items``
         key.
+
+    .. _ArraySchema: https://www.w3.org/TR/wot-thing-description/#arrayschema
     """
     if "prefixItems" not in d:
         return d
@@ -160,27 +140,6 @@ def convert_prefixitems(d: JSONSchema) -> JSONSchema:
         raise KeyError(f"Overwrote the `items` key on {out}.")
     out["items"] = out["prefixItems"]
     del out["prefixItems"]
-    return out
-
-
-def convert_additionalproperties(d: JSONSchema) -> JSONSchema:
-    r"""Move additionalProperties into properties, or remove it.
-
-    JSONSchema uses ``additionalProperties`` to define optional properties
-    of ``object``\ s. For Thing Descriptions, this should be moved inside
-    the ``properties`` object.
-
-    :param d: the JSONSchema object.
-
-    :return: a copy of ``d``, with ``additionalProperties`` moved into
-        ``properties`` or deleted if ``properties`` is not present.
-    """
-    if "additionalProperties" not in d:
-        return d
-    out: JSONSchema = d.copy()
-    if "properties" in out and "additionalProperties" not in out["properties"]:
-        out["properties"]["additionalProperties"] = out["additionalProperties"]
-    del out["additionalProperties"]
     return out
 
 
@@ -250,11 +209,8 @@ def jsonschema_to_dataschema(
         recursion_depth += 1
         check_recursion(recursion_depth, recursion_limit)
 
-    if is_an_object(d):
-        d = convert_object(d)
     d = convert_anyof(d)
     d = convert_prefixitems(d)
-    d = convert_additionalproperties(d)
 
     # After checking the object isn't a reference, we now recursively check
     # sub-dictionaries and dereference those if necessary. This could be done with a
