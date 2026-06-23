@@ -12,7 +12,6 @@ from fastapi.responses import StreamingResponse, HTMLResponse
 from typing import (
     Any,
     AsyncGenerator,
-    AsyncIterator,
     Literal,
     Optional,
     TYPE_CHECKING,
@@ -20,8 +19,6 @@ from typing import (
     overload,
 )
 from typing_extensions import Self
-from copy import copy
-from contextlib import asynccontextmanager
 import threading
 import anyio
 import logging
@@ -203,36 +200,12 @@ class MJPEGStream:
             raise ValueError("the ith frame has been overwritten")
         return entry
 
-    @asynccontextmanager
-    async def buffer_for_reading(self, i: int) -> AsyncIterator[bytes]:
-        """Yield the ith frame as a bytes object.
-
-        Retrieve frame ``i`` from the ringbuffer.
-
-        This allows async code access to a frame in the ringbuffer.
-        The frame will not be copied, and should not be written to.
-        The frame may not exist after the function has completed (i.e.
-        after any ``with`` statement has finished).
-
-        Using a context manager is intended to allow future versions of this
-        code to manage access to the ringbuffer (e.g. allowing buffer reuse).
-        Currently, buffers are always created as fresh `bytes` objects, so
-        this context manager does not provide additional functionality
-        over `.MJPEGStream.ringbuffer_entry`.
-
-        :param i: The index of the frame to read
-
-        :yield: The frame's data as `bytes`, along with timestamp and index.
-        """
-        entry = await self.ringbuffer_entry(i)
-        yield entry.frame
-
     async def next_frame(self) -> int:
         """Wait for the next frame, and return its index.
 
         This async function will yield until a new frame arrives, then return
         its index. The index may then be used to retrieve the new frame
-        with `.MJPEGStream.buffer_for_reading`.
+        with `.MJPEGStream.ringbuffer_entry`.
 
         :return: the index of the next frame to arrive.
 
@@ -253,8 +226,8 @@ class MJPEGStream:
         :return: The next JPEG frame, as a `bytes` object.
         """
         i = await self.next_frame()
-        async with self.buffer_for_reading(i) as frame:
-            return copy(frame)
+        entry = await self.ringbuffer_entry(i)
+        return entry.frame
 
     async def next_frame_size(self) -> int:
         """Wait for the next frame and return its size.
@@ -264,20 +237,13 @@ class MJPEGStream:
         :return: The size of the next JPEG frame, in bytes.
         """
         i = await self.next_frame()
-        async with self.buffer_for_reading(i) as frame:
-            return len(frame)
+        entry = await self.ringbuffer_entry(i)
+        return len(entry.frame)
 
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """Yield frames as bytes objects.
 
-        This generator will return frames from the MJPEG stream. These are
-        taken from the ringbuffer by `.MJPEGStream.buffer_for_reading` and
-        so should have any buffer-management considerations taken care of.
-
-        Code using this generator should complete as quickly as possible,
-        because future implementations may hold a lock while this function
-        yields. If lengthy processing is required, please copy the buffer
-        and continue processing elsewhere.
+        This generator will return frames from the MJPEG stream.
 
         Note that this will wait for a new frame each time. There is no
         guarantee that we won't skip frames.
@@ -288,8 +254,8 @@ class MJPEGStream:
         while self._streaming:
             try:
                 i = await self.next_frame()
-                async with self.buffer_for_reading(i) as frame:
-                    yield frame
+                entry = await self.ringbuffer_entry(i)
+                yield entry.frame
             except StopAsyncIteration:
                 break
             except Exception as e:  # noqa: BLE001
