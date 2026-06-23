@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
@@ -20,6 +19,7 @@ from typing import (
     Union,
     overload,
 )
+from weakref import WeakSet
 
 import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -27,14 +27,11 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 from typing_extensions import Self
 
-from labthings_fastapi.exceptions import MessageDroppedWarning
+from labthings_fastapi.message_broker import MessageBroker
 
 if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
     from labthings_fastapi.thing_server_interface import ThingServerInterface
-
-
-LOGGER = logging.getLogger(__name__)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -71,7 +68,10 @@ class MJPEGStreamResponse(StreamingResponse):
     """The media_type used to describe the endpoint in FastAPI."""
 
     def __init__(
-        self, stream: MemoryObjectReceiveStream[Frame], status_code: int = 200
+        self,
+        send_stream: MemoryObjectSendStream[Frame],
+        receive_stream: MemoryObjectReceiveStream[Frame],
+        status_code: int = 200,
     ) -> None:
         """Set up StreamingResponse that streams an MJPEG stream.
 
@@ -86,11 +86,14 @@ class MJPEGStreamResponse(StreamingResponse):
         NB the ``status_code`` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
 
-        :param stream: a stream that will receive `Frame` objects.
+        :param send_stream: the stream used to send `Frame` objects (this must be
+            retained or it will be garbage collected).
+        :param receive_stream: a stream that will receive `Frame` objects.
         :param status_code: The status code associated with the response, by default
             a 200 code is returned.
         """
-        self._stream = stream
+        self._send_stream = send_stream
+        self._receive_stream = receive_stream
         StreamingResponse.__init__(
             self,
             self.mjpeg_async_generator(),
@@ -105,9 +108,12 @@ class MJPEGStreamResponse(StreamingResponse):
         ``--frame`` separator and content type header. It is the basis
         of the response sent over HTTP (see ``__init__``).
 
+        We use three `yield` statements in order to avoid concatenating
+        (and thus copying) `bytes` objects.
+
         :yield: JPEG frames, each with a ``--frame`` marker prepended.
         """
-        async for frame in self._stream:
+        async for frame in self._receive_stream:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
             yield frame.frame
             yield b"\r\n"
@@ -139,8 +145,8 @@ class MJPEGStream:
             code that relays frames to open connections.
         """
         self._lock = threading.Lock()
-        self._streaming = False
-        self._send_streams = set[MemoryObjectSendStream[Frame]]()
+        self._streaming = True
+        self._subscriptions = WeakSet[MemoryObjectSendStream[Frame]]()
         self._thing_server_interface = thing_server_interface
         self.last_frame_i = -1
 
@@ -153,21 +159,38 @@ class MJPEGStream:
         """Stop the stream.
 
         Stop the stream and cause all clients to disconnect.
+
+        .. warning::
+
+            This function must be called from a thread, not from the event loop.
+            Calling it from the event loop may deadlock: use `close_streams`
+            instead.
         """
-        with self._lock:
-            self._streaming = False
-            self._thing_server_interface.start_async_task_soon(
-                self.notify_stream_stopped
-            )
+        self._thing_server_interface.start_async_task_soon(self.close_streams)
 
-    def receive_stream(self) -> MemoryObjectReceiveStream[Frame]:
-        """Add a new stream to receive frames.
+    def connected_stream(
+        self, max_buffer_size: int = 0
+    ) -> tuple[
+        MemoryObjectSendStream[Frame],
+        MemoryObjectReceiveStream[Frame],
+    ]:
+        """Make a stream pair to receive frames.
 
+        The "send" stream will be added to our list of subscribers. However, it must
+        be retained as well as the "receive" stream. This is because the set of
+        subscribers only holds weak references. Once the streams are out of scope,
+        they will be finalised and unsubscribed.
+
+        The stream will not have a buffer by default: this means any delay in reading
+        it could lead to missed frames.
+
+        :param max_buffer_size: the size of buffer to permit. This reduces the
+            likelihood of dropping frames, at the expense of latency and memory.
         :return: a stream that will yield new frames.
         """
-        send, receive = anyio.create_memory_object_stream[Frame](0)
-        self._send_streams.add(send)
-        return receive
+        send, receive = anyio.create_memory_object_stream[Frame](max_buffer_size)
+        self._subscriptions.add(send)
+        return send, receive
 
     async def grab_frame(self) -> bytes:
         """Wait for the next frame, and return it.
@@ -176,7 +199,7 @@ class MJPEGStream:
 
         :return: The next JPEG frame, as a `bytes` object.
         """
-        receive = self.receive_stream()
+        _send, receive = self.connected_stream()
         try:
             frame = await receive.receive()
         finally:
@@ -186,7 +209,8 @@ class MJPEGStream:
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """Yield frames as bytes objects.
 
-        This generator will return frames from the MJPEG stream.
+        This generator will return frames from the MJPEG stream as `bytes`
+        objects.
 
         Note that this will wait for a new frame each time. There is no
         guarantee that we won't skip frames.
@@ -194,7 +218,7 @@ class MJPEGStream:
         :yield: the frames in sequence, as a `bytes` object containing
             JPEG data.
         """
-        receive = self.receive_stream()
+        _send, receive = self.connected_stream()
         async for frame in receive:
             yield frame.frame
 
@@ -209,7 +233,7 @@ class MJPEGStream:
 
         :return: a streaming response in MJPEG format.
         """
-        return MJPEGStreamResponse(self.receive_stream())
+        return MJPEGStreamResponse(*self.connected_stream())
 
     def add_frame(self, frame: bytes) -> None:
         """Add a JPEG to the MJPEG stream.
@@ -219,7 +243,8 @@ class MJPEGStream:
         call code in the `anyio` event loop, which is where notifications
         are handled.
 
-        :param frame: The frame to add
+        :param frame: The frame to add. This must start and end with the JPEG
+            start/end bytes.
 
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
@@ -246,37 +271,21 @@ class MJPEGStream:
     async def notify_new_frame(self, frame: Frame) -> None:
         """Notify any waiting tasks that a new frame is available.
 
+        This uses the same logic as `MessageBroker` to send new frames to a set of
+        streams.
+
         :param frame: The new frame to circulate.
         """
-        subscriptions_to_remove = set[MemoryObjectSendStream]()
-        for stream in self._send_streams:
-            try:
-                stream.send_nowait(frame)
-            except (anyio.ClosedResourceError, anyio.BrokenResourceError):
-                # Streams that have been closed will be automatically removed.
-                # They can't be reopened, so they won't be reused.
-                subscriptions_to_remove.add(stream)
-            except anyio.WouldBlock:
-                msg = f"Could not pass notification to {stream} as it was full."
-                warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
-        for stream in subscriptions_to_remove:
-            # discard rather than remove, so that if the stream has been finalised
-            # since it was closed, we don't get an error.
-            self._send_streams.discard(stream)
+        # For backwards compatibility, we check the `_streaming` flag here.
+        # This is consistent with the old behaviour, which would act on it when
+        # new frames were distributed.
+        if not self._streaming:
+            await self.close_streams()
+        await MessageBroker.publish_and_prune(self._subscriptions, frame)
 
-    async def notify_stream_stopped(self) -> None:
-        """Raise an exception in any waiting tasks to signal the stream has stopped.
-
-        This should be run only when streaming has stopped, i.e. ``self._streaming``
-        is ``False`` and an error will be raised if this isn't the case.
-
-        :raises RuntimeError: if the stream is still streaming.
-        """
-        if self._streaming is True:
-            raise RuntimeError(
-                "This function should only be called when the stream is stopped."
-            )
-        for stream in self._send_streams:
+    async def close_streams(self) -> None:
+        """Raise an exception in any waiting tasks to signal the stream has stopped."""
+        for stream in self._subscriptions:
             await stream.aclose()
 
 

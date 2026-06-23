@@ -6,7 +6,7 @@ all the pub-sub messaging in LabThings.
 
 import logging
 import warnings
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 from weakref import WeakSet
 
 import anyio
@@ -108,17 +108,30 @@ class MessageBroker:
         except KeyError as e:
             raise e
 
-    async def publish(self, message: Message) -> None:
-        """Publish a message.
+    Payload = TypeVar("Payload")
 
-        This async method will relay the message to any subscriber streams.
+    @staticmethod
+    async def publish_and_prune(
+        subscriptions: WeakSet[MemoryObjectSendStream[Payload]],
+        message: Payload,
+    ) -> None:
+        """Publish a message to a set of subscribers, removing any that are closed.
 
-        :param message: the message to send.
+        This iterates over all subscriptions, sending messages. It does not await
+        the stream, meaning that the stream must either be currently being awaited
+        or have available capacity: full streams will be skipped.
+
+        There's some error handling here to automatically skip streams that would
+        slow down the publishing thread (i.e. handle `anyio.WouldBlock`), and also
+        to automatically remove streams that have been closed.
+
+        Streams that have been closed will be discarded: this is the "prune" in the
+        name. This feels appropriate as the stream cannot be reopened, so there's no
+        point sending more messages.
+
+        :param subscriptions: a weak set of streams to send the payload to.
+        :param message: the payload to send.
         """
-        try:
-            subscriptions = self._subscriptions[message.thing][message.affordance]
-        except KeyError:
-            return  # No subscribers for this thing.
         subscriptions_to_remove = set()
         for stream in subscriptions:
             try:
@@ -135,6 +148,19 @@ class MessageBroker:
             # discard rather than remove, so that if the stream has been finalised
             # since it was closed, we don't get an error.
             subscriptions.discard(stream)
+
+    async def publish(self, message: Message) -> None:
+        """Publish a message.
+
+        This async method will relay the message to any subscriber streams.
+
+        :param message: the message to send.
+        """
+        try:
+            subscriptions = self._subscriptions[message.thing][message.affordance]
+        except KeyError:
+            return  # No subscribers for this thing.
+        await self.publish_and_prune(subscriptions, message)
 
     async def close_streams(self) -> None:
         """Close all streams that are subscribed to receive messages.
