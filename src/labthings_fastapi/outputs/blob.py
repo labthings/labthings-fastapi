@@ -108,6 +108,7 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Self
+from labthings_fastapi.exceptions import MediaTypeMismatchError
 from labthings_fastapi.middleware.url_for import url_for
 
 
@@ -469,7 +470,11 @@ class BlobModel(BaseModel):
     """A model for JSON-serialised `.Blob` objects.
 
     This model describes the JSON representation of a `.Blob`
-    and does not offer any useful functionality.
+    and is used to describe the `.Blob` object in JSON responses.
+
+    The binary data may be retrieved with a ``GET`` request to the URL
+    specified in ``href`` which should return it directly in the body of
+    the response.
     """
 
     href: str
@@ -774,7 +779,31 @@ class Blob:
         return self.data.open()
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Self:
+    def validate_media_type(cls, media_type: str | None) -> str:
+        r"""Check a specified media type is valid, or use the class default.
+
+        If a media type is specified when creating a `.Blob`, this function checks
+        that it's compatible with the class media type. The check is quite basic,
+        and is defined in `match_media_type`\ .
+
+        If ``media_type`` is not compatible with the class, we raise an exception.
+        If `None` is supplied, we return the class media type.
+
+        :param media_type: the media type to validate.
+        :return: a valid media type, or the class media type.
+        :raises MediaTypeMismatchError: if the media type doesn't match the class.
+        """
+        if media_type is None:
+            return cls.media_type
+        if match_media_types(media_type, cls.media_type):
+            return media_type
+        raise MediaTypeMismatchError(
+            f"Can't create a {cls.__qualname__} as media type '{media_type}' "
+            f"doesn't match '{cls.media_type}'."
+        )
+
+    @classmethod
+    def from_bytes(cls, data: bytes, media_type: str | None = None) -> Self:
         """Create a `.Blob` from a bytes object.
 
         This is the recommended way to create a `.Blob` from data that is held
@@ -782,13 +811,17 @@ class Blob:
         ``media_type``.
 
         :param data: the data as a `bytes` object.
+        :param media_type: the media type of the supplied data, defaults to
+            the ``media_type`` attribute of this class.
 
         :return: a `.Blob` wrapping the supplied data.
         """
-        return cls(BlobBytes(data, media_type=cls.media_type))
+        return cls(BlobBytes(data, media_type=cls.validate_media_type(media_type)))
 
     @classmethod
-    def from_temporary_directory(cls, folder: TemporaryDirectory, file: str) -> Self:
+    def from_temporary_directory(
+        cls, folder: TemporaryDirectory, file: str, media_type: str | None = None
+    ) -> Self:
         """Create a `.Blob` from a file in a temporary directory.
 
         This is the recommended way to create a `.Blob` from data that is
@@ -803,6 +836,8 @@ class Blob:
 
         :param folder: a `tempfile.TemporaryDirectory` where the file is saved.
         :param file: the path to the file, relative to the ``folder``.
+        :param media_type: the media type of the supplied data, defaults to
+            the ``media_type`` attribute of this class.
 
         :return: a `.Blob` wrapping the file.
         """
@@ -810,14 +845,14 @@ class Blob:
         return cls(
             BlobFile(
                 file_path,
-                media_type=cls.media_type,
+                media_type=cls.validate_media_type(media_type),
                 # Prevent the temporary directory from being cleaned up
                 _temporary_directory=folder,
             ),
         )
 
     @classmethod
-    def from_file(cls, file: str) -> Self:
+    def from_file(cls, file: str, media_type: str | None = None) -> Self:
         """Create a `.Blob` from a regular file.
 
         This is the recommended way to create a `.Blob` from a file, if that
@@ -832,15 +867,22 @@ class Blob:
             `.Blob` with `from_temporary_directory` instead.
 
         :param file: is the path to the file. This file must exist.
+        :param media_type: the media type of the supplied data, defaults to
+            the ``media_type`` attribute of this class.
 
         :return: a `.Blob` object referencing the specified file.
         """
         return cls(
-            BlobFile(file, media_type=cls.media_type),
+            BlobFile(file, media_type=cls.validate_media_type(media_type)),
         )
 
     @classmethod
-    def from_url(cls, href: str, client: httpx.Client | None = None) -> Self:
+    def from_url(
+        cls,
+        href: str,
+        client: httpx.Client | None = None,
+        media_type: str | None = None,
+    ) -> Self:
         """Create a `.Blob` that references data at a URL.
 
         This is the recommended way to create a `.Blob` that references
@@ -850,12 +892,14 @@ class Blob:
         :param href: the URL where the data may be downloaded.
         :param client: if supplied, this `httpx.Client` will be used to
             download the data.
+        :param media_type: the media type of the supplied data, defaults to
+            the ``media_type`` attribute of this class.
 
         :return: a `.Blob` object referencing the specified URL.
         """
         return cls(
             RemoteBlobData(
-                media_type=cls.media_type,
+                media_type=cls.validate_media_type(media_type),
                 href=href,
                 client=client,
             ),
