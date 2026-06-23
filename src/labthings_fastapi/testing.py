@@ -153,7 +153,7 @@ class MockThingServerInterface(ThingServerInterface):
 
     @property
     def application_config(self) -> None:
-        """Return an empty application configuration when mocking.
+        """An empty application configuration when mocking.
 
         :return: None
         """
@@ -161,7 +161,7 @@ class MockThingServerInterface(ThingServerInterface):
 
     @property
     def global_lock(self) -> GlobalLock | None:
-        """Return a global lock."""
+        """A global lock."""
         return self._global_lock
 
 

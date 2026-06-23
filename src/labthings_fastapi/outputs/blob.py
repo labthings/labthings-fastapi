@@ -743,7 +743,7 @@ class Blob:
 
     @property
     def content(self) -> bytes:
-        """Return the the output as a `bytes` object.
+        """The blob's content as a `bytes` object in memory.
 
         This property may return the `bytes` object, or if we have a file it
         will read the file and return the contents. Client objects may use
