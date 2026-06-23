@@ -206,6 +206,14 @@ class MJPEGStream:
             await receive.aclose()
         return frame.frame
 
+    async def next_frame_size(self) -> int:
+        """Wait for the next frame, and return its size.
+
+        :return: the size of the next JPEG frame.
+        """
+        frame = await self.grab_frame()
+        return len(frame)
+
     async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
         """Yield frames as bytes objects.
 
