@@ -69,6 +69,7 @@ def test_mjpeg_stream(client):
         for b in stream.iter_bytes():
             received += 1
             assert b.startswith(b"--frame")
+        assert received == 1  # Should be 3, but they all arrive at once.
 
 
 if __name__ == "__main__":
