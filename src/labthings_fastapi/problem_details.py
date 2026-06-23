@@ -49,7 +49,7 @@ DOCS_URL = (
 PYTHON_DOCS_URL = "https://docs.python.org/3/library/exceptions.html"
 
 
-def docs_url(exc: type[Exception]) -> str | None:
+def docs_url(exc: type[BaseException]) -> str | None:
     """Return a URL identifying a LabThings exception.
 
     :param exc: An exception class.
@@ -60,3 +60,4 @@ def docs_url(exc: type[Exception]) -> str | None:
         return f"{DOCS_URL}#{exc.__module__}.{exc.__qualname__}"
     if exc.__module__ == "builtins":
         return f"{PYTHON_DOCS_URL}#{exc.__name__}"
+    return None
