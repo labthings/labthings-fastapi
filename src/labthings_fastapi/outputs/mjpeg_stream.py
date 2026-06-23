@@ -187,7 +187,13 @@ class MJPEGStream:
         :param max_buffer_size: the size of buffer to permit. This reduces the
             likelihood of dropping frames, at the expense of latency and memory.
         :return: a stream that will yield new frames.
+        :raises StopAsyncIteration: if the stream has already been stopped. This
+            ensures we don't end up with stalled streams being added when there
+            will not be any more frames.
         """
+        if not self._streaming:
+            # Don't accept
+            raise StopAsyncIteration("This MJPEG stream has stopped.")
         send, receive = anyio.create_memory_object_stream[Frame](max_buffer_size)
         self._subscriptions.add(send)
         return send, receive
@@ -293,6 +299,7 @@ class MJPEGStream:
 
     async def close_streams(self) -> None:
         """Raise an exception in any waiting tasks to signal the stream has stopped."""
+        self._streaming = False
         for stream in self._subscriptions:
             await stream.aclose()
 
