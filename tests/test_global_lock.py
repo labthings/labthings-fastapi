@@ -495,7 +495,7 @@ def test_global_lock_log(caplog):
             # lock, but no traceback.
             caplog.clear()
             with pytest.raises(
-                ServerActionError,
+                GlobalLockBusyError,
                 match="The global lock could not be acquired",
             ):
                 checker.increment_fprop2()
@@ -509,6 +509,6 @@ def test_global_lock_log(caplog):
             # does. This should print a stack trace, as the
             # exception is not handled.
             caplog.clear()
-            with pytest.raises(ServerActionError, match="GlobalLockBusyError"):
+            with pytest.raises(GlobalLockBusyError):
                 checker.increment_prop1()
             assert "Traceback" in caplog.text
