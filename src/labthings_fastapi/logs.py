@@ -9,7 +9,7 @@ intended to be visible to the user in e.g. a graphical interface.
 
 import logging
 from collections.abc import MutableSequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from weakref import WeakValueDictionary
 
@@ -21,7 +21,18 @@ USER = logging.INFO + 5
 logging.addLevelName(USER, "USER")
 
 
-class LoggerWithUser(logging.getLoggerClass()):
+# This allows mypy to work with a dynamic base class.
+# logging.getLoggerClass() should always return a subclass of logging.Logger
+# (and will usually return logging.Logger).
+# Using this dynamic base class means we're much less likely to break
+# customisations done to the logger by other code.
+if TYPE_CHECKING:
+    Logger = logging.Logger
+else:
+    Logger = logging.getLoggerClass()
+
+
+class LoggerWithUser(Logger):
     """A subclass of `logging.Logger` with an extra `user` level."""
 
     def user(self, msg: str, *args: Any, **kwargs: Any) -> None:
