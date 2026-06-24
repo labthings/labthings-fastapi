@@ -494,7 +494,10 @@ def test_global_lock_log(caplog):
             # This should fail with a message about the global
             # lock, but no traceback.
             caplog.clear()
-            with pytest.raises(ServerActionError, match="Global lock was busy"):
+            with pytest.raises(
+                ServerActionError,
+                match="The global lock could not be acquired",
+            ):
                 checker.increment_fprop2()
             matches = [r for r in caplog.records if "Global lock was busy" in r.message]
             assert len(matches) == 1

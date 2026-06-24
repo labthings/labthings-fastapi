@@ -27,7 +27,7 @@ class ProblemDetails(BaseModel):
     """A URI that may or may not give details about this specific instance."""
 
     @classmethod
-    def from_exception(cls, exc: Exception) -> Self:
+    def from_exception(cls, exc: BaseException) -> Self:
         r"""Generate a `ProblemDetails` model from an exception instance.
 
         :param exc: the exception instance to be described.

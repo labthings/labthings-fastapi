@@ -154,7 +154,9 @@ class Invocation(Thread):
         self._request_time: datetime.datetime = datetime.datetime.now()
         self._start_time: Optional[datetime.datetime] = None  # Task start time
         self._end_time: Optional[datetime.datetime] = None  # Task end time
-        self._exception: Optional[Exception] = None  # Propagate exceptions helpfully
+        self._exception: Optional[BaseException] = (
+            None  # Propagate exceptions helpfully
+        )
         self._log: deque = deque(maxlen=log_len)  # log entries for this thread
 
     @property
@@ -363,10 +365,11 @@ class Invocation(Thread):
                     self._output_model_instance = output_model_instance
                     self._status = InvocationStatus.COMPLETED
                     self._publish_status()
-            except InvocationCancelledError:
+            except InvocationCancelledError as e:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
                     self._status = InvocationStatus.CANCELLED
+                    self._exception = e
                     self._publish_status()
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
