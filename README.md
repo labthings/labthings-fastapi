@@ -16,9 +16,9 @@ See [readthedocs] for installation instructions that are automatically tested. Y
 
 `labthings-fastapi` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current `pydantic-core` dependencies.
 
-> **Note: Windows Installations**
+> **Note: Windows Installations on devices with ARM processors**
 >
-> Installing on Windows requires Visual Studio with the **"Desktop development with C++"** workload enabled. This is necessary because `pydantic` relies on Rust, which in turn requires C++ build tools to compile.
+> Installing on Windows devices with ARM processors requires Visual Studio with the **"Desktop development with C++"** workload enabled. This is necessary because `pydantic` relies on Rust, which in turn requires C++ build tools to compile.
 >
 > *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
 
