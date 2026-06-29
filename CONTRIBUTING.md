@@ -105,7 +105,7 @@ All changes to the codebase must go via pull requests. Unless you are a core mai
 **Pull Request Guidelines:**
 
 * Code should only be merged once all the checks in the CI test job are passing.
-* **Unpinned Dependencies:** Note that we have a specific CI job called `test-with-unpinned-dependencies`. It is acceptable to merge code if only this specific job fails, provided the failure is due to upstream dependency issues. We prefer to deal with upstream dependency issues in a separate PR, particularly when the required fixes are distinct from the code in your current PR.
+* **Unpinned Dependencies:** Note that we have a specific CI job called `test-with-unpinned-dependencies`. It is acceptable to merge code if only this specific job fails, provided the failure is due to upstream dependency issues. We prefer to deal with upstream dependency issues in a separate PR, particularly when the required fixes are distinct from the code in your current PR. The same applies to the `pip-audit` job.
 * Update documentation (`docs/` or docstrings) if your changes modify existing behavior or add new features.
 
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
