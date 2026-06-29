@@ -1,4 +1,4 @@
-# Testing `labthings-fastapi`
+# Testing labthings-fastapi
 
 Our test suite ensures the framework functions correctly, maintains code quality, and integrates seamlessly with static type checkers.
 
