@@ -27,7 +27,10 @@ extensions = [
     "autoapi.extension",
     "sphinx_rtd_theme",
     "sphinx_toolbox.decorators",
+    "myst_parser",
 ]
+
+myst_heading_anchors = 3
 
 templates_path = ["_templates"]
 exclude_patterns = []

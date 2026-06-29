@@ -12,7 +12,10 @@ from pydantic import TypeAdapter
 from pydantic_core import PydanticSerializationError
 import pytest
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import FailedToInvokeActionError
+from labthings_fastapi.exceptions import (
+    FailedToInvokeActionError,
+    MediaTypeMismatchError,
+)
 from labthings_fastapi.testing import create_thing_without_server, use_dummy_url_for
 
 
@@ -117,23 +120,81 @@ def test_invalid_media_type_parsing(media_type, msg):
     with pytest.raises(ValueError, match=msg):
         lt.blob.parse_media_type(media_type)
 
+    # This error should also appear when we create a Blob
+    with pytest.raises(ValueError, match=msg):
+        _ = lt.blob.Blob.from_bytes(b"", media_type=media_type)
+
+
+MEDIA_TYPES_FOR_MATCHING = [
+    ("text/plain", "text/plain", True),
+    ("text/html", "text/*", True),
+    ("image/png", "image/*", True),
+    ("application/json", "*/*", True),
+    ("text/plain", "text/html", False),
+    ("image/jpeg", "image/png", False),
+    ("application/xml", "application/json", False),
+    ("text/plain", "image/*", False),
+]
+
 
 @pytest.mark.parametrize(
     ("data_media_type", "blob_media_type", "expected"),
-    [
-        ("text/plain", "text/plain", True),
-        ("text/html", "text/*", True),
-        ("image/png", "image/*", True),
-        ("application/json", "*/*", True),
-        ("text/plain", "text/html", False),
-        ("image/jpeg", "image/png", False),
-        ("application/xml", "application/json", False),
-        ("text/plain", "image/*", False),
-    ],
+    MEDIA_TYPES_FOR_MATCHING,
 )
-def test_media_type_matching(data_media_type, blob_media_type, expected):
+def test_media_type_matching(data_media_type, blob_media_type, expected, mocker):
     """Check that media type matching works as expected."""
     assert lt.blob.match_media_types(data_media_type, blob_media_type) is expected
+
+
+@pytest.mark.parametrize(
+    ("data_media_type", "blob_media_type", "expected"),
+    MEDIA_TYPES_FOR_MATCHING,
+)
+def test_validate_media_type(data_media_type, blob_media_type, expected):
+    """Check that the data type validator class method on Blob works correctly."""
+
+    class BlobSubclass(lt.blob.Blob):
+        media_type: str = blob_media_type
+
+    if expected:
+        assert BlobSubclass.validate_media_type(data_media_type) == data_media_type
+    else:
+        with pytest.raises(MediaTypeMismatchError):
+            BlobSubclass.validate_media_type(data_media_type)
+
+
+@pytest.mark.parametrize(
+    ("data_media_type", "blob_media_type", "expected"),
+    MEDIA_TYPES_FOR_MATCHING,
+)
+def test_media_type_validated(data_media_type, blob_media_type, expected, mocker):
+    """Check that the class methods used to create a Blob validate the media type."""
+
+    class BlobSubclass(lt.blob.Blob):
+        media_type: str = blob_media_type
+
+    if not expected:
+        tmpdir = mocker.Mock(spec=TemporaryDirectory)
+        tmpdir.name = "folder/path"
+
+        # The media type should be checked when creating a blob with class methods
+        with pytest.raises(MediaTypeMismatchError):
+            BlobSubclass.from_bytes(b"", media_type=data_media_type)
+        with pytest.raises(MediaTypeMismatchError):
+            BlobSubclass.from_file("file/path", media_type=data_media_type)
+        with pytest.raises(MediaTypeMismatchError):
+            BlobSubclass.from_temporary_directory(
+                tmpdir,
+                "file/path",
+                media_type=data_media_type,
+            )
+        with pytest.raises(MediaTypeMismatchError):
+            BlobSubclass.from_url("https://whatever/", media_type=data_media_type)
+    else:
+        # If the media types match, the instance produced should have the media type
+        # of the
+        blob = BlobSubclass.from_bytes(b"", media_type=data_media_type)
+        assert blob.media_type == data_media_type
 
 
 def test_blobdata_base_class():

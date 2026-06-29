@@ -11,19 +11,18 @@ Documentation, including install instructions, is available on [readthedocs].
 
 See [readthedocs] for installation instructions that are automatically tested. You can install this package with `pip install labthings-fastapi`.
 
-## Developer notes
 
-For the latest development version, clone this repository and run `pip install -e .[dev]`. 
+### Installation Notes
 
-The code is linted with `ruff .`, type checked with `mypy`, and tested with `pytest`. These all run in CI with GitHub Actions. We recommend a [pre-commit hook] to ensure `ruff` passes on every commit. `flake8` is also run in CI, primarily to enable stricter checks on docstrings. It is run as `flake8 src`. `ruff` and `flake8` are both configured from `pyproject.toml`.
+`labthings-fastapi` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current `pydantic-core` dependencies.
 
-All changes to the codebase should go via pull requests, and should only be merged once all the checks in the `test` job are passing. It is preferable to merge code where the `test-with-unpinned-dependencies` job fails, and deal with the dependency issues in another PR, particularly where the required changes are distinct from the code in the PR.
+> **Note: Windows Installations on devices with ARM processors**
+>
+> Installing on Windows devices with ARM processors requires Visual Studio with the **"Desktop development with C++"** workload enabled. This is necessary because `pydantic` relies on Rust, which in turn requires C++ build tools to compile.
+>
+> *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
 
-Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
-```
-uv pip compile --extra dev pyproject.toml --output-file dev-requirements.txt
-```
-If you're not using `uv`, just regular `pip-compile` from `pip-tools` should do the same thing.
+For instructions on how to set up a development environment, run tests, and contribute to this project, please see [CONTRIBUTING.md].
 
 ## Demo
 
@@ -34,3 +33,4 @@ See [readthedocs] for a runnable demo.
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
 [pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
+[CONTRIBUTING.md]: ./CONTRIBUTING.md
