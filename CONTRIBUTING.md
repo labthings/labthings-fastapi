@@ -45,7 +45,7 @@ pip install -r dev-requirements.txt
 
 We use several tools to maintain code quality. All of these run in CI with [GitHub Actions], but you should run them locally before submitting a Pull Request. Both `ruff` and `flake8` are configured from [`pyproject.toml`].
 
-More detailed information on our testing and linting can be found in [`testing.md`]
+More detailed information on our testing and linting can be found in [`testing.md`].
 
 * **Linting:** We use [`ruff`] for fast linting and formatting. We highly recommend setting up a pre-commit hook to ensure [`ruff`] passes on every commit.
   ```bash
