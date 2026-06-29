@@ -25,9 +25,9 @@ from labthings_fastapi.exceptions import (
 from labthings_fastapi.utilities.introspection import EmptyObject
 
 __all__ = [
-    "class_attributes",
-    "attributes",
     "RootModelWrapper",
+    "attributes",
+    "class_attributes",
     "model_to_dict",
 ]
 

@@ -109,6 +109,7 @@ select = [
   "DOC",   # pydocstyle (limited support for sphinx style: see ignores)
   "FAST",  # FastAPI rules
   "I",     # Sort imports
+  "RUF022",# Sort __all__
   "S",     # flake8-bandit - notably, this disallows `assert`
 ]
 ignore = [

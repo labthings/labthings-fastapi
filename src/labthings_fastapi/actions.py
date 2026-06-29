@@ -92,7 +92,7 @@ if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
 
 
-__all__ = ["Invocation", "ActionManager"]
+__all__ = ["ActionManager", "Invocation"]
 
 
 ACTION_INVOCATIONS_PATH = "/action_invocations"
