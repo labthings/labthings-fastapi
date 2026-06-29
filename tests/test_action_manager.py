@@ -1,6 +1,6 @@
 import time
 
-import httpx
+import httpx2
 import pytest
 
 import labthings_fastapi as lt
@@ -59,7 +59,7 @@ def test_action_expires(client):
     invocation["status"] = "running"  # Force an extra poll
     # When the second action runs, the first one should expire
     # so polling it again should give a 404.
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(httpx2.HTTPStatusError):
         poll_task(client, invocation)
 
 
