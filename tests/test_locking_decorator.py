@@ -7,8 +7,7 @@ import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
-
-from .temp_client import poll_task
+from tests.temp_client import poll_task
 
 Value = TypeVar("Value")
 Params = ParamSpec("Params")

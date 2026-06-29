@@ -16,8 +16,7 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server, mock_thing_instance
-
-from .temp_client import poll_task
+from tests.temp_client import poll_task
 
 
 class Unjsonable:

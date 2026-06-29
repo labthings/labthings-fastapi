@@ -21,7 +21,7 @@ from typing import Any, Optional
 
 from pydantic import TypeAdapter, ValidationError
 
-from ._model import DataSchema
+from labthings_fastapi.thing_description._model import DataSchema
 
 JSONSchema = dict[str, Any]  # A type to represent JSONSchema
 

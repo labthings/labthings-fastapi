@@ -43,16 +43,13 @@ from typing import (
 from fastapi import APIRouter, BackgroundTasks, Body, FastAPI, HTTPException, Response
 from pydantic import BaseModel, create_model
 
-from labthings_fastapi.message_broker import Message
-from labthings_fastapi.problem_details import ProblemDetails
-
-from . import invocation_contexts
-from .base_descriptor import (
+from labthings_fastapi import invocation_contexts
+from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
     BaseDescriptorInfo,
     DescriptorInfoCollection,
 )
-from .exceptions import (
+from labthings_fastapi.exceptions import (
     GlobalLockBusyError,
     InvalidReturnValueError,
     InvocationCancelledError,
@@ -60,18 +57,29 @@ from .exceptions import (
     NotConnectedToServerError,
     UnserialisableTypeError,
 )
-from .invocations import InvocationModel, InvocationStatus, InvocationSummary
-from .logs import add_thing_log_destination
-from .middleware.url_for import URLFor
-from .thing_description import type_to_dataschema
-from .thing_description._model import ActionAffordance, ActionOp, Form, LinkElement
-from .utilities import (
+from labthings_fastapi.invocations import (
+    InvocationModel,
+    InvocationStatus,
+    InvocationSummary,
+)
+from labthings_fastapi.logs import add_thing_log_destination
+from labthings_fastapi.message_broker import Message
+from labthings_fastapi.middleware.url_for import URLFor
+from labthings_fastapi.problem_details import ProblemDetails
+from labthings_fastapi.thing_description import type_to_dataschema
+from labthings_fastapi.thing_description._model import (
+    ActionAffordance,
+    ActionOp,
+    Form,
+    LinkElement,
+)
+from labthings_fastapi.utilities import (
     RootModelWrapper,
     model_to_dict,
     serialise_from_user_code,
     validate_from_user_code,
 )
-from .utilities.introspection import (
+from labthings_fastapi.utilities.introspection import (
     EmptyInput,
     StrictEmptyInput,
     fastapi_dependency_params,
@@ -81,7 +89,7 @@ from .utilities.introspection import (
 
 if TYPE_CHECKING:
     # We only need these imports for type hints, so this avoids circular imports.
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 __all__ = ["Invocation", "ActionManager"]

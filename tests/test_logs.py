@@ -23,8 +23,7 @@ from labthings_fastapi.invocation_contexts import (
 from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.server.cli import serve_from_cli
 from labthings_fastapi.testing import create_thing_without_server
-
-from .temp_client import poll_task
+from tests.temp_client import poll_task
 
 
 class ThingThatLogs(lt.Thing):

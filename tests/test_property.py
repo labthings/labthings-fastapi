@@ -40,8 +40,7 @@ from labthings_fastapi.properties import (
     default_factory_from_arguments,
 )
 from labthings_fastapi.testing import create_thing_without_server
-
-from .utilities import raises_or_is_caused_by
+from tests.utilities import raises_or_is_caused_by
 
 
 def test_default_factory_from_arguments():

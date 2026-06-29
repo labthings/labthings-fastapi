@@ -28,12 +28,11 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 
+from labthings_fastapi.exceptions import PropertyNotObservableError
 from labthings_fastapi.message_broker import Message, MessageBroker
 
-from .exceptions import PropertyNotObservableError
-
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 LOGGER = logging.getLogger(__file__)
 

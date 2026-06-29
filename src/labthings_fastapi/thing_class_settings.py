@@ -11,12 +11,13 @@ from typing import TYPE_CHECKING
 from pydantic import ConfigDict, TypeAdapter, with_config
 from typing_extensions import ReadOnly, TypedDict
 
-from labthings_fastapi.exceptions import InvalidClassSettingsError
-
-from .exceptions import DefaultWillChangeWarning
+from labthings_fastapi.exceptions import (
+    DefaultWillChangeWarning,
+    InvalidClassSettingsError,
+)
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 @with_config(ConfigDict(extra="forbid"))

@@ -25,7 +25,10 @@ from weakref import WeakValueDictionary
 
 from typing_extensions import Self
 
-from .exceptions import InvocationCancelledError, NoInvocationContextError
+from labthings_fastapi.exceptions import (
+    InvocationCancelledError,
+    NoInvocationContextError,
+)
 
 invocation_id_ctx = ContextVar[UUID]("invocation_id_ctx")
 """Context variable storing the current invocation ID.

@@ -9,8 +9,7 @@ import pytest
 import labthings_fastapi as lt
 from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
-
-from .temp_client import poll_task
+from tests.temp_client import poll_task
 
 
 class ThingThatLogsAndErrors(lt.Thing):

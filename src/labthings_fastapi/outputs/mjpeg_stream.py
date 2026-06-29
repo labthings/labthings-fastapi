@@ -26,8 +26,8 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from ..thing import Thing
-    from ..thing_server_interface import ThingServerInterface
+    from labthings_fastapi.thing import Thing
+    from labthings_fastapi.thing_server_interface import ThingServerInterface
 
 
 @dataclass

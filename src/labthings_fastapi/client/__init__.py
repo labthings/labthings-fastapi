@@ -16,16 +16,15 @@ import httpx
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from typing_extensions import Self  # 3.9, 3.10 compatibility
 
-from labthings_fastapi.problem_details import ProblemDetails, docs_url
-
-from ..exceptions import (
+from labthings_fastapi.exceptions import (
     ClientPropertyError,
     FailedToInvokeActionError,
     GlobalLockBusyError,
     InvocationCancelledError,
     ServerActionError,
 )
-from ..outputs.blob import Blob, RemoteBlobData
+from labthings_fastapi.outputs.blob import Blob, RemoteBlobData
+from labthings_fastapi.problem_details import ProblemDetails, docs_url
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]

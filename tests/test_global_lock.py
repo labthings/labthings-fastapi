@@ -15,8 +15,7 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.testing import create_thing_without_server
-
-from .utilities import assert_takes_time
+from tests.utilities import assert_takes_time
 
 
 class LockChecker(Thread):

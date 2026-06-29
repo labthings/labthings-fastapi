@@ -9,8 +9,8 @@ from collections.abc import MutableSequence
 from uuid import UUID
 from weakref import WeakValueDictionary
 
-from .exceptions import LogConfigurationError, NoInvocationContextError
-from .invocation_contexts import get_invocation_id
+from labthings_fastapi.exceptions import LogConfigurationError, NoInvocationContextError
+from labthings_fastapi.invocation_contexts import get_invocation_id
 
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
 

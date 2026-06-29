@@ -20,8 +20,7 @@ from pydantic import (
 
 from labthings_fastapi.middleware.url_for import URLFor
 from labthings_fastapi.problem_details import ProblemDetails
-
-from .thing_description._model import Links
+from labthings_fastapi.thing_description._model import Links
 
 
 class InvocationStatus(Enum):

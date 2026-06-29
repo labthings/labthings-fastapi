@@ -25,8 +25,7 @@ from labthings_fastapi.invocation_contexts import (
     raise_if_cancelled,
     set_invocation_id,
 )
-
-from .utilities import assert_takes_time
+from tests.utilities import assert_takes_time
 
 
 def append_invocation_id(ids: list):

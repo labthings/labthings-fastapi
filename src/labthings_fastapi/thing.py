@@ -20,25 +20,31 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
 from typing_extensions import Self
 
-from .actions import ActionCollection
-from .base_descriptor import OptionallyBoundDescriptor
-from .invocation_contexts import get_invocation_id
-from .logs import THING_LOGGER
-from .properties import (
+from labthings_fastapi.actions import ActionCollection
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
+from labthings_fastapi.invocation_contexts import get_invocation_id
+from labthings_fastapi.logs import THING_LOGGER
+from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
 )
-from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
-from .thing_description import validation
-from .thing_description._model import NoSecurityScheme, ThingDescription
-from .thing_server_interface import ThingServerInterface
-from .utilities import class_attributes
-from .utilities.introspection import get_docstring, get_summary
-from .websockets import websocket_endpoint
+from labthings_fastapi.thing_class_settings import (
+    ThingClassSettings,
+    validate_thing_class_settings,
+)
+from labthings_fastapi.thing_description import validation
+from labthings_fastapi.thing_description._model import (
+    NoSecurityScheme,
+    ThingDescription,
+)
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.utilities import class_attributes
+from labthings_fastapi.utilities.introspection import get_docstring, get_summary
+from labthings_fastapi.websockets import websocket_endpoint
 
 if TYPE_CHECKING:
-    from .actions import ActionManager
-    from .server import ThingServer
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 class Thing:

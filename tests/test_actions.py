@@ -15,8 +15,7 @@ from labthings_fastapi.exceptions import (
     UnserialisableTypeError,
 )
 from labthings_fastapi.testing import create_thing_without_server
-
-from .temp_client import get_link, poll_task
+from tests.temp_client import get_link, poll_task
 
 
 class ActionMan(lt.Thing):

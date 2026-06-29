@@ -38,7 +38,7 @@ from weakref import WeakKeyDictionary, ref
 
 from typing_extensions import Self
 
-from .exceptions import (
+from labthings_fastapi.exceptions import (
     DescriptorAddedToClassTwiceError,
     DescriptorNotAddedToClassError,
     InconsistentTypeError,
@@ -46,10 +46,10 @@ from .exceptions import (
     NotBoundToInstanceError,
     UnexpectedGarbageCollectionError,
 )
-from .utilities.introspection import get_docstring, get_summary
+from labthings_fastapi.utilities.introspection import get_docstring, get_summary
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""

@@ -8,8 +8,7 @@ import uuid
 import pytest
 
 import labthings_fastapi as lt
-
-from .temp_client import poll_task, task_href
+from tests.temp_client import poll_task, task_href
 
 
 class CancellableCountingThing(lt.Thing):

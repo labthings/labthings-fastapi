@@ -24,28 +24,27 @@ from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
 from typing_extensions import Self
 
+from labthings_fastapi.actions import ActionManager
 from labthings_fastapi.exceptions import GlobalLockBusyError
+from labthings_fastapi.global_lock import GlobalLock
+from labthings_fastapi.logs import configure_thing_logger
 from labthings_fastapi.message_broker import MessageBroker
+from labthings_fastapi.middleware.url_for import url_for_middleware
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from labthings_fastapi.outputs import blob
-
-from ..actions import ActionManager
-from ..global_lock import GlobalLock
-from ..logs import configure_thing_logger
-from ..middleware.url_for import url_for_middleware
-from ..thing import Thing
-from ..thing_description._model import ThingDescription
-from ..thing_server_interface import ThingServerInterface
-from ..thing_slots import ThingSlot
-from ..utilities import class_attributes
-from .config_model import (
+from labthings_fastapi.server.config_model import (
     ThingsConfig,
     ThingServerConfig,
 )
-from .config_model import (
+from labthings_fastapi.server.config_model import (
     normalise_things_config as normalise_things_config,
 )
+from labthings_fastapi.thing import Thing
+from labthings_fastapi.thing_description._model import ThingDescription
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.thing_slots import ThingSlot
+from labthings_fastapi.utilities import class_attributes
 
 __all__ = ["ThingServer"]
 

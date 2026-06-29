@@ -3,7 +3,7 @@ from runpy import run_path
 
 import pytest
 
-from .test_server_cli import MonitoredProcess
+from tests.test_server_cli import MonitoredProcess
 
 this_file = Path(__file__)
 repo = this_file.parents[1]

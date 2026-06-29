@@ -22,8 +22,7 @@ from labthings_fastapi.exceptions import (
     UnexpectedGarbageCollectionError,
 )
 from labthings_fastapi.testing import create_thing_without_server
-
-from .utilities import raises_or_is_caused_by
+from tests.utilities import raises_or_is_caused_by
 
 
 class MockProperty(BaseDescriptor[lt.Thing, str]):

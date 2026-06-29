@@ -22,8 +22,7 @@ from labthings_fastapi.exceptions import (
     UnserialisableTypeError,
     UnsupportedConstraintError,
 )
-
-from .introspection import EmptyObject
+from labthings_fastapi.utilities.introspection import EmptyObject
 
 __all__ = [
     "class_attributes",

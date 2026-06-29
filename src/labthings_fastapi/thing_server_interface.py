@@ -18,14 +18,13 @@ from typing import (
 )
 from weakref import ReferenceType, ref
 
+from labthings_fastapi.exceptions import FeatureNotEnabledError, ServerNotRunningError
 from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.message_broker import Message
 
-from .exceptions import FeatureNotEnabledError, ServerNotRunningError
-
 if TYPE_CHECKING:
-    from .actions import ActionManager
-    from .server import ThingServer
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 Params = ParamSpec("Params")

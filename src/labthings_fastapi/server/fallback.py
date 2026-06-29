@@ -22,10 +22,10 @@ from fastapi.responses import HTMLResponse
 from jinja2 import BaseLoader, Environment, select_autoescape
 from starlette.responses import RedirectResponse
 
-from .config_model import ThingServerConfig
+from labthings_fastapi.server.config_model import ThingServerConfig
 
 if TYPE_CHECKING:
-    from . import ThingServer
+    from labthings_fastapi.server import ThingServer
 
 LOGGER = logging.getLogger(__name__)
 

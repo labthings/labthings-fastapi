@@ -16,7 +16,7 @@ from importlib.resources import files
 import jsonschema
 import jsonschema.exceptions
 
-from .. import thing_description
+from labthings_fastapi import thing_description
 
 
 def validate_thing_description(td: dict) -> None:

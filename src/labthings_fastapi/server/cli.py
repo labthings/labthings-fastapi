@@ -25,8 +25,8 @@ from typing import Optional
 import uvicorn
 from pydantic import ValidationError
 
-from . import ThingServer, fallback
-from .config_model import ThingImportFailure, ThingServerConfig
+from labthings_fastapi.server import ThingServer, fallback
+from labthings_fastapi.server.config_model import ThingImportFailure, ThingServerConfig
 
 
 def get_default_parser() -> ArgumentParser:
