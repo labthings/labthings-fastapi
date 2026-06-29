@@ -44,7 +44,7 @@ Check that your code adheres to the project's formatting and style guidelines fr
 `labthings-fastapi` is designed to be fully type-hinted. We explicitly test that `mypy` can infer the correct types for `Thing` attributes. Run static type checking across the source code and our dedicated typing tests folder:
 
 ```bash
-mypy src typing_tests
+mypy
 ```
 
 ### 4. Unit Tests & Coverage
@@ -52,7 +52,7 @@ mypy src typing_tests
 We use `pytest` for our core test suite. Execute the unit tests and generate a coverage report using:
 
 ```bash
-pytest --cov=src
+pytest
 ```
 
 ---
