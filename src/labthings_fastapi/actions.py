@@ -42,6 +42,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Response, Body, Backgroun
 from pydantic import BaseModel, create_model
 
 from labthings_fastapi.message_broker import Message
+from labthings_fastapi.problem_details import ProblemDetails
 
 
 from .middleware.url_for import URLFor
@@ -153,7 +154,9 @@ class Invocation(Thread):
         self._request_time: datetime.datetime = datetime.datetime.now()
         self._start_time: Optional[datetime.datetime] = None  # Task start time
         self._end_time: Optional[datetime.datetime] = None  # Task end time
-        self._exception: Optional[Exception] = None  # Propagate exceptions helpfully
+        self._exception: Optional[BaseException] = (
+            None  # Propagate exceptions helpfully
+        )
         self._log: deque = deque(maxlen=log_len)  # log entries for this thread
 
     @property
@@ -187,6 +190,15 @@ class Invocation(Thread):
         """
         with self._status_lock:
             return self._status
+
+    @property
+    def error_model(self) -> ProblemDetails | None:
+        """A description of the error, if an error has happened."""
+        with self._status_lock:
+            if not self._exception:
+                return None
+            else:
+                return ProblemDetails.from_exception(self._exception)
 
     @property
     def action(self) -> ActionDescriptor:
@@ -269,6 +281,7 @@ class Invocation(Thread):
                 input=self.input,
                 output=self.output_model_instance,
                 log=self.log,
+                error=self.error_model,
             )
 
     def _publish_status(self) -> None:
@@ -352,10 +365,11 @@ class Invocation(Thread):
                     self._output_model_instance = output_model_instance
                     self._status = InvocationStatus.COMPLETED
                     self._publish_status()
-            except InvocationCancelledError:
+            except InvocationCancelledError as e:
                 logger.info(f"Invocation {self.id} was cancelled.")
                 with self._status_lock:
                     self._status = InvocationStatus.CANCELLED
+                    self._exception = e
                     self._publish_status()
             except Exception as e:  # skipcq: PYL-W0703
                 # First log
