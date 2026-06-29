@@ -237,7 +237,7 @@ class ThingServerConfig(BaseModel):
     )
 
     global_lock_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="DEBUG",
+        default="INFO",
         description=(
             "The log level to use when an action can't start due to the global lock "
             "being busy."
