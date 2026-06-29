@@ -5,6 +5,7 @@ Documentation for LabThings-FastAPI
    :maxdepth: 2
    :caption: Contents:
 
+   contributing.md
    quickstart/quickstart.rst
    tutorial/index.rst
    structure.rst
@@ -50,6 +51,10 @@ Installation
 
 ``pip install labthings-fastapi``
 
+``labthings-fastapi`` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current ``pydantic-core`` dependencies.
+
+.. include:: _windows_arm_note.rst
+
 Indices and tables
 ==================
 
@@ -60,3 +65,5 @@ Indices and tables
 .. _python-labthings: https://github.com/labthings/python-labthings/
 .. _FastAPI: https://fastapi.tiangolo.com/
 .. _pydantic: https://pydantic-docs.helpmanual.io/
+.. _Visual Studio: https://visualstudio.microsoft.com/
+.. _Rust: https://www.rust-lang.org/

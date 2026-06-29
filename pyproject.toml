@@ -42,6 +42,7 @@ dev = [
   "sphinx-autoapi",
   "sphinx-toolbox",
   "sphobjinv",
+  "myst-parser<5",
   "tomli; python_version < '3.11'",
   "codespell",
 ]
@@ -70,6 +71,7 @@ addopts = [
     "--cov-report=xml:coverage.xml",
     "--cov-report=html:htmlcov",
     "--cov-report=lcov",
+    "--cov=src"
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
