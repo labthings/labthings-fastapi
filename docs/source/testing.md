@@ -5,6 +5,7 @@ Our test suite ensures the framework functions correctly, maintains code quality
 ## Continuous Integration (CI) Pipeline
 
 When you submit a Pull Request (PR), our GitHub Actions CI pipeline automatically runs a comprehensive suite of checks. Your PR must pass these checks before it can be merged.
+You can find out more about contributing code in [`CONTRIBUTING.md`].
 
 Here is what the CI pipeline tests:
 
@@ -29,6 +30,12 @@ git clone https://github.com/labthings/labthings-fastapi.git
 cd labthings-fastapi
 pip install -e . -r dev-requirements.txt
 ```
+
+> **Note: Windows Installations on devices with ARM processors**
+>
+> Installing on Windows devices with ARM processors requires Visual Studio with the **"Desktop development with C++"** workload enabled. This is necessary because `pydantic` relies on Rust, which in turn requires C++ build tools to compile.
+>
+> *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
 
 ### 2. Linting, Formatting, and Spelling
 
@@ -83,3 +90,4 @@ mypy src                                   # Run OFM static type checks
 ```
 
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
+[`CONTRIBUTING.md`]: ../../CONTRIBUTING.md

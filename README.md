@@ -22,7 +22,7 @@ See [readthedocs] for installation instructions that are automatically tested. Y
 >
 > *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
 
-For instructions on how to set up a development environment, run tests, and contribute to this project, please see [CONTRIBUTING.md].
+For instructions on how to set up a development environment, run tests, and contribute to this project, please see [CONTRIBUTING.md] and [`testing.md`].
 
 ## Demo
 
@@ -34,3 +34,4 @@ See [readthedocs] for a runnable demo.
 [pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
 [CONTRIBUTING.md]: ./CONTRIBUTING.md
+[`testing.md`]: ./docs/source/testing.md
