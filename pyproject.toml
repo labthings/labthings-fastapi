@@ -111,6 +111,7 @@ select = [
   "I",     # Sort imports
   "RUF022",# Sort __all__
   "S",     # flake8-bandit - notably, this disallows `assert`
+  "TID",   # flake8-tidy-imports (prevents relative imports)
 ]
 ignore = [
     "D203",  # incompatible with D204
