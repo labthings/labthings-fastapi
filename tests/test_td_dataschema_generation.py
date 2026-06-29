@@ -19,6 +19,22 @@ class A(BaseModel):
     """Note that `b` is optional."""
 
 
+# This is what the generated schema should look like for the class above.
+DATASCHEMA_FOR_A = {
+    "description": "A model used to check the schema generates OK.",
+    "type": "object",
+    "properties": {
+        "a": {"title": "A", "type": "integer"},
+        "b": {
+            "title": "B",
+            "oneOf": [{"type": "integer"}, {"type": "null"}],
+        },
+    },
+    "required": ["a"],  # Note: "b" is optional, so should not be listed.
+    "title": "A",
+}
+
+
 class B(BaseModel):
     """A model use to check the schema may nest other models."""
 
@@ -26,11 +42,36 @@ class B(BaseModel):
     second_child: A
 
 
+# The generated schema for B should look like this:
+DATASCHEMA_FOR_B = {
+    "description": "A model use to check the schema may nest other models.",
+    "properties": {
+        # Note: unlike in JSONSchema, sub-schemas get inlined, as there's no
+        # way to refer to a schema defined elsewhere.
+        "first_child": DATASCHEMA_FOR_A,
+        "second_child": DATASCHEMA_FOR_A,
+    },
+    "required": ["first_child", "second_child"],
+    "title": "B",
+    "type": "object",
+}
+
+
 class C(BaseModel):
     """A model where extra properties are allowed."""
 
     model_config = {"extra": "allow"}
     a: int
+
+
+DATASCHEMA_FOR_C = {  # The schema we should generate for the class above.
+    "title": "C",
+    "description": "A model where extra properties are allowed.",
+    "properties": {"a": {"title": "A", "type": "integer"}},
+    "required": ["a"],
+    "type": "object",
+    "additionalProperties": True,  # Extra properties are allowed
+}
 
 
 def ds_json_dict(ds: DataSchema) -> dict:
@@ -98,70 +139,9 @@ def ds_json_dict(ds: DataSchema) -> dict:
             },
         ),
         # A model also becomes an "object" but it has defined "properties".
-        (
-            A,  # This is a relatively simple object (each property is a simple type)
-            {
-                "description": "A model used to check the schema generates OK.",
-                "type": "object",
-                "properties": {
-                    "a": {"title": "A", "type": "integer"},
-                    "b": {
-                        "title": "B",
-                        "oneOf": [{"type": "integer"}, {"type": "null"}],
-                    },
-                },
-                "required": ["a"],  # Note: "b" is optional, so should not be listed.
-                "title": "A",
-            },
-        ),
-        (
-            B,  # This features nested sub-models, which are expanded in-line.
-            {
-                "description": "A model use to check the schema may nest other models.",
-                "properties": {
-                    "first_child": {
-                        "description": "A model used to check the schema generates OK.",
-                        "properties": {
-                            "a": {"title": "A", "type": "integer"},
-                            "b": {
-                                "oneOf": [{"type": "integer"}, {"type": "null"}],
-                                "title": "B",
-                            },
-                        },
-                        "required": ["a"],
-                        "title": "A",
-                        "type": "object",
-                    },
-                    "second_child": {
-                        "description": "A model used to check the schema generates OK.",
-                        "properties": {
-                            "a": {"title": "A", "type": "integer"},
-                            "b": {
-                                "oneOf": [{"type": "integer"}, {"type": "null"}],
-                                "title": "B",
-                            },
-                        },
-                        "required": ["a"],
-                        "title": "A",
-                        "type": "object",
-                    },
-                },
-                "required": ["first_child", "second_child"],
-                "title": "B",
-                "type": "object",
-            },
-        ),
-        (
-            C,
-            {
-                "title": "C",
-                "description": "A model where extra properties are allowed.",
-                "properties": {"a": {"title": "A", "type": "integer"}},
-                "required": ["a"],
-                "type": "object",
-                "additionalProperties": True,  # Extra properties are allowed
-            },
-        ),
+        (A, DATASCHEMA_FOR_A),  # Properties with simple types
+        (B, DATASCHEMA_FOR_B),  # Properties that are nested models
+        (C, DATASCHEMA_FOR_C),  # Additional properties are allowed
     ],
 )
 def test_types(python_type, schema_dict):
