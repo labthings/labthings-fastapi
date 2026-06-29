@@ -154,7 +154,9 @@ jobs:
           filename: labthings-fastapi-coverage.json
           label: coverage
           message: ${{ steps.get-coverage.outputs.coverage }}%
-          color: green
+          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          maxColorRange: 90
+          minColorRange: 50
 
       - name: Download code coverage report for base branch
         id: download-base-coverage
