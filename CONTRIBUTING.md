@@ -38,7 +38,7 @@ git clone https://github.com/labthings/labthings-fastapi.git
 cd labthings-fastapi
 
 # Install the package in editable mode with development dependencies
-pip install -e .[dev]
+pip install -r dev-requirements.txt
 ```
 
 ### 2. Linting and Testing
