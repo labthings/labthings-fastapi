@@ -21,7 +21,7 @@ All changes to the codebase should go via pull requests, and should only be merg
 
 Dependencies are defined in `pyproject.toml` and can be compiled to `dev-requirements.txt` with:
 ```
-uv pip compile --extra dev pyproject.toml --output-file dev-requirements.txt
+uv pip compile dev-requirements.in -o dev-requirements.txt
 ```
 If you're not using `uv`, just regular `pip-compile` from `pip-tools` should do the same thing.
 

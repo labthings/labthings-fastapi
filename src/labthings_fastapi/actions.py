@@ -163,13 +163,13 @@ class Invocation(Thread):
 
     @property
     def output(self) -> Any:
-        """Return value of the Action. If the Action is still running, returns None."""
+        """The Action's output (return value) or `None` if it's still running."""
         with self._status_lock:
             return RootModelWrapper.unwrap(self._output_model_instance)
 
     @property
     def output_model_instance(self) -> BaseModel | None:
-        """Return value of the Action, as a model, or None."""
+        """The Action's output (return value), as a model, or None."""
         with self._status_lock:
             return self._output_model_instance
 

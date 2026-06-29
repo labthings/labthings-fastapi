@@ -338,7 +338,7 @@ class Thing:
 
     @property
     def thing_state(self) -> Mapping:
-        """Return a dictionary summarising our current state.
+        """A dictionary summarising our current state.
 
         This is intended to be an easy way to collect metadata from a Thing that
         summarises its state. It might be used, for example, to record metadata

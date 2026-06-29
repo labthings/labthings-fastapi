@@ -101,12 +101,12 @@ class OptionallyBoundInfo(Generic[Owner]):
 
     @property
     def owning_class(self) -> type[Owner]:
-        """Retrieve the class this info object is describing."""
+        """The class this info object is describing."""
         return self._descriptor_cls
 
     @property
     def owning_object(self) -> Owner | None:
-        """Retrieve the object to which this info object is bound, if present."""
+        """The object to which this info object is bound, if present."""
         return self._bound_to_obj
 
     @property

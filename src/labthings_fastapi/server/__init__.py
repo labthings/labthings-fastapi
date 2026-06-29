@@ -291,7 +291,7 @@ class ThingServer:
 
     @property
     def application_config(self) -> Mapping[str, Any] | None:
-        """Return the application configuration from the config file.
+        """The application configuration from the config file.
 
         :return: The custom configuration as specified in the configuration
             file.
