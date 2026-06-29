@@ -61,7 +61,7 @@ We use several tools to maintain code quality. All of these run in CI with [GitH
   codespell .
   ```
 
-* **Type Checking:** We use [`mypy`] for static type checking.
+* **Type Checking:** We use [`mypy`] for static type checking. It is configured in `pyproject.toml`.
   ```bash
   mypy
   ```
