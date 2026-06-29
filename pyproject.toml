@@ -70,6 +70,8 @@ addopts = [
     "--cov-report=xml:coverage.xml",
     "--cov-report=html:htmlcov",
     "--cov-report=lcov",
+    "--cov=src",
+    "--cov-report=json",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
