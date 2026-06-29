@@ -47,6 +47,7 @@ We use several tools to maintain code quality. All of these run in CI with [GitH
 
 * **Linting:** We use [`ruff`] for fast linting and formatting. We highly recommend setting up a pre-commit hook to ensure [`ruff`] passes on every commit.
   ```bash
+  ruff format --check
   ruff check .
   ```
 
