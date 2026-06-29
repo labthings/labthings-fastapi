@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 from labthings_fastapi.middleware.url_for import URLFor
+from labthings_fastapi.problem_details import ProblemDetails
 
 from .thing_description._model import Links
 
@@ -120,6 +121,7 @@ class GenericInvocationModel(InvocationSummary, Generic[InputT, OutputT]):
     input: InputT
     output: OutputT
     log: Sequence[LogRecordModel]
+    error: ProblemDetails | None = None
 
 
 InvocationModel = GenericInvocationModel[Any, Any]

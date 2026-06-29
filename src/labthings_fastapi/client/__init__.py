@@ -13,14 +13,17 @@ from collections.abc import Mapping
 import httpx
 from urllib.parse import urlparse, urljoin
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ..outputs.blob import Blob, RemoteBlobData
 from ..exceptions import (
     FailedToInvokeActionError,
+    InvocationCancelledError,
     ServerActionError,
     ClientPropertyError,
+    GlobalLockBusyError,
 )
+from labthings_fastapi.problem_details import ProblemDetails, docs_url
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
@@ -191,7 +194,7 @@ class ThingClient:
 
             raise ClientPropertyError(f"Failed to set property {path}: {err_msg}")
 
-    def invoke_action(self, path: str, **kwargs: Any) -> Any:
+    def invoke_action(self, path: str, **kwargs: Any) -> Any:  # noqa: DOC503
         r"""Invoke an action on the Thing.
 
         This method will make the initial POST request to invoke an action,
@@ -212,6 +215,8 @@ class ThingClient:
         :raise FailedToInvokeActionError: if the action fails to start.
         :raise ServerActionError: is raised if the action does not complete
             successfully.
+        :raise GlobalLockBusyError: if the action fails because of the global lock.
+        :raise InvocationCancelledError: if the action is cancelled.
         """
         for k in kwargs.keys():
             value = kwargs[k]
@@ -243,8 +248,9 @@ class ThingClient:
                     )
                 )
             return invocation["output"]
-        message = _construct_invocation_error_message(invocation)
-        raise ServerActionError(message)
+        # Note that flake8 is confused by the error below - this is why we ignore
+        # error DOC503 for this function.
+        raise _invocation_error(invocation)
 
     def follow_link(self, response: dict, rel: str) -> httpx.Response:
         """Follow a link in a response object, by its `rel` attribute.
@@ -474,7 +480,7 @@ def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> 
     return message
 
 
-def _construct_invocation_error_message(invocation: Mapping[str, Any]) -> str:
+def _invocation_error(invocation: Mapping[str, Any]) -> BaseException:
     """Format an error for ThingClient to raise if an invocation ends in and error.
 
     :param invocation: The invocation dictionary returned.
@@ -484,19 +490,49 @@ def _construct_invocation_error_message(invocation: Mapping[str, Any]) -> str:
     action_name = invocation["action"].split("/")[-1]
 
     err_message = "Unknown error"
+    log = invocation.get("log", [])
+    last_log = log[-1] if log else None
+    traceback: str | None = None
 
-    if len(invocation.get("log", [])) > 0:
-        last_log = invocation["log"][-1]
+    # If there's a log item, use the traceback and possibly the message.
+    # we don't currently check if this message actually is an error.
+    # We'll overwrite the message later, if "error" is populated.
+    if last_log:
         err_message = last_log.get("message", err_message)
 
         exception_type = last_log.get("exception_type")
         if exception_type is not None:
             err_message = f"[{exception_type}]: {err_message}"
 
+        # If there's a traceback, put it i
         traceback = last_log.get("traceback")
-        if traceback is not None:
-            err_message += "\n\nSERVER TRACEBACK START:\n\n"
-            err_message += traceback
-            err_message += "\n\nSERVER TRACEBACK END\n\n"
 
-    return f"Action {action_name} (ID: {inv_id}) failed with error:\n{err_message}"
+    # If there's an error specified, use that in preference to the message
+    # extracted from the logs.
+    try:
+        pd = ProblemDetails.model_validate(invocation.get("error", None))
+        if pd.type == docs_url(GlobalLockBusyError):
+            # GlobalLockBusyError is worth handling specially: it's likely to
+            # happen quite a bit, and "we couldn't start the action because
+            # we were busy" feels like it doesn't want to be lumped in with
+            # other failures.
+            return GlobalLockBusyError(pd.detail)
+        if pd.type == docs_url(InvocationCancelledError):
+            # Similarly, InvocationCancelledError means the action was cancelled,
+            # so it feels right to raise this instead
+            return InvocationCancelledError(pd.detail)
+        if pd.detail:
+            err_message = pd.detail
+        if pd.title:
+            err_message = f"[{pd.title}]: {err_message}"
+    except ValidationError:
+        pass  # If it's not a valid problem details object, ignore it and move on.
+
+    # Append the server traceback, if we have one.
+    if traceback is not None:
+        err_message += "\n\nSERVER TRACEBACK START:\n\n"
+        err_message += traceback
+        err_message += "\n\nSERVER TRACEBACK END\n\n"
+    return ServerActionError(
+        f"Action {action_name} (ID: {inv_id}) failed with error:\n{err_message}"
+    )
