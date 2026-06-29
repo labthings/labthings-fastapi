@@ -12,6 +12,12 @@ from labthings_fastapi.logs import THING_LOGGER
 from tests.temp_client import poll_task
 
 
+def log_externally():
+    """A function that should show up in invocation logs."""
+    logger = lt.get_thing_logger().getChild("external")
+    logger.user("Take me to your user.")
+
+
 class ThingThatLogsAndErrors(lt.Thing):
     LOG_MESSAGES = [
         "message 1",
@@ -30,6 +36,11 @@ class ThingThatLogsAndErrors(lt.Thing):
     @lt.action
     def action_with_invocation_error(self):
         raise lt.exceptions.InvocationError("This is an error, but I handled it!")
+
+    @lt.action
+    def action_that_logs_externally(self):
+        """This action calls code that uses `lt.get_thing_logger` to log."""
+        log_externally()
 
 
 @pytest.fixture
@@ -54,6 +65,20 @@ def test_invocation_logging(caplog, client):
             ThingThatLogsAndErrors.LOG_MESSAGES, invocation["log"], strict=True
         ):
             assert entry["message"] == expected
+
+
+def test_external_invocaton_logging(caplog, client):
+    """Check that `lt.get_thing_logger` is picked up in invocation logs."""
+    with caplog.at_level(logging.INFO, logger=THING_LOGGER.name):
+        r = client.post("/log_and_error_thing/action_that_logs_externally")
+        r.raise_for_status()
+        invocation = poll_task(client, r.json())
+        assert invocation["status"] == "completed"
+        assert len(caplog.records) == 1
+        assert len(invocation["log"]) == 1
+        # The message should be picked up, even though it's not from
+        # `log_and_error_thing.logger`
+        assert invocation["log"][0]["message"] == "Take me to your user."
 
 
 def test_unhandled_error_logs(caplog, client):
