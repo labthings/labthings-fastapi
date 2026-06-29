@@ -1,9 +1,12 @@
-import pytest
-import httpx
-from .temp_client import poll_task
 import time
+
+import httpx
+import pytest
+
 import labthings_fastapi as lt
 from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
+
+from .temp_client import poll_task
 
 
 class CounterThing(lt.Thing):

@@ -9,13 +9,14 @@ with a few key tasks, in particular creating pydantic models
 from functions by analysing their signatures.
 """
 
-from collections import OrderedDict
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
 import inspect
+from collections import OrderedDict
 from inspect import Parameter, signature
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
+
+from fastapi.dependencies.utils import analyze_param, get_typed_signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 from pydantic.main import create_model
-from fastapi.dependencies.utils import analyze_param, get_typed_signature
 
 
 class EmptyObject(BaseModel):

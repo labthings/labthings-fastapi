@@ -1,5 +1,5 @@
-from labthings_fastapi.example_things import MyThing
 from labthings_fastapi import ThingServer
+from labthings_fastapi.example_things import MyThing
 from labthings_fastapi.testing import create_thing_without_server
 
 

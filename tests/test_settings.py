@@ -1,11 +1,11 @@
-import logging
-from threading import Thread
-import tempfile
 import json
-from typing import Any
-import pytest
+import logging
 import os
+import tempfile
+from threading import Thread
+from typing import Any
 
+import pytest
 from pydantic import BaseModel
 
 import labthings_fastapi as lt

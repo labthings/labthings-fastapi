@@ -2,7 +2,7 @@
 
 import pytest
 
-from labthings_fastapi import problem_details, exceptions
+from labthings_fastapi import exceptions, problem_details
 
 DOCS_URL = (
     "https://labthings-fastapi.readthedocs.io/en/latest/"

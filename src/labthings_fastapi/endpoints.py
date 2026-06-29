@@ -14,21 +14,22 @@ more detail.
 """
 
 from __future__ import annotations
+
 from functools import partial, wraps
-
-from .base_descriptor import BaseDescriptor
-from .exceptions import NotConnectedToServerError
-from .utilities.introspection import get_docstring
-
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Literal,
     Mapping,
     Optional,
-    TYPE_CHECKING,
 )
+
 from fastapi import FastAPI
+
+from .base_descriptor import BaseDescriptor
+from .exceptions import NotConnectedToServerError
+from .utilities.introspection import get_docstring
 
 if TYPE_CHECKING:
     from .thing import Thing

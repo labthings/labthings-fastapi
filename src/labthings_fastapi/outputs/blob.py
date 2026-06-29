@@ -82,11 +82,14 @@ we use the sequence above, which will work for both quick and slow actions.
 """
 
 from __future__ import annotations
-from collections.abc import Callable
+
 import io
 import os
 import re
 import shutil
+import uuid
+from collections.abc import Callable
+from tempfile import TemporaryDirectory
 from typing import (
     Any,
     ClassVar,
@@ -94,12 +97,10 @@ from typing import (
     Mapping,
 )
 from weakref import WeakValueDictionary
-from tempfile import TemporaryDirectory
-import uuid
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
-import httpx
 from pydantic import (
     BaseModel,
     GetCoreSchemaHandler,
@@ -108,6 +109,7 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from typing_extensions import Self
+
 from labthings_fastapi.exceptions import MediaTypeMismatchError
 from labthings_fastapi.middleware.url_for import url_for
 

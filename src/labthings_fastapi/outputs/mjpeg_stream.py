@@ -5,23 +5,25 @@ MJPEG stream. See `.MJPEGStreamDescriptor`.
 """
 
 from __future__ import annotations
+
+import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse, HTMLResponse
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Literal,
     Optional,
-    TYPE_CHECKING,
     Union,
     overload,
 )
-from typing_extensions import Self
-import threading
+
 import anyio
-import logging
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, StreamingResponse
+from typing_extensions import Self
 
 if TYPE_CHECKING:
     from ..thing import Thing

@@ -4,13 +4,13 @@ This module currently contains code that allows us to filter out logs by invocat
 ID, so that they may be returned when invocations are queried.
 """
 
-from collections.abc import MutableSequence
 import logging
+from collections.abc import MutableSequence
 from uuid import UUID
 from weakref import WeakValueDictionary
-from .invocation_contexts import get_invocation_id
-from .exceptions import LogConfigurationError, NoInvocationContextError
 
+from .exceptions import LogConfigurationError, NoInvocationContextError
+from .invocation_contexts import get_invocation_id
 
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
 

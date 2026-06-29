@@ -8,17 +8,18 @@ on embedded hardware.
 """
 
 from __future__ import annotations
+
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
-import logging
 from traceback import format_exception
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from jinja2 import Environment, BaseLoader, select_autoescape
+from jinja2 import BaseLoader, Environment, select_autoescape
 from starlette.responses import RedirectResponse
 
 from .config_model import ThingServerConfig

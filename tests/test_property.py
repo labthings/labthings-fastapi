@@ -11,24 +11,18 @@ in particular checking `lt.property` and `lt.setting` work in the
 same way.
 """
 
-from dataclasses import dataclass
 import json
-from typing import Any
 import warnings
+from dataclasses import dataclass
+from typing import Any
 
 import fastapi
-from fastapi.testclient import TestClient
 import pydantic
 import pytest
+from fastapi.testclient import TestClient
+
+import labthings_fastapi as lt
 from labthings_fastapi import properties
-from labthings_fastapi.properties import (
-    BaseProperty,
-    DataProperty,
-    FunctionalProperty,
-    MissingDefaultError,
-    OverspecifiedDefaultError,
-    default_factory_from_arguments,
-)
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 from labthings_fastapi.exceptions import (
     FeatureNotAvailableError,
@@ -37,8 +31,16 @@ from labthings_fastapi.exceptions import (
     NotConnectedToServerError,
     PropertyRedefinitionError,
 )
-import labthings_fastapi as lt
+from labthings_fastapi.properties import (
+    BaseProperty,
+    DataProperty,
+    FunctionalProperty,
+    MissingDefaultError,
+    OverspecifiedDefaultError,
+    default_factory_from_arguments,
+)
 from labthings_fastapi.testing import create_thing_without_server
+
 from .utilities import raises_or_is_caused_by
 
 

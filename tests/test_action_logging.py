@@ -3,11 +3,14 @@ This tests the log that is returned in an action invocation
 """
 
 import logging
+
 import pytest
-from .temp_client import poll_task
+
 import labthings_fastapi as lt
 from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
+
+from .temp_client import poll_task
 
 
 class ThingThatLogsAndErrors(lt.Thing):

@@ -4,9 +4,8 @@ import logging
 from weakref import WeakSet
 
 import anyio
-from anyio.abc import ObjectReceiveStream
 import pytest
-
+from anyio.abc import ObjectReceiveStream
 from pydantic import ValidationError
 
 from labthings_fastapi.exceptions import MessageDroppedWarning

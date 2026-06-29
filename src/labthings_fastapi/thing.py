@@ -6,37 +6,39 @@ for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
+
 import json
-from typing import TYPE_CHECKING, Any, Optional
-from pydantic import ValidationError
-from typing_extensions import Self
-from collections.abc import Mapping
 import logging
 import os
+from collections.abc import Mapping
 from json.decoder import JSONDecodeError
-from fastapi.encoders import jsonable_encoder
-from fastapi import Request, WebSocket
-from anyio.to_thread import run_sync
+from typing import TYPE_CHECKING, Any, Optional
 
+from anyio.to_thread import run_sync
+from fastapi import Request, WebSocket
+from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
+from typing_extensions import Self
+
+from .actions import ActionCollection
+from .base_descriptor import OptionallyBoundDescriptor
+from .invocation_contexts import get_invocation_id
 from .logs import THING_LOGGER
 from .properties import (
     PropertyCollection,
     SettingCollection,
 )
-from .actions import ActionCollection
-from .base_descriptor import OptionallyBoundDescriptor
-from .thing_description._model import ThingDescription, NoSecurityScheme
-from .utilities import class_attributes
-from .thing_description import validation
-from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint
-from .thing_server_interface import ThingServerInterface
-from .invocation_contexts import get_invocation_id
 from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
+from .thing_description import validation
+from .thing_description._model import NoSecurityScheme, ThingDescription
+from .thing_server_interface import ThingServerInterface
+from .utilities import class_attributes
+from .utilities.introspection import get_docstring, get_summary
+from .websockets import websocket_endpoint
 
 if TYPE_CHECKING:
-    from .server import ThingServer
     from .actions import ActionManager
+    from .server import ThingServer
 
 
 class Thing:

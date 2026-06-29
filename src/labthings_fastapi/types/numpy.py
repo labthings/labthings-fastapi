@@ -21,6 +21,10 @@ Complex numbers are currently not supported, again this is left for the future.
 """
 
 from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Annotated, Any, List, Union
+
 import numpy as np
 from pydantic import (
     ConfigDict,
@@ -31,10 +35,7 @@ from pydantic import (
     WithJsonSchema,
     WrapSerializer,
 )
-from typing import Annotated, Any, List, Union
 from typing_extensions import TypeAlias
-from collections.abc import Mapping, Sequence
-
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type

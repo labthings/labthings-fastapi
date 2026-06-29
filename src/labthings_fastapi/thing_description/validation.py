@@ -8,13 +8,15 @@ in the W3C specification, as an additional check.
 See :ref:`wot_td` for a link to the specification in human-readable format.
 """
 
-from importlib.resources import files
 import json
+import logging
+import time
+from importlib.resources import files
+
 import jsonschema
 import jsonschema.exceptions
+
 from .. import thing_description
-import time
-import logging
 
 
 def validate_thing_description(td: dict) -> None:

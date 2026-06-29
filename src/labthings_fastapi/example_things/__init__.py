@@ -5,11 +5,13 @@ moved into the unit tests.
 """
 
 import time
-from typing import Any, Optional, Annotated
-from labthings_fastapi.thing import Thing
+from typing import Annotated, Any, Optional
+
+from pydantic import Field
+
 from labthings_fastapi.actions import action
 from labthings_fastapi.properties import property as lt_property
-from pydantic import Field
+from labthings_fastapi.thing import Thing
 
 
 class MyThing(Thing):

@@ -8,7 +8,6 @@ import pytest
 
 from labthings_fastapi import exceptions
 
-
 EXCEPTIONS = (
     exceptions.InvalidReturnValueError,
     exceptions.UnserialisableTypeError,

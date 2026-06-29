@@ -1,17 +1,17 @@
 """Test how errors in actions and properties are reported to the client."""
 
-from collections.abc import Iterator
 import threading
+from collections.abc import Iterator
 
 import pytest
 
 import labthings_fastapi as lt
+from labthings_fastapi.client import poll_invocation
 from labthings_fastapi.exceptions import (
     GlobalLockBusyError,
     InvocationCancelledError,
     ServerActionError,
 )
-from labthings_fastapi.client import poll_invocation
 
 
 class CustomError(Exception):

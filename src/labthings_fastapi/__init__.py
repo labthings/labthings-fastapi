@@ -24,23 +24,23 @@ code does not break if modules are rearranged.
 
 """
 
-from .thing import Thing
-from .thing_slots import thing_slot
-from .thing_server_interface import ThingServerInterface
-from .thing_class_settings import ThingClassSettings
-from .properties import property, setting, DataProperty, DataSetting
-from .actions import action
-from .endpoints import endpoint
 from . import outputs
-from .outputs import blob
-from .server import ThingServer, cli
-from .server.config_model import ThingConfig, ThingServerConfig
+from .actions import action
 from .client import ThingClient
+from .endpoints import endpoint
 from .invocation_contexts import (
+    ThreadWithInvocationID,
     cancellable_sleep,
     raise_if_cancelled,
-    ThreadWithInvocationID,
 )
+from .outputs import blob
+from .properties import DataProperty, DataSetting, property, setting
+from .server import ThingServer, cli
+from .server.config_model import ThingConfig, ThingServerConfig
+from .thing import Thing
+from .thing_class_settings import ThingClassSettings
+from .thing_server_interface import ThingServerInterface
+from .thing_slots import thing_slot
 
 # The symbols in __all__ are part of our public API.
 # They are imported when using `import labthings_fastapi as lt`.

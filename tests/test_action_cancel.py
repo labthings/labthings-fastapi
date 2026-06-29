@@ -2,11 +2,14 @@
 This tests the log that is returned in an action invocation
 """
 
-import uuid
-import pytest
-from .temp_client import poll_task, task_href
-import labthings_fastapi as lt
 import time
+import uuid
+
+import pytest
+
+import labthings_fastapi as lt
+
+from .temp_client import poll_task, task_href
 
 
 class CancellableCountingThing(lt.Thing):

@@ -1,20 +1,22 @@
-from typing import Any
+import functools
 import uuid
+from typing import Any
+
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
+
+import labthings_fastapi as lt
+from labthings_fastapi.actions import ActionInfo
+from labthings_fastapi.example_things import MyThing
 from labthings_fastapi.exceptions import (
     FailedToInvokeActionError,
     ServerActionError,
     UnserialisableTypeError,
 )
-from pydantic import BaseModel
-import pytest
-import functools
-
-from labthings_fastapi.actions import ActionInfo
 from labthings_fastapi.testing import create_thing_without_server
-from .temp_client import poll_task, get_link
-from labthings_fastapi.example_things import MyThing
-import labthings_fastapi as lt
+
+from .temp_client import get_link, poll_task
 
 
 class ActionMan(lt.Thing):

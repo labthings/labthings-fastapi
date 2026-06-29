@@ -1,10 +1,11 @@
 """Test the thing_slot module."""
 
-from collections.abc import Mapping
 import gc
-import pytest
-import labthings_fastapi as lt
+from collections.abc import Mapping
 
+import pytest
+
+import labthings_fastapi as lt
 from labthings_fastapi.exceptions import ThingSlotError
 
 

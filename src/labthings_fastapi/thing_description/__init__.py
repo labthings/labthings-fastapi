@@ -14,13 +14,14 @@ We also use the JSONSchema provided by W3C to validate the TDs we generate, in
 """
 
 from __future__ import annotations
+
+import json
 from collections.abc import Mapping, Sequence
 from typing import Any, Optional
-import json
 
 from pydantic import TypeAdapter, ValidationError
-from ._model import DataSchema
 
+from ._model import DataSchema
 
 JSONSchema = dict[str, Any]  # A type to represent JSONSchema
 

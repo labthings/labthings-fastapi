@@ -1,9 +1,11 @@
 from __future__ import annotations
-from labthings_fastapi.thing_description import type_to_dataschema
 
 import json
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
+from labthings_fastapi.thing_description import type_to_dataschema
 from labthings_fastapi.thing_description._model import DataSchema
 
 
