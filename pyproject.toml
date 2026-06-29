@@ -108,6 +108,7 @@ select = [
   "D",     # pydoclint (recommended by the developers over flake8 plugin)
   "DOC",   # pydocstyle (limited support for sphinx style: see ignores)
   "FAST",  # FastAPI rules
+  "I",     # Sort imports
   "S",     # flake8-bandit - notably, this disallows `assert`
 ]
 ignore = [
