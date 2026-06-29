@@ -302,3 +302,40 @@ def test_action_logs_over_http():
     for log in logs:
         log_as_model = LogRecordModel(**log)
         assert log_as_model.message == "foobar"
+
+
+def test_thing_logger_has_user_level(caplog):
+    """Check `Thing.logger` exposes a `user` function."""
+
+    class Dummy(lt.Thing):
+        pass
+
+    server = lt.ThingServer.from_things({"dummy": Dummy})
+    dummy = server.things["dummy"]
+    dummy.logger.user("Test message at USER level")
+    assert caplog.record_tuples == [
+        (
+            "labthings_fastapi.things.dummy",
+            logs.USER,
+            "Test message at USER level",
+        ),
+    ]
+
+
+def test_get_thing_logger(caplog):
+    """Check `lt.get_thing_logger` works and has a `user` function."""
+    logger = lt.get_thing_logger()
+    logger.user("Test message at USER level")
+    logger.getChild("child").user("Test message at USER level")
+    assert caplog.record_tuples == [
+        (
+            "labthings_fastapi.things",
+            logs.USER,
+            "Test message at USER level",
+        ),
+        (
+            "labthings_fastapi.things.child",
+            logs.USER,
+            "Test message at USER level",
+        ),
+    ]

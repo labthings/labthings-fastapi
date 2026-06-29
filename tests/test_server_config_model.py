@@ -157,3 +157,20 @@ def test_unimportable_modules(import_string: str, message: str):
         # If a module is missing, the error should make that clear.
         # Note that the error message changed with Pydantic 2.13.
         ThingConfig(cls=import_string)
+
+
+def test_defaults():
+    """Check the default values.
+
+    This test is intended as a double-check so that any change in default
+    values must be made both here and in the config model.
+    """
+    config = ThingServerConfig(things={})
+    assert config.things == {}
+    assert config.api_prefix == ""
+    assert config.application_config is None
+    assert config.enable_global_lock is False
+    assert config.global_lock_log_level == "INFO"
+    assert config.settings_folder is None
+    # Check there aren't any fields missing from this test
+    assert len(ThingServerConfig.model_fields) == 6
