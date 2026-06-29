@@ -3,8 +3,8 @@
 ## Documentation (Currently on ReadTheDocs)
 JOSS requires clear documentation that allows a new user to understand and use the software.
 
-- [ ] Verify Installation Instructions: Ensure the pip install instructions are clear and account for any system-level dependencies.
-    - [ ] Add additional instructions for Windows specific installation as there are additional requirements (MR #367)
+- [x] Verify Installation Instructions: Ensure the pip install instructions are clear and account for any system-level dependencies.
+    - [x] Add additional instructions for Windows specific installation as there are additional requirements (MR #367)
 
 - [ ] Usage Examples / Tutorials: Reviewers need to see examples of how to use the software to solve real-world problems. Ensure the ReadTheDocs includes a clear, executable example of spinning up a Thing and interacting with it.
 
@@ -26,10 +26,10 @@ JOSS reviewers will look closely at the testing framework to ensure the software
 ## Community & Repository Health
 JOSS requires evidence of open development practices and a welcoming environment for external contributors.
 
-- [ ] Add a CONTRIBUTING.md file: We currently have "Developer notes" in the README, but JOSS strongly prefers a dedicated CONTRIBUTING.md file outlining how users can submit issues, run tests, and open pull requests. This file should include how to: (MR #367)
-    - [ ] Contribute to the software (code/docs). (MR #367)
-    - [ ] Report issues or bugs. (MR #367)
-    - [ ] Seek support. (MR #367)
+- [x] Add a CONTRIBUTING.md file: We currently have "Developer notes" in the README, but JOSS strongly prefers a dedicated CONTRIBUTING.md file outlining how users can submit issues, run tests, and open pull requests. This file should include how to: (MR #367)
+    - [x] Contribute to the software (code/docs). (MR #367)
+    - [x] Report issues or bugs. (MR #367)
+    - [x] Seek support. (MR #367)
 
 - [ ] Verify Issue Tracker Activity: JOSS requires evidence of iterative development over time. With over 1,000 commits over the last 3 years and active PRs/Issues, we should easily pass this gate.
 
