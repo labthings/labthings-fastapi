@@ -67,7 +67,7 @@ Assuming you have both repositories cloned in the same parent directory:
 # 1. Setup the OpenFlexure Microscope Server
 cd ../openflexure-microscope-server
 git checkout v3
-pip install -e .[dev]
+pip install -r dev-requirements.txt
 
 # 2. Install your local version of labthings-fastapi
 pip install -e ../labthings-fastapi
