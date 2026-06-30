@@ -66,12 +66,8 @@ artifacts = ["src/*.json", "src/*.jinja"]
 
 [tool.pytest.ini_options]
 addopts = [
-    "--cov=labthings_fastapi",
-    "--cov-report=term",
-    "--cov-report=xml:coverage.xml",
-    "--cov-report=html:htmlcov",
-    "--cov-report=lcov",
     "--cov=src",
+    "--cov-report=lcov",
     "--cov-report=json",
 ]
 markers = [
