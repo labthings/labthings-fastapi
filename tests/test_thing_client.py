@@ -2,7 +2,7 @@
 
 import re
 
-import httpx
+import httpx2
 import pytest
 
 import labthings_fastapi as lt
@@ -288,8 +288,8 @@ def test_poll_invocation_errors(mocker):
         "id": 0,
     }
     # This error conforms to "problem_details" format
-    client = mocker.Mock(spec=httpx.Client)
-    response = mocker.Mock(spec=httpx.Response)
+    client = mocker.Mock(spec=httpx2.Client)
+    response = mocker.Mock(spec=httpx2.Response)
     response.is_error = True
     response.status_code = 500
     response.json = mocker.MagicMock(return_value={"detail": "expected error text"})

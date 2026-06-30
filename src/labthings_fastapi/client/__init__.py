@@ -1,7 +1,7 @@
 """Code to access `~lt.Thing` features over HTTP.
 
 This module defines a base class for controlling LabThings-FastAPI over HTTP.
-It is based on `httpx`, and attempts to create a simple wrapper such that
+It is based on `httpx2`, and attempts to create a simple wrapper such that
 each Action becomes a method and each Property becomes an attribute.
 """
 
@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from typing import Any, Optional, Union
 from urllib.parse import urljoin, urlparse
 
-import httpx
+import httpx2
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from typing_extensions import Self  # 3.9, 3.10 compatibility
 
@@ -86,7 +86,7 @@ def invocation_href(invocation: dict) -> str:
 
 
 def poll_invocation(
-    client: httpx.Client,
+    client: httpx2.Client,
     invocation: dict,
     interval: float = 0.5,
     first_interval: float = 0.05,
@@ -99,7 +99,7 @@ def poll_invocation(
     has completed, whether it was successful, and retrieve its
     output.
 
-    :param client: the `httpx.Client` to use for HTTP requests.
+    :param client: the `httpx2.Client` to use for HTTP requests.
     :param invocation: the dictionary returned from the initial POST request.
     :param interval: sets how frequently we poll, in seconds.
     :param first_interval: sets how long we wait before the first
@@ -139,12 +139,12 @@ class ThingClient:
         creates a subclass with the right attributes.
     """
 
-    def __init__(self, base_url: str, client: Optional[httpx.Client] = None) -> None:
+    def __init__(self, base_url: str, client: Optional[httpx2.Client] = None) -> None:
         """Create a ThingClient connected to a remote Thing.
 
         :param base_url: the base URL of the Thing. This should be the URL
             of the Thing Description document.
-        :param client: an optional `httpx.Client` object to use for all
+        :param client: an optional `httpx2.Client` object to use for all
             HTTP requests. This may be a `fastapi.TestClient` object for
             testing purposes.
         """
@@ -152,7 +152,7 @@ class ThingClient:
         server = f"{parsed.scheme}://{parsed.netloc}"
         self.server = server
         self.path = parsed.path
-        self.client = client or httpx.Client(base_url=server)
+        self.client = client or httpx2.Client(base_url=server)
 
     def get_property(self, path: str) -> Any:
         """Make a GET request to retrieve the value of a property.
@@ -253,7 +253,7 @@ class ThingClient:
         # error DOC503 for this function.
         raise _invocation_error(invocation)
 
-    def follow_link(self, response: dict, rel: str) -> httpx.Response:
+    def follow_link(self, response: dict, rel: str) -> httpx2.Response:
         """Follow a link in a response object, by its `rel` attribute.
 
         :param response: is the dictionary returned by e.g. `.poll_invocation`.
@@ -268,7 +268,7 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, client: Optional[httpx.Client] = None) -> Self:
+    def from_url(cls, thing_url: str, client: Optional[httpx2.Client] = None) -> Self:
         """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
@@ -276,7 +276,7 @@ class ThingClient:
 
         :param thing_url: The base URL of the Thing, which should also be the
             URL of its Thing Description.
-        :param client: is an optional `httpx.Client` object. If not present,
+        :param client: is an optional `httpx2.Client` object. If not present,
             one will be created. This is particularly useful if you need to
             set HTTP options, or if you want to work with a local server
             object for testing purposes (see `fastapi.TestClient`).
@@ -284,7 +284,7 @@ class ThingClient:
         :return: a `~lt.ThingClient` subclass with properties and methods that
             match the retrieved Thing Description (see :ref:`wot_thing`).
         """
-        td_client = client or httpx
+        td_client = client or httpx2
         r = td_client.get(thing_url)
         r.raise_for_status()
         subclass = cls.subclass_from_td(r.json())
@@ -460,7 +460,7 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
     )
 
 
-def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> str:
+def _construct_failed_to_invoke_message(path: str, response: httpx2.Response) -> str:
     """Format an error for ThingClient to raise if an invocation fails to start.
 
     :param path: The path of the action

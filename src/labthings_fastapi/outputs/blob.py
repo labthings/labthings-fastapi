@@ -98,7 +98,7 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 
-import httpx
+import httpx2
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import (
@@ -195,18 +195,18 @@ class RemoteBlobData(BlobData):
     """
 
     def __init__(
-        self, media_type: str, href: str, client: httpx.Client | None = None
+        self, media_type: str, href: str, client: httpx2.Client | None = None
     ) -> None:
         """Create a reference to remote `.Blob` data.
 
         :param media_type: the MIME type of the data.
         :param href: the URL where it may be downloaded.
-        :param client: if supplied, this `httpx.Client` will be used to
+        :param client: if supplied, this `httpx2.Client` will be used to
             download the data.
         """
         super().__init__(media_type=media_type)
         self._href = href
-        self._client = client or httpx.Client()
+        self._client = client or httpx2.Client()
 
     def get_href(self) -> str:
         """Return the URL to download the data.
@@ -882,7 +882,7 @@ class Blob:
     def from_url(
         cls,
         href: str,
-        client: httpx.Client | None = None,
+        client: httpx2.Client | None = None,
         media_type: str | None = None,
     ) -> Self:
         """Create a `.Blob` that references data at a URL.
@@ -892,7 +892,7 @@ class Blob:
         of `.Blob` that has set ``media_type``.
 
         :param href: the URL where the data may be downloaded.
-        :param client: if supplied, this `httpx.Client` will be used to
+        :param client: if supplied, this `httpx2.Client` will be used to
             download the data.
         :param media_type: the media type of the supplied data, defaults to
             the ``media_type`` attribute of this class.
