@@ -33,7 +33,7 @@ import typing
 from collections.abc import Iterator
 from itertools import pairwise
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Generic, Mapping, TypeVar, overload
+from typing import Any, Generic, Mapping, TypeVar, overload
 from weakref import WeakKeyDictionary, ref
 
 from typing_extensions import Self
@@ -48,13 +48,10 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.utilities.introspection import get_docstring, get_summary
 
-if TYPE_CHECKING:
-    from labthings_fastapi.thing import Thing
-
 Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""
 
-Owner = TypeVar("Owner", bound="Thing")
+Owner = TypeVar("Owner")
 """A Thing subclass that owns a descriptor."""
 
 Descriptor = TypeVar("Descriptor", bound="BaseDescriptor")
@@ -970,7 +967,7 @@ def get_class_attribute_docstrings(cls: type) -> Mapping[str, str]:
     # any guarantee docstrings are available.
     try:
         src = inspect.getsource(cls)
-    except (OSError, AttributeError):
+    except (OSError, AttributeError, TypeError):
         # An OSError is raised if the source is not available.
         # An AttributeError is raised if the source was loaded from
         # a WindowsPath object, perhaps using ``runpy``

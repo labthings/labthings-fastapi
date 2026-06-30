@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import Any, Optional, Union
+from typing import Any, Generic, Optional, TypeVar
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from pydantic import BaseModel, TypeAdapter, ValidationError
-from typing_extensions import Self  # 3.9, 3.10 compatibility
+from pydantic import BaseModel, RootModel, TypeAdapter, ValidationError
 
+from labthings_fastapi.base_descriptor import FieldTypedBaseDescriptor
+from labthings_fastapi.code_generation import generate_client_class
 from labthings_fastapi.exceptions import (
     ClientPropertyError,
     FailedToInvokeActionError,
@@ -25,9 +26,22 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.outputs.blob import Blob, RemoteBlobData
 from labthings_fastapi.problem_details import ProblemDetails, docs_url
+from labthings_fastapi.thing_description._model import ThingDescription
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
+
+
+def _optional() -> Any:
+    """Return `...` to signify an unspecified default.
+
+    This function returns `...` but is typed as `Any` so that it
+    may be used as a Pydantic default factory when we don't ever
+    want to see the default value.
+
+    :returns: `...` as a sentinel for a missing value.
+    """
+    return ...
 
 
 class ObjectHasNoLinksError(KeyError):
@@ -219,17 +233,30 @@ class ThingClient:
         :raise GlobalLockBusyError: if the action fails because of the global lock.
         :raise InvocationCancelledError: if the action is cancelled.
         """
-        for k in kwargs.keys():
-            value = kwargs[k]
-            if isinstance(value, Blob):
-                # Blob objects may be used as input to a subsequent
-                # action. When this is done, they should be serialised by
-                # pydantic, to a dictionary that includes href and media_type.
-                #
-                # Note that the blob will not be uploaded: we rely on the blob
-                # still existing on the server.
-                kwargs[k] = TypeAdapter(Blob).dump_python(value)
-        response = self.client.post(urljoin(self.path, path), json=kwargs)
+        # weed out parameters that are `...`: these should not be sent, so that
+        # the server fills in its defaults.
+        payload = {}
+        for key, value in kwargs.items():
+            if value is ...:
+                # Items that are `...` should not be included
+                continue
+            elif hasattr(value, "__get_pydantic_core_schema__") and not isinstance(
+                value, BaseModel
+            ):
+                # For "pydantic-compatible" custom types, we wrap them in a
+                # root model, so that they're serialised using the metadata
+                # attached to the type.
+                # This is important for `Blob` instances, for example.
+                # Note that `RootModel` accepts expressions and variables in its
+                # square brackets, hence the type: ignore.
+                payload[key] = RootModel[type(value)](value)  # type: ignore[misc,operator]
+            else:
+                # For now, we assume all other types will serialise OK
+                payload[key] = value
+        # The next line uses pydantic to serialise any models to simple types.
+        # We may in future serialise straight to JSON.
+        plain_payload = TypeAdapter(dict).dump_python(payload, exclude_unset=True)
+        response = self.client.post(urljoin(self.path, path), json=plain_payload)
         if response.is_error:
             message = _construct_failed_to_invoke_message(path, response)
             raise FailedToInvokeActionError(message)
@@ -268,7 +295,9 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, client: Optional[httpx.Client] = None) -> Self:
+    def from_url(
+        cls, thing_url: str, client: Optional[httpx.Client] = None
+    ) -> ThingClient:
         """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
@@ -284,14 +313,14 @@ class ThingClient:
         :return: a `~lt.ThingClient` subclass with properties and methods that
             match the retrieved Thing Description (see :ref:`wot_thing`).
         """
-        td_client = client or httpx
+        td_client = client or httpx.Client()
         r = td_client.get(thing_url)
         r.raise_for_status()
         subclass = cls.subclass_from_td(r.json())
         return subclass(thing_url, client=client)
 
     @classmethod
-    def subclass_from_td(cls, thing_description: dict) -> type[Self]:
+    def subclass_from_td(cls, thing_description: dict) -> type[ThingClient]:
         """Create a ThingClient subclass from a Thing Description.
 
         Dynamically subclass `~lt.ThingClient` to add properties and
@@ -303,161 +332,66 @@ class ThingClient:
         :return: a `~lt.ThingClient` subclass with the right properties and
             methods.
         """
-        my_thing_description = thing_description
-
-        class Client(cls):  # type: ignore[valid-type, misc]
-            # mypy wants the superclass to be statically type-able, but
-            # this isn't possible (for now) if we are to be able to
-            # use this class method on `ThingClient` subclasses, i.e.
-            # to provide customisation but also add methods from a
-            # Thing Description.
-            thing_description = my_thing_description
-
-        for name, p in thing_description["properties"].items():
-            add_property(Client, name, p)
-        for name, a in thing_description["actions"].items():
-            add_action(Client, name, a)
-        return Client
+        parsed_td = ThingDescription.model_validate(thing_description)
+        client_cls = generate_client_class(parsed_td)
+        return client_cls
 
 
-class PropertyClientDescriptor:
-    """A base class for properties on `~lt.ThingClient` objects."""
-
-    name: str
-    type: type | BaseModel
-    path: str
+Value = TypeVar("Value")
 
 
-def property_descriptor(
-    property_name: str,
-    model: Union[type, BaseModel],
-    description: Optional[str] = None,
-    readable: bool = True,
-    writeable: bool = True,
-    property_path: Optional[str] = None,
-) -> PropertyClientDescriptor:
-    """Create a correctly-typed descriptor that gets and/or sets a property.
+class ClientProperty(Generic[Value], FieldTypedBaseDescriptor[ThingClient, Value]):
+    """A descriptor to make properties of ThingClient objects work."""
 
-    The returned `.PropertyClientDescriptor` will have ``__get__`` and
-    (optionally) ``__set__`` methods that are typed according to the
-    supplied ``model``. The descriptor should be added to a `~lt.ThingClient`
-    subclass and used to access the relevant property via
-    `.ThingClient.get_property` and `.ThingClient.set_property`.
+    def __init__(
+        self,
+        read_only: bool = False,
+        write_only: bool = False,
+    ) -> None:
+        """Initialise a ClientProperty.
 
-    :param property_name: should be the name of the property (i.e. the
-        name it takes in the thing description, and also the name it is
-        assigned to in the class).
-    :param model: the Python ``type`` or a ``pydantic.BaseModel`` that
-        represents the datatype of the property.
-    :param description: text to use for a docstring.
-    :param readable: whether the property may be read (i.e. has ``__get__``).
-    :param writeable: whether the property may be written to.
-    :param property_path: the URL of the ``getproperty`` and ``setproperty``
-        HTTP endpoints. Currently these must both be the same. These are
-        relative to the ``base_url``, i.e. the URL of the Thing Description.
+        :param read_only: whether the property should be read-only.
+        :param write_only: whether the property should be write-only.
+        """
+        super().__init__()
+        self.read_only = read_only
+        self.write_only = write_only
 
-    :return: a descriptor allowing access to the specified property.
-    """
+    def instance_get(self, obj: ThingClient) -> Value:
+        """Retrieve the property.
 
-    class P(PropertyClientDescriptor):
-        name = property_name
-        type = model
-        path = property_path or property_name
-
-    if readable:
-
-        def __get__(
-            self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
-        ) -> Any:
-            if obj is None:
-                return self
-            return obj.get_property(self.name)
-    else:
-
-        def __get__(
-            self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
-        ) -> Any:
+        :param obj: the client object on which the property is accessed.
+        :return: the value of the property.
+        :raises ClientPropertyError: if the property is write-only.
+        """
+        if self.write_only:
             raise ClientPropertyError("This property may not be read.")
+        return obj.get_property(self.name)
 
-    __get__.__annotations__["return"] = model
-    P.__get__ = __get__  # type: ignore[attr-defined]
+    def __set__(self, obj: ThingClient, value: Value) -> None:
+        """Retrieve the property.
 
-    # Set __set__ method based on whether writable
-    if writeable:
-
-        def __set__(
-            self: PropertyClientDescriptor, obj: ThingClient, value: Any
-        ) -> None:
-            obj.set_property(self.name, value)
-    else:
-
-        def __set__(
-            self: PropertyClientDescriptor, obj: ThingClient, value: Any
-        ) -> None:
+        :param obj: the client object on which the property is set.
+        :param value: the new value for the property.
+        :raises ClientPropertyError: if the property is read-only.
+        """
+        if self.read_only:
             raise ClientPropertyError("This property may not be set.")
-
-    __set__.__annotations__["value"] = model
-    P.__set__ = __set__  # type: ignore[attr-defined]
-    if description:
-        P.__doc__ = description
-    return P()
+        return obj.set_property(self.name, value)
 
 
-def add_action(cls: type[ThingClient], action_name: str, action: dict) -> None:
-    """Add an action to a ThingClient subclass.
+def client_property(read_only: bool = False, write_only: bool = False) -> Any:
+    r"""Create a `ClientProperty` descriptor.
 
-    A method will be added to the class that calls the provided action.
-    Currently, this will have a return type hint but no argument names
-    or type hints.
+    This function returns a `ClientProperty` and passes all parameters directly
+    to the constructor. It's typed as `Any` so that we can use it as a field-style
+    placeholder just like `lt.property`\ .
 
-    :param cls: the `~lt.ThingClient` subclass to which we are adding the
-        action.
-    :param action_name: is both the name we assign the method to, and
-        the name of the action in the Thing Description.
-    :param action: a dictionary representing the action, in :ref:`wot_td`
-        format.
+    :param read_only: whether the property is read only.
+    :param write_only: whether the property is write only.
+    :return: a `ClientProperty` descriptor.
     """
-
-    def action_method(self: ThingClient, **kwargs: Any) -> Any:
-        return self.invoke_action(action_name, **kwargs)
-
-    if "output" in action and "type" in action["output"]:
-        action_method.__annotations__["return"] = action["output"]["type"]
-    if "description" in action:
-        action_method.__doc__ = action["description"]
-    setattr(cls, action_name, action_method)
-
-
-def add_property(cls: type[ThingClient], property_name: str, property: dict) -> None:
-    """Add a property to a ThingClient subclass.
-
-    A descriptor will be added to the provided class that makes the
-    attribute ``property_name`` get and/or set the property described
-    by the ``property`` dictionary.
-
-
-    :param cls: the `~lt.ThingClient` subclass to which we are adding the
-        property.
-    :param property_name: is both the name we assign the descriptor to, and
-        the name of the property in the Thing Description.
-    :param property: a dictionary representing the property, in :ref:`wot_td`
-        format.
-    """
-    setattr(
-        cls,
-        property_name,
-        property_descriptor(
-            property_name,
-            property.get("type", Any),
-            description=property.get("description", None),
-            writeable=not property.get("readOnly", False),
-            readable=not property.get("writeOnly", False),
-        ),
-    )
+    return ClientProperty(read_only=read_only, write_only=write_only)
 
 
 def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> str:
