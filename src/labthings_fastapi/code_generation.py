@@ -335,7 +335,17 @@ class DataSchemaConverter:
             if isinstance(schema.properties, Mapping):
                 return self.convert_to_model(schema, recursion_depth=recursion_depth)
             return _name("dict")
+        elif (
+            schema.type is None
+            and schema.enum is None
+            and schema.oneOf is None
+            and schema.const is None
+        ):
+            # If the schema is really empty, it should be `Any` and there's no need for
+            # a warning.
+            return _name("Any")
         if self.warn_on_fallback:
+            # If we've found a type that we don't understand, warn then use `Any`
             warnings.warn(
                 f"Could not convert {schema} to a Python type, falling back to `Any`.",
                 stacklevel=1,
