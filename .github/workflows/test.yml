@@ -22,7 +22,7 @@ jobs:
 
       - name: Test with pytest
         run: |
-          pytest --cov=src --cov-report=lcov
+          pytest
           mv coverage.lcov base-coverage.lcov
 
       - name: Upload code coverage for base branch
@@ -77,13 +77,15 @@ jobs:
         run: flake8 src
 
       - name: Test with pytest
-        run: pytest --cov=src --cov-report=lcov
+        run: pytest
 
       - name: Upload code coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.python }}
-          path: ./coverage.lcov
+          path: |
+            ./coverage.lcov
+            ./coverage.json
       
       - name: Analyse with MyPy
         run: mypy
@@ -121,7 +123,7 @@ jobs:
 
       - name: Test with pytest
         if: success() || failure()
-        run: pytest --cov=src --cov-report=lcov
+        run: pytest
 
       - name: Check quickstart, including installation
         if: success() || failure()
@@ -135,6 +137,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-3.12
+
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Update Coverage Badge
+        # Only run this on the main branch so PRs don't overwrite the main badge
+        if: github.ref == 'refs/heads/main'
+        uses: Schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 936bcec8e1815a49d1e7f947924ffa3f
+          filename: labthings-fastapi-coverage.json
+          label: coverage
+          message: ${{ steps.get-coverage.outputs.coverage }}%
+          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          maxColorRange: 90
+          minColorRange: 50
 
       - name: Download code coverage report for base branch
         id: download-base-coverage

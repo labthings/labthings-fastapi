@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/rwb27/labthings-fastapi/branch/main/graph/badge.svg?token=IR4QNA8X6M)](https://codecov.io/gh/rwb27/labthings-fastapi)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/bprobert97/936bcec8e1815a49d1e7f947924ffa3f/raw/labthings-fastapi-coverage.json)
 [![Documentation Status](https://readthedocs.org/projects/labthings-fastapi/badge/?version=latest)](https://labthings-fastapi.readthedocs.io/en/latest/?badge=latest)
 
 # labthings-fastapi
@@ -22,7 +22,7 @@ See [readthedocs] for installation instructions that are automatically tested. Y
 >
 > *If you are using a centrally managed machine, you will need administrator privileges to install these system-level dependencies.*
 
-For instructions on how to set up a development environment, run tests, and contribute to this project, please see [CONTRIBUTING.md].
+For instructions on how to set up a development environment, run tests, and contribute to this project, please see our [Contributor Guidelines] and [Testing Guidelines].
 
 ## Demo
 
@@ -33,4 +33,5 @@ See [readthedocs] for a runnable demo.
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
 [pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
-[CONTRIBUTING.md]: ./CONTRIBUTING.md
+[Contributor Guidelines]: ./docs/source/contributing.md
+[Testing Guidelines]: ./docs/source/testing.md

@@ -19,6 +19,7 @@ Documentation for LabThings-FastAPI
    updates_and_features.rst
    see_also.rst
    examples.rst
+   testing.md
    wot_core_concepts.rst
    removed_features.rst
 

@@ -23,7 +23,7 @@ then install labthings with:
     :start-after: BEGIN install
     :end-before: END install
 
-It is also possible to install LabThings from source, by cloning the GitHub repository and running ``pip install -e .[dev]``, but this is only recommended if you intend to alter the LabThings-FastAPI library; it is best to use the published package unless you have a good reason not to.
+It is also possible to install LabThings from source, by cloning the GitHub repository and running ``pip install -r dev-requirements.txt``, but this is only recommended if you intend to alter the LabThings-FastAPI library; it is best to use the published package unless you have a good reason not to.
 
 
 Installation Notes
