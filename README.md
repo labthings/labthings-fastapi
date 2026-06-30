@@ -33,5 +33,5 @@ See [readthedocs] for a runnable demo.
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
 [pre-commit hook]: https://openflexure.org/contribute#use-git-hooks-for-ci-checks
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
-[CONTRIBUTING.md]: ./CONTRIBUTING.md
+[CONTRIBUTING.md]: ./docs/source/contributing.md
 [`testing.md`]: ./docs/source/testing.md

@@ -90,4 +90,4 @@ mypy src                                   # Run OFM static type checks
 ```
 
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
-[`CONTRIBUTING.md`]: ../../CONTRIBUTING.md
+[`CONTRIBUTING.md`]: ./contributing.md
