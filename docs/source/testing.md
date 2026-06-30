@@ -5,7 +5,7 @@ Our test suite ensures the framework functions correctly, maintains code quality
 ## Continuous Integration (CI) Pipeline
 
 When you submit a Pull Request (PR), our GitHub Actions CI pipeline automatically runs a comprehensive suite of checks. Your PR must pass these checks before it can be merged.
-You can find out more about contributing code in [`CONTRIBUTING.md`].
+You can find out more about contributing code in our [Contributor Guidelines].
 
 Here is what the CI pipeline tests:
 
@@ -90,4 +90,4 @@ mypy src                                   # Run OFM static type checks
 ```
 
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
-[`CONTRIBUTING.md`]: ./contributing.md
+[Contributor Guidelines]: ./contributing.md
