@@ -1,14 +1,15 @@
 r"""Test code for `.server.config_model`\ ."""
 
-from pydantic import ValidationError
 import pytest
-from labthings_fastapi.server.config_model import (
-    ThingConfig,
-    ThingServerConfig,
-    ThingImportFailure,
-)
+from pydantic import ValidationError
+
 import labthings_fastapi.example_things
 from labthings_fastapi.example_things import MyThing
+from labthings_fastapi.server.config_model import (
+    ThingConfig,
+    ThingImportFailure,
+    ThingServerConfig,
+)
 
 
 def test_ThingConfig():

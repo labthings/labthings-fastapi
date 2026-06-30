@@ -1,26 +1,28 @@
 import gc
+
 import pytest
+
+import labthings_fastapi as lt
 from labthings_fastapi.base_descriptor import (
     BaseDescriptor,
     BaseDescriptorInfo,
-    DescriptorInfoCollection,
-    FieldTypedBaseDescriptor,
-    DescriptorNotAddedToClassError,
     DescriptorAddedToClassTwiceError,
+    DescriptorInfoCollection,
+    DescriptorNotAddedToClassError,
+    FieldTypedBaseDescriptor,
     FieldTypedBaseDescriptorInfo,
     OptionallyBoundDescriptor,
     OptionallyBoundInfo,
     get_class_attribute_docstrings,
 )
-from labthings_fastapi.testing import create_thing_without_server
-from .utilities import raises_or_is_caused_by
 from labthings_fastapi.exceptions import (
-    MissingTypeError,
     InconsistentTypeError,
+    MissingTypeError,
     NotBoundToInstanceError,
     UnexpectedGarbageCollectionError,
 )
-import labthings_fastapi as lt
+from labthings_fastapi.testing import create_thing_without_server
+from tests.utilities import raises_or_is_caused_by
 
 
 class MockProperty(BaseDescriptor[lt.Thing, str]):

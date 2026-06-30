@@ -19,18 +19,20 @@ with a single Thing instance. This may change in the future.
 """
 
 from __future__ import annotations
-from anyio import create_memory_object_stream, create_task_group
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+
 import logging
-from fastapi import WebSocket, WebSocketDisconnect
-from fastapi.encoders import jsonable_encoder
 from typing import TYPE_CHECKING, Literal
 
+from anyio import create_memory_object_stream, create_task_group
+from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+
+from labthings_fastapi.exceptions import PropertyNotObservableError
 from labthings_fastapi.message_broker import Message, MessageBroker
-from .exceptions import PropertyNotObservableError
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 LOGGER = logging.getLogger(__file__)
 

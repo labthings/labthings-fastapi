@@ -6,45 +6,45 @@ provides the tools to serve and manage `~lt.Thing` instances.
 See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
+import logging
+import os
 import warnings
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from types import MappingProxyType
+from typing import Any, AsyncGenerator, Optional, TypeVar, overload
+
+import uvicorn
+from anyio.from_thread import BlockingPortal
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
-from typing import Any, AsyncGenerator, Optional, TypeVar, overload
-from fastapi.responses import JSONResponse
 from typing_extensions import Self
-import os
-import logging
 
-from fastapi import APIRouter, FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from anyio.from_thread import BlockingPortal
-from contextlib import asynccontextmanager, AsyncExitStack, contextmanager
-from collections.abc import Iterator, Mapping, Sequence
-from types import MappingProxyType
-import uvicorn
-
+from labthings_fastapi.actions import ActionManager
 from labthings_fastapi.exceptions import GlobalLockBusyError
+from labthings_fastapi.global_lock import GlobalLock
+from labthings_fastapi.logs import configure_thing_logger
 from labthings_fastapi.message_broker import MessageBroker
-
-from ..middleware.url_for import url_for_middleware
-from ..thing_slots import ThingSlot
-from ..utilities import class_attributes
-
-from ..actions import ActionManager
-from ..logs import configure_thing_logger
-from ..thing import Thing
-from ..thing_server_interface import ThingServerInterface
-from ..thing_description._model import ThingDescription
-from ..global_lock import GlobalLock
-from .config_model import (
-    ThingsConfig,
-    ThingServerConfig,
-    normalise_things_config as normalise_things_config,
-)
+from labthings_fastapi.middleware.url_for import url_for_middleware
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from labthings_fastapi.outputs import blob
+from labthings_fastapi.server.config_model import (
+    ThingsConfig,
+    ThingServerConfig,
+)
+from labthings_fastapi.server.config_model import (
+    normalise_things_config as normalise_things_config,
+)
+from labthings_fastapi.thing import Thing
+from labthings_fastapi.thing_description._model import ThingDescription
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.thing_slots import ThingSlot
+from labthings_fastapi.utilities import class_attributes
 
 __all__ = ["ThingServer"]
 

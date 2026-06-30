@@ -3,9 +3,9 @@ from tempfile import TemporaryDirectory
 from threading import Thread
 from typing import Any
 
-from annotated_types import Ge, Le, Gt, Lt, MultipleOf, MinLen, MaxLen
-from pydantic import BaseModel, RootModel, ValidationError
 import pytest
+from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen, MultipleOf
+from pydantic import BaseModel, RootModel, ValidationError
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
@@ -16,7 +16,7 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server, mock_thing_instance
-from .temp_client import poll_task
+from tests.temp_client import poll_task
 
 
 class Unjsonable:

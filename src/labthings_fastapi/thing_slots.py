@@ -41,15 +41,16 @@ typed and documented on the class, i.e.
             return self.thing_a.say_hello()
 """
 
+from collections.abc import Iterable, Mapping, Sequence
 from types import EllipsisType, NoneType, UnionType
-from typing import Any, Generic, TypeVar, TYPE_CHECKING, Union, get_args, get_origin
-from collections.abc import Mapping, Iterable, Sequence
-from weakref import ReferenceType, WeakKeyDictionary, ref, WeakValueDictionary
-from .base_descriptor import FieldTypedBaseDescriptor
-from .exceptions import ThingNotConnectedError, ThingSlotError
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args, get_origin
+from weakref import ReferenceType, WeakKeyDictionary, WeakValueDictionary, ref
+
+from labthings_fastapi.base_descriptor import FieldTypedBaseDescriptor
+from labthings_fastapi.exceptions import ThingNotConnectedError, ThingSlotError
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound="Thing")

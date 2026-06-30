@@ -4,8 +4,8 @@ import re
 
 import httpx
 import pytest
-import labthings_fastapi as lt
 
+import labthings_fastapi as lt
 from labthings_fastapi.client import poll_invocation
 from labthings_fastapi.exceptions import (
     ClientPropertyError,

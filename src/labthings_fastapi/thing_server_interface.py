@@ -1,11 +1,12 @@
 r"""Interface between `~lt.Thing` subclasses and the `~lt.ThingServer`\ ."""
 
 from __future__ import annotations
+
+import os
 from collections.abc import Iterator
 from concurrent.futures import Future
 from contextlib import contextmanager
 from copy import deepcopy
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,16 +16,15 @@ from typing import (
     ParamSpec,
     TypeVar,
 )
-from weakref import ref, ReferenceType
+from weakref import ReferenceType, ref
 
+from labthings_fastapi.exceptions import FeatureNotEnabledError, ServerNotRunningError
 from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.message_broker import Message
 
-from .exceptions import FeatureNotEnabledError, ServerNotRunningError
-
 if TYPE_CHECKING:
-    from .server import ThingServer
-    from .actions import ActionManager
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 Params = ParamSpec("Params")

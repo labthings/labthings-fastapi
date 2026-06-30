@@ -6,37 +6,45 @@ for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
+
 import json
-from typing import TYPE_CHECKING, Any, Optional
-from pydantic import ValidationError
-from typing_extensions import Self
-from collections.abc import Mapping
 import logging
 import os
+from collections.abc import Mapping
 from json.decoder import JSONDecodeError
-from fastapi.encoders import jsonable_encoder
-from fastapi import Request, WebSocket
-from anyio.to_thread import run_sync
+from typing import TYPE_CHECKING, Any, Optional
 
-from .logs import THING_LOGGER
-from .properties import (
+from anyio.to_thread import run_sync
+from fastapi import Request, WebSocket
+from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
+from typing_extensions import Self
+
+from labthings_fastapi.actions import ActionCollection
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
+from labthings_fastapi.invocation_contexts import get_invocation_id
+from labthings_fastapi.logs import THING_LOGGER
+from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
 )
-from .actions import ActionCollection
-from .base_descriptor import OptionallyBoundDescriptor
-from .thing_description._model import ThingDescription, NoSecurityScheme
-from .utilities import class_attributes
-from .thing_description import validation
-from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint
-from .thing_server_interface import ThingServerInterface
-from .invocation_contexts import get_invocation_id
-from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
+from labthings_fastapi.thing_class_settings import (
+    ThingClassSettings,
+    validate_thing_class_settings,
+)
+from labthings_fastapi.thing_description import validation
+from labthings_fastapi.thing_description._model import (
+    NoSecurityScheme,
+    ThingDescription,
+)
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.utilities import class_attributes
+from labthings_fastapi.utilities.introspection import get_docstring, get_summary
+from labthings_fastapi.websockets import websocket_endpoint
 
 if TYPE_CHECKING:
-    from .server import ThingServer
-    from .actions import ActionManager
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 class Thing:

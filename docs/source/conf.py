@@ -1,7 +1,8 @@
+import importlib.metadata
 import inspect
 import logging
+
 import labthings_fastapi as lt
-import importlib.metadata
 
 # Configuration file for the Sphinx documentation builder.
 #

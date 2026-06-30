@@ -1,8 +1,9 @@
 import pytest
+
 from labthings_fastapi.utilities.introspection import (
-    input_model_from_signature,
-    StrictEmptyInput,
     EmptyInput,
+    StrictEmptyInput,
+    input_model_from_signature,
 )
 
 

@@ -5,24 +5,25 @@ in ``test_action_logging`` with bottom-up tests for code in the
 `.logs` module.
 """
 
-from collections import deque
 import json
 import logging
+from collections import deque
 from types import EllipsisType
-import pytest
 from uuid import UUID, uuid4
+
+import pytest
+
+import labthings_fastapi as lt
 from labthings_fastapi import logs
-from labthings_fastapi.invocations import LogRecordModel
+from labthings_fastapi.exceptions import LogConfigurationError
 from labthings_fastapi.invocation_contexts import (
     fake_invocation_context,
     set_invocation_id,
 )
-import labthings_fastapi as lt
-from labthings_fastapi.exceptions import LogConfigurationError
-from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.server.cli import serve_from_cli
-
-from .temp_client import poll_task
+from labthings_fastapi.testing import create_thing_without_server
+from tests.temp_client import poll_task
 
 
 class ThingThatLogs(lt.Thing):

@@ -6,8 +6,9 @@ it's not, it may mean those utility functions should be removed as they
 are not used.
 """
 
-from pydantic import BaseModel, RootModel
 import pytest
+from pydantic import BaseModel, RootModel
+
 from labthings_fastapi import utilities
 from labthings_fastapi.utilities.introspection import EmptyObject
 

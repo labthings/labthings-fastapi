@@ -4,17 +4,16 @@ Both properties and actions can emit events that may be observed. This module ha
 all the pub-sub messaging in LabThings.
 """
 
-import anyio
-from pydantic.dataclasses import dataclass
-from typing import Any, Literal
-from weakref import WeakSet
 import logging
 import warnings
+from typing import Any, Literal
+from weakref import WeakSet
 
+import anyio
 from anyio.streams.memory import MemoryObjectSendStream
+from pydantic.dataclasses import dataclass
 
 from labthings_fastapi.exceptions import MessageDroppedWarning
-
 
 LOGGER = logging.getLogger(__name__)
 

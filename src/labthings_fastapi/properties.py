@@ -46,10 +46,12 @@ Adding a "setter" to properties is optional, and makes them read-write.
 """
 
 from __future__ import annotations
+
 import builtins
 from collections.abc import Mapping
 from types import EllipsisType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Callable,
@@ -57,11 +59,9 @@ from typing import (
     Literal,
     TypeVar,
     overload,
-    TYPE_CHECKING,
 )
-from typing_extensions import Self, TypedDict
 
-from fastapi import Body, FastAPI, Response, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Response
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -71,28 +71,14 @@ from pydantic import (
     create_model,
     with_config,
 )
+from typing_extensions import Self, TypedDict
 
-from labthings_fastapi.message_broker import Message
-
-from .thing_description import type_to_dataschema
-from .thing_description._model import (
-    DataSchema,
-    Form,
-    PropertyAffordance,
-    PropertyOp,
-)
-from .utilities import (
-    RootModelWrapper,
-    serialise_from_user_code,
-    validate_from_user_code,
-)
-from .utilities.introspection import return_type
-from .base_descriptor import (
+from labthings_fastapi.base_descriptor import (
     DescriptorInfoCollection,
     FieldTypedBaseDescriptor,
     FieldTypedBaseDescriptorInfo,
 )
-from .exceptions import (
+from labthings_fastapi.exceptions import (
     FeatureNotAvailableError,
     InvalidReturnValueError,
     NotConnectedToServerError,
@@ -101,10 +87,24 @@ from .exceptions import (
     UnserialisableTypeError,
     UnsupportedConstraintError,
 )
-from .thing_class_settings import get_validate_properties_on_set
+from labthings_fastapi.message_broker import Message
+from labthings_fastapi.thing_class_settings import get_validate_properties_on_set
+from labthings_fastapi.thing_description import type_to_dataschema
+from labthings_fastapi.thing_description._model import (
+    DataSchema,
+    Form,
+    PropertyAffordance,
+    PropertyOp,
+)
+from labthings_fastapi.utilities import (
+    RootModelWrapper,
+    serialise_from_user_code,
+    validate_from_user_code,
+)
+from labthings_fastapi.utilities.introspection import return_type
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 # Note on ignored linter codes:

@@ -12,11 +12,11 @@ from html import unescape
 
 import pytest
 import uvicorn
-
 from fastapi.testclient import TestClient
+
 import labthings_fastapi as lt
-from labthings_fastapi.server.fallback import app, FallbackApp, FallbackContext
 from labthings_fastapi.example_things import ThingThatCantStart
+from labthings_fastapi.server.fallback import FallbackApp, FallbackContext, app
 
 CONFIG_DICT = {
     "things": {

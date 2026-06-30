@@ -1,8 +1,9 @@
 import pytest
+
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
-    PropertyNotObservableError,
     InvocationCancelledError,
+    PropertyNotObservableError,
 )
 from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.websockets import assert_property_is_observable

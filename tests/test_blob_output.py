@@ -7,10 +7,11 @@ from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 import fastapi
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
 from pydantic_core import PydanticSerializationError
-import pytest
+
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
     FailedToInvokeActionError,

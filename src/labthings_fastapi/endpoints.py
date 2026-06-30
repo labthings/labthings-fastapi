@@ -14,24 +14,25 @@ more detail.
 """
 
 from __future__ import annotations
+
 from functools import partial, wraps
-
-from .base_descriptor import BaseDescriptor
-from .exceptions import NotConnectedToServerError
-from .utilities.introspection import get_docstring
-
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Literal,
     Mapping,
     Optional,
-    TYPE_CHECKING,
 )
+
 from fastapi import FastAPI
 
+from labthings_fastapi.base_descriptor import BaseDescriptor
+from labthings_fastapi.exceptions import NotConnectedToServerError
+from labthings_fastapi.utilities.introspection import get_docstring
+
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 HTTPMethod = Literal["get", "post", "put", "delete"]
 """Valid HTTP verbs to use with `.endpoint` or `.EndpointDescriptor`."""

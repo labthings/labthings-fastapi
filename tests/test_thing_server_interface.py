@@ -6,7 +6,6 @@ import tempfile
 from typing import Mapping
 from unittest.mock import Mock
 
-from labthings_fastapi.global_lock import GlobalLock
 import pytest
 
 import labthings_fastapi as lt
@@ -15,13 +14,14 @@ from labthings_fastapi.exceptions import (
     ServerNotRunningError,
     ThingNotConnectedError,
 )
-from labthings_fastapi.thing_server_interface import (
-    ThingServerInterface,
-    ThingServerMissingError,
-)
+from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.testing import (
     MockThingServerInterface,
     create_thing_without_server,
+)
+from labthings_fastapi.thing_server_interface import (
+    ThingServerInterface,
+    ThingServerMissingError,
 )
 
 from .test_global_lock import lock_is_available

@@ -5,9 +5,9 @@ be helpful to have some more bottom-up unit testing in this file.
 """
 
 import pytest
-import labthings_fastapi as lt
 from starlette.routing import Route
 
+import labthings_fastapi as lt
 from labthings_fastapi.example_things import MyThing
 from labthings_fastapi.server.config_model import ThingServerConfig
 

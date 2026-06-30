@@ -1,8 +1,9 @@
 """Useful functions for test code."""
 
+import time
 from contextlib import contextmanager
 from typing import Iterator
-import time
+
 import pytest
 
 

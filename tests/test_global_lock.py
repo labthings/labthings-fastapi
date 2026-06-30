@@ -1,21 +1,21 @@
 """Test code for the global lock."""
 
-from collections.abc import Iterator
 import logging
-from threading import Thread, Event
-import pytest
+from collections.abc import Iterator
 from contextlib import contextmanager
+from threading import Event, Thread
 
+import pytest
+
+import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
     ClientPropertyError,
     GlobalLockBusyError,
     ServerActionError,
 )
-from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.global_lock import GlobalLock
-import labthings_fastapi as lt
-
-from .utilities import assert_takes_time
+from labthings_fastapi.testing import create_thing_without_server
+from tests.utilities import assert_takes_time
 
 
 class LockChecker(Thread):

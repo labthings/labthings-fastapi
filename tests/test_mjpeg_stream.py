@@ -1,8 +1,10 @@
 import io
 import threading
 import time
-from PIL import Image
+
 import pytest
+from PIL import Image
+
 import labthings_fastapi as lt
 
 

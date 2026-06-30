@@ -1,31 +1,33 @@
 """Utility functions used by LabThings-FastAPI."""
 
 from __future__ import annotations
+
 from collections.abc import Callable, Mapping
 from types import FunctionType
 from typing import Any, Dict, Generic, Iterable, Optional, TypeVar
+
+from fastapi import Response
 from pydantic import (
     BaseModel,
     Field,
-    RootModel,
-    create_model,
     PydanticSchemaGenerationError,
+    RootModel,
     ValidationError,
+    create_model,
 )
 from pydantic_core import PydanticSerializationError
-from fastapi import Response
 
 from labthings_fastapi.exceptions import (
     InvalidReturnValueError,
-    UnsupportedConstraintError,
     UnserialisableTypeError,
+    UnsupportedConstraintError,
 )
-from .introspection import EmptyObject
+from labthings_fastapi.utilities.introspection import EmptyObject
 
 __all__ = [
-    "class_attributes",
-    "attributes",
     "RootModelWrapper",
+    "attributes",
+    "class_attributes",
     "model_to_dict",
 ]
 

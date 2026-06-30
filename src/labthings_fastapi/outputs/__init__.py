@@ -4,7 +4,7 @@ Currently, this submodule provides an MJPEG Stream output. See
 `.MJPEGStreamDescriptor`.
 """
 
-from .mjpeg_stream import MJPEGStream, MJPEGStreamDescriptor
+from labthings_fastapi.outputs.mjpeg_stream import MJPEGStream, MJPEGStreamDescriptor
 
 # __all__ enables convenience imports from this module.
 # see the note in src/labthings_fastapi/__init__.py for more details.

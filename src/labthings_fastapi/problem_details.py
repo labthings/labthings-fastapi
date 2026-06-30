@@ -4,9 +4,9 @@ This module defines a model and supporting functions that help to create
 "Problem Details" objects to represent errors in HTTP responses.
 """
 
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
-from pydantic import BaseModel, ConfigDict
 from labthings_fastapi import exceptions
 
 

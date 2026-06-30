@@ -4,12 +4,13 @@ This module contains types used to describe an `.Invocation`.
 """
 
 from __future__ import annotations
-from datetime import datetime
-from enum import Enum
+
 import logging
 import traceback
-from typing import Optional, Any, Sequence, TypeVar, Generic
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any, Generic, Optional, Sequence, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -19,8 +20,7 @@ from pydantic import (
 
 from labthings_fastapi.middleware.url_for import URLFor
 from labthings_fastapi.problem_details import ProblemDetails
-
-from .thing_description._model import Links
+from labthings_fastapi.thing_description._model import Links
 
 
 class InvocationStatus(Enum):
