@@ -341,6 +341,17 @@ def test_get_thing_logger(caplog):
     ]
 
 
+def test_custom_logger_class_applied():
+    """Check that we do get the custom logger class from `logging.getLogger()` ."""
+    assert logging.getLoggerClass() is logs.LoggerWithUser
+    assert isinstance(logging.getLogger("unused2"), logs.LoggerWithUser)
+    assert "user" in dir(logging.getLogger("unused2"))
+    assert isinstance(logs.get_thing_logger(), logs.LoggerWithUser)
+    assert isinstance(logs.get_thing_logger("unused3"), logs.LoggerWithUser)
+    thing = create_thing_without_server(ThingThatLogs, name="newthing1")
+    assert isinstance(thing.logger, logs.LoggerWithUser)
+
+
 @pytest.fixture
 def reset_custom_logger_class():
     """Undo customisation to the logger class."""
@@ -353,39 +364,21 @@ def reset_custom_logger_class():
         logging.setLoggerClass(old_class)
 
 
-def test_custom_logger_error(mocker, reset_custom_logger_class):
-    """Check the expected error is raised if logger customisation is broken.
-
-    I can't see how this would happen given we get the logger immediately after
-    applying the customisation, but the `isinstance` check is helpful for `mypy`
-    checking, and thus wants to stay (and needs a test).
-    """
-    # check new loggers are now missing `user`
-    assert "user" not in dir(logging.getLogger("unused_logger_name"))
-    assert "user" not in dir(
-        logging.getLogger(f"{logs.THING_LOGGER.name}.unused_logger_name")
-    )
-    # This should not have broken `Thing.logger` because `THING_LOGGER` still has
-    # the correct class (it was created before we broke things)
-    thing = create_thing_without_server(ThingThatLogs)
-    assert "user" in dir(thing.logger)
-
-    # If we really want to break things,
-    # we also need to mock the thing logger, otherwise it will keep using the
-    # (correct) customised class.
-    mocker.patch("labthings_fastapi.logs.THING_LOGGER", logging.getLogger("TEST"))
-    mocker.patch("labthings_fastapi.thing.THING_LOGGER", logging.getLogger("TEST"))
-    assert "user" not in dir(logs.THING_LOGGER)
-    # We should now have broken `lt.get_thing_logger`
-    with pytest.raises(
-        TypeError,
-        match="Customisations to `logging.Logger` have been lost.",
-    ):
-        lt.get_thing_logger()
-    # This should also break `Thing.logger` for new classes
-    thing2 = create_thing_without_server(ThingThatLogs)
-    with pytest.raises(
-        TypeError,
-        match="LabThings custom log level is missing!",
-    ):
-        _ = thing2.logger
+def test_logger_class_error(reset_custom_logger_class):
+    """Check that breaking our logger customisation produces an error."""
+    # First, check that the fixture has reset the logger class
+    assert logging.getLoggerClass() is logging.Logger
+    assert not isinstance(logging.getLogger("unused4"), logs.LoggerWithUser)
+    assert "user" not in dir(logging.getLogger("unused4"))
+    # We won't affect loggers that have already been obtained
+    assert isinstance(logs.THING_LOGGER, logs.LoggerWithUser)
+    assert isinstance(logs.get_thing_logger(), logs.LoggerWithUser)
+    # New loggers will have the wrong type
+    assert not isinstance(logs.THING_LOGGER.getChild("unused5"), logs.LoggerWithUser)
+    # This should lead to errors when we call `get_thing_logger`
+    with pytest.raises(TypeError, match="Customisations to the logger class "):
+        logs.get_thing_logger("unusedchildname1")
+    # Those errors should propagate through `Thing.logger` as well
+    thing = create_thing_without_server(ThingThatLogs, name="newthing2")
+    with pytest.raises(TypeError, match="Customisations to the logger class "):
+        _ = thing.logger

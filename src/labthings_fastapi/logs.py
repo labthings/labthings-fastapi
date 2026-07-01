@@ -64,19 +64,34 @@ logging.setLoggerClass(LoggerWithUser)
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
 
 
-def get_thing_logger() -> LoggerWithUser:
-    """Return the Thing Logger.
+def get_thing_logger(thing_name: str | None = None) -> LoggerWithUser:
+    r"""Return the Thing Logger, or a child logger.
 
     `lt.Thing.logger` will return a child of this logger, and any messages
     logged to this logger will be picked up by invocation logs, if they are
     logged from an invocation thread/context.
 
+    :param thing_name: the name of a `lt.Thing`\ . If supplied, we will get a child
+        logger (i.e. ``labthings_fastapi.things.{thing_name}``). By default,
+        the root Thing logger (``labthings_fastapi.things``) is returned.
     :return: the parent logger of all the `lt.Thing.logger` instances.
     :raises TypeError: if the logger is missing the ``user`` level.
     """
-    if not isinstance(THING_LOGGER, LoggerWithUser):
-        raise TypeError("Customisations to `logging.Logger` have been lost.")
-    return THING_LOGGER
+    if thing_name:
+        logger = THING_LOGGER.getChild(thing_name)
+    else:
+        logger = THING_LOGGER
+    if not isinstance(logger, LoggerWithUser):
+        msg = (
+            "Customisations to the logger class have been lost. "
+            "This probably means that `logging.setLoggerClass()` has been "
+            "called, and the new class was not a subclass of the old one. \n\n"
+            "To customise the logger without breaking the `USER` level added "
+            "by LabThings, you should call `logging.getLoggerClass()` and "
+            "subclass it when creating a new logger class."
+        )
+        raise TypeError(msg)
+    return logger
 
 
 def inject_invocation_id(record: logging.LogRecord) -> bool:
