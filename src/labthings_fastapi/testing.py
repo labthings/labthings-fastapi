@@ -174,6 +174,7 @@ def create_thing_without_server(
     settings_folder: str | None = None,
     mock_all_slots: bool = False,
     enable_global_lock: bool = True,
+    name: str | None = None,
     **kwargs: Any,
 ) -> ThingSubclass:
     r"""Create a `~lt.Thing` and supply a mock ThingServerInterface.
@@ -193,6 +194,7 @@ def create_thing_without_server(
         to the slot. So if an optional slot has a default of `None`, no mock
         will be provided.
     :param enable_global_lock: Whether a global lock should be provided.
+    :param name: Optionally specify the name of the created `~lt.Thing` .
     :param \**kwargs: keyword arguments to ``__init__``.
 
     :returns: an instance of ``cls`` with a `.MockThingServerInterface`
@@ -201,7 +203,7 @@ def create_thing_without_server(
     :raises ValueError: if a keyword argument called 'thing_server_interface'
         is supplied, as this would conflict with the mock interface.
     """
-    name = cls.__name__.lower()
+    name = name or cls.__name__.lower()
     if "thing_server_interface" in kwargs:
         msg = "You may not supply a keyword argument called 'thing_server_interface'."
         raise ValueError(msg)

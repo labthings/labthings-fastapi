@@ -14,7 +14,7 @@ from tests.temp_client import poll_task
 
 def log_externally():
     """A function that should show up in invocation logs."""
-    logger = lt.get_thing_logger().getChild("external")
+    logger = lt.get_thing_logger("external")
     logger.user("Take me to your user.")
 
 
