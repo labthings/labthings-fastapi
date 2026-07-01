@@ -23,7 +23,7 @@ from typing_extensions import Self
 from labthings_fastapi.actions import ActionCollection
 from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
 from labthings_fastapi.invocation_contexts import get_invocation_id
-from labthings_fastapi.logs import THING_LOGGER
+from labthings_fastapi.logs import LoggerWithUser, get_thing_logger
 from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
@@ -143,9 +143,18 @@ class Thing:
         return self._thing_server_interface.name
 
     @property
-    def logger(self) -> logging.Logger:
-        """A logger, named after this Thing."""
-        return THING_LOGGER.getChild(self.name)
+    def logger(self) -> LoggerWithUser:
+        r"""A logger, named after this Thing.
+
+        This logger will have an extra ``user`` method, which logs at a level
+        called ``USER`` in between ``INFO`` and ``WARNING``\ .
+
+        LabThings will handle messages logged to this logger, including relaying
+        them to clients over the network.
+
+        This logger will be obtained with `~lt.get_thing_logger`\ .
+        """
+        return get_thing_logger(self.name)
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.

@@ -401,8 +401,22 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.enable_global_lock
         :no-index:
 
+   .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.global_lock_log_level
+        :no-index:
+
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.application_config
         :no-index:
+
+
+.. py:function:: get_thing_logger(thing_name: str) -> logging.Logger
+
+    Return the parent logger of all the `~lt.Thing.logger` instances, or a child of it.
+    
+    This logger is where invocation logs are collected, so if you are writing code that
+    is not part of a `~lt.Thing` but still wants to show up in the log associated with
+    a particular invocation, you should create a child of this logger.
+
+    :param thing_name: if supplied, a child logger will be created using this name.
 
 
 .. py:class:: ThingClient

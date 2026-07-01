@@ -2,17 +2,96 @@
 
 This module currently contains code that allows us to filter out logs by invocaton
 ID, so that they may be returned when invocations are queried.
+
+It also defines the `USER` loglevel, which should be used for messages that are
+intended to be visible to the user in e.g. a graphical interface.
 """
 
 import logging
 from collections.abc import MutableSequence
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from weakref import WeakValueDictionary
 
 from labthings_fastapi.exceptions import LogConfigurationError, NoInvocationContextError
 from labthings_fastapi.invocation_contexts import get_invocation_id
 
+# Add the custom USER loglevel.
+USER = logging.INFO + 5
+logging.addLevelName(USER, "USER")
+
+
+# This allows mypy to work with a dynamic base class.
+# logging.getLoggerClass() should always return a subclass of logging.Logger
+# (and will usually return logging.Logger).
+# Using this dynamic base class means we're much less likely to break
+# customisations done to the logger by other code.
+if TYPE_CHECKING:
+    Logger = logging.Logger
+else:
+    Logger = logging.getLoggerClass()
+
+
+class LoggerWithUser(Logger):
+    """A subclass of `logging.Logger` with an extra `user` level."""
+
+    def user(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        r"""Log 'msg % args' with severity 'INFO'.
+
+        To pass exception information, use the keyword argument exc_info with
+        a true value, e.g.
+
+        .. code-block:: python
+
+            logger.info("Houston, we have a %s", "interesting problem", exc_info=1)
+
+        :param msg: The message to log, including `%` placeholders if desired.
+        :param \*args: Additional arguments can be used to customise ``msg``\ .
+        :param \**kwargs: Keyword arguments may be used to customise ``msg``\ .
+        """
+        if self.isEnabledFor(USER):
+            self._log(USER, msg, args, **kwargs)
+
+
+# We tell `logging` to use our new class, so `user` is available to all
+# loggers obtained with `logging.getLogger`
+# We do this before defining THING_LOGGER so that it gets the new level
+logging.setLoggerClass(LoggerWithUser)
+
+
+# Note that this is done **after** defining the new level, so that it's
+# of the correct class.
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
+
+
+def get_thing_logger(thing_name: str | None = None) -> LoggerWithUser:
+    r"""Return the Thing Logger, or a child logger.
+
+    `lt.Thing.logger` will return a child of this logger, and any messages
+    logged to this logger will be picked up by invocation logs, if they are
+    logged from an invocation thread/context.
+
+    :param thing_name: the name of a `lt.Thing`\ . If supplied, we will get a child
+        logger (i.e. ``labthings_fastapi.things.{thing_name}``). By default,
+        the root Thing logger (``labthings_fastapi.things``) is returned.
+    :return: the parent logger of all the `lt.Thing.logger` instances.
+    :raises TypeError: if the logger is missing the ``user`` level.
+    """
+    if thing_name:
+        logger = THING_LOGGER.getChild(thing_name)
+    else:
+        logger = THING_LOGGER
+    if not isinstance(logger, LoggerWithUser):
+        msg = (
+            "Customisations to the logger class have been lost. "
+            "This probably means that `logging.setLoggerClass()` has been "
+            "called, and the new class was not a subclass of the old one. \n\n"
+            "To customise the logger without breaking the `USER` level added "
+            "by LabThings, you should call `logging.getLoggerClass()` and "
+            "subclass it when creating a new logger class."
+        )
+        raise TypeError(msg)
+    return logger
 
 
 def inject_invocation_id(record: logging.LogRecord) -> bool:
@@ -39,7 +118,7 @@ class DequeByInvocationIDHandler(logging.Handler):
 
     def __init__(
         self,
-        level: int = logging.INFO,
+        level: int = logging.NOTSET,
     ) -> None:
         """Set up a log handler that appends messages to a deque.
 
@@ -48,8 +127,10 @@ class DequeByInvocationIDHandler(logging.Handler):
             the list. It's best to use a `deque` with a finite capacity
             to avoid memory leaks.
 
-        :param level: sets the level of the logger. For most invocations,
-            a log level of `logging.INFO` is appropriate.
+        :param level: sets the level of the handler. Usually
+            a log level of `logging.NOTSET` is appropriate. This does not
+            do any extra filtering, and so will use the log level of the
+            logger to which it is attached.
         """
         super().__init__()
         self.setLevel(level)

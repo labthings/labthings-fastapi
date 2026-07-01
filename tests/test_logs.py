@@ -130,7 +130,7 @@ def test_inject_invocation_id_withcontext():
 def test_dequebyinvocationidhandler():
     """Check the custom log handler works as expected."""
     handler = logs.DequeByInvocationIDHandler()
-    assert handler.level == logging.INFO
+    assert handler.level == logging.NOTSET
 
     destinations = {
         uuid4(): deque(),
@@ -302,3 +302,83 @@ def test_action_logs_over_http():
     for log in logs:
         log_as_model = LogRecordModel(**log)
         assert log_as_model.message == "foobar"
+
+
+def test_thing_logger_has_user_level(caplog):
+    """Check `Thing.logger` exposes a `user` function."""
+
+    class Dummy(lt.Thing):
+        pass
+
+    server = lt.ThingServer.from_things({"dummy": Dummy})
+    dummy = server.things["dummy"]
+    dummy.logger.user("Test message at USER level")
+    assert caplog.record_tuples == [
+        (
+            "labthings_fastapi.things.dummy",
+            logs.USER,
+            "Test message at USER level",
+        ),
+    ]
+
+
+def test_get_thing_logger(caplog):
+    """Check `lt.get_thing_logger` works and has a `user` function."""
+    logger = lt.get_thing_logger()
+    logger.user("Test message at USER level")
+    logger.getChild("child").user("Test message at USER level")
+    assert caplog.record_tuples == [
+        (
+            "labthings_fastapi.things",
+            logs.USER,
+            "Test message at USER level",
+        ),
+        (
+            "labthings_fastapi.things.child",
+            logs.USER,
+            "Test message at USER level",
+        ),
+    ]
+
+
+def test_custom_logger_class_applied():
+    """Check that we do get the custom logger class from `logging.getLogger()` ."""
+    assert logging.getLoggerClass() is logs.LoggerWithUser
+    assert isinstance(logging.getLogger("unused2"), logs.LoggerWithUser)
+    assert "user" in dir(logging.getLogger("unused2"))
+    assert isinstance(logs.get_thing_logger(), logs.LoggerWithUser)
+    assert isinstance(logs.get_thing_logger("unused3"), logs.LoggerWithUser)
+    thing = create_thing_without_server(ThingThatLogs, name="newthing1")
+    assert isinstance(thing.logger, logs.LoggerWithUser)
+
+
+@pytest.fixture
+def reset_custom_logger_class():
+    """Undo customisation to the logger class."""
+    old_class = logging.getLoggerClass()
+    logging.setLoggerClass(logging.Logger)  # reset logger customisation
+    try:
+        yield
+    finally:
+        # restore customisation so we don't break future tests
+        logging.setLoggerClass(old_class)
+
+
+def test_logger_class_error(reset_custom_logger_class):
+    """Check that breaking our logger customisation produces an error."""
+    # First, check that the fixture has reset the logger class
+    assert logging.getLoggerClass() is logging.Logger
+    assert not isinstance(logging.getLogger("unused4"), logs.LoggerWithUser)
+    assert "user" not in dir(logging.getLogger("unused4"))
+    # We won't affect loggers that have already been obtained
+    assert isinstance(logs.THING_LOGGER, logs.LoggerWithUser)
+    assert isinstance(logs.get_thing_logger(), logs.LoggerWithUser)
+    # New loggers will have the wrong type
+    assert not isinstance(logs.THING_LOGGER.getChild("unused5"), logs.LoggerWithUser)
+    # This should lead to errors when we call `get_thing_logger`
+    with pytest.raises(TypeError, match="Customisations to the logger class "):
+        logs.get_thing_logger("unusedchildname1")
+    # Those errors should propagate through `Thing.logger` as well
+    thing = create_thing_without_server(ThingThatLogs, name="newthing2")
+    with pytest.raises(TypeError, match="Customisations to the logger class "):
+        _ = thing.logger
