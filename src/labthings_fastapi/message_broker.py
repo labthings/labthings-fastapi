@@ -6,7 +6,7 @@ all the pub-sub messaging in LabThings.
 
 import logging
 import warnings
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 from weakref import WeakSet
 
 import anyio
@@ -108,6 +108,72 @@ class MessageBroker:
         except KeyError as e:
             raise e
 
+    Payload = TypeVar("Payload")
+
+    @staticmethod
+    async def publish_and_prune(
+        subscriptions: WeakSet[MemoryObjectSendStream[Payload]],
+        message: Payload,
+    ) -> set[MemoryObjectSendStream[Payload]]:
+        """Publish a message to a set of subscribers, removing any that are closed.
+
+        This iterates over all subscriptions, sending messages. It does not await
+        the stream, meaning that the stream must either be currently being awaited
+        or have available capacity: full streams will be skipped.
+
+        There's some error handling here to automatically skip streams that would
+        slow down the publishing thread (i.e. handle `anyio.WouldBlock`), and also
+        to automatically remove streams that have been closed.
+
+        Streams that have been closed will be discarded: this is the "prune" in the
+        name. This feels appropriate as the stream cannot be reopened, so there's no
+        point sending more messages.
+
+        The return value is a set of full streams - if this is not empty, it means
+        one or more streams were full, and so the message was not relayed.
+
+        :param subscriptions: a weak set of streams to send the payload to.
+        :param message: the payload to send.
+        :return: A set of streams that were full and did not receive the message.
+        """
+        subscriptions_to_remove = set()
+        skipped_streams = set()
+        for stream in subscriptions:
+            try:
+                stream.send_nowait(message)
+            except (anyio.ClosedResourceError, anyio.BrokenResourceError):
+                # Streams that have been closed will be automatically unsubscribed.
+                # They can't be reopened, so they won't be reused.
+                subscriptions_to_remove.add(stream)
+            except anyio.WouldBlock:
+                skipped_streams.add(stream)
+        for stream in subscriptions_to_remove:
+            # discard rather than remove, so that if the stream has been finalised
+            # since it was closed, we don't get an error.
+            subscriptions.discard(stream)
+        return skipped_streams
+
+    def log_dropped_message(
+        self, message: Message, streams: set[MemoryObjectSendStream[Message]]
+    ) -> None:
+        """Log a warning that messages were not relayed to subscriber(s).
+
+        `MessageBroker` won't block if a subscriber's stream is full - it will skip
+        the stream instead. This will result in lost messages, which we log as a
+        warning.
+
+        :param message: the message that was dropped.
+        :param streams: the streams that did not receive the message.
+        """
+        if not streams:
+            return  # Don't log if streams is empty.
+        msg = (
+            f"Could not pass a '{message.message_type}' message from "
+            f"'{message.thing}.{message.affordance}' to {streams} as they were full."
+        )
+        LOGGER.warning(msg)
+        warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
+
     async def publish(self, message: Message) -> None:
         """Publish a message.
 
@@ -119,22 +185,8 @@ class MessageBroker:
             subscriptions = self._subscriptions[message.thing][message.affordance]
         except KeyError:
             return  # No subscribers for this thing.
-        subscriptions_to_remove = set()
-        for stream in subscriptions:
-            try:
-                stream.send_nowait(message)
-            except (anyio.ClosedResourceError, anyio.BrokenResourceError):
-                # Streams that have been closed will be automatically unsubscribed.
-                # They can't be reopened, so they won't be reused.
-                subscriptions_to_remove.add(stream)
-            except anyio.WouldBlock:
-                msg = f"Could not pass notification to {stream} as it was full."
-                LOGGER.warning(msg)
-                warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
-        for stream in subscriptions_to_remove:
-            # discard rather than remove, so that if the stream has been finalised
-            # since it was closed, we don't get an error.
-            subscriptions.discard(stream)
+        skipped_streams = await self.publish_and_prune(subscriptions, message)
+        self.log_dropped_message(message, skipped_streams)
 
     async def close_streams(self) -> None:
         """Close all streams that are subscribed to receive messages.
