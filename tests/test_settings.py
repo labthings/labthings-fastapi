@@ -112,6 +112,16 @@ class SubclassOfThingWithSettings(ThingWithSettings):
     """A subclass, so we can check it doesn't share settings with its parent."""
 
 
+class ThingThatWritesSettingOnInit(ThingWithSettings):
+    """A check that writing settings values during __init__ is safe."""
+
+    def __init__(self, **kwargs):
+        """Initialise, including writing a setting."""
+        super().__init__(**kwargs)
+
+        self.boolsetting = True  # Override the default value
+
+
 def _get_setting_file(server: lt.ThingServer, name: str):
     """Find the location of the settings file for a given Thing on a server."""
     path = server.things[name]._thing_server_interface.settings_file_path
@@ -161,10 +171,13 @@ def tempdir():
         yield tempdir
 
 
-def test_setting_available():
+@pytest.mark.parametrize("cls", [ThingWithSettings, ThingThatWritesSettingOnInit])
+def test_setting_available(cls: type[ThingWithSettings]):
     """Check default settings are available before connecting to server"""
-    thing = create_thing_without_server(ThingWithSettings)
-    assert not thing.boolsetting
+    thing = create_thing_without_server(cls)
+    # ThingWithSettings modifies boolsetting during __init__, effectively
+    # changing the default value.
+    assert thing.boolsetting is (cls is ThingThatWritesSettingOnInit)
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
@@ -269,14 +282,27 @@ def test_settings_dict_internal_update(tempdir):
         assert not os.path.isfile(setting_file)
 
 
-def test_settings_load(tempdir, caplog):
-    """Check settings can be loaded from disk when added to server"""
-    server = lt.ThingServer.from_things(
-        {"thing": ThingWithSettings}, settings_folder=tempdir
-    )
+@pytest.mark.parametrize("cls", [ThingWithSettings, ThingThatWritesSettingOnInit])
+def test_settings_load(tempdir, caplog, cls: type[ThingWithSettings]):
+    """Check settings are loaded from disk when added to server.
+
+    This manually writes a settings file, then checks the settings are
+    correctly loaded.
+
+    We check this with and without a write to settings during __init__ to
+    test for #383 - that's done by the parametrization of `cls`.
+    """
+    server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
+    thing = server.things["thing"]
+    assert isinstance(thing, cls)
+    # Check the settings have their default values
+    for name in ["floatsetting", "stringsetting", "dictsetting"]:
+        assert getattr(thing, name) == _settings_dict()[name]
+    assert thing.tuplesetting == (1, 2)  # _settings_dict returns a list.
     setting_file = _get_setting_file(server, "thing")
     del server
     setting_json = json.dumps(
+        # Note: these are not the default values.
         _settings_dict(
             floatsetting=3.0,
             stringsetting="bar",
@@ -289,12 +315,12 @@ def test_settings_load(tempdir, caplog):
         file_obj.write(setting_json)
     with caplog.at_level(logging.WARNING):
         # Add thing to server and check new settings are loaded
-        server = lt.ThingServer.from_things(
-            {"thing": ThingWithSettings}, settings_folder=tempdir
-        )
+        server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
     assert len(caplog.records) == 0
     thing = server.things["thing"]
-    assert isinstance(thing, ThingWithSettings)
+    assert isinstance(thing, cls)
+    # boolsetting is modified in __init__ for one class, but as it's loaded
+    # from the file, we always get the value in _settings_dict
     assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
