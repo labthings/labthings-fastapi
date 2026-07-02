@@ -122,9 +122,9 @@ class Thing:
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
-        # Prevent settings being saved before the file has been loaded.
-        # This fixes #383, where writing to a setting during __init__
-        # overwrote the settings file with default values.
+        # Prevent settings being saved to the settings file before
+        # they have been loaded from the settings file (which would overwrite
+        # the file with default values).
         self._disable_saving_settings: bool = True
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
