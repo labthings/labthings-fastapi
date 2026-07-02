@@ -171,10 +171,13 @@ def tempdir():
         yield tempdir
 
 
-def test_setting_available():
+@pytest.mark.parametrize("cls", [ThingWithSettings, ThingThatWritesSettingOnInit])
+def test_setting_available(cls: type[ThingWithSettings]):
     """Check default settings are available before connecting to server"""
-    thing = create_thing_without_server(ThingWithSettings)
-    assert not thing.boolsetting
+    thing = create_thing_without_server(cls)
+    # ThingWithSettings modifies boolsetting during __init__, effectively
+    # changing the default value.
+    assert thing.boolsetting is (cls is ThingThatWritesSettingOnInit)
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
@@ -316,11 +319,9 @@ def test_settings_load(tempdir, caplog, cls: type[ThingWithSettings]):
     assert len(caplog.records) == 0
     thing = server.things["thing"]
     assert isinstance(thing, cls)
-    if cls is ThingThatWritesSettingOnInit:
-        # We modify this in __init__ which effectively changes its default
-        assert thing.boolsetting
-    if cls is ThingWithSettings:
-        assert not thing.boolsetting
+    # boolsetting is modified in __init__ for one class, but as it's loaded
+    # from the file, we always get the value in _settings_dict
+    assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
     assert thing.dictsetting == {"c": 3}

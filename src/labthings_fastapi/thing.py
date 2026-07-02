@@ -122,7 +122,10 @@ class Thing:
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
-        self._disable_saving_settings: bool = False
+        # Prevent settings being saved before the file has been loaded.
+        # This fixes #383, where writing to a setting during __init__
+        # overwrote the settings file with default values.
+        self._disable_saving_settings: bool = True
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         r"""Validate the class settings.
@@ -275,7 +278,11 @@ class Thing:
         """
         settings = self._read_settings_file()
         if settings is None:
-            # Return if no settings can be loaded from file.
+            # If no settings were read, we don't need to update their values.
+            # We should, however, allow the settings file to be saved, as we
+            # have established that we're not going to overwrite anything of
+            # value.
+            self._disable_saving_settings = False
             return
 
         # Stop recursion by not allowing settings to be saved as we're reading them.
