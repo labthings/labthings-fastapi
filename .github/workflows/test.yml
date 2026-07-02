@@ -238,6 +238,21 @@ jobs:
       - name: Run OFM lifecycle test
         run: tests/lifecycle_test/testfile.py
       
+      - name: Generate OpenAPI and Thing Description.
+        run: |
+          mkdir -p ./apidocs/http/
+          python ./generate_http_api_data.py
+          ls ./apidocs/http/
+      
+      - name: Upload OpenAPI and Thing Description
+        uses: actions/upload-artifact@v7
+        with:
+          name: api_docs
+          path: |
+            ../openflexure-microscope-server/apidocs/http/openapi.json
+            ../openflexure-microscope-server/apidocs/http/thing_description.json
+          if-no-files-found: error
+      
       - name: Type check with `mypy`
         run: mypy src
 
