@@ -239,18 +239,20 @@ jobs:
         run: tests/lifecycle_test/testfile.py
       
       - name: Generate OpenAPI and Thing Description.
+        # Note: we need to move the files into the original
+        # repo directory, so they're found by the next step.
         run: |
           mkdir -p ./apidocs/http/
           python ./generate_http_api_data.py
-          ls ./apidocs/http/
+          mv apidocs ../labthings-fastapi
       
       - name: Upload OpenAPI and Thing Description
         uses: actions/upload-artifact@v7
         with:
           name: api_docs
-          path: |
-            ../openflexure-microscope-server/apidocs/http/openapi.json
-            ../openflexure-microscope-server/apidocs/http/thing_description.json
+          path: |  # Note: this ignores working-directory
+            apidocs/http/openapi.json
+            apidocs/http/thing_description.json
           if-no-files-found: error
       
       - name: Type check with `mypy`
