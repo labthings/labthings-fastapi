@@ -237,3 +237,8 @@ Settings
 ------------
 
 Settings are properties with an additional feature: they are saved to disk. This means that settings will be automatically restored after the server is restarted. The function `~lt.setting` can be used to declare a `~lt.DataSetting` or decorate a function to make a `~lt.FunctionalSetting` in the same way that `~lt.property` can. It is usually imported as ``lt.setting``\ .
+
+.. note::
+    
+    Settings are currently loaded when Things are attached to the server: this happens *after* ``__init__`` has been called and any `~lt.thing_slot`\ s have been populated, but *before* ``__enter__`` is called.
+    This means that, if you write to a setting during ``__init__``\ , that value may be overwritten when the settings are loaded.  Effectively, writing to settings during ``__init__`` modifies the default value. Prior to LabThings v0.3.0, writing to settings during ``__init__`` would raise an exception.
