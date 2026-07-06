@@ -408,7 +408,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
 
-.. py:function:: get_thing_logger(thing_name: str) -> logging.Logger
+.. py:function:: get_thing_logger(thing_name: str | None = None) -> logging.Logger
 
     Return the parent logger of all the `~lt.Thing.logger` instances, or a child of it.
     
