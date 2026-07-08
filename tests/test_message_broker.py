@@ -229,8 +229,8 @@ async def test_sending_to_full_stream(caplog):
         await broker.publish(message)
     assert len(caplog.records) == 1
     msg = caplog.records[0].getMessage()
-    assert msg.startswith("Could not pass notification to")
-    assert msg.endswith("as it was full.")
+    assert msg.startswith("Could not pass a 'property' message")
+    assert msg.endswith("as they were full.")
 
     # Receive the message and clear the buffer
     received = await receive_stream.receive()
