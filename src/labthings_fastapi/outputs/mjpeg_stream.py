@@ -44,8 +44,8 @@ class RingbufferEntry:
     """The frame as a `bytes` object, which is a JPEG image for an MJPEG stream."""
     timestamp: datetime
     """The time the frame was captured.
-    
-    If the capture time is unknown then the it was added to the buffer."""
+    If the capture time is unknown then the timestamp is
+    the time that the frame was added to the ringbuffer."""
 
     index: int
     """The index of the frame within the stream."""
@@ -292,7 +292,9 @@ class MJPEGStream:
         are handled.
 
         :param frame: The frame to add
-        :param timestamp: The time the frame was captured.
+        :param timestamp: The time the frame was captured. If not supplied,
+            the timestamp falls back to the time the frame  was added to the
+            ringbuffer.
 
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
