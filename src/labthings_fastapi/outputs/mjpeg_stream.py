@@ -43,7 +43,10 @@ class RingbufferEntry:
     frame: bytes
     """The frame as a `bytes` object, which is a JPEG image for an MJPEG stream."""
     timestamp: datetime
-    """The time the frame was added to the ringbuffer."""
+    """The time the frame was captured.
+    If the capture time is unknown then the timestamp is
+    the time that the frame was added to the ringbuffer."""
+
     index: int
     """The index of the frame within the stream."""
 
@@ -280,7 +283,7 @@ class MJPEGStream:
         """
         return MJPEGStreamResponse(self.frame_async_generator())
 
-    def add_frame(self, frame: bytes) -> None:
+    def add_frame(self, frame: bytes, timestamp: Optional[datetime] = None) -> None:
         """Add a JPEG to the MJPEG stream.
 
         This function adds a frame to the stream. It may be called from
@@ -289,6 +292,9 @@ class MJPEGStream:
         are handled.
 
         :param frame: The frame to add
+        :param timestamp: The time the frame was captured. If not supplied,
+            the timestamp falls back to the time the frame  was added to the
+            ringbuffer.
 
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
@@ -302,7 +308,7 @@ class MJPEGStream:
             raise ValueError("Invalid JPEG")
         with self._lock:
             entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
-            entry.timestamp = datetime.now()
+            entry.timestamp = timestamp if timestamp is not None else datetime.now()
             entry.frame = frame
             entry.index = self.last_frame_i + 1
             self._thing_server_interface.start_async_task_soon(
