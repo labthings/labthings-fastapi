@@ -33,6 +33,7 @@ from labthings_fastapi.middleware.url_for import url_for_middleware
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from labthings_fastapi.outputs import blob
+from labthings_fastapi.problem_details import ProblemDetails
 from labthings_fastapi.server.config_model import (
     ThingsConfig,
     ThingServerConfig,
@@ -244,6 +245,21 @@ class ThingServer:
 
     def _add_exception_handlers(self) -> None:
         """Add exception handlers to the FastAPI application."""
+
+        @self.app.exception_handler(Exception)
+        async def exceptions_to_problemdetails(
+            _request: Request, exc: Exception
+        ) -> JSONResponse:
+            """Handle all exceptions by returning a ProblemDetails object.
+
+            By default, this does not expose stack traces or line numbers.
+
+            :param _request: the request that started the code that failed.
+            :param exc: the error that occurred.
+            :return: a response containing a ProblemDetails object.
+            """
+            pd = ProblemDetails.from_exception(exc)
+            return JSONResponse(pd.model_dump(), status_code=pd.status or 500)
 
         @self.app.exception_handler(GlobalLockBusyError)
         async def global_lock_exception_handler(
