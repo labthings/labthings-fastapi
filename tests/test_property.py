@@ -231,8 +231,9 @@ def test_baseproperty_add_to_fastapi():
         """
         prop._type = str | None
 
-        # Add a path attribute, so we can use Example as a mock Thing.
+        # Add path and logger, so we can use Example as a mock Thing.
         path = "/example/"
+        logger = None
 
     # Make a FastAPI app and retrieve the OpenAPI document
     app = fastapi.FastAPI()
