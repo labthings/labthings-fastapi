@@ -294,6 +294,7 @@ def test_property_get_and_set(server):
         response = client.put("/thing/stringprop", json=test_str)
         # Check for a successful response code
         assert response.status_code == 201
+        assert response.content == b"null"
         # Check it was written successfully
         after_value = client.get("/thing/stringprop")
         assert after_value.status_code == 200
