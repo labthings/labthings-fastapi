@@ -4,6 +4,12 @@ This module defines a model and supporting functions that help to create
 "Problem Details" objects to represent errors in HTTP responses.
 """
 
+from functools import wraps
+from logging import Logger
+from typing import Any, Callable, ParamSpec, TypeVar
+
+from fastapi import Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
@@ -40,6 +46,15 @@ class ProblemDetails(BaseModel):
             status=getattr(exc, "status_code", 500),
         )
 
+    def json_response(self) -> Response:
+        """Return a JSONResponse representing this object.
+
+        :return: a `JSONResponse` object suitable for returning from a request handler.
+        """
+        # Typing note: this is typed as `Response` in case we move to using `pydantic`
+        # to serialise directly to JSON in the future.
+        return JSONResponse(self.model_dump(), status_code=self.status or 500)
+
 
 # This URL should describe all exceptions in this module.
 DOCS_URL = (
@@ -61,3 +76,45 @@ def docs_url(exc: type[BaseException]) -> str | None:
     if exc.__module__ == "builtins":
         return f"{PYTHON_DOCS_URL}#{exc.__name__}"
     return None
+
+
+Params = ParamSpec("Params")
+ReturnT = TypeVar("ReturnT", bound=Response)
+
+
+def exceptions_to_problemdetails(
+    logger: Logger | None,
+) -> Callable[[Callable[Params, ReturnT]], Callable[Params, ReturnT]]:
+    """Decorate a function to handle errors with a `ProblemDetails` response.
+
+    :param logger: the logger to use, or `None` for no logging.
+    :return: a decorator that handles errors by returning a `ProblemDetails`
+        object.
+    """
+
+    def decorator(func: Callable[Params, ReturnT]) -> Callable[Params, ReturnT]:
+        """Wrap a function in error handling code.
+
+        This function is a decorator with no arguments, `logger` is available
+        as a local variable.
+
+        :param func: the function to be wrapped.
+        :return: the function, wrapped in error handling code.
+        """
+
+        @wraps(func)
+        def decorated(*args: Any, **kwargs: Any) -> Any:
+            # Typing note: the type hints and docstring should be supplied by @wraps.
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:  # noqa: BLE001
+                # This decorator is an intentional catch-all error handler, so BLE001 is
+                # appropriately ignored here.
+                if logger:
+                    logger.error(e)
+                pd = ProblemDetails.from_exception(e)
+                return pd.json_response()
+
+        return decorated
+
+    return decorator
