@@ -6,6 +6,8 @@ Python exceptions. This test module is intended to check that various error
 conditions result in easily-interpreted exceptions, log entries, and HTTP responses.
 """
 
+import logging
+
 import pytest
 
 import labthings_fastapi as lt
@@ -90,28 +92,37 @@ def test_violates_constraint_python(thing: ErrorThing):
 # It is actually a `lt.ThingClient` instance.
 
 
-def test_get_always_raises_server(client: ErrorThing):
+def test_get_always_raises_server(client: ErrorThing, caplog):
     """Check always_raises errors nicely when retrieved over HTTP."""
     with pytest.raises(ClientPropertyError, match="failed, as expected"):
         _ = client.always_raises
+    assert caplog.record_tuples == [
+        ("labthings_fastapi.things.thing", 40, "'always_raises' failed, as expected."),
+    ]
 
 
-def test_set_always_raises_server(client: ErrorThing):
+def test_set_always_raises_server(client: ErrorThing, caplog):
     """Check always_raises errors when set over HTTP."""
     with pytest.raises(ClientPropertyError, match="failed, as expected"):
         client.always_raises = 42
+    assert caplog.record_tuples == [
+        ("labthings_fastapi.things.thing", 40, "'always_raises' failed, as expected."),
+    ]
 
 
-def test_wrongly_typed_server(client: ErrorThing):
+def test_wrongly_typed_server(client: ErrorThing, caplog):
     """Check the error when we return a wrongly typed value."""
     with pytest.raises(
         ClientPropertyError,
         match="Error validating thing.wrongly_typed",
     ):
         _ = client.wrongly_typed
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert "Error validating thing.wrongly_typed" in caplog.records[0].getMessage()
 
 
-def test_violates_constraint_server(client: ErrorThing):
+def test_violates_constraint_server(client: ErrorThing, caplog):
     """Check we can retrieve a value that violates its constraint.
 
     Constraints are not yet validated on the return values of property
@@ -122,6 +133,9 @@ def test_violates_constraint_server(client: ErrorThing):
         match="Error validating thing.violates_constraint",
     ):
         _ = client.violates_constraint
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.ERROR
+    assert "validating thing.violates_constraint" in caplog.records[0].getMessage()
 
 
 if __name__ == "__main__":
