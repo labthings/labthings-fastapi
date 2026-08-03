@@ -31,6 +31,10 @@ class ErrorThing(lt.Thing):
     def _set_always_raises(self, value: int) -> None:
         raise SpecificError("'always_raises' failed, as expected.")
 
+    @always_raises.resetter
+    def _reset_always_raises(self) -> None:
+        raise SpecificError("'always_raises' failed, as expected.")
+
     @lt.property
     def wrongly_typed(self) -> int:
         """A value of the wrong type."""
@@ -73,6 +77,12 @@ def test_set_always_raises_python(thing: ErrorThing):
         thing.always_raises = 42
 
 
+def test_reset_always_raises_python(thing: ErrorThing):
+    """Check always_raises errors when set directly."""
+    with pytest.raises(SpecificError, match="failed, as expected"):
+        thing.properties["always_raises"].reset()
+
+
 def test_wrongly_typed_python(thing: ErrorThing):
     """Check we can retrieve a wrongly typed value in Python."""
     # Currently, no validation is performed on property values
@@ -101,13 +111,14 @@ def test_get_always_raises_server(client: ErrorThing, caplog):
     ]
 
 
-def test_set_always_raises_server(client: ErrorThing, caplog):
-    """Check always_raises errors when set over HTTP."""
-    with pytest.raises(ClientPropertyError, match="failed, as expected"):
-        client.always_raises = 42
-    assert caplog.record_tuples == [
-        ("labthings_fastapi.things.thing", 40, "'always_raises' failed, as expected."),
-    ]
+def test_reset_always_raises_server(client: lt.ThingClient, caplog):
+    """Check always_raises errors when reset over HTTP."""
+    # Reset isn't yet exposed in ThingClient, so we do it manually.
+    response = client.client.post("/thing/always_raises/reset")
+    assert response.status_code == 500
+    value = response.json()
+    assert value["detail"] == "'always_raises' failed, as expected."
+    assert value["title"] == "SpecificError"
 
 
 def test_wrongly_typed_server(client: ErrorThing, caplog):
