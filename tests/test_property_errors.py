@@ -9,6 +9,7 @@ conditions result in easily-interpreted exceptions, log entries, and HTTP respon
 import pytest
 
 import labthings_fastapi as lt
+from labthings_fastapi.exceptions import ClientPropertyError
 from labthings_fastapi.testing import create_thing_without_server
 
 
@@ -91,19 +92,23 @@ def test_violates_constraint_python(thing: ErrorThing):
 
 def test_get_always_raises_server(client: ErrorThing):
     """Check always_raises errors nicely when retrieved over HTTP."""
-    with pytest.raises(SpecificError, match="failed, as expected"):
+    with pytest.raises(ClientPropertyError, match="failed, as expected"):
         _ = client.always_raises
 
 
 def test_set_always_raises_server(client: ErrorThing):
     """Check always_raises errors when set over HTTP."""
-    with pytest.raises(SpecificError, match="failed, as expected"):
+    with pytest.raises(ClientPropertyError, match="failed, as expected"):
         client.always_raises = 42
 
 
 def test_wrongly_typed_server(client: ErrorThing):
     """Check the error when we return a wrongly typed value."""
-    assert client.wrongly_typed == "not an integer"
+    with pytest.raises(
+        ClientPropertyError,
+        match="Error validating thing.wrongly_typed",
+    ):
+        _ = client.wrongly_typed
 
 
 def test_violates_constraint_server(client: ErrorThing):
@@ -112,7 +117,11 @@ def test_violates_constraint_server(client: ErrorThing):
     Constraints are not yet validated on the return values of property
     getters.
     """
-    assert client.violates_constraint == 42
+    with pytest.raises(
+        ClientPropertyError,
+        match="Error validating thing.violates_constraint",
+    ):
+        _ = client.violates_constraint
 
 
 if __name__ == "__main__":

@@ -62,6 +62,7 @@ from typing import (
 )
 
 from fastapi import Body, FastAPI, Response
+from fastapi.responses import JSONResponse
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -560,7 +561,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
                 if isinstance(body, RootModel):
                     body = body.root
                 self.__set__(thing, body)
-                return Response(status_code=201)
+                return JSONResponse(None, status_code=201)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.put(
@@ -611,7 +612,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             @exceptions_to_problemdetails(logger=thing.logger)
             def reset() -> Response:
                 self.reset(thing)
-                return Response(status_code=200)
+                return JSONResponse(None, status_code=200)
 
     def property_affordance(
         self, thing: Owner, path: str | None = None
