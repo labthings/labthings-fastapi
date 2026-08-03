@@ -136,10 +136,3 @@ def test_violates_constraint_server(client: ErrorThing, caplog):
     assert len(caplog.records) == 1
     assert caplog.records[0].levelno == logging.ERROR
     assert "validating thing.violates_constraint" in caplog.records[0].getMessage()
-
-
-if __name__ == "__main__":
-    # This block enables the test Thing here to be interacted with over
-    # HTTP, to allow manual testing from a variety of clients.
-    server = lt.ThingServer.from_things({"thing": ErrorThing})
-    server.serve()
