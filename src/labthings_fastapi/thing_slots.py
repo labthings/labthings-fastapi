@@ -47,7 +47,12 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union, get_args, get_or
 from weakref import ReferenceType, WeakKeyDictionary, WeakValueDictionary, ref
 
 from labthings_fastapi.base_descriptor import FieldTypedBaseDescriptor
-from labthings_fastapi.exceptions import ThingNotConnectedError, ThingSlotError
+from labthings_fastapi.exceptions import (
+    ThingNotConnectedError,
+    ThingSlotCircularDependencyError,
+    ThingSlotError,
+)
+from labthings_fastapi.utilities import class_attributes
 
 if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
@@ -102,7 +107,10 @@ class ThingSlot(
     """
 
     def __init__(
-        self, *, default: str | None | Iterable[str] | EllipsisType = ...
+        self,
+        *,
+        default: str | None | Iterable[str] | EllipsisType = ...,
+        start_first: bool = False,
     ) -> None:
         """Declare a ThingSlot.
 
@@ -118,12 +126,21 @@ class ThingSlot(
 
             If the type is a mapping of `str` to `~lt.Thing` the default should be
             of type `Iterable[str]` (and could be an empty list).
+        :param start_first: Whether the connected Things should be started before
+            the Thing on which the slot is defined.
+
+            When this is `False` (the default), an error will be raised if the slot
+            is accessed during ``__enter__`` and there's no constraint on the order
+            in which things will be started. If it is set to `True` then LabThings
+            will ensure the connected Thing(s) have ``__enter__`` called before it
+            is called on this Thing.
         """
         super().__init__()
         self._default = default
         self._things: WeakKeyDictionary[
             "Thing", ReferenceType["Thing"] | WeakValueDictionary[str, "Thing"] | None
         ] = WeakKeyDictionary()
+        self._start_first = start_first
 
     @property
     def thing_type(self) -> tuple[type, ...]:
@@ -164,6 +181,11 @@ class ThingSlot(
     def default(self) -> str | Iterable[str] | None | EllipsisType:
         """The name of the Thing that will be connected by default, if any."""
         return self._default
+
+    @property
+    def start_first(self) -> bool:
+        """Whether the connected Things must be started before this one."""
+        return self._start_first
 
     def _pick_things(
         self,
@@ -338,8 +360,73 @@ class ThingSlot(
             return val  # type: ignore[return-value]
             # See docstring for an explanation of the type ignore directives.
 
+    def _connected_thing_names(self, obj: "Thing") -> set[str]:
+        """Return the names of the Thing(s) connected to this slot.
 
-def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
+        :param obj: the Thing instance we're considering.
+        :return: a set of Thing names that are connected.
+        """
+        val = self.instance_get(obj)
+        if val is None:
+            return set()
+        if isinstance(val, Mapping):
+            return set(val.keys())
+        else:
+            return {val.name}
+
+
+def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
+    r"""Determine the order in which Things should be started.
+
+    Thing Slots may specify that connected Things must be started before the
+    thing on which the slot is defined. This function resolves those
+    dependencies and sets the order in which the Things should start.
+
+    "start" here refers to calling ``__enter__``\ .
+
+    :param things: a mapping of names to Things.
+    :return: an ordered list of Thing names.
+    :raises ThingSlotCircularDependencyError: if there is no order of starting
+        the Things that will satisfy all the constraints.
+    """
+    dependencies: dict[str, set[str]] = {}
+    for name, thing in things.items():
+        deps = set()
+        for _, slot in class_attributes(thing, ThingSlot):
+            if slot.start_first:
+                deps = deps.union(slot._connected_thing_names(thing))
+        dependencies[name] = deps
+
+    # We add Things to the list iteratively, when they are able to be added.
+    # Things with no dependencies will be added first, gradually working through
+    # until everything's done.
+    # If we reach an iteration where we can't add anything, we have a deadlock
+    # and we must raise an exception.
+    order: list[str] = []
+    remaining = set(things.keys())
+    while remaining:
+        # If a Thing's dependencies are a subset of the things that are already
+        # started, we can now add it to the order.
+        things_to_add = {n for n in remaining if dependencies[n].issubset(order)}
+        if things_to_add:
+            order += list(things_to_add)
+            remaining = remaining.difference(things_to_add)
+        else:
+            msg = (
+                f"There is no order in which the Things may be started.\n"
+                f"We could start {order}, but the remaining Things have cyclic "
+                f"dependencies: {remaining}.\n\n"
+            )
+            for name in remaining:
+                msg += f"'{name}' must be started after {dependencies[name]}.\n"
+            raise ThingSlotCircularDependencyError(msg)
+    return tuple(order)
+
+
+def thing_slot(
+    default: str | Iterable[str] | None | EllipsisType = ...,
+    start_first: bool = False,
+) -> Any:
     r"""Declare a connection to another `~lt.Thing` in the same server.
 
     ``lt.thing_slot`` marks a class attribute as a connection to another
@@ -427,6 +514,14 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
         If the default is omitted or set to ``...`` the server will attempt to find
         a matching `~lt.Thing` instance (or instances). A default value of `None` is
         allowed if the connection is type hinted as optional.
+    :param start_first: Whether the connected Things should be started before
+        the Thing on which the slot is defined.
+
+        When this is `False` (the default), an error will be raised if the slot
+        is accessed during ``__enter__`` and there's no constraint on the order
+        in which things will be started. If it is set to `True` then LabThings
+        will ensure the connected Thing(s) have ``__enter__`` called before it
+        is called on this Thing.
     :return: A `.ThingSlot` descriptor.
 
     Typing notes:
@@ -441,4 +536,4 @@ def thing_slot(default: str | Iterable[str] | None | EllipsisType = ...) -> Any:
     and it is done by established libraries such as `pydantic`\ .
 
     """
-    return ThingSlot(default=default)
+    return ThingSlot(default=default, start_first=start_first)
