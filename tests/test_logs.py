@@ -302,3 +302,11 @@ def test_action_logs_over_http():
     for log in logs:
         log_as_model = LogRecordModel(**log)
         assert log_as_model.message == "foobar"
+
+
+def test_get_thing_logger():
+    """Check the convenience function to get the thing logger."""
+    assert lt.get_thing_logger() is logs.THING_LOGGER
+    child = lt.get_thing_logger("thing_name")
+    assert isinstance(child, logging.Logger)
+    assert child.name == logs.THING_LOGGER.name + ".thing_name"
