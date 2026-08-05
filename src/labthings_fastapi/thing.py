@@ -23,7 +23,7 @@ from typing_extensions import Self
 from labthings_fastapi.actions import ActionCollection
 from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
 from labthings_fastapi.invocation_contexts import get_invocation_id
-from labthings_fastapi.logs import THING_LOGGER
+from labthings_fastapi.logs import get_thing_logger
 from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
@@ -148,7 +148,7 @@ class Thing:
     @property
     def logger(self) -> logging.Logger:
         """A logger, named after this Thing."""
-        return THING_LOGGER.getChild(self.name)
+        return get_thing_logger(self.name)
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.

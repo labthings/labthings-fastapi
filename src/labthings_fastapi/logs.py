@@ -107,6 +107,28 @@ def configure_thing_logger(level: int | None = None) -> None:
         THING_LOGGER.addHandler(DequeByInvocationIDHandler())
 
 
+def get_thing_logger(thing_name: str | None = None) -> logging.Logger:
+    r"""Return the Thing Logger, or a child logger.
+
+    This function returns either the Thing logger, or a child of it. Any messages
+    logged to this logger will be picked up by invocation logs, if they are
+    logged from an invocation thread/context.
+
+    ``thing.logger`` is equivalent to ``get_thing_logger(thing.name)`` for any
+    `~lt.Thing` instance.
+
+    :param thing_name: the name of a `lt.Thing`\ . If supplied, we will get a child
+        logger (i.e. ``labthings_fastapi.things.{thing_name}``). By default,
+        the root Thing logger (``labthings_fastapi.things``) is returned.
+    :return: the Thing logger or a child of it.
+    """
+    if thing_name:
+        logger = THING_LOGGER.getChild(thing_name)
+    else:
+        logger = THING_LOGGER
+    return logger
+
+
 def add_thing_log_destination(
     invocation_id: UUID, destination: MutableSequence
 ) -> None:
