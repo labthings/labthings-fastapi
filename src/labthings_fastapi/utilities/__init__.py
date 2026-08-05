@@ -26,40 +26,41 @@ from labthings_fastapi.utilities.introspection import EmptyObject
 
 __all__ = [
     "RootModelWrapper",
-    "attributes",
     "class_attributes",
     "model_to_dict",
 ]
 
 
-def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]:
+AttrT = TypeVar("AttrT")
+
+
+def class_attributes(
+    obj: Any, filter_type: type[AttrT] = object
+) -> Iterable[tuple[str, AttrT]]:
     """List all the attributes of an object's class.
 
     This function gets all class attributes, including inherited ones.
     It is used to obtain the various descriptors used to represent
     properties and actions. It calls `.attributes` on ``obj.__class__``.
 
+    If a ``filter_type`` argument is supplied, only attributes that match the
+    supplied type will be returned. The default (`object`) matches all
+    attributes.
+
+    Attributes starting with a double underscore will be ignored.
+
     :param obj: The instance, usually a `~lt.Thing` instance.
+    :param filter_type: if specified, only return attributes of this type.
 
     :yield: tuples of ``(name, value)`` giving each attribute of the class.
     """
     cls = obj.__class__
-    yield from attributes(cls)
-
-
-def attributes(cls: Any) -> Iterable[tuple[str, Any]]:
-    """List all the attributes of an object not starting with `__`.
-
-    :param cls: The object whose attributes we are listing. This may be
-        a class, because classes are objects too.
-
-    :yield: tuples of ``(name, value)`` giving each attribute and its
-        value.
-    """
     for name in dir(cls):
         if name.startswith("__"):
             continue
-        yield name, getattr(cls, name)
+        value = getattr(cls, name)
+        if isinstance(value, filter_type):
+            yield name, value
 
 
 WrappedT = TypeVar("WrappedT")
