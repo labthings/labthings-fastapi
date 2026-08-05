@@ -214,6 +214,17 @@ class ThingSlotError(RuntimeError):
     """
 
 
+class ThingSlotCircularDependencyError(RuntimeError):
+    """There was no order in which the Things could be correctly started.
+
+    This error is raised when Things have incompatible requirements about
+    start-up order. `~lt.thing_slot` allows Things to specify that they
+    should be started up only once the connected Things have been started.
+    If there's a cycle (e.g. A must start after B, but B must start after A),
+    then LabThings will fail to start with this error.
+    """
+
+
 class InvocationCancelledError(BaseException):
     """An invocation was cancelled by the user.
 
