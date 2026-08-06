@@ -1,0 +1,19 @@
+sequenceDiagram
+    Client->>+Server: POST /camera/capture_image
+    Server->>+Camera: Run "capture_image"
+    Server-->>-Client: 201 Invoked successfully
+    note over Camera: Take image
+    create participant Blob
+    Camera->>Blob: Create from bytes
+    Client->>+Server: GET /action_invocations/{id}
+    Server-->>-Client: 200 Running
+    Camera->>-Server: Complete
+    note over Server: The Blob is retained as part<br/>of the Invocation's output.
+    Client->>+Server: GET /action_invocations/{id}
+    Server-->>-Client: 200 Complete<br/>(includes blob URL)
+    Client->>+Server: GET /blobs/{blob_id}
+    Blob->>Server: Response object containing binary data
+    Server->>-Client: 200 Binary data
+    note over Server: ~5 minutes later, the invocation<br />expires and is deleted
+    destroy Blob
+    Server-xBlob: 
