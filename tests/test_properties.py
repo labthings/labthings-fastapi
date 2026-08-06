@@ -281,7 +281,7 @@ def test_instantiation_with_model() -> None:
     assert Dummy.func_prop.value_type is MyModel
 
 
-def test_property_get_and_set(server):
+def test_property_get_and_set_and_reset(server):
     """Use PUT and GET requests to check the property.
 
     PUT sets the value and GET retrieves it, so we use a PUT
@@ -294,10 +294,15 @@ def test_property_get_and_set(server):
         response = client.put("/thing/stringprop", json=test_str)
         # Check for a successful response code
         assert response.status_code == 201
+        assert response.content == b"null"
         # Check it was written successfully
         after_value = client.get("/thing/stringprop")
         assert after_value.status_code == 200
         assert after_value.json() == test_str
+        # Reset the property over HTTP
+        response = client.post("/thing/stringprop/reset")
+        assert response.status_code == 200
+        assert response.json() is None
 
 
 def test_boolprop(server):
