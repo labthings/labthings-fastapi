@@ -389,8 +389,13 @@ class Invocation(Thread):
                     and self._status == InvocationStatus.PENDING
                 ):
                     # The global lock timed out before the function started.
-                    # In this case, don't print a traceback.
-                    logger.warning(f"Global lock was busy: didn't run {action.name}.")
+                    # In this case, don't print a traceback, and log at the level.
+                    # specified by the server.
+                    server = thing._thing_server_interface._get_server()
+                    logger.log(
+                        server.global_lock_log_level,
+                        f"Global lock was busy: didn't run {action.name}.",
+                    )
                 else:
                     # Other exceptions show up in the log with a traceback
                     logger.exception(e)

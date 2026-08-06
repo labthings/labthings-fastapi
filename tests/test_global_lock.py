@@ -1,7 +1,7 @@
 """Test code for the global lock."""
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from threading import Event, Thread
 
@@ -183,7 +183,7 @@ def assert_changes(thing: ConcurrencyChecker):
 
 
 @contextmanager
-def assert_fails(thing: ConcurrencyChecker) -> Iterator[None]:
+def assert_fails(thing: ConcurrencyChecker) -> Generator[None]:
     """Assert that the code in a with block fails with an error.
 
     Currently, this will look for several exceptions, so that it works on both client
@@ -199,7 +199,7 @@ def assert_fails(thing: ConcurrencyChecker) -> Iterator[None]:
 
 
 @contextmanager
-def monitor_for_changes(thing: ConcurrencyChecker, hold_lock: bool) -> Iterator[None]:
+def monitor_for_changes(thing: ConcurrencyChecker, hold_lock: bool) -> Generator[None]:
     """Monitor for changes in a background thread"""
     # Start the background action that checks for changes.
     monitor_thread = Thread(
@@ -481,10 +481,30 @@ def test_reuse_of_action_callables():
             func()
 
 
-def test_global_lock_log(caplog):
-    """Test that we get sensible errors when the lock is busy."""
+@pytest.mark.parametrize("loglevel", ["DEBUG", "INFO", "WARNING", "ERROR"])
+@pytest.mark.parametrize("debug", [True, False])
+def test_global_lock_log(caplog, debug, loglevel):
+    """Test that we get sensible errors when the lock is busy.
+
+    This performs tests with and without DEBUG mode - if the lock is set to
+    log at DEBUG level and the server isn't configured to propagate DEBUG
+    logs, we don't expect anything to show up.
+
+    In that case, we do still want to check that the client raises the right
+    error: the lock error should be reported to the client even if it's not
+    logged.
+
+    We check that:
+    1. The client is informed that the global lock was busy (and thus it
+        raises a `GlobalLockBusyError`).
+    2. The lock error is recorded in the log, at the specified level, if
+        appropriate (i.e. DEBUG logs shouldn't show up if debug is False).
+    """
     server = lt.ThingServer.from_things(
-        {"checker": ConcurrencyChecker}, enable_global_lock=True
+        {"checker": ConcurrencyChecker},
+        enable_global_lock=True,
+        global_lock_log_level=loglevel,
+        debug=debug,
     )
     with server.test_client() as client:
         checker = lt.ThingClient.from_url("/checker/", client=client)
@@ -500,9 +520,12 @@ def test_global_lock_log(caplog):
             ):
                 checker.increment_fprop2()
             matches = [r for r in caplog.records if "Global lock was busy" in r.message]
-            assert len(matches) == 1
-            assert matches[0].levelno == logging.WARNING
-            assert "Traceback" not in caplog.text
+            if loglevel == "DEBUG" and debug is False:
+                assert len(matches) == 0
+            else:
+                assert len(matches) == 1
+                assert matches[0].levelno == getattr(logging, loglevel)
+                assert "Traceback" not in caplog.text
 
             # Next, try the same thing with an action that does
             # not hold the global lock, but calls a property that

@@ -401,6 +401,9 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.enable_global_lock
         :no-index:
 
+   .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.global_lock_log_level
+        :no-index:
+
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.application_config
         :no-index:
 
