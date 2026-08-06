@@ -40,7 +40,13 @@ class ThingN(lt.Thing):
 class ThingThree(lt.Thing):
     """A Thing that has no other attributes."""
 
-    pass
+    started = False
+
+    def __enter__(self):
+        self.started = True
+
+    def __exit__(self, *args, **kwargs):
+        pass
 
 
 class ThingThatMustBeConfigured(lt.Thing):
@@ -52,19 +58,38 @@ class ThingThatMustBeConfigured(lt.Thing):
 class ThingWithDependency(lt.Thing):
     r"""A Thing that relies on a connected Thing during ``__enter__``\ ."""
 
+    started = False
+
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot(
         start_first=True
     )
+
+    def __enter__(self):
+        assert self.other_thing.started
+        self.started = True
+
+    def __exit__(self, *args, **kwargs):
+        pass
 
 
 class ThingWithoutDependency(lt.Thing):
     """A Thing with a slot that has start_first=False (default)."""
 
+    started = False
+
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot()
+
+    def __enter__(self):
+        self.started = True
+
+    def __exit__(self, *args, **kwargs):
+        pass
 
 
 class ThingWithCircularDependency(lt.Thing):
     """A Thing that will cause a dependency cycle."""
+
+    started = False
 
     other_thing: ThingWithDependency = lt.thing_slot(start_first=True)
 
@@ -491,24 +516,36 @@ def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:
     return things
 
 
-@pytest.mark.parametrize(
-    ("thing_classes", "orders"),
-    [
-        # If there are no constraints, the order doesn't matter
-        ({"a": ThingThree, "b": ThingThree}, {("a", "b"), ("b", "a")}),
-        ({"b": ThingThree, "a": ThingThree}, {("a", "b"), ("b", "a")}),
-        # A thing_slot that doesn't declare `start_first` can have any order
-        ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b"), ("b", "a")}),
-        # If start_first==True, the list order can take only one value
-        ({"a": ThingWithDependency, "b": ThingThree}, {("b", "a")}),
-        # Try with swapped names, just in case something is sorting alphabetically
-        ({"b": ThingWithDependency, "a": ThingThree}, {("a", "b")}),
-    ],
-)
+THING_CLASSES_AND_ORDERS = [
+    # If there are no constraints, the order doesn't matter
+    ({"a": ThingThree, "b": ThingThree}, {("a", "b"), ("b", "a")}),
+    ({"b": ThingThree, "a": ThingThree}, {("a", "b"), ("b", "a")}),
+    # A thing_slot that doesn't declare `start_first` can have any order
+    ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b"), ("b", "a")}),
+    # If start_first==True, the list order can take only one value
+    ({"a": ThingWithDependency, "b": ThingThree}, {("b", "a")}),
+    # Try with swapped names, just in case something is sorting alphabetically
+    ({"b": ThingWithDependency, "a": ThingThree}, {("a", "b")}),
+]
+
+
+@pytest.mark.parametrize(("thing_classes", "orders"), THING_CLASSES_AND_ORDERS)
 def test_determine_startup_order(thing_classes, orders):
     """Check the logic to figure out the order in which Things should be started."""
     things = connected_things(thing_classes)
     assert _determine_startup_order(things) in orders
+
+
+@pytest.mark.parametrize(("thing_classes", "orders"), THING_CLASSES_AND_ORDERS)
+def test_determine_startup_order_server(thing_classes, orders):
+    """Check the logic to figure out the order in which Things should be started."""
+    server = lt.ThingServer.from_things(thing_classes)
+    assert server._startup_order in orders
+    with server.test_client():
+        # There's an assertion in the relevant Thing's `__enter__` method, and
+        # it sets `started=True`
+        assert server.things["a"].started is True
+        assert server.things["b"].started is True
 
 
 def test_circular_startup_dependency():
