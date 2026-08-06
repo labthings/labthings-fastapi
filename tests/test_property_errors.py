@@ -103,9 +103,22 @@ def test_violates_constraint_python(thing: ErrorThing):
 
 
 def test_get_always_raises_server(client: ErrorThing, caplog):
-    """Check always_raises errors nicely when retrieved over HTTP."""
+    r"""Check always_raises errors nicely when retrieved over HTTP.
+
+    Note that `caplog` here is capturing the *server* log, the client-side
+    code doesn't log, but does raise a `ClientPropertyError`\ .
+    """
     with pytest.raises(ClientPropertyError, match="failed, as expected"):
         _ = client.always_raises
+    assert caplog.record_tuples == [
+        ("labthings_fastapi.things.thing", 40, "'always_raises' failed, as expected."),
+    ]
+
+
+def test_set_always_raises_server(client: ErrorThing, caplog):
+    """Check always_raises errors nicely when set over HTTP."""
+    with pytest.raises(ClientPropertyError, match="failed, as expected"):
+        client.always_raises = 42
     assert caplog.record_tuples == [
         ("labthings_fastapi.things.thing", 40, "'always_raises' failed, as expected."),
     ]
