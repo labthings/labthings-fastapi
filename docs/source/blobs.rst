@@ -14,7 +14,7 @@ A `.Blob` consists of some data and a MIME type, which sets how the data should 
 Creating and using `.Blob` objects
 ------------------------------------------------
 
-Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes` or on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`). A `.Blob` may also point to remote data (see `.Blob.from_url`). Code that uses a `.Blob` should not need to know how the data is stored, as the interface is the same in each case.
+Code that uses a `.Blob` should not need to know how the data is stored, as the interface is the same in each case. Blobs can be created from binary data that is in memory (a `bytes` object) with `.Blob.from_bytes` or on disk (with `.Blob.from_temporary_directory` or `.Blob.from_file`). A `.Blob` may also point to remote data (see `.Blob.from_url`). Blobs that are returned by a `~lt.ThingClient` will generally refer to the data using a URL, and download the data when it is accessed.
 
 Blobs offer three ways to access their data:
 
@@ -162,13 +162,20 @@ It may be possible to have actions return binary data directly in the future, bu
 
     Serialising or deserialising `.Blob` objects generates URLs, which are specific to the HTTP request. This means that `.Blob` objects cannot be serialised or deserialised outside the context of an HTTP request handler, so if code in an Action or Property attempts to turn a `.Blob` into JSON, it is likely to raise exceptions. For more detail on this mechanism, see `.middleware.url_for`\ .
 
+Class structure
+---------------
+
+The public interface is provided by `.Blob`, which is the only class most code should need to interact with. Internally, `.BlobData` is responsible for implementing the different back-end methods that manage data in memory or on disk. In principle it would be possible to implement a custom `.BlobData` subclass, though this is not currently considered part of the public LabThings API. `.BlobData` is subclassed into `.LocalBlobData` and `.RemoteBlobData`, and local is further subclassed to use either a file or a `bytes` object to store the data.
+
 
 Memory management and retention
 -------------------------------
 
-Management of `.Blob` objects is currently very basic: when a `.Blob` object is returned in the output of an Action that has been called via the HTTP interface, it will be retained as long as the action's output. This may be set on each action, and defaults to 5 minutes. This should be improved in the future to avoid memory management issues. 
+A `.Blob` instance holds a strong reference to exactly one `.BlobData` object, which refers to data on memory, on disk, or at a remote network location. Using class methods, it's possible to retrieve a `.BlobData` object using a unique ID. This is used internally by LabThings to allow the data to be downloaded, and to allow Blobs to be passed as input to actions. Only a weak reference is retained by the class, so this mechanism does not prevent the data from being finalised: a strong reference to the `.Blob` object must exist somewhere, or the data will be discarded.
 
-When a `.Blob` is serialised, a URL is generated with a unique ID to allow it to be downloaded. However, only a weak reference is held to the `.Blob`. Once an Action has finished running, the only strong reference to the `.Blob` should be held by the output property of the action invocation. The `.Blob` should be garbage collected once the output is no longer required, i.e. when the invocation is discarded - currently 5 minutes after the action completes, once the maximum number of invocations has been reached or when it is explicitly deleted by the client.
+When a `.Blob` object is returned in the output of an Action that has been called via the HTTP interface, it will be retained as long as the action's output by the `.ActionManager`. The retention period may be set on each action, and defaults to 5 minutes. This should be improved in the future to avoid memory management issues. 
+
+When a `.Blob` is serialised, a URL is generated with its unique ID to allow it to be downloaded. As described above, only a weak reference is held to the `.Blob`. Once an Action has finished running, the only strong reference to the `.Blob` should be held by the output property of the  `.Invocation` retained by the `.ActionManager`. The `.Blob` will be finalised by Python once the output is no longer required, i.e. when the invocation is discarded - currently defaulting to 5 minutes after the action completes, once the maximum number of invocations has been reached, or when it is explicitly deleted by the client.
 
 The behaviour is different when actions are called from other actions. If `action_a` calls `action_b`, and `action_b` returns a `.Blob`, that `.Blob` will be subject to Python's usual garbage collection rules when `action_a` ends - i.e. it will not be retained unless it is included in the output of `action_a`.
 
