@@ -82,7 +82,7 @@ Params = ParamSpec("Params")
 ReturnT = TypeVar("ReturnT", bound=Response)
 
 
-def exceptions_to_problemdetails(
+def exceptions_to_problem_details(
     logger: Logger | None,
 ) -> Callable[[Callable[Params, ReturnT]], Callable[Params, ReturnT]]:
     """Decorate a function to handle errors with a `ProblemDetails` response.

@@ -94,13 +94,13 @@ def test_response_from_exception(pd):
     assert value == pd.model_dump()
 
 
-def test_exceptions_to_problemdetails_noerror(mocker):
-    """Check the `exceptions_to_problemdetails` decorator with no error."""
+def test_exceptions_to_problem_details_noerror(mocker):
+    """Check the `exceptions_to_problem_details` decorator with no error."""
 
     response = JSONResponse("success!", status_code=200)
     logger = mocker.Mock()
 
-    @problem_details.exceptions_to_problemdetails(logger=logger)
+    @problem_details.exceptions_to_problem_details(logger=logger)
     def successful():
         return response
 
@@ -112,11 +112,11 @@ def test_exceptions_to_problemdetails_noerror(mocker):
 
 
 @pytest.mark.parametrize(("err", "url", "code"), ERRORS)
-def test_exceptions_to_problemdetails_error(err, url, code, mocker):
+def test_exceptions_to_problem_details_error(err, url, code, mocker):
     """Check exceptions produce a response with the right message."""
     logger = mocker.Mock()
 
-    @problem_details.exceptions_to_problemdetails(logger=logger)
+    @problem_details.exceptions_to_problem_details(logger=logger)
     def fails():
         raise err("Message")
 

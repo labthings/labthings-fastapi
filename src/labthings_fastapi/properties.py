@@ -88,7 +88,7 @@ from labthings_fastapi.exceptions import (
     UnsupportedConstraintError,
 )
 from labthings_fastapi.message_broker import Message
-from labthings_fastapi.problem_details import exceptions_to_problemdetails
+from labthings_fastapi.problem_details import exceptions_to_problem_details
 from labthings_fastapi.thing_class_settings import get_validate_properties_on_set
 from labthings_fastapi.thing_description import type_to_dataschema
 from labthings_fastapi.thing_description._model import (
@@ -556,7 +556,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             # The function is initially defined with a ``body`` argument of type
             # ``Any`` but this will be replaced with the correct annotation a
             # few lines below.
-            @exceptions_to_problemdetails(logger=thing.logger)
+            @exceptions_to_problem_details(logger=thing.logger)
             def set_property(body: Any) -> Response:
                 if isinstance(body, RootModel):
                     body = body.root
@@ -579,7 +579,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             summary=self.title,
             description=f"## {self.title}\n\n{self.description or ''}",
         )
-        @exceptions_to_problemdetails(logger=thing.logger)
+        @exceptions_to_problem_details(logger=thing.logger)
         def get_property() -> Response:
             instance = validate_from_user_code(
                 model=self.model,
@@ -609,7 +609,7 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
                     rf"with the ``name`` argument set to ``{self.name}``\ ."
                 ),
             )
-            @exceptions_to_problemdetails(logger=thing.logger)
+            @exceptions_to_problem_details(logger=thing.logger)
             def reset() -> Response:
                 self.reset(thing)
                 return JSONResponse(None, status_code=200)
