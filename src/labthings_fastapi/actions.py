@@ -65,7 +65,10 @@ from labthings_fastapi.invocations import (
 from labthings_fastapi.logs import add_thing_log_destination
 from labthings_fastapi.message_broker import Message
 from labthings_fastapi.middleware.url_for import URLFor
-from labthings_fastapi.problem_details import ProblemDetails
+from labthings_fastapi.problem_details import (
+    ProblemDetails,
+    exceptions_to_problem_details,
+)
 from labthings_fastapi.thing_description import type_to_dataschema
 from labthings_fastapi.thing_description._model import (
     ActionAffordance,
@@ -932,6 +935,7 @@ class ActionDescriptor(
         # at runtime.
         # The solution below is to manually add the annotation, before passing
         # the function to the decorator.
+        @exceptions_to_problem_details(logger=thing.logger)
         def start_action(
             body: Any,  # This annotation will be overwritten below.
             background_tasks: BackgroundTasks,
@@ -945,16 +949,12 @@ class ActionDescriptor(
                 dependencies=dependencies,
             )
             background_tasks.add_task(action_manager.expire_invocations)
-            try:
-                return serialise_from_user_code(
-                    model_instance=invocation.response(),
-                    description=f"{invocation}",
-                    status_code=201,
-                    code=self.func,
-                )
-            except InvalidReturnValueError as e:
-                thing.logger.error(e)
-                raise HTTPException(status_code=500, detail=str(e)) from e
+            return serialise_from_user_code(
+                model_instance=invocation.response(),
+                description=f"{invocation}",
+                status_code=201,
+                code=self.func,
+            )
 
         if issubclass(self.input_model, EmptyInput):
             annotation = Body(default_factory=StrictEmptyInput)
