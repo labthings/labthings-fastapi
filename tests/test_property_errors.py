@@ -78,7 +78,7 @@ def test_set_always_raises_python(thing: ErrorThing):
 
 
 def test_reset_always_raises_python(thing: ErrorThing):
-    """Check always_raises errors when set directly."""
+    """Check always_raises errors when reset."""
     with pytest.raises(SpecificError, match="failed, as expected"):
         thing.properties["always_raises"].reset()
 
