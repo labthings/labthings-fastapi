@@ -156,6 +156,8 @@ In order to run an action and download the data, currently an HTTP client must:
 * Poll the invocation until it is complete, and the `.Blob` is available in its ``output`` property with the URL and content type.
 * Download the data from the URL in the `.Blob` object, which will return the binary data.
 
+.. mermaid:: diagrams/blob_http_flow.mermaid
+
 It may be possible to have actions return binary data directly in the future, but this is not yet implemented.
 
 .. note::
