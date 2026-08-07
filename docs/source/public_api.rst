@@ -333,7 +333,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
    .. py:property:: global_lock
-        :type GlobalLock | None:
+        :type: GlobalLock | None
 
         A global lock object that is used to restrict concurrent execution of actions and setting of properties.
 

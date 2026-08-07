@@ -30,7 +30,9 @@ We welcome pull requests for bug fixes, new features, and documentation improvem
 ### 1. Local Development Setup
 
 To work on the code, you will need to clone the repository and install the development dependencies.
-Please see the [installation notes](./README.md#installation-notes) for more detail about compatible Python versions and Windows installation.
+Please see the [installation notes] for more detail about compatible Python versions and Windows installation.
+
+[installation notes]: https://github.com/labthings/labthings-fastapi/blob/main/README.md#installation-notes
 
 ```bash
 # Clone the repository
@@ -117,7 +119,7 @@ All changes to the codebase must go via pull requests. Unless you are a core mai
 [OpenFlexure Microscope software]: https://gitlab.com/openflexure/openflexure-microscope-server/
 [GitHub Actions]: https://github.com/labthings/labthings-fastapi/actions
 [`ruff`]: https://docs.astral.sh/ruff/
-[`pyproject.toml`]: ./pyproject.toml
+[`pyproject.toml`]: https://github.com/labthings/labthings-fastapi/blob/main/pyproject.toml
 [`flake8`]: https://flake8.pycqa.org/en/latest/
 [`mypy`]: https://mypy-lang.org/
 [`pytest`]: https://docs.pytest.org/en/stable/
