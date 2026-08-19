@@ -43,7 +43,7 @@ from labthings_fastapi.server.config_model import (
 from labthings_fastapi.thing import Thing
 from labthings_fastapi.thing_description._model import ThingDescription
 from labthings_fastapi.thing_server_interface import ThingServerInterface
-from labthings_fastapi.thing_slots import ThingSlot
+from labthings_fastapi.thing_slots import ThingSlot, _determine_startup_order
 from labthings_fastapi.utilities import class_attributes
 
 __all__ = ["ThingServer"]
@@ -105,9 +105,9 @@ class ThingServer:
 
         :param config: a `~lt.ThingServerConfig` object that configures the server,
             or something that may be converted to one.
-        :param debug: ff ``True``, set the log level for `~lt.Thing` instances to
+        :param debug: if ``True``, set the log level for `~lt.Thing` instances to
             DEBUG.
-        :param \**kwargs: ff keyword arguments are supplied, they will be passed
+        :param \**kwargs: if keyword arguments are supplied, they will be passed
             to the constructor of `~lt.ThingServerConfig`\ . This is not allowed
             if `config` is a `~lt.ThingServerConfig` object.
 
@@ -162,6 +162,7 @@ class ThingServer:
         # The function calls below create and set up the Things.
         self._things = self._create_things()
         self._connect_things()
+        self._startup_order = _determine_startup_order(self.things)
         self._attach_things_to_server()
 
     @classmethod
@@ -406,9 +407,7 @@ class ThingServer:
         """
         for thing_name, thing in self.things.items():
             config = self._config.thing_configs[thing_name].thing_slots
-            for attr_name, attr in class_attributes(thing):
-                if not isinstance(attr, ThingSlot):
-                    continue
+            for attr_name, attr in class_attributes(thing, ThingSlot):
                 target = config.get(attr_name, ...)
                 attr.connect(thing, self.things, target)
 
@@ -444,6 +443,8 @@ class ThingServer:
             ``__enter__`` on each Thing. The error is also saved to
             ``self.startup_failure`` for post mortem, as otherwise uvicorn will swallow
             it and replace it with SystemExit(3) and no traceback.
+        :raises RuntimeError: if the startup order doesn't match the Things that are
+            attached to the server. This should never happen.
         """
         async with BlockingPortal() as portal:
             # We create a blocking portal to allow threaded code to call async code
@@ -454,8 +455,13 @@ class ThingServer:
             # synchronous __enter__ and __exit__ methods if they exist, to initialise
             # and shut down the hardware. NB we must make sure the blocking portal
             # is present when this happens, in case we are dealing with threads.
+            if set(self.things.keys()) != set(self._startup_order):
+                raise RuntimeError(
+                    "`self._startup_order` does not match `self.things`."
+                )
             async with AsyncExitStack() as stack:
-                for thing in self.things.values():
+                for name in self._startup_order:
+                    thing = self.things[name]
                     try:
                         await stack.enter_async_context(thing)
                     except BaseException as e:
