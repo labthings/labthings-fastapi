@@ -31,7 +31,7 @@ JOSS requires evidence of open development practices and a welcoming environment
     - [x] Report issues or bugs. (MR #367)
     - [x] Seek support. (MR #367)
 
-- [ ] Verify Issue Tracker Activity: JOSS requires evidence of iterative development over time. With over 1,000 commits over the last 3 years and active PRs/Issues, we should easily pass this gate.
+- [x] Verify Issue Tracker Activity: JOSS requires evidence of iterative development over time. With over 1,000 commits over the last 3 years and active PRs/Issues, we should easily pass this gate.
 
 - [x] Check License: We have an MIT license, which fulfills the OSI-approved license requirement.
 
