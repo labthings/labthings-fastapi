@@ -29,6 +29,7 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx_toolbox.decorators",
     "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 
 myst_heading_anchors = 3

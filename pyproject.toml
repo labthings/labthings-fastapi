@@ -44,6 +44,7 @@ dev = [
   "sphinx>=7.2",
   "sphinx-autoapi",
   "sphinx-toolbox",
+  "sphinxcontrib-mermaid",
   "sphobjinv",
   "myst-parser<5",
   "tomli; python_version < '3.11'",
