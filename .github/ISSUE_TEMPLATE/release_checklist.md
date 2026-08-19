@@ -25,11 +25,19 @@ assignees: ''
 - [ ] Decide on issues and PRs that will be included, adjusting milestones as necessary.
 - [ ] Make a prerelease on PyPI for testing.
 
-**Manual testing**
-- [ ] Ensure the prerelease is tested against a real system (currently this will be an OpenFlexure Microscope).
-- [ ] Open issues and PRs to fix any bugs that are found.
+**Testing**
+- [ ] Check that all formatting, linting, unit, and integration tests are passing on CI
+- [ ] Verify core functionality against a real system:
+    - [ ] Run a large ( > 200 images) slide scan on an OpenFlexure Microscope
+    - [ ] Verify the UI on the OpenFlexure Microscope works as expected
+    - [ ] Report any relevant bugs as an Issue in the [OpenFlexure Microscope Server Repository](https://gitlab.com/openflexure/openflexure-microscope-server)
+- [ ] Open issues and PRs in the labthings-fastapi to fix any bugs that are found in the labthings software.
 
 **Release**
-- [ ] Bump the version number.
+- [ ] Bump the version number in `pyproject.toml`
 - [ ] Make a release on Github, including a changelog in the release notes.
 - [ ] Verify that the release appears on PyPI and add a link to the Github release.
+
+**Post-Release**
+- [ ] Announce the new release on relevant channels, including telling the OpenFlexure Core Team and other other downstream project teams.
+- [ ] Close this issue and the corresponding GitHub Milestone.

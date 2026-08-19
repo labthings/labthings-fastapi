@@ -31,6 +31,7 @@ assignees: ''
 * [ ] All new/changed functions have up to date typehints and docstrings.
 * [ ] Any changes to the public API have been updated in `docs/src/public_api.rst`.
 * [ ] New or changed features have been added to (or updated in) the conceptual documentation.
+* [ ] Any new or updated dependencies have been added to the project configuration (e.g., `pyproject.toml`).
 * [ ] New functionality is fully tested.
 * [ ] Any decrease in test coverage has been justified.
 * [ ] Either the `test-against-ofm-v3` job passes, or `test-against-ofm-feature-branch` passes.
