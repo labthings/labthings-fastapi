@@ -14,6 +14,8 @@ JOSS requires clear documentation that allows a new user to understand and use t
 
 - [ ] Consider renaming the project to 'labthings'
 
+- [ ] Update website
+
 ## Testing & Continuous Integration (CI)
 JOSS reviewers will look closely at the testing framework to ensure the software is reliable.
 
