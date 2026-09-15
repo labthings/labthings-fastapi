@@ -7,7 +7,7 @@ it whenever its dependencies change, allowing it to be observed.
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, cast
 from weakref import WeakKeyDictionary
 
 from labthings_fastapi.exceptions import PropertyNotObservableError
@@ -56,6 +56,32 @@ class AccessWrapper:
                 "computed property."
             )
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Don't allow attributes to be set, there should be no side-effects.
+
+        :param name: the name of the attribute.
+        :param value: the value to set.
+        :raises AttributeError: because the wrapper is read-only.
+        """
+        raise AttributeError("Computed properties may not set values.")
+
+
+def access_wrapper(obj: Owner, dependencies: set[str]) -> Owner:
+    """Wrap a Thing to record attribute access.
+
+    This function is preferred to instantiating AccessWrapper directly,
+    as it ensures the wrapper is type hinted as the original object.
+
+    :param obj: the Thing to wrap.
+    :param dependencies: a set to store dependencies.
+    :return: `obj` with an attribute access wrapper.
+    """
+    # Typing note: AccessWrapper proxies attribute access back to the
+    # wrapped object, so its signature should be identical to `obj`
+    # and thus the `cast` below is justified.
+    wrapper = AccessWrapper(obj, dependencies=dependencies)
+    return cast(Owner, wrapper)
+
 
 class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
     """A property that recomputes its value on demand.
@@ -84,10 +110,10 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         :return: the value of the property.
         """
         dependencies: set[str] = set()
-        access_wrapper = AccessWrapper(obj, dependencies=dependencies)
+        wrapper = access_wrapper(obj, dependencies=dependencies)
         # access_wrapper is wrapping `self` but has its own type. We therefore
         # ignore type checking on this line.
-        val = self._fget(access_wrapper)  # type: ignore[arg-type]
+        val = self._fget(wrapper)  # type: ignore[arg-type]
         self._dependencies[obj] = dependencies
         return val
 
