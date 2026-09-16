@@ -414,6 +414,11 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     `False` for functional properties.
     """
 
+    @builtins.property
+    def is_computed(self) -> bool:  # noqa: DOC201
+        """Whether the property is a computed property."""
+        return False
+
     @staticmethod
     def _validate_constraints(constraints: Mapping[str, Any]) -> FieldConstraints:
         """Validate an untyped dictionary of constraints.
@@ -1213,6 +1218,30 @@ class PropertyInfo(
             `.FeatureNotAvailableError` exceptions.
         """
         return self.get_descriptor().reset(self.owning_object_or_error())
+
+    @builtins.property
+    def is_computed(self) -> bool:  # noqa: DOC201
+        """Whether the property is a computed property."""
+        # This is done by inspecting the name rather than an isinstance check
+        # to avoid circular dependencies.
+        return self.get_descriptor().is_computed
+
+    def publish(self) -> None:
+        """Get the property's value, and publish it to any observers.
+
+        This reduces boilerplate when you are managing property notifications manually,
+        and is also used to initialise computed properties.
+        """
+        value = self.get()
+        obj = self.owning_object_or_error()
+        obj._thing_server_interface.publish(
+            Message(
+                thing=obj.name,
+                affordance=self.name,
+                message_type="property",
+                payload=value,
+            )
+        )
 
     def validate(self, value: Any) -> Value:
         """Use the validation logic in `self.model`.
