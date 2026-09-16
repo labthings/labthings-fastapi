@@ -8,10 +8,9 @@ it whenever its dependencies change, allowing it to be observed.
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, cast
-from weakref import WeakKeyDictionary
 
 from anyio import create_memory_object_stream
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
+from anyio.streams.memory import MemoryObjectSendStream
 
 from labthings_fastapi.exceptions import PropertyNotObservableError
 from labthings_fastapi.message_broker import Message
@@ -93,106 +92,80 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
     This is a way to make functional properties observable.
     """
 
-    def __init__(
-        self,
-        fget: Callable[[Owner], Value],
-        **kwargs: Any,
-    ) -> None:
-        r"""Initialise a computed property.
-
-        :param fget: The getter function.
-        :param \**kwargs: Additional keyword arguments are passed to
-            `BaseProperty`.
-        """
-        super().__init__(fget=fget, **kwargs)
-        self._dependencies: "WeakKeyDictionary[Thing, set[str]]" = WeakKeyDictionary()
-        self._streams: WeakKeyDictionary[
-            "Thing",
-            tuple[MemoryObjectSendStream[Message], MemoryObjectReceiveStream[Message]],
-        ] = WeakKeyDictionary()
-
     @property
     def is_computed(self) -> bool:
         """Whether the property is a computed property."""
         return True
 
-    def instance_get(self, obj: Owner) -> Value:
+    def instance_get(self, obj: Owner, dependencies: set[str] | None = None) -> Value:
         """Get the value of this functional property.
 
         :param obj: the object on which this property is being accessed.
+        :param dependencies: an optional set to be populated with properties accessed
+            during recomputation.
         :return: the value of the property.
         """
-        dependencies: set[str] = set()
-        wrapper = access_wrapper(obj, dependencies=dependencies)
-        val = self._fget(wrapper)
-        if not dependencies:
-            self._stop_watching(obj)
+        if dependencies is not None:
+            wrapper = access_wrapper(obj, dependencies=dependencies)
+            return self._fget(wrapper)
         else:
-            self._watch_for_changes(obj, dependencies)
-        return val
+            return self._fget(obj)
 
-    def _watch_for_changes(self, obj: Owner, dependencies: set[str]) -> None:
-        """Ensure a coroutine is watching for changes.
+    async def _watch_for_changes(self, obj: Owner) -> None:
+        """Watch for changes in our dependencies, and recompute as needed.
 
-        This method will check whether we are currently processing messages
-        from the properties we depend on, so that this property will be
-        recomputed when they change. If that's not happening, we will start
-        a new coroutine to do this.
+        This method will evaluate the computed property, tracking which
+        properties are accessed. It then subscribes to these properties,
+        and will recompute the property as required.
 
         :param obj: the object on which the property is defined.
-        :param dependencies: the properties on which the object depends.
-        :raises ValueError: if the dependencies set is empty.
         """
-        if not dependencies:
-            # This shouldn't ever happen - the calling function checks that
-            # dependencies is non-empty.
-            raise ValueError(
-                "_watch_for_changes must have at least one dependency to watch."
-            )
-        streams = self._streams.get(obj)
-        if streams is None or streams[1].statistics().open_receive_streams == 0:
-            # If the streams are missing or closed, create them and start the coroutine.
-            send, recv = create_memory_object_stream[Message]()
-            obj._thing_server_interface.start_async_task_soon(
-                _recompute_on_changes, self.descriptor_info().publish, recv
-            )
-            self._streams[obj] = send, recv
-        else:
-            send, recv = self._streams[obj]
+        send, recv = create_memory_object_stream[Message](max_buffer_size=1)
+        # Subscribe to a non-existent affordance, to ensure that the stream
+        # is closed by the message broker even if there are no other
+        # subscriptions.
+        obj._thing_server_interface.subscribe(obj.name, "#dummy", send)
 
+        dependencies: set[str] = set()
+        # Add a message to the stream, so we initialise everything immediately
+        # in the `async for` loop.
+        initial_message = Message(obj.name, self.name, "property", None)
+        await send.send(initial_message)
+
+        # Whenever a dependency changes, we'll recompute and publish an update
+        async for message in recv:
+            old_dependencies = dependencies
+            dependencies = set()
+            value = self.instance_get(obj, dependencies=dependencies)
+            await self._update_subscriptions(obj, dependencies, old_dependencies, send)
+            if message is initial_message:
+                continue
+            obj._thing_server_interface.publish(
+                Message(obj.name, self.name, "property", value)
+            )
+
+    @staticmethod
+    async def _update_subscriptions(
+        obj: Owner,
+        dependencies: set[str],
+        old_dependencies: set[str],
+        send_stream: MemoryObjectSendStream[Message],
+    ) -> None:
+        """Subscribe and unsubscribe to other properties.
+
+        :param obj: the Thing on which we are defined.
+        :param dependencies: a set of the names of current dependencies.
+        :param old_dependencies: previous dependencies - any not in ``dependencies``
+            will be unsubscribed.
+        :param send_stream: the stream to use for subscriptions.
+        """
         # The streams exist and a coroutine is monitoring them. Now, subscribe
         # to changes in our dependencies
         for affordance in dependencies:
-            obj._thing_server_interface.subscribe(obj.name, affordance, send)
+            obj._thing_server_interface.subscribe(obj.name, affordance, send_stream)
         # Unsubscribe from any dependencies no longer needed
-        for affordance in self._dependencies[obj].difference(dependencies):
-            obj._thing_server_interface.unsubscribe(obj.name, affordance, send)
-        self._dependencies[obj] = dependencies
-
-    def _stop_watching(self, obj: Owner) -> None:
-        """Stop watching for changes, as we have no dependencies.
-
-        :param obj: the Thing on which we are defined.
-        """
-        send, _recv = self._streams[obj]
-        # Unsubscribe from any dependencies no longer needed
-        for affordance in self._dependencies[obj]:
-            obj._thing_server_interface.unsubscribe(obj.name, affordance, send)
-        # Close the stream, so that the coroutine terminates
-        send.close()
-
-
-async def _recompute_on_changes(
-    recompute: Callable[[], None], stream: MemoryObjectReceiveStream[Message]
-) -> None:
-    """Recompute and publish a property if its dependencies change.
-
-    :param recompute: a function to call when a dependency changes.
-    :param stream: the stream on which we'll get notified.
-    """
-    async for _msg in stream:
-        # Currently, we don't check what changed - we just trigger a recompute.
-        recompute()
+        for affordance in old_dependencies.difference(dependencies):
+            obj._thing_server_interface.unsubscribe(obj.name, affordance, send_stream)
 
 
 def computed_property(fget: Callable[[Owner], Value]) -> ComputedProperty[Owner, Value]:
@@ -211,4 +184,9 @@ def initialise_computed_properties(thing: "Thing") -> None:
     """
     for prop in thing.properties.values():
         if prop.is_computed:
-            prop.publish()
+            computed_property = prop.get_descriptor()
+            if not isinstance(computed_property, ComputedProperty):
+                continue
+            thing._thing_server_interface.start_async_task_soon(
+                computed_property._watch_for_changes, thing
+            )
