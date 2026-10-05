@@ -11,6 +11,15 @@ Once you have activated the virtual environment, you should be able to run an ex
 
     labthings-server --json '{"things":{"mything":"labthings_fastapi.example_things:MyThing"}}'
 
+.. note::
+
+If you are using Windows PowerShell, the quotation marks in the JSON
+argument must be escaped. Use the following command instead:
+
+.. code-block:: powershell
+
+labthings-server --json '{\"things\":{\"mything\":\"labthings_fastapi.example_things:MyThing\"}}'
+
 This command will start a LabThings server, and will print the root URL for your server (by default, ``http://127.0.0.1:5000``). The ``127.0.0.1`` part means the server is only accessible from your computer, so you don't need to worry about other computers on your network accessing it.
 
 Now that your server is running, you should be able to view the interactive documentation in your web browser. There is an OpenAPI documentation page at ``http://127.0.0.1:5000/docs/``. This shows all the requests that the server supports, and even allows you to try them out in the web browser.
