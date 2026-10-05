@@ -79,7 +79,9 @@ API documentation. In particular:
 
 JOSS specifically asks for design trade-offs and architectural reasoning, so
 the final text should concentrate on WHY these choices were made rather than
-documenting individual API functions. -->
+documenting individual API functions.
+
+We also may want figures in this section.-->
 
 # Research impact statement
 
@@ -100,7 +102,9 @@ Suggested evidence:
 - publications or datasets produced using the v3 software.
 
 JOSS requires evidence of realised research impact or credible and specific
-near-term significance, rather than purely aspirational statements. -->
+near-term significance, rather than purely aspirational statements.
+
+We also may want figures in this section-->
 
 # AI Usage Disclosure
 
