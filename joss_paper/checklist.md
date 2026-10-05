@@ -6,9 +6,9 @@ JOSS requires clear documentation that allows a new user to understand and use t
 - [x] Verify Installation Instructions: Ensure the pip install instructions are clear and account for any system-level dependencies.
     - [x] Add additional instructions for Windows specific installation as there are additional requirements (MR #367)
 
-- [ ] Usage Examples / Tutorials: Reviewers need to see examples of how to use the software to solve real-world problems. Ensure the ReadTheDocs includes a clear, executable example of spinning up a Thing and interacting with it.
+- [x] Usage Examples / Tutorials: Reviewers need to see examples of how to use the software to solve real-world problems. Ensure the ReadTheDocs includes a clear, executable example of spinning up a Thing and interacting with it.
 
-- [ ] API Reference: Confirm that the top-level API summary (lt.*) and Pydantic models are fully rendered and easily navigable.
+- [x] API Reference: Confirm that the top-level API summary (lt.*) and Pydantic models are fully rendered and easily navigable.
 
 - [ ] W3C Web of Things (WoT) Context: Clearly document how the framework implements or extends the WoT specification (this will tie directly into the paper).
 
@@ -40,8 +40,8 @@ JOSS requires evidence of open development practices and a welcoming environment
 ## Paper Generation
 See an example at:https://joss.readthedocs.io/en/latest/example_paper.html
 
-- [ ] Draft paper.md: Create the JOSS-formatted paper in the root of your repository (see [paper.md](./paper.md)).
+- [x] Draft paper.md: Create the JOSS-formatted paper in the root of the repository (see [paper.md](./paper.md)).
 
-- [ ] Compile paper.bib: Gather all necessary BibTeX references (e.g., the W3C WoT spec, FastAPI, OpenFlexure Microscope papers).
+- [x] Compile paper.bib: Gather all necessary BibTeX references (e.g., the W3C WoT spec, FastAPI, OpenFlexure Microscope papers).
 
-- [ ] Automated Paper Check: Once drafted, you can use the JOSS editorial bot to generate a PDF preview of your paper directly from your GitHub repository to ensure the metadata parses correctly.
+- [ ] Automated Paper Check: Once drafted, use the JOSS editorial bot to generate a PDF preview of the paper directly from the GitHub repository to ensure the metadata parses correctly.
