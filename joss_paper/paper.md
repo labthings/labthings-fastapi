@@ -43,7 +43,7 @@ The framework is intended for researchers developing custom or open scientific i
 
 # State of the field
 
-Laboratory automation software addresses the connection between experimental protocols, software, and heterogeneous physical equipment at several different levels. Projects such as PyLabRobot provide hardware-independent Python interfaces for classes of laboratory equipment, including liquid-handling robots, plate readers, and related devices [@pylabrobot]. Bluesky and Ophyd provide abstractions for experiment orchestration, data acquisition, and hardware interfaces [@bluesky; @ophyd]. These frameworks demonstrate the value of separating experimental logic from device-specific control, but address a different layer of the laboratory automation software stack. `labthings-fastapi` focuses specifically on exposing a Python representation of hardware or software as a self-describing network service, rather than providing a library of hardware drivers or a system for orchestrating complete experiments.
+Laboratory automation software addresses the connection between experimental protocols, software, and heterogeneous physical equipment at several different levels. Projects such as PyLabRobot provide hardware-independent Python interfaces for classes of laboratory equipment, including liquid-handling robots, plate readers, and related devices [@wierenga2023]. Bluesky and Ophyd provide abstractions for experiment orchestration, data acquisition, and hardware interfaces [@bluesky; @ophyd]. These frameworks demonstrate the value of separating experimental logic from device-specific control, but address a different layer of the laboratory automation software stack. `labthings-fastapi` focuses specifically on exposing a Python representation of hardware or software as a self-describing network service, rather than providing a library of hardware drivers or a system for orchestrating complete experiments.
 
 The W3C Web of Things provides a complementary approach to interoperability between network-connected devices. A WoT Thing Description defines machine-readable metadata and interaction affordances for a physical or virtual entity, including properties, actions, and events [@wot-td]. General-purpose WoT implementations are available for exposing and consuming Things in several programming languages [@wot-tools]. `labthings-fastapi` does not aim to replace these general-purpose WoT runtimes. Instead, the framework applies WoT concepts to Python-controlled laboratory hardware while addressing requirements associated with physical research instruments, including device lifecycle and concurrent access.
 
@@ -83,9 +83,9 @@ documenting individual API functions. -->
 
 # Research impact statement
 
-`labthings-fastapi` is the underlying framework for version 3 of the OpenFlexure Microscope software. The OpenFlexure Microscope is an open-source, automated microscope designed to be manufactured using accessible fabrication techniques [@collins2020]. Earlier work on the OpenFlexure software demonstrated the use of Web of Things concepts to simplify interactions between microscope hardware, server software, and user-facing applications [@mcdermott2021]. `labthings-fastapi` continues this approach using a redesigned implementation based on FastAPI and Pydantic.
+`labthings-fastapi` is the underlying framework for version 3 of the OpenFlexure Microscope software. The OpenFlexure Microscope is an open-source, automated microscope designed to be manufactured using accessible fabrication techniques [@collins2020]. Earlier work on the OpenFlexure software demonstrated the use of Web of Things concepts to simplify interactions between microscope hardware, server software, and user-facing applications [@collins2021]. `labthings-fastapi` continues this approach using a redesigned implementation based on FastAPI and Pydantic.
 
-The wider OpenFlexure project has supported research across a range of microscopy and laboratory applications [@openflexure_publications]. Within OpenFlexure Microscope version 3, `labthings-fastapi` provides the framework through which microscope functionality is exposed as a documented HTTP interface and represented through Web of Things concepts.
+The wider OpenFlexure project has supported research across a range of microscopy and laboratory applications [@collins2020; @knapper2024]. Within OpenFlexure Microscope version 3, `labthings-fastapi` provides the framework through which microscope functionality is exposed as a documented HTTP interface and represented through Web of Things concepts.
 
 <!-- TODO (Ben/Joe/Richard): Add concrete evidence of the impact specifically
 attributable to labthings-fastapi rather than OpenFlexure generally.
@@ -117,5 +117,3 @@ We acknowledge contributions from [Name] during the early development of this
 project, and funding from [Grant Name/Number] which supported this work. -->
 
 # References
-<!-- TODO. Include as a minimum https://doi.org/10.1098/rsta.2023.0257 and https://doi.org/10.1098/rsos.211158
-Must be in a different paper.bib file. -->
