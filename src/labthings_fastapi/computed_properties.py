@@ -6,11 +6,14 @@ This means LabThings is able to recompute
 it whenever its dependencies change, allowing it to be observed.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Generic, cast
+from weakref import WeakKeyDictionary
 
-from anyio import create_memory_object_stream
+from anyio import create_memory_object_stream, to_thread
+from anyio.abc import TaskGroup
 from anyio.streams.memory import MemoryObjectSendStream
+from typing_extensions import Literal
 
 from labthings_fastapi.exceptions import PropertyNotObservableError
 from labthings_fastapi.message_broker import Message
@@ -20,8 +23,13 @@ if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
 
 
+RECOMPUTE = object()
+
+
 class AccessWrapper:
     """Wrap access to the properties of an object."""
+
+    _access_wrapper_locked = False
 
     def __init__(self, obj: "Thing", dependencies: set[str]) -> None:
         """Initialise the AccessWrapper.
@@ -31,6 +39,7 @@ class AccessWrapper:
         """
         self._obj = obj
         self._dependencies = dependencies
+        self._access_wrapper_locked = True
 
     def __getattr__(self, name: str) -> Any:
         """Proxy attribute access to the underlying object.
@@ -60,13 +69,19 @@ class AccessWrapper:
             )
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Don't allow attributes to be set, there should be no side-effects.
+        """Don't allow attributes to be set.
+
+        Once the wrapper is initialised, it won't allow attributes to be set.
+        We need to be able to set some attributes during `__init__`, but
+        after that, everything becomes read-only.
 
         :param name: the name of the attribute.
         :param value: the value to set.
         :raises AttributeError: because the wrapper is read-only.
         """
-        raise AttributeError("Computed properties may not set values.")
+        if self._access_wrapper_locked is True:
+            raise AttributeError("Computed properties may not set values.")
+        super().__setattr__(name, value)
 
 
 def access_wrapper(obj: Owner, dependencies: set[str]) -> Owner:
@@ -92,24 +107,88 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
     This is a way to make functional properties observable.
     """
 
+    def __init__(
+        self,
+        fget: Callable[[Owner], Value],
+        constraints: Mapping[str, Any] | None = None,
+        use_global_lock: Literal[False] | None = None,
+    ) -> None:
+        """Set up a FunctionalProperty.
+
+        Create a descriptor for a property that uses a getter function.
+
+        This class also inherits from `builtins.property` to help type checking
+        tools understand that it functions like a property.
+
+        :param fget: the getter function, called when the property is read.
+        :param constraints: is passed as keyword arguments to `pydantic.Field`
+            to add validation constraints to the property. See `pydantic.Field`
+            for details.
+        :param use_global_lock: may be set to `False` to disable the global lock
+            for setting this property. By default, if global locking is enabled,
+            we hold the global lock while setting the property.
+        """
+        super().__init__(
+            fget=fget, constraints=constraints, use_global_lock=use_global_lock
+        )
+        self._send_streams = WeakKeyDictionary[
+            "Thing", MemoryObjectSendStream[Message]
+        ]()
+        self._latest_values = WeakKeyDictionary["Thing", Value]()
+
     @property
     def is_computed(self) -> bool:
         """Whether the property is a computed property."""
         return True
 
-    def instance_get(self, obj: Owner, dependencies: set[str] | None = None) -> Value:
-        """Get the value of this functional property.
+    def instance_get(self, obj: Owner) -> Value:
+        """Get the value of this computed property.
+
+        This will use the latest value that was cached. It will fall back to
+        computing it directly if a cached value is not available.
 
         :param obj: the object on which this property is being accessed.
-        :param dependencies: an optional set to be populated with properties accessed
-            during recomputation.
         :return: the value of the property.
         """
-        if dependencies is not None:
-            wrapper = access_wrapper(obj, dependencies=dependencies)
-            return self._fget(wrapper)
-        else:
-            return self._fget(obj)
+        try:
+            return self._latest_values[obj]
+        except KeyError:
+            msg = f"Computed property {self.name} was accessed before initialisation."
+            obj.logger.warning(msg)
+            return self.fget(obj)
+
+    async def _request_recomputation(self, obj: Owner) -> Value:
+        """Trigger a recomputation of the property and return the new value.
+
+        :param obj: the object on which the property is defined.
+        :return: the value of the property.
+        """
+        broker = obj._thing_server_interface.message_broker
+        send, recv = create_memory_object_stream[Message](max_buffer_size=1)
+        # Subscribe for updates (get the recomputed value)
+        await broker.subscribe(obj.name, self.name, send)
+        # Trigger a recompute
+        await self._send_streams[obj].send(
+            # Note that RECOMPUTE messages should never hit the broker: they
+            # are only ever sent directly to our stream.
+            Message(obj.name, self.name, "property", RECOMPUTE)
+        )
+        message = await recv.receive()
+        return message.payload
+
+    def recompute(self, obj: Owner) -> tuple[Value, set[str]]:
+        """Recompute the property and track dependencies.
+
+        This function isn't async, and is intended to be called in a
+        worker thread.
+
+        :param obj: the object on which the property is defined.
+        :return: a tuple of the new value and the dependencies.
+        """
+        dependencies: set[str] = set()
+        wrapper = access_wrapper(obj, dependencies=dependencies)
+        value = self._fget(wrapper)
+        return value, dependencies
 
     async def _watch_for_changes(self, obj: Owner) -> None:
         """Watch for changes in our dependencies, and recompute as needed.
@@ -120,29 +199,29 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
 
         :param obj: the object on which the property is defined.
         """
+        broker = obj._thing_server_interface.message_broker
         send, recv = create_memory_object_stream[Message](max_buffer_size=1)
         # Subscribe to a non-existent affordance, to ensure that the stream
-        # is closed by the message broker even if there are no other
-        # subscriptions.
-        obj._thing_server_interface.subscribe(obj.name, "#dummy", send)
+        # is closed by the message broker when it's shut down even if there
+        # are no other subscriptions.
+        await broker.subscribe(obj.name, "#dummy", send)
+        # Save the send stream so other methods can trigger updates
+        self._send_streams[obj] = send
 
         dependencies: set[str] = set()
         # Add a message to the stream, so we initialise everything immediately
         # in the `async for` loop.
-        initial_message = Message(obj.name, self.name, "property", None)
+        initial_message = Message(obj.name, self.name, "property", RECOMPUTE)
         await send.send(initial_message)
 
         # Whenever a dependency changes, we'll recompute and publish an update
         async for message in recv:
             old_dependencies = dependencies
-            dependencies = set()
-            value = self.instance_get(obj, dependencies=dependencies)
+            value, dependencies = await to_thread.run_sync(self.recompute, obj)
             await self._update_subscriptions(obj, dependencies, old_dependencies, send)
             if message is initial_message:
                 continue
-            obj._thing_server_interface.publish(
-                Message(obj.name, self.name, "property", value)
-            )
+            await broker.publish(Message(obj.name, self.name, "property", value))
 
     @staticmethod
     async def _update_subscriptions(
@@ -159,13 +238,14 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
             will be unsubscribed.
         :param send_stream: the stream to use for subscriptions.
         """
+        broker = obj._thing_server_interface.message_broker
         # The streams exist and a coroutine is monitoring them. Now, subscribe
         # to changes in our dependencies
         for affordance in dependencies:
-            obj._thing_server_interface.subscribe(obj.name, affordance, send_stream)
+            await broker.subscribe(obj.name, affordance, send_stream)
         # Unsubscribe from any dependencies no longer needed
         for affordance in old_dependencies.difference(dependencies):
-            obj._thing_server_interface.unsubscribe(obj.name, affordance, send_stream)
+            await broker.unsubscribe(obj.name, affordance, send_stream)
 
 
 def computed_property(fget: Callable[[Owner], Value]) -> ComputedProperty[Owner, Value]:
@@ -177,16 +257,21 @@ def computed_property(fget: Callable[[Owner], Value]) -> ComputedProperty[Owner,
     return ComputedProperty(fget=fget)
 
 
-def initialise_computed_properties(thing: "Thing") -> None:
-    """Initialise the computed properties on a Thing.
+async def start_watching_computed_properties(
+    thing: "Thing",
+    task_group: TaskGroup,
+) -> None:
+    """Watch the computed properties on a Thing.
 
-    :param thing: the Thing on which to initialise computed properties.
+    :param thing: the Thing on which to watch computed properties.
+    :param task_group: the task group to use for watching properties.
+    :raises TypeError: if a property declares itself to be computed, but is not
+        an instance of ComputedProperty.
     """
     for prop in thing.properties.values():
         if prop.is_computed:
             computed_property = prop.get_descriptor()
             if not isinstance(computed_property, ComputedProperty):
-                continue
-            thing._thing_server_interface.start_async_task_soon(
-                computed_property._watch_for_changes, thing
-            )
+                msg = "Computed properties must be instances of ComputedProperty."
+                raise TypeError(msg)
+            task_group.start_soon(computed_property._watch_for_changes, thing)

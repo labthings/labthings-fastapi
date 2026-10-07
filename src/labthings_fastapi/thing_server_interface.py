@@ -18,11 +18,9 @@ from typing import (
 )
 from weakref import ReferenceType, ref
 
-from anyio.streams.memory import MemoryObjectSendStream
-
 from labthings_fastapi.exceptions import FeatureNotEnabledError, ServerNotRunningError
 from labthings_fastapi.global_lock import GlobalLock
-from labthings_fastapi.message_broker import Message
+from labthings_fastapi.message_broker import Message, MessageBroker
 
 if TYPE_CHECKING:
     from labthings_fastapi.actions import ActionManager
@@ -158,39 +156,10 @@ class ThingServerInterface:
         except ServerNotRunningError:
             pass  # If the server isn't running yet, we can't publish events.
 
-    def subscribe(
-        self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
-    ) -> None:
-        """Subscribe to messages from an affordance.
-
-        :param thing: the name of the Thing being subscribed to.
-        :param affordance: the name of the affordance being subscribed to.
-        :param stream: the stream messages should be sent to.
-        :raises ServerNotRunningError: if the server hasn't started yet. It doesn't
-            make sense to subscribe to events if the event loop isn't yet running.
-        """
-        try:
-            broker = self._get_server().message_broker
-            self.start_async_task_soon(broker.subscribe, thing, affordance, stream)
-        except ServerNotRunningError:
-            raise
-
-    def unsubscribe(
-        self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
-    ) -> None:
-        """Unsubscribe to messages from an affordance.
-
-        :param thing: the name of the Thing being subscribed to.
-        :param affordance: the name of the affordance being subscribed to.
-        :param stream: the stream messages should be sent to.
-        :raises ServerNotRunningError: if the server hasn't started yet. It doesn't
-            make sense to unsubscribe from events if the event loop isn't yet running.
-        """
-        try:
-            broker = self._get_server().message_broker
-            self.start_async_task_soon(broker.unsubscribe, thing, affordance, stream)
-        except ServerNotRunningError:
-            raise
+    @property
+    def message_broker(self) -> MessageBroker:
+        """The message broker, coordinating pub/sub messaging."""
+        return self._get_server().message_broker
 
     @property
     def settings_folder(self) -> str:
