@@ -96,19 +96,85 @@ def test_unobservable():
         MyBrokenThing.broken.recompute(thing)
 
 
-async def test_notifications(server, aclient):
+async def test_notifications_double(server, aclient):
     """Check that we get a notification if a dependent property changes."""
     thing = server.things["thing"]
     assert isinstance(thing, MyThing)
 
+    # Subscribe to updates from "double"
     send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=1)
     await server.message_broker.subscribe("thing", "double", send)
+    print("started")
+
+    # Listen for updates and set `quantity` to trigger one
     async with anyio.create_task_group() as tg:
         handle = tg.start_soon(recv.receive)
         await run_sync(thing.properties["quantity"].set, 42)
     message = handle.return_value
 
+    # Check the message described the update properly
     assert message.affordance == "double"
     assert message.thing == "thing"
     assert message.message_type == "property"
     assert message.payload == 84
+
+
+async def test_notifications_selected(server, aclient):
+    """Check that we get a notification if a dependent property changes."""
+    thing = server.things["thing"]
+    assert isinstance(thing, MyThing)
+
+    # Subscribe to updates from "selected"
+    send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=2)
+    await server.message_broker.subscribe("thing", "selected", send)
+
+    # Set `quantity` to trigger a recomputation and a message
+    await run_sync(thing.properties["quantity"].set, 42)
+    message = await recv.receive()
+    print("changed quantity")
+
+    # Check the message described the update properly
+    assert message.affordance == "selected"
+    assert message.thing == "thing"
+    assert message.message_type == "property"
+    assert message.payload == 42
+
+    # Setting `quantity2` should not trigger an update.
+    await run_sync(thing.properties["quantity2"].set, 1)
+    await anyio.sleep(0.05)
+    with pytest.raises(anyio.WouldBlock):
+        # There should be no message in the receive stream
+        recv.receive_nowait()
+    print("changed quantity2")
+
+    # Change the value of `quantity2` to guard against
+    # messages sitting in the stream. This shouldn't notify,
+    # because  quantity2 is not yet a dependency
+    await run_sync(thing.properties["quantity2"].set, 2)
+    # Now change `selector`, which should trigger a recomputation.
+    await run_sync(thing.properties["selector"].set, "q2")
+    message = await recv.receive()
+
+    # Check the message described the update properly
+    assert message.affordance == "selected"
+    assert message.thing == "thing"
+    assert message.message_type == "property"
+    assert message.payload == 2
+
+    # `quantity2` should now be a dependency, so it ought to trigger
+    # an update.
+    await run_sync(thing.properties["quantity2"].set, 3)
+    message = await recv.receive()
+
+    # Check the message described the update properly
+    assert message.affordance == "selected"
+    assert message.thing == "thing"
+    assert message.message_type == "property"
+    assert message.payload == 3
+
+    # Setting `quantity` should not trigger an update any more.
+    await run_sync(thing.properties["quantity"].set, 1)
+    await anyio.sleep(0.05)
+    with pytest.raises(anyio.WouldBlock):
+        # There should be no message in the receive stream
+        recv.receive_nowait()
