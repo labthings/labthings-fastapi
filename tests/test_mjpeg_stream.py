@@ -41,7 +41,6 @@ class Telly(lt.Thing):
             time.sleep(1 / self.framerate)
             i = i + 1
         self.stream.stop()
-        self._streaming = False
 
 
 @pytest.fixture
