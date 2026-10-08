@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
 
 
+__all__ = ["computed_property"]
+
+
 RECOMPUTE = object()
 
 
@@ -269,6 +272,14 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
 
 def computed_property(fget: Callable[[Owner], Value]) -> ComputedProperty[Owner, Value]:
     """Decorate a method as a computed property.
+
+    Computed properties are simple functional properties that only depend on other
+    properties of their host Thing. Unlike functional properties, it's possible to
+    observe them for changes, and LabThings will recalculate them automatically when
+    their dependencies change.
+
+    See :ref:`computed_properties` for full details of how computed properties work and
+    how to use them.
 
     :param fget: the getter function, which must depend only on observable properties.
     :return: a computed property descriptor.
