@@ -161,13 +161,8 @@ class MJPEGStream:
         self._name = name
         self.reset()
 
-    def reset(self, ringbuffer_size: Optional[int] = None) -> None:
-        """Reset the stream and optionally change the ringbuffer size.
-
-        Discard all frames from the ringbuffer and reset the frame index.
-
-        :param ringbuffer_size: the number of frames to keep in memory.
-        """
+    def reset(self) -> None:
+        """Reset the frame index."""
         with self._lock:
             self.last_frame_i = -1
 
