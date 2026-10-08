@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Generic, cast
 from weakref import WeakKeyDictionary
 
-from anyio import create_memory_object_stream, to_thread
+from anyio import create_memory_object_stream, from_thread, to_thread
 from anyio.abc import TaskGroup, TaskStatus
 from anyio.streams.memory import MemoryObjectSendStream
 from typing_extensions import Literal
@@ -31,14 +31,18 @@ class AccessWrapper:
 
     _access_wrapper_locked = False
 
-    def __init__(self, obj: "Thing", dependencies: set[str]) -> None:
+    def __init__(
+        self,
+        obj: "Thing",
+        callback: Callable[[str], None],
+    ) -> None:
         """Initialise the AccessWrapper.
 
         :param obj: the object being wrapped.
-        :param dependencies: a set to use for tracking dependencies.
+        :param callback: a function that's called with the name of each dependency.
         """
         self._obj = obj
-        self._dependencies = dependencies
+        self._callback = callback
         self._access_wrapper_locked = True
 
     def __getattr__(self, name: str) -> Any:
@@ -52,8 +56,7 @@ class AccessWrapper:
         """
         if name in self._obj.properties:
             if self._obj.properties[name].is_observable:
-                self._dependencies.add(name)
-                print(f"Found an access to {name}")
+                self._callback(name)
                 return getattr(self._obj, name)
             else:
                 raise PropertyNotObservableError(
@@ -84,20 +87,21 @@ class AccessWrapper:
         super().__setattr__(name, value)
 
 
-def access_wrapper(obj: Owner, dependencies: set[str]) -> Owner:
+def access_wrapper(obj: Owner, callback: Callable[[str], None]) -> Owner:
     """Wrap a Thing to record attribute access.
 
     This function is preferred to instantiating AccessWrapper directly,
     as it ensures the wrapper is type hinted as the original object.
 
     :param obj: the Thing to wrap.
-    :param dependencies: a set to store dependencies.
+    :param callback: a function that's called for each identified dependency,
+        with the property name as its argument.
     :return: `obj` with an attribute access wrapper.
     """
     # Typing note: AccessWrapper proxies attribute access back to the
     # wrapped object, so its signature should be identical to `obj`
     # and thus the `cast` below is justified.
-    wrapper = AccessWrapper(obj, dependencies=dependencies)
+    wrapper = AccessWrapper(obj, callback=callback)
     return cast(Owner, wrapper)
 
 
@@ -136,6 +140,8 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         ]()
         self._latest_values = WeakKeyDictionary["Thing", Value]()
 
+    observable: bool = True
+
     @property
     def is_computed(self) -> bool:
         """Whether the property is a computed property."""
@@ -151,10 +157,9 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         :return: the value of the property.
         """
         try:
-            return self._latest_values[obj]
+            value = self._latest_values[obj]
+            return value
         except KeyError:
-            msg = f"Computed property {self.name} was accessed before initialisation."
-            obj.logger.warning(msg)
             return self.fget(obj)
 
     async def _request_recomputation(self, obj: Owner) -> Value:
@@ -176,19 +181,19 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         message = await recv.receive()
         return message.payload
 
-    def recompute(self, obj: Owner) -> tuple[Value, set[str]]:
-        """Recompute the property and track dependencies.
+    def publish(self, obj: Owner) -> Value:
+        """Recompute and publish the property's value.
 
-        This function isn't async, and is intended to be called in a
-        worker thread.
+        This will signal to the coroutine watching for changes that a recomputation
+        should happen. The new value will be published to the message broker.
+        This function will block until the recomputation has happened.
 
-        :param obj: the object on which the property is defined.
-        :return: a tuple of the new value and the dependencies.
+        :param obj: the Thing on which we are publishing the property.
+        :return: the recomputed value of the property.
         """
-        dependencies: set[str] = set()
-        wrapper = access_wrapper(obj, dependencies=dependencies)
-        value = self._fget(wrapper)
-        return value, dependencies
+        return obj._thing_server_interface.call_async_task(
+            self._request_recomputation, obj
+        )
 
     async def _watch_for_changes(self, obj: Owner, task_status: TaskStatus) -> None:
         """Watch for changes in our dependencies, and recompute as needed.
@@ -208,50 +213,58 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         # is closed by the message broker when it's shut down even if there
         # are no other subscriptions.
         await broker.subscribe(obj.name, "#dummy", send)
-        # Save the send stream so other methods can trigger updates
+        # Save the send stream so _request_recomputation can trigger updates
         self._send_streams[obj] = send
-
+        # This set will be filled with the dependencies each time we recompute.
         dependencies: set[str] = set()
+
+        def add_dependency(name: str) -> None:
+            """Add a dependency to the ``dependencies`` set and subscribe.
+
+            Note: this is called from the worker thread that is used to
+            recompute the property, hence the need for `anyio.from_thread.run_sync`.
+
+            It's important that we subscribe as-we-go otherwise it's possible to
+            miss changes to dependencies if they occur during recomputation.
+
+            The dependencies set should be cleared before each recomputation.
+
+            :param name: the name of the property to subscribe to.
+            """
+            from_thread.run(broker.subscribe, obj.name, name, send)
+            dependencies.add(name)
+
+        # This adds a side-effect to attribute access: it will subscribe to
+        # the attribute and add the attribute's name to `dependencies`.
+        obj_access_wrapper = access_wrapper(obj, add_dependency)
+
         # Add a message to the stream, so we initialise everything immediately
         # in the `async for` loop.
         initial_message = Message(obj.name, self.name, "property", RECOMPUTE)
         await send.send(initial_message)
 
-        # Whenever a dependency changes, we'll recompute and publish an update
+        # Whenever a dependency changes, we'll recompute and publish an update.
+        # Each time we update the value, we also check the dependencies in case
+        # they change.
         async for message in recv:
-            old_dependencies = dependencies
-            value, dependencies = await to_thread.run_sync(self.recompute, obj)
-            await self._update_subscriptions(obj, dependencies, old_dependencies, send)
+            # We need to keep track of dependencies, so we can unsubscribe from
+            # those we no longer need.
+            old_dependencies = dependencies.copy()
+            dependencies.clear()
+            # The next line recomputes the value, subscribes to dependencies, and
+            # puts the new dependencies into the `dependencies` set.
+            value = await to_thread.run_sync(self._fget, obj_access_wrapper)
+            self._latest_values[obj] = value
+            # Unsubscribe from any dependencies no longer needed
+            for affordance in old_dependencies.difference(dependencies):
+                await broker.unsubscribe(obj.name, affordance, send)
             if message is initial_message:
                 # At this point, we've calculated our dependencies and started
                 # listening, so we signal that everything's started OK.
+                # We don't send an initial update, hence the `continue`.
                 task_status.started()
                 continue
             await broker.publish(Message(obj.name, self.name, "property", value))
-
-    @staticmethod
-    async def _update_subscriptions(
-        obj: Owner,
-        dependencies: set[str],
-        old_dependencies: set[str],
-        send_stream: MemoryObjectSendStream[Message],
-    ) -> None:
-        """Subscribe and unsubscribe to other properties.
-
-        :param obj: the Thing on which we are defined.
-        :param dependencies: a set of the names of current dependencies.
-        :param old_dependencies: previous dependencies - any not in ``dependencies``
-            will be unsubscribed.
-        :param send_stream: the stream to use for subscriptions.
-        """
-        broker = obj._thing_server_interface.message_broker
-        # The streams exist and a coroutine is monitoring them. Now, subscribe
-        # to changes in our dependencies
-        for affordance in dependencies:
-            await broker.subscribe(obj.name, affordance, send_stream)
-        # Unsubscribe from any dependencies no longer needed
-        for affordance in old_dependencies.difference(dependencies):
-            await broker.unsubscribe(obj.name, affordance, send_stream)
 
 
 def computed_property(fget: Callable[[Owner], Value]) -> ComputedProperty[Owner, Value]:
