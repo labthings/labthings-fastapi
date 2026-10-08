@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 from weakref import WeakKeyDictionary
 
 from anyio import create_memory_object_stream, to_thread
-from anyio.abc import TaskGroup
+from anyio.abc import TaskGroup, TaskStatus
 from anyio.streams.memory import MemoryObjectSendStream
 from typing_extensions import Literal
 
@@ -190,7 +190,7 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         value = self._fget(wrapper)
         return value, dependencies
 
-    async def _watch_for_changes(self, obj: Owner) -> None:
+    async def _watch_for_changes(self, obj: Owner, task_status: TaskStatus) -> None:
         """Watch for changes in our dependencies, and recompute as needed.
 
         This method will evaluate the computed property, tracking which
@@ -198,6 +198,9 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
         and will recompute the property as required.
 
         :param obj: the object on which the property is defined.
+        :param task_status: anyio handle that reports when this task has
+            started (i.e. once we've figured out dependencies and started
+            listening).
         """
         broker = obj._thing_server_interface.message_broker
         send, recv = create_memory_object_stream[Message](max_buffer_size=1)
@@ -220,6 +223,9 @@ class ComputedProperty(FunctionalProperty[Owner, Value], Generic[Owner, Value]):
             value, dependencies = await to_thread.run_sync(self.recompute, obj)
             await self._update_subscriptions(obj, dependencies, old_dependencies, send)
             if message is initial_message:
+                # At this point, we've calculated our dependencies and started
+                # listening, so we signal that everything's started OK.
+                task_status.started()
                 continue
             await broker.publish(Message(obj.name, self.name, "property", value))
 
@@ -274,4 +280,4 @@ async def start_watching_computed_properties(
             if not isinstance(computed_property, ComputedProperty):
                 msg = "Computed properties must be instances of ComputedProperty."
                 raise TypeError(msg)
-            task_group.start_soon(computed_property._watch_for_changes, thing)
+            await task_group.start(computed_property._watch_for_changes, thing)
