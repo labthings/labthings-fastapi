@@ -11,6 +11,7 @@ Documentation for LabThings-FastAPI
    structure.rst
    actions.rst
    properties.rst
+   computed_properties.rst
    documentation.rst
    thing_slots.rst
    blobs.rst

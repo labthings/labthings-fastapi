@@ -142,6 +142,11 @@ This page summarises the parts of the LabThings API that should be most frequent
     For a full listing of attributes that may be modified, see `DataProperty`\ .
 
 
+.. py:decorator:: computed_property
+
+   Decorate a method as a computed property. See :ref:`computed_properties` for more details.
+
+
 .. py:function:: setting(getter: Callable[[Owner], Value]) -> FunctionalSetting[Owner, Value]
                  setting(*, default: Value, readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value
                  setting(*, default_factory: Callable[[], Value], readonly: bool = False, use_global_lock: bool | None = None,  **constraints: Any) -> Value

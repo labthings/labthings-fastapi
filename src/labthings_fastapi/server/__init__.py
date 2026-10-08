@@ -14,6 +14,7 @@ from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from types import MappingProxyType
 from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 
+import anyio
 import uvicorn
 from anyio.from_thread import BlockingPortal
 from fastapi import APIRouter, FastAPI, Request
@@ -25,6 +26,7 @@ from pydantic_core import PydanticSerializationError
 from typing_extensions import Self
 
 from labthings_fastapi.actions import ActionManager
+from labthings_fastapi.computed_properties import start_watching_computed_properties
 from labthings_fastapi.exceptions import GlobalLockBusyError
 from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.logs import configure_thing_logger
@@ -464,7 +466,19 @@ class ThingServer:
                             "exception": e,
                         }
                         raise
+                # We create a task group for watching computed properties
+                # This uses the AsyncExitStack instead of `with tg:` to save on
+                # indentation.
+                tg = anyio.create_task_group()
+                await stack.enter_async_context(tg)
+                for thing in self.things.values():
+                    await start_watching_computed_properties(thing, tg)
                 yield
+
+                # Closing streams in the message broker should close websockets
+                # and terminate the coroutines that recompute computed properties
+                # (those coroutines run in the task group created above)
+                await self.message_broker.close_streams()
 
         self.blocking_portal = None
 
