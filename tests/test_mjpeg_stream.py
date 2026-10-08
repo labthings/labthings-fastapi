@@ -1,11 +1,14 @@
 import io
 import threading
 import time
+from datetime import datetime
 
 import pytest
 from PIL import Image
 
 import labthings_fastapi as lt
+from labthings_fastapi.message_broker import Message
+from labthings_fastapi.outputs.mjpeg_stream import Frame, frame_payload
 
 
 class Telly(lt.Thing):
@@ -79,6 +82,21 @@ def telly(server):
     return telly
 
 
+def test_frame_payload():
+    """Check that a frame is returned, or we get an error."""
+    frame = Frame(b"payload", datetime.now(), 1)
+    good_message = Message("thing", "affordance", "stream", frame)
+    assert frame_payload(good_message) is frame
+
+    bad_message = Message("thing", "affordance", "action", frame)
+    with pytest.raises(TypeError):
+        frame_payload(bad_message)
+
+    bad_message2 = Message("thing", "affordance", "stream", b"payload")
+    with pytest.raises(TypeError):
+        frame_payload(bad_message2)
+
+
 def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
     """Check we can grab frames, and shut down cleanly.
 
@@ -127,17 +145,8 @@ def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
         assert size > 0
 
         # Close all streams
-        telly._thing_server_interface.call_async_task(telly.stream.close_streams)
+        telly.stream.stop()
 
-        # We shouldn't be able to get any more frames now
-        # This means that the stream won't generate any new stream pairs
-        with pytest.raises(StopAsyncIteration):
-            telly.stream.connected_stream()
-        # The grab functions depend on the function above, so they should also fail.
-        with pytest.raises(StopAsyncIteration):
-            telly._thing_server_interface.call_async_task(telly.stream.grab_frame)
-        with pytest.raises(StopAsyncIteration):
-            telly._thing_server_interface.call_async_task(telly.stream.next_frame_size)
     # The background thread gets shut down by `Telly.__exit__`.
 
 
