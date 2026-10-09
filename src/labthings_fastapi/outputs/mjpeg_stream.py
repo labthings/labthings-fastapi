@@ -178,18 +178,24 @@ class MJPEGStream:
             self._name,
         )
 
-    async def grab_frame(self) -> bytes:
+    async def grab_frame_with_metadata(self) -> Frame:
         """Wait for the next frame, and return it.
 
-        This copies the frame for safety, so there is no need to release
-        or return the buffer.
+        This includes metadata such as the timestamp.
 
-        :return: The next JPEG frame, as a `bytes` object.
+        :return: The next JPEG frame, in a dataclass with metadata.
         """
         message = await self._thing._thing_server_interface.message_broker.next_message(
             self._thing.name, self._name
         )
-        payload = frame_payload(message)
+        return frame_payload(message)
+
+    async def grab_frame(self) -> bytes:
+        """Wait for the next frame, and return it.
+
+        :return: The next JPEG frame, as a `bytes` object.
+        """
+        payload = await self.grab_frame_with_metadata()
         return payload.frame
 
     async def next_frame_size(self) -> int:
