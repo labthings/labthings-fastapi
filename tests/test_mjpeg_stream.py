@@ -3,12 +3,22 @@ import threading
 import time
 from datetime import datetime
 
+import anyio
 import pytest
+from anyio import from_thread, to_thread
 from PIL import Image
 
 import labthings_fastapi as lt
-from labthings_fastapi.message_broker import Message
-from labthings_fastapi.outputs.mjpeg_stream import Frame, frame_payload
+from labthings_fastapi.message_broker import Message, MessageBroker
+from labthings_fastapi.outputs.mjpeg_stream import Frame, MJPEGStream, frame_payload
+
+
+def make_jpeg(colour: str) -> bytes:
+    """Return a 10x10 JPEG of the given colour."""
+    image = Image.new("RGB", (10, 10), colour)
+    dest = io.BytesIO()
+    image.save(dest, "jpeg")
+    return dest.getvalue()
 
 
 class Telly(lt.Thing):
@@ -37,12 +47,7 @@ class Telly(lt.Thing):
     def _make_images(self):
         """Stream a series of solid colours"""
         colours = ["#F00", "#0F0", "#00F"]
-        jpegs = []
-        for c in colours:
-            image = Image.new("RGB", (10, 10), c)
-            dest = io.BytesIO()
-            image.save(dest, "jpeg")
-            jpegs.append(dest.getvalue())
+        jpegs = [make_jpeg(c) for c in colours]
 
         if self.initial_delay > 0:
             time.sleep(self.initial_delay)
@@ -148,6 +153,55 @@ def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
         telly.stream.stop()
 
     # The background thread gets shut down by `Telly.__exit__`.
+
+
+@pytest.fixture
+def mjpeg_stream(mocker):
+    """An MJPEGStream object with a mocked Thing."""
+    thing = mocker.Mock()
+    broker = MessageBroker()
+    tsi = thing._thing_server_interface
+    tsi.message_broker = broker
+    tsi.start_async_task_soon.side_effect = from_thread.run
+
+    def publish(message: Message) -> None:
+        from_thread.run(broker.publish, message)
+
+    tsi.publish.side_effect = publish
+    thing.name = "thing"
+    yield MJPEGStream(thing, "stream")
+
+
+@pytest.fixture
+def jpeg_bytes():
+    return make_jpeg("#F0F")
+
+
+async def test_grab_frame(mjpeg_stream, jpeg_bytes):
+    """Test we can add a frame in a thread and grab its bytes."""
+    # Listen for the next frame (grab_frame) then add a frame.
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(mjpeg_stream.grab_frame)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    assert handle.return_value is jpeg_bytes
+
+
+async def test_grab_frame_with_metadata(mjpeg_stream, jpeg_bytes):
+    """Test we can add a frame in a thread and grab it."""
+    # Listen for the next frame (grab_frame) then add a frame.
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(mjpeg_stream.grab_frame_with_metadata)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    assert handle.return_value.frame is jpeg_bytes
+
+
+async def test_next_frame_size(mjpeg_stream, jpeg_bytes):
+    """Test we can add a frame in a thread and grab its size."""
+    # Listen for the next frame (grab_frame) then add a frame.
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(mjpeg_stream.next_frame_size)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    assert handle.return_value == len(jpeg_bytes)
 
 
 def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
