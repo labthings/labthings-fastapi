@@ -1,7 +1,6 @@
 import io
 import threading
 import time
-from datetime import datetime
 
 import anyio
 import pytest
@@ -10,7 +9,11 @@ from PIL import Image
 
 import labthings_fastapi as lt
 from labthings_fastapi.message_broker import Message, MessageBroker
-from labthings_fastapi.outputs.mjpeg_stream import Frame, MJPEGStream, frame_payload
+from labthings_fastapi.outputs.mjpeg_stream import (
+    Frame,
+    MJPEGStream,
+    check_jpeg_bytes,
+)
 
 
 def make_jpeg(colour: str) -> bytes:
@@ -87,19 +90,10 @@ def telly(server):
     return telly
 
 
-def test_frame_payload():
-    """Check that a frame is returned, or we get an error."""
-    frame = Frame(b"payload", datetime.now(), 1)
-    good_message = Message("thing", "affordance", "stream", frame)
-    assert frame_payload(good_message) is frame
-
-    bad_message = Message("thing", "affordance", "action", frame)
-    with pytest.raises(TypeError):
-        frame_payload(bad_message)
-
-    bad_message2 = Message("thing", "affordance", "stream", b"payload")
-    with pytest.raises(TypeError):
-        frame_payload(bad_message2)
+def test_check_jpeg_bytes(jpeg_bytes):
+    """Check the check_jpeg_bytes function works correctly"""
+    assert check_jpeg_bytes(jpeg_bytes) is True
+    assert check_jpeg_bytes(b"00000000") is False
 
 
 def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
@@ -156,10 +150,15 @@ def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
 
 
 @pytest.fixture
-def mjpeg_stream(mocker):
+def broker() -> MessageBroker:
+    """A MessageBroker object."""
+    return MessageBroker()
+
+
+@pytest.fixture
+def mjpeg_stream(mocker, broker):
     """An MJPEGStream object with a mocked Thing."""
     thing = mocker.Mock()
-    broker = MessageBroker()
     tsi = thing._thing_server_interface
     tsi.message_broker = broker
     tsi.start_async_task_soon.side_effect = from_thread.run
@@ -202,6 +201,71 @@ async def test_next_frame_size(mjpeg_stream, jpeg_bytes):
         handle = tg.start_soon(mjpeg_stream.next_frame_size)
         await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
     assert handle.return_value == len(jpeg_bytes)
+
+
+async def grab_three_frames_with_generator(stream: MJPEGStream) -> list[Frame]:
+    """Grab three frames and return them in a list."""
+    frames = []
+    async for frame in stream.frames():
+        frames.append(frame)
+        if len(frames) >= 3:
+            break
+    return frames
+
+
+async def test_frames(mjpeg_stream, jpeg_bytes, broker):
+    """Check we can get a few frames from the generator.
+
+    This test also makes sure we don't end up with dangling
+    streams that are no longer wanted.
+    """
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(grab_three_frames_with_generator, mjpeg_stream)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    frames = handle.return_value
+    assert len(frames) == 3
+    for i, f in enumerate(frames):
+        assert isinstance(f, Frame)
+        assert f.frame is jpeg_bytes
+        assert f.index == i
+    # Emit another frame, to ensure it deletes the stream
+    await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    # Check there's no streams left connected
+    assert len(broker._subscriptions["thing"]["stream"]) == 0
+
+
+async def grab_three_frames_from_old_generator(stream: MJPEGStream) -> list[bytes]:
+    """Grab three frames from the old-style generator"""
+    frames = []
+    async for frame in stream.frame_async_generator():
+        frames.append(frame)
+        if len(frames) >= 3:
+            break
+    return frames
+
+
+async def test_frame_async_generator(mjpeg_stream, jpeg_bytes, broker):
+    """Check we can get a few frames from the old generator.
+
+    This test also makes sure we don't end up with dangling
+    streams that are no longer wanted.
+    """
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(grab_three_frames_from_old_generator, mjpeg_stream)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+        await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    frames = handle.return_value
+    assert len(frames) == 3
+    for f in frames:
+        assert isinstance(f, bytes)
+        assert f is jpeg_bytes
+    # Emit another frame, to ensure it deletes the stream
+    await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    # Check there's no streams left connected
+    assert len(broker._subscriptions["thing"]["stream"]) == 0
 
 
 SEPARATOR = b"--frame\r\nContent-Type: image/jpeg"
