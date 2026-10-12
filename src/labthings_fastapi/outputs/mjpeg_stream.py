@@ -15,13 +15,11 @@ from typing import (
     Optional,
 )
 
-import anyio
-from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from labthings_fastapi.base_descriptor import BaseDescriptor
-from labthings_fastapi.message_broker import Message
+from labthings_fastapi.message_broker import Message, MessageBroker
 from labthings_fastapi.thing import Thing
 
 
@@ -37,6 +35,7 @@ class Frame:
 
     frame: bytes
     """The frame as a `bytes` object, which is a JPEG image for an MJPEG stream."""
+
     timestamp: datetime
     """The time the frame was captured.
     If the capture time is unknown then the timestamp is
@@ -46,22 +45,18 @@ class Frame:
     """The index of the frame within the stream."""
 
 
-def frame_payload(message: Message) -> Frame:
-    """Extract a Frame object from a Message.
+def check_jpeg_bytes(frame: bytes) -> bool:
+    """Check a JPEG file starts and ends with the right magic bytes.
 
-    This checks that the message is of "stream" type, and checks the
-    type of its payload.
-
-    :param message: the message containing the Frame.
-    :return: the Frame object.
-    :raises TypeError: if the message isn't a stream message containing
-        a `Frame` object.
+    :param frame: the data, which should be in JPEG format.
+    :return: `True` if the data is a valid JPEG (i.e. has valid start/end bytes).
     """
-    if message.message_type != "stream":
-        raise TypeError("The message {message} was not part of a stream.")
-    if not isinstance(message.payload, Frame):
-        raise TypeError("The message {message} didn't contain a Frame.")
-    return message.payload
+    return (
+        frame[0] == 0xFF
+        and frame[1] == 0xD8
+        and frame[-2] == 0xFF
+        and frame[-1] == 0xD9
+    )
 
 
 class MJPEGStreamResponse(StreamingResponse):
@@ -77,10 +72,7 @@ class MJPEGStreamResponse(StreamingResponse):
     """The media_type used to describe the endpoint in FastAPI."""
 
     def __init__(
-        self,
-        send: MemoryObjectSendStream[Message],
-        recv: MemoryObjectReceiveStream[Message],
-        status_code: int = 200,
+        self, gen: AsyncGenerator[bytes, None], status_code: int = 200
     ) -> None:
         """Set up StreamingResponse that streams an MJPEG stream.
 
@@ -89,20 +81,18 @@ class MJPEGStreamResponse(StreamingResponse):
         types that mark it as an MJPEG stream. This is sufficient to enable it to
         work in an `img` tag, with the `src` set to the MJPEG stream's endpoint.
 
-        It expects to get a stream that receives `Message` objects with `Frame`
-        payloads. Both the send and receive streams are retained, because the send
-        stream is only weakly referenced by the message broker.
+        It expects an async generator that supplies individual JPEGs to be streamed,
+        such as the one provided by `.MJPEGStream`.
 
         NB the ``status_code`` argument is used by FastAPI to set the status code of
         the response in OpenAPI.
 
-        :param send: the send stream subscribed to the MJPEG stream.
-        :param recv: the receive stream subscribed to the MJPEG stream.
+        :param gen: an async generator, yielding `bytes` objects each of which is
+            one image, in JPEG format.
         :param status_code: The status code associated with the response, by default
             a 200 code is returned.
         """
-        self._send_stream = send
-        self._receive_stream = recv
+        self._frame_async_generator = gen
         StreamingResponse.__init__(
             self,
             self.mjpeg_async_generator(),
@@ -119,10 +109,9 @@ class MJPEGStreamResponse(StreamingResponse):
 
         :yield: JPEG frames, each with a ``--frame`` marker prepended.
         """
-        async for message in self._receive_stream:
-            frame = frame_payload(message)
+        async for frame in self._frame_async_generator:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
-            yield frame.frame
+            yield frame
             yield b"\r\n"
 
 
@@ -161,6 +150,11 @@ class MJPEGStream:
         self._name = name
         self.reset()
 
+    @property
+    def _broker(self) -> MessageBroker:
+        """The message broker associated with our host Thing."""
+        return self._thing._thing_server_interface.message_broker
+
     def reset(self) -> None:
         """Reset the frame index."""
         with self._lock:
@@ -170,25 +164,62 @@ class MJPEGStream:
         """Stop the stream.
 
         Stop the stream and cause all clients to disconnect.
+        This uses the thing server interface to allow it to be called from
+        a thread, for convenience.
+
+        To close all streams from the event loop, use the message broker directly.
         """
-        tsi = self._thing._thing_server_interface
-        tsi.call_async_task(
-            tsi.message_broker.close_streams_for_affordance,
+        self._thing._thing_server_interface.call_async_task(
+            self._broker.close_streams_for_affordance,
             self._thing.name,
             self._name,
         )
+
+    async def frames(self) -> AsyncGenerator[Frame, None]:
+        """Yield Frame objects (data and metadata).
+
+        This generator will return frames from the MJPEG stream along with timestamps,
+        using the `Frame` dataclass.
+
+        Note that this will wait for a new frame each time. There is no
+        guarantee that we won't skip frames. There's no timeout, if the MJPEG stream
+        doesn't get new frames this may block indefinitely.
+
+        :yield: the frames in sequence.
+        """
+        async for message in self._broker.messages_for_affordance(
+            self._thing.name, self._name
+        ):
+            if isinstance(message.payload, Frame):
+                # We simply ignore messages that don't contain Frame objects.
+                # We don't expect to get any payloads that are not Frame objects.
+                yield message.payload
+
+    async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
+        """Yield frames as bytes objects.
+
+        This generator will return frames from the MJPEG stream.
+
+        See `frames` for how this works. This function wraps that one, returning
+        only the `bytes` object rather than the full `Frame` dataclass which also
+        includes metadata.
+
+        :yield: the frames in sequence, as a `bytes` object containing
+            JPEG data.
+        """
+        async for frame in self.frames():
+            yield frame.frame
 
     async def grab_frame_with_metadata(self) -> Frame:
         """Wait for the next frame, and return it.
 
         This includes metadata such as the timestamp.
 
+        This method calls `frames` and returns the first frame that's yielded.
+
         :return: The next JPEG frame, in a dataclass with metadata.
         """
-        message = await self._thing._thing_server_interface.message_broker.next_message(
-            self._thing.name, self._name
-        )
-        return frame_payload(message)
+        return await anext(self.frames())
 
     async def grab_frame(self) -> bytes:
         """Wait for the next frame, and return it.
@@ -218,11 +249,7 @@ class MJPEGStream:
 
         :return: a streaming response in MJPEG format.
         """
-        send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=1)
-        await self._thing._thing_server_interface.message_broker.subscribe(
-            self._thing.name, self._name, send
-        )
-        return MJPEGStreamResponse(send, recv)
+        return MJPEGStreamResponse(self.frame_async_generator())
 
     def add_frame(self, frame: bytes, timestamp: Optional[datetime] = None) -> None:
         """Add a JPEG to the MJPEG stream.
@@ -240,20 +267,16 @@ class MJPEGStream:
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
         """
-        if not (
-            frame[0] == 0xFF
-            and frame[1] == 0xD8
-            and frame[-2] == 0xFF
-            and frame[-1] == 0xD9
-        ):
+        if not check_jpeg_bytes(frame):
             raise ValueError("Invalid JPEG")
         with self._lock:
             self.last_frame_i += 1
-            payload = Frame(
-                frame=frame,
-                timestamp=timestamp if timestamp is not None else datetime.now(),
-                index=self.last_frame_i,
-            )
+            frame_index = self.last_frame_i
+        payload = Frame(
+            frame=frame,
+            timestamp=timestamp if timestamp is not None else datetime.now(),
+            index=frame_index,
+        )
         self._thing._thing_server_interface.publish(
             Message(self._thing.name, self._name, "stream", payload)
         )
