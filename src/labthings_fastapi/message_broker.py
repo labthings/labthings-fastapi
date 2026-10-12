@@ -6,6 +6,7 @@ all the pub-sub messaging in LabThings.
 
 import logging
 import warnings
+from collections.abc import AsyncGenerator
 from typing import Any, Literal
 from weakref import WeakSet
 
@@ -83,6 +84,24 @@ class MessageBroker:
         streams = affordances.setdefault(affordance, WeakSet())
         streams.add(stream)
 
+    async def messages_for_affordance(
+        self, thing: str, affordance: str
+    ) -> AsyncGenerator[Message, None]:
+        """Yield messages from one affordance as an async generator.
+
+        Note that there's no timeout: standard `anyio` commands may be used to do that.
+
+        :param thing: The name of the `.Thing` being subscribed to.
+        :param affordance: The name of the affordance being subscribed to.
+        :yield: messages from the specified affordance.
+        """
+        send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=1)
+        await self.subscribe(thing, affordance, send)
+        async for message in recv:
+            yield message
+        # The stream isn't explicitly closed because it will now be discarded: the
+        # broker doesn't hold a strong reference.
+
     async def next_message(self, thing: str, affordance: str) -> Message:
         """Get the next message from a particular affordance.
 
@@ -91,10 +110,12 @@ class MessageBroker:
         :param thing: The name of the `.Thing` being subscribed to.
         :param affordance: The name of the affordance being subscribed to.
         :return: the next message from the specified affordance.
+        :raises GeneratorExit: if the stream closes before a message is received.
         """
-        send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=1)
-        await self.subscribe(thing, affordance, send)
-        return await recv.receive()
+        # Note: the for loop below will do at most one iteration.
+        async for message in self.messages_for_affordance(thing, affordance):
+            return message
+        raise GeneratorExit("The message stream closed before anything was received.")
 
     async def unsubscribe(
         self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
