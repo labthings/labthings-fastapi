@@ -1,6 +1,8 @@
 import io
+import logging
 import threading
 import time
+from datetime import datetime
 
 import anyio
 import pytest
@@ -94,6 +96,20 @@ def test_check_jpeg_bytes(jpeg_bytes):
     """Check the check_jpeg_bytes function works correctly"""
     assert check_jpeg_bytes(jpeg_bytes) is True
     assert check_jpeg_bytes(b"00000000") is False
+
+
+def test_frame_repr(jpeg_bytes):
+    """Make sure Frame objects don't print JPEG data."""
+    frame = Frame(jpeg_bytes, datetime(2005, 7, 14, 12, 30), 1)
+    # I'll be explicit here: I want to make sure there's no dump
+    # of the bytes.
+    assert 'b"' not in repr(frame)
+    # I can also just test the known repr:
+    assert repr(frame) == (
+        "Frame(index=1, timestamp=2005-07-14 12:30:00, "
+        f"frame=<{len(jpeg_bytes)} bytes>)"
+    )
+    assert str(frame) == repr(frame)
 
 
 def test_grab_and_shutdown(server: lt.ThingServer, telly: Telly):
@@ -266,6 +282,32 @@ async def test_frame_async_generator(mjpeg_stream, jpeg_bytes, broker):
     await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
     # Check there's no streams left connected
     assert len(broker._subscriptions["thing"]["stream"]) == 0
+
+
+async def test_dropped_frames(mjpeg_stream, jpeg_bytes, broker, caplog):
+    """Test what happens when a subscribed stream is full.
+
+    Note that the MessageBroker functionality is also tested in
+    test_message_broker.py::test_sending_to_full_stream.
+    """
+    send, recv = anyio.create_memory_object_stream[Message](1)
+    await broker.subscribe("thing", "stream", send)
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
+    # The first message sits in the buffer, the second gets dropped
+    await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    await to_thread.run_sync(mjpeg_stream.add_frame, jpeg_bytes)
+    print(caplog.records)
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.DEBUG
+    msg = caplog.records[0].getMessage()
+    assert msg.startswith("Could not pass notification to")
+    assert msg.endswith("as it was full.")
+    # We should summarise the length of the JPEG, not include
+    # the JPEG bytes.
+    assert f"<{len(jpeg_bytes)} bytes>" in msg
+    # We want to make sure we're not dumping JPEGs to the log
+    assert 'b"' not in msg
 
 
 def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
