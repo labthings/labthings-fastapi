@@ -827,7 +827,13 @@ class ActionDescriptor(
             f"{name}_invocation",
             __base__=InvocationModel,
             input=(self.input_model, ...),
-            output=(Optional[self.output_model], None),
+            output=(Optional[self.output_model], None),  # type: ignore[arg-type]
+            # mypy spuriously flags this as incorrect. I think this is another
+            # example of https://github.com/pydantic/pydantic/issues/3585
+            # where the `pydantic` lead dev suggests using Any. As that's
+            # equivalent to adding an ignore, I've just added the ignore, as
+            # I think it's less confusing than going via a variable that's
+            # typed as `Any`.
         )
         self.invocation_model.__name__ = f"{name}_invocation"
 
