@@ -44,6 +44,16 @@ class Frame:
     index: int
     """The index of the frame within the stream."""
 
+    def __repr__(self) -> str:
+        """Represent the object as a string.
+
+        :return: a representation of the object as a string.
+        """
+        return (
+            f"Frame(index={self.index}, timestamp={self.timestamp}, "
+            f"frame=<{len(self.frame)} bytes>)"
+        )
+
 
 def check_jpeg_bytes(frame: bytes) -> bool:
     """Check a JPEG file starts and ends with the right magic bytes.
