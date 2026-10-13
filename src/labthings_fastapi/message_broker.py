@@ -163,8 +163,13 @@ class MessageBroker:
                 subscriptions_to_remove.add(stream)
             except anyio.WouldBlock:
                 msg = f"Could not pass notification to {stream} as it was full."
-                LOGGER.warning(msg)
-                warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
+                if message.message_type == "stream":
+                    # It's expected that streams might drop messages, so we
+                    # only log this at debug level.
+                    LOGGER.debug(msg)
+                else:
+                    LOGGER.warning(msg)
+                    warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
         for stream in subscriptions_to_remove:
             # discard rather than remove, so that if the stream has been finalised
             # since it was closed, we don't get an error.

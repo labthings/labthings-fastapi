@@ -246,6 +246,19 @@ async def test_sending_to_full_stream(caplog):
     with pytest.warns(MessageDroppedWarning):
         await broker.publish(message)
     assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.WARNING
+    msg = caplog.records[0].getMessage()
+    assert msg.startswith("Could not pass notification to")
+    assert msg.endswith("as it was full.")
+    caplog.clear()
+
+    # Send a fourth message marked as being part of a stream.
+    # This should only log at DEBUG level.
+    stream_msg = Message("thing", "prop", "stream", None)
+    caplog.set_level(logging.DEBUG)
+    await broker.publish(stream_msg)
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.DEBUG
     msg = caplog.records[0].getMessage()
     assert msg.startswith("Could not pass notification to")
     assert msg.endswith("as it was full.")
