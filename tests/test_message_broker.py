@@ -23,6 +23,7 @@ class Unjsonable:
         ("test_thing", "prop", "property", Unjsonable()),
         ("test_thing", "do_it", "action", None),
         ("test_thing", "notify", "action", {"key": "value"}),
+        ("test_thing", "mjpeg", "stream", b"whatever"),
     ],
 )
 def test_message_valid(message):
@@ -89,6 +90,23 @@ async def test_subscribe_unsubscribe():
         await broker.subscribe("whatever", 42, send_stream)  # type: ignore
     with pytest.raises(TypeError, match="`affordance`" + msg_suffix):
         await broker.unsubscribe("whatever", 42, send_stream)  # type: ignore
+
+
+async def test_unsubscribe_on_deletion():
+    """Check that streams auto-unsubscribe when they are finalised."""
+    broker = MessageBroker()
+    assert broker._subscriptions == {}
+
+    # subscribe to a stream
+    send_stream, receive_stream = anyio.create_memory_object_stream[Message]()
+    await broker.subscribe("thing_name", "prop", send_stream)
+    assert send_stream in broker._subscriptions["thing_name"]["prop"]
+
+    # delete the streams
+    del send_stream
+    del receive_stream
+
+    assert len(broker._subscriptions["thing_name"]["prop"]) == 0
 
 
 async def append_messages(
@@ -228,6 +246,19 @@ async def test_sending_to_full_stream(caplog):
     with pytest.warns(MessageDroppedWarning):
         await broker.publish(message)
     assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.WARNING
+    msg = caplog.records[0].getMessage()
+    assert msg.startswith("Could not pass notification to")
+    assert msg.endswith("as it was full.")
+    caplog.clear()
+
+    # Send a fourth message marked as being part of a stream.
+    # This should only log at DEBUG level.
+    stream_msg = Message("thing", "prop", "stream", None)
+    caplog.set_level(logging.DEBUG)
+    await broker.publish(stream_msg)
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.DEBUG
     msg = caplog.records[0].getMessage()
     assert msg.startswith("Could not pass notification to")
     assert msg.endswith("as it was full.")
@@ -260,3 +291,87 @@ async def test_weakset_garbage_collection():
     assert len(iterated) == 1  # We only iterated once, but there wasn't an error.
     # If we complete the test, it confirms we don't need to worry about streams being
     # finalised during iteration.
+
+
+async def collect_messages(generator, limit: int | None = None) -> list[Message]:
+    """Collect messages from a generator into a list."""
+    received = []
+    async for message in generator:
+        received.append(message)
+        if limit and len(received) >= limit:
+            break
+    return received
+
+
+async def test_messages_for_affordance():
+    """Test the shorthand to iterate over messages for an affordance works.
+
+    This also tests close_streams_for_affordance().
+
+    I don't love that this test needs `await anyio.sleep(0.001)` in
+    order to work, but because the message broker is deliberately
+    lossy (to prevent back-pressure from a slow consumer) this is
+    the least horrible way I've found to stop messages being dropped.
+    """
+    broker = MessageBroker()
+    message = Message("thing", "prop", "property", None)
+
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(
+            collect_messages,
+            broker.messages_for_affordance("thing", "prop"),
+            3,
+        )
+        for _ in range(3):
+            await anyio.sleep(0.001)  # allow other task to run
+            await broker.publish(message)
+    assert handle.return_value == [message] * 3
+    # As the listener stopped, its stream should no longer be subscribed
+    assert len(broker._subscriptions["thing"]["prop"]) == 0
+
+    # Do the same again, but this time stop the stream from the broker
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(
+            collect_messages,
+            broker.messages_for_affordance("thing", "prop"),
+            # Note: no "limit" value
+        )
+        for _ in range(3):
+            await anyio.sleep(0.001)  # allow other task to run
+            await broker.publish(message)
+        # The background task will run until its stream is closed.
+        # the next line should close the stream: if the test doesn't
+        # hang, it's worked.
+        await broker.close_streams_for_affordance("thing", "prop")
+        # Calling this twice shouldn't error.
+        await broker.close_streams_for_affordance("thing", "prop")
+    assert handle.return_value == [message] * 3
+    # As the listener stopped, its stream should no longer be subscribed
+    assert len(broker._subscriptions["thing"]["prop"]) == 0
+
+
+async def test_next_message():
+    """Test the shorthand to get the next message for an affordance.
+
+    This also tests close_streams_for_affordance().
+    """
+    broker = MessageBroker()
+    message = Message("thing", "prop", "property", None)
+
+    # Listen for three messages (and then stop listening)
+    async with anyio.create_task_group() as tg:
+        handle = tg.start_soon(broker.next_message, "thing", "prop")
+        await anyio.sleep(0.001)  # allow other task to run
+        await broker.publish(message)
+    assert handle.return_value == message
+    # The stream should no longer be subscribed
+    assert len(broker._subscriptions["thing"]["prop"]) == 0
+
+    # Test for error if the stream closes without a message
+    with pytest.RaisesGroup(GeneratorExit, flatten_subgroups=True):
+        async with anyio.create_task_group() as tg:
+            handle = tg.start_soon(broker.next_message, "thing", "prop")
+            await anyio.sleep(0.001)  # allow other task to run
+            await broker.close_streams_for_affordance("thing", "prop")
+    # The stream should no longer be subscribed
+    assert len(broker._subscriptions["thing"]["prop"]) == 0
