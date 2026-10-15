@@ -414,6 +414,11 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
     `False` for functional properties.
     """
 
+    @builtins.property
+    def is_computed(self) -> bool:  # noqa: DOC201
+        """Whether the property is a computed property."""
+        return False
+
     @staticmethod
     def _validate_constraints(constraints: Mapping[str, Any]) -> FieldConstraints:
         """Validate an untyped dictionary of constraints.
@@ -533,6 +538,31 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         :return: `True` if a call to ``reset()`` should work.
         """
         return BaseProperty.reset is not self.__class__.reset
+
+    def publish(self, obj: Owner) -> Value:
+        r"""Publish the property's value to the message broker.
+
+        This is intended to remove the need for code that looks like
+        ``thing.prop = thing.prop`` to manually trigger publication of the
+        property's value to the message broker.
+
+        On functional and data properties, it is equivalent to the above.
+        On computed properties (which are cached by default), it will first
+        trigger recomputation - see the overridden method there.
+
+        :param obj: the Thing on which we are publishing the property.
+        :return: the current value of the property.
+        """
+        value = self.__get__(obj)
+        obj._thing_server_interface.publish(
+            Message(
+                thing=obj.name,
+                affordance=self.name,
+                message_type="property",
+                payload=value,
+            )
+        )
+        return value
 
     def add_to_fastapi(self, app: FastAPI, thing: Owner) -> None:
         """Add this action to a FastAPI app, bound to a particular Thing.
@@ -1213,6 +1243,23 @@ class PropertyInfo(
             `.FeatureNotAvailableError` exceptions.
         """
         return self.get_descriptor().reset(self.owning_object_or_error())
+
+    @builtins.property
+    def is_computed(self) -> bool:  # noqa: DOC201
+        """Whether the property is a computed property."""
+        # This is done by inspecting the name rather than an isinstance check
+        # to avoid circular dependencies.
+        return self.get_descriptor().is_computed
+
+    def publish(self) -> None:
+        """Get the property's value, and publish it to any observers.
+
+        This reduces boilerplate when you are managing property notifications manually,
+        and is also used to manually recompute computed properties.
+        """
+        obj = self.owning_object_or_error()
+        prop = self.get_descriptor()
+        prop.publish(obj)
 
     def validate(self, value: Any) -> Value:
         """Use the validation logic in `self.model`.
