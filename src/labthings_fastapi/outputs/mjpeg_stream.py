@@ -193,12 +193,14 @@ class MJPEGStream:
 
         Note that this will wait for a new frame each time. There is no
         guarantee that we won't skip frames. There's no timeout, if the MJPEG stream
-        doesn't get new frames this may block indefinitely.
+        doesn't get new frames this may block indefinitely. Frames are never buffered.
 
         :yield: the frames in sequence.
         """
         async for message in self._broker.messages_for_affordance(
-            self._thing.name, self._name
+            self._thing.name,
+            self._name,
+            max_buffer_size=0,
         ):
             if isinstance(message.payload, Frame):
                 # We simply ignore messages that don't contain Frame objects.
