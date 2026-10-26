@@ -85,7 +85,10 @@ class MessageBroker:
         streams.add(stream)
 
     async def messages_for_affordance(
-        self, thing: str, affordance: str
+        self,
+        thing: str,
+        affordance: str,
+        max_buffer_size: int = 1,
     ) -> AsyncGenerator[Message, None]:
         """Yield messages from one affordance as an async generator.
 
@@ -93,9 +96,13 @@ class MessageBroker:
 
         :param thing: The name of the `.Thing` being subscribed to.
         :param affordance: The name of the affordance being subscribed to.
+        :param max_buffer_size: The buffer size of the underlying streams.
+            The default will buffer up to one message.
         :yield: messages from the specified affordance.
         """
-        send, recv = anyio.create_memory_object_stream[Message](max_buffer_size=1)
+        send, recv = anyio.create_memory_object_stream[Message](
+            max_buffer_size=max_buffer_size,
+        )
         await self.subscribe(thing, affordance, send)
         async for message in recv:
             yield message

@@ -4,6 +4,7 @@ import logging
 from weakref import WeakSet
 
 import anyio
+import anyio.lowlevel
 import pytest
 from anyio.abc import ObjectReceiveStream
 from pydantic import ValidationError
@@ -204,7 +205,6 @@ async def test_sending_to_closed_streams(caplog, action):
     assert send_stream in broker._subscriptions["thing"]["prop"]
     message = Message("thing", "prop", "property", None)
 
-    print("sending first message")
     # Check we can send and receive a message
     await broker.publish(message)
     received = await receive_stream.receive()
@@ -218,7 +218,6 @@ async def test_sending_to_closed_streams(caplog, action):
     else:
         del send_stream  # streams are unsubscribed when they are finalised
     assert len(caplog.records) == 0
-    print("sending second message")
     await broker.publish(message)
     assert len(caplog.records) == 0  # Shouldn't be any warnings in the log
     # Check we've been unsubscribed
@@ -303,49 +302,62 @@ async def collect_messages(generator, limit: int | None = None) -> list[Message]
     return received
 
 
-async def test_messages_for_affordance():
+@pytest.mark.parametrize("buffer_size", (0, 1, 3))
+@pytest.mark.parametrize("close_stream", ("subscriber", "broker"))
+async def test_messages_for_affordance(buffer_size, close_stream):
     """Test the shorthand to iterate over messages for an affordance works.
 
     This also tests close_streams_for_affordance().
 
-    I don't love that this test needs `await anyio.sleep(0.001)` in
-    order to work, but because the message broker is deliberately
-    lossy (to prevent back-pressure from a slow consumer) this is
-    the least horrible way I've found to stop messages being dropped.
+    Note that there are various uses of `await anyio.lowlevel.checkpoint()` in
+    this test. It's necessary to add these in order to yield to the event
+    loop so that the task that listens is able to run.
+
+    For buffer sizes from 0 to 3, we send (b+1) messages at which point the
+    buffer is full. We then send another message that is dropped.
+
+    After sending the messages, we then await (b+2) checkpoints, to allow
+    the task to clear the buffer, and try again.
     """
     broker = MessageBroker()
-    message = Message("thing", "prop", "property", None)
+    messages = [Message("thing", "prop", "property", i) for i in range(buffer_size + 1)]
+    dropped_message = Message("thing", "prop", "property", "dropped")
 
+    # We subscribe to the broker in a background task, and send messages.
+    # With no buffer, we should process one message each time we yield to the
+    # event loop. With a finite buffer, we process (b+1) messages each time.
+    # We make b+2 messages, and check we get the first (b+1) of them.
     async with anyio.create_task_group() as tg:
+        # Start a background task to listen for messages, using a pair of streams
+        # with the specified buffer size.
         handle = tg.start_soon(
             collect_messages,
-            broker.messages_for_affordance("thing", "prop"),
-            3,
+            broker.messages_for_affordance("thing", "prop", buffer_size),
+            2 * (buffer_size + 1) if close_stream == "subscriber" else None,
         )
-        for _ in range(3):
-            await anyio.sleep(0.001)  # allow other task to run
-            await broker.publish(message)
-    assert handle.return_value == [message] * 3
-    # As the listener stopped, its stream should no longer be subscribed
-    assert len(broker._subscriptions["thing"]["prop"]) == 0
-
-    # Do the same again, but this time stop the stream from the broker
-    async with anyio.create_task_group() as tg:
-        handle = tg.start_soon(
-            collect_messages,
-            broker.messages_for_affordance("thing", "prop"),
-            # Note: no "limit" value
-        )
-        for _ in range(3):
-            await anyio.sleep(0.001)  # allow other task to run
-            await broker.publish(message)
-        # The background task will run until its stream is closed.
-        # the next line should close the stream: if the test doesn't
-        # hang, it's worked.
-        await broker.close_streams_for_affordance("thing", "prop")
-        # Calling this twice shouldn't error.
-        await broker.close_streams_for_affordance("thing", "prop")
-    assert handle.return_value == [message] * 3
+        # Allow the background task to run (subscribe and start listening)
+        await anyio.lowlevel.checkpoint()
+        await anyio.lowlevel.checkpoint()
+        # We loop around twice, sending all the messages
+        for _ in range(2):
+            for message in messages:
+                await broker.publish(message)
+            # After sending these, the buffer should be full
+            with pytest.warns(MessageDroppedWarning):
+                await broker.publish(dropped_message)
+            # Yield to the event loop, so the task can clear its buffer.
+            for _ in range(buffer_size + 2):
+                await anyio.lowlevel.checkpoint()
+        if close_stream == "broker":
+            # The background task will run until its stream is closed.
+            # the next line should close the stream: if the test doesn't
+            # hang, it's worked.
+            await broker.close_streams_for_affordance("thing", "prop")
+            # Calling this twice shouldn't error.
+            await broker.close_streams_for_affordance("thing", "prop")
+    # Each time, we should have dropped the last message (because we send two
+    # more than the buffer size).
+    assert handle.return_value == messages * 2
     # As the listener stopped, its stream should no longer be subscribed
     assert len(broker._subscriptions["thing"]["prop"]) == 0
 
@@ -361,7 +373,7 @@ async def test_next_message():
     # Listen for three messages (and then stop listening)
     async with anyio.create_task_group() as tg:
         handle = tg.start_soon(broker.next_message, "thing", "prop")
-        await anyio.sleep(0.001)  # allow other task to run
+        await anyio.lowlevel.checkpoint()
         await broker.publish(message)
     assert handle.return_value == message
     # The stream should no longer be subscribed
@@ -371,7 +383,7 @@ async def test_next_message():
     with pytest.RaisesGroup(GeneratorExit, flatten_subgroups=True):
         async with anyio.create_task_group() as tg:
             handle = tg.start_soon(broker.next_message, "thing", "prop")
-            await anyio.sleep(0.001)  # allow other task to run
+            await anyio.lowlevel.checkpoint()
             await broker.close_streams_for_affordance("thing", "prop")
     # The stream should no longer be subscribed
     assert len(broker._subscriptions["thing"]["prop"]) == 0
