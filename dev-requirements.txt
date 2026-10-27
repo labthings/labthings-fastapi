@@ -38,7 +38,7 @@ beautifulsoup4==4.15.0
     # via sphinx-toolbox
 cachecontrol==0.14.4
     # via sphinx-toolbox
-certifi==2026.7.22
+certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
@@ -74,7 +74,7 @@ docutils==0.21.2
     #   sphinx-rtd-theme
     #   sphinx-tabs
     #   sphinx-toolbox
-domdf-python-tools==3.10.0
+domdf-python-tools==3.11.0
     # via
     #   apeye
     #   apeye-core
@@ -96,7 +96,7 @@ fastapi-cloud-cli==0.26.0
     # via fastapi-cli
 fastar==0.12.0
     # via fastapi-cloud-cli
-filelock==4.0.12
+filelock==4.1.0
     # via
     #   cachecontrol
     #   sphinx-toolbox
@@ -122,15 +122,15 @@ html5lib==1.1
     # via sphinx-toolbox
 httpcore==1.0.9
     # via httpx
-httpcore2==2.13.1
+httpcore2==2.14.0
     # via httpx2
-httptools==0.8.0
+httptools==0.9.0
     # via uvicorn
 httpx==0.28.1
     # via
     #   fastapi
     #   fastapi-cloud-cli
-httpx2==2.13.1
+httpx2==2.14.0
     # via labthings-fastapi
 idna==3.20
     # via
@@ -179,7 +179,7 @@ mdit-py-plugins==0.6.1
     # via myst-parser
 mdurl==0.1.2
     # via markdown-it-py
-msgpack==1.2.3
+msgpack==1.2.4
     # via cachecontrol
 mypy==1.20.2
     # via labthings-fastapi
@@ -201,26 +201,26 @@ pillow==12.3.0
     # via labthings-fastapi
 platformdirs==4.12.4
     # via apeye
-pluggy==1.6.0
+pluggy==1.7.0
     # via
     #   pytest
     #   pytest-cov
 pycodestyle==2.15.0
     # via flake8
-pydantic==2.14.0
+pydantic==2.14.1
     # via
     #   fastapi
     #   fastapi-cloud-cli
     #   labthings-fastapi
     #   pydantic-extra-types
     #   pydantic-settings
-pydantic-core==2.50.0
+pydantic-core==2.50.1
     # via pydantic
 pydantic-extra-types==2.11.1
     # via fastapi
 pydantic-settings==2.15.0
     # via fastapi
-pydoclint==0.11.0
+pydoclint==0.11.1
     # via labthings-fastapi
 pyflakes==4.0.3
     # via flake8
@@ -232,14 +232,14 @@ pygments==2.21.0
     #   sphinx
     #   sphinx-prompt
     #   sphinx-tabs
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   labthings-fastapi
     #   pytest-cov
     #   pytest-mock
 pytest-cov==7.1.0
     # via labthings-fastapi
-pytest-mock==3.16.0
+pytest-mock==3.17.0
     # via labthings-fastapi
 python-dotenv==1.2.4
     # via
@@ -283,9 +283,9 @@ rpds-py==0.30.0
     #   referencing
 ruamel-yaml==0.19.1
     # via sphinx-toolbox
-ruff==0.16.10
+ruff==0.17.3
     # via labthings-fastapi
-sentry-sdk==2.71.0
+sentry-sdk==2.73.0
     # via fastapi-cloud-cli
 shellingham==1.5.4
     # via typer
@@ -329,7 +329,7 @@ sphinxcontrib-htmlhelp==2.1.0
     # via sphinx
 sphinxcontrib-jquery==4.1
     # via sphinx-rtd-theme
-sphinxcontrib-jsmath==1.0.1
+sphinxcontrib-jsmath==2.0.0
     # via sphinx
 sphinxcontrib-qthelp==2.0.0
     # via sphinx
@@ -353,7 +353,7 @@ tomli==2.5.0
     #   pydoclint
     #   pytest
     #   sphinx
-truststore==0.10.4
+truststore==0.10.5
     # via
     #   httpcore2
     #   httpx2
