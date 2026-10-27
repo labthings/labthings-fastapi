@@ -95,6 +95,7 @@ from typing import (
     ClassVar,
     Literal,
     Mapping,
+    Self,
 )
 from weakref import WeakValueDictionary
 
@@ -108,7 +109,6 @@ from pydantic import (
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
-from typing_extensions import Self
 
 from labthings_fastapi.exceptions import MediaTypeMismatchError
 from labthings_fastapi.middleware.url_for import url_for

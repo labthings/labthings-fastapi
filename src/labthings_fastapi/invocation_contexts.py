@@ -19,11 +19,9 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Event, Thread
-from typing import Any, Callable
+from typing import Any, Callable, Self
 from uuid import UUID, uuid4
 from weakref import WeakValueDictionary
-
-from typing_extensions import Self
 
 from labthings_fastapi.exceptions import (
     InvocationCancelledError,

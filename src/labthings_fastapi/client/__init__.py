@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import Any, Optional, Union
+from typing import Any, Optional, Self, Union
 from urllib.parse import urljoin, urlparse
 
 import httpx2
 from pydantic import BaseModel, TypeAdapter, ValidationError
-from typing_extensions import Self  # 3.9, 3.10 compatibility
 
 from labthings_fastapi.exceptions import (
     ClientPropertyError,

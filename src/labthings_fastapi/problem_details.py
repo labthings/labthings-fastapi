@@ -6,12 +6,11 @@ This module defines a model and supporting functions that help to create
 
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Any, Callable, ParamSpec, Self, TypeVar
 
 from fastapi import Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
-from typing_extensions import Self
 
 from labthings_fastapi import exceptions
 

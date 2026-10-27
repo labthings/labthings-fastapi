@@ -33,10 +33,8 @@ import typing
 from collections.abc import Iterator
 from itertools import pairwise
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Generic, Mapping, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Mapping, Self, TypeVar, overload
 from weakref import WeakKeyDictionary, ref
-
-from typing_extensions import Self
 
 from labthings_fastapi.exceptions import (
     DescriptorAddedToClassTwiceError,

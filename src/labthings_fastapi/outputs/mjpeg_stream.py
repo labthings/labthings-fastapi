@@ -16,6 +16,7 @@ from typing import (
     AsyncGenerator,
     Literal,
     Optional,
+    Self,
     Union,
     overload,
 )
@@ -23,7 +24,6 @@ from typing import (
 import anyio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
-from typing_extensions import Self
 
 if TYPE_CHECKING:
     from labthings_fastapi.thing import Thing
