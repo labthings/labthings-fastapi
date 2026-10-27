@@ -6,9 +6,8 @@ authors = [
 ]
 description = "An implementation of LabThings using FastAPI"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -39,6 +38,7 @@ dev = [
   "flake8-pyproject",
   "flake8-rst",
   "flake8-rst-docstrings",
+  "pip-audit",
   "pydoclint[flake8]",
   "sphinx-rtd-theme",
   "sphinx>=7.2",
@@ -46,7 +46,6 @@ dev = [
   "sphinx-toolbox",
   "sphobjinv",
   "myst-parser<5",
-  "tomli; python_version < '3.11'",
   "codespell",
 ]
 

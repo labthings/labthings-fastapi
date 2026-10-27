@@ -29,7 +29,7 @@ It is also possible to install LabThings from source, by cloning the GitHub repo
 Installation Notes
 ++++++++++++++++++
 
-``labthings-fastapi`` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current ``pydantic-core`` dependencies.
+``labthings-fastapi`` supports **Python 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current ``pydantic-core`` dependencies.
 
 .. include:: ../_windows_arm_note.rst
 

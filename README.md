@@ -14,7 +14,7 @@ See [readthedocs] for installation instructions that are automatically tested. Y
 
 ### Installation Notes
 
-`labthings-fastapi` supports **Python 3.10, 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current `pydantic-core` dependencies.
+`labthings-fastapi` supports **Python 3.11, 3.12, and 3.13**. The upper limit is strictly capped at 3.13 due to current `pydantic-core` dependencies.
 
 > **Note: Windows Installations on devices with ARM processors**
 >
