@@ -21,6 +21,10 @@ Complex numbers are currently not supported, again this is left for the future.
 """
 
 from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Annotated, Any, List, Union
+
 import numpy as np
 from pydantic import (
     ConfigDict,
@@ -31,10 +35,7 @@ from pydantic import (
     WithJsonSchema,
     WrapSerializer,
 )
-from typing import Annotated, Any, List, Union
 from typing_extensions import TypeAlias
-from collections.abc import Mapping, Sequence
-
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
@@ -126,7 +127,7 @@ def denumpify(v: Any) -> Any:
         return v
 
 
-def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
+def denumpify_serialiser(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
     """Denumpify mappings before serialization.
 
     This is intended for use as a "wrap serialiser" in `pydantic`, and
@@ -145,5 +146,5 @@ def denumpify_serializer(v: Any, nxt: SerializerFunctionWrapHandler) -> Any:
 class DenumpifyingDict(RootModel):
     """A `pydantic` model for a dictionary that converts arrays to lists."""
 
-    root: Annotated[Mapping, WrapSerializer(denumpify_serializer)]
+    root: Annotated[Mapping, WrapSerializer(denumpify_serialiser)]
     model_config = ConfigDict(arbitrary_types_allowed=True)

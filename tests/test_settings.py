@@ -1,11 +1,11 @@
-import logging
-from threading import Thread
-import tempfile
 import json
-from typing import Any
-import pytest
+import logging
 import os
+import tempfile
+from threading import Thread
+from typing import Any
 
+import pytest
 from pydantic import BaseModel
 
 import labthings_fastapi as lt
@@ -108,6 +108,20 @@ class ThingWithSettings(lt.Thing):
         t.start()
 
 
+class SubclassOfThingWithSettings(ThingWithSettings):
+    """A subclass, so we can check it doesn't share settings with its parent."""
+
+
+class ThingThatWritesSettingOnInit(ThingWithSettings):
+    """A check that writing settings values during __init__ is safe."""
+
+    def __init__(self, **kwargs):
+        """Initialise, including writing a setting."""
+        super().__init__(**kwargs)
+
+        self.boolsetting = True  # Override the default value
+
+
 def _get_setting_file(server: lt.ThingServer, name: str):
     """Find the location of the settings file for a given Thing on a server."""
     path = server.things[name]._thing_server_interface.settings_file_path
@@ -157,10 +171,13 @@ def tempdir():
         yield tempdir
 
 
-def test_setting_available():
+@pytest.mark.parametrize("cls", [ThingWithSettings, ThingThatWritesSettingOnInit])
+def test_setting_available(cls: type[ThingWithSettings]):
     """Check default settings are available before connecting to server"""
-    thing = create_thing_without_server(ThingWithSettings)
-    assert not thing.boolsetting
+    thing = create_thing_without_server(cls)
+    # ThingWithSettings modifies boolsetting during __init__, effectively
+    # changing the default value.
+    assert thing.boolsetting is (cls is ThingThatWritesSettingOnInit)
     assert thing.stringsetting == "foo"
     assert thing.floatsetting == 1.0
     assert thing.localonlysetting == "Local-only default."
@@ -265,14 +282,27 @@ def test_settings_dict_internal_update(tempdir):
         assert not os.path.isfile(setting_file)
 
 
-def test_settings_load(tempdir, caplog):
-    """Check settings can be loaded from disk when added to server"""
-    server = lt.ThingServer.from_things(
-        {"thing": ThingWithSettings}, settings_folder=tempdir
-    )
+@pytest.mark.parametrize("cls", [ThingWithSettings, ThingThatWritesSettingOnInit])
+def test_settings_load(tempdir, caplog, cls: type[ThingWithSettings]):
+    """Check settings are loaded from disk when added to server.
+
+    This manually writes a settings file, then checks the settings are
+    correctly loaded.
+
+    We check this with and without a write to settings during __init__ to
+    test for #383 - that's done by the parametrization of `cls`.
+    """
+    server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
+    thing = server.things["thing"]
+    assert isinstance(thing, cls)
+    # Check the settings have their default values
+    for name in ["floatsetting", "stringsetting", "dictsetting"]:
+        assert getattr(thing, name) == _settings_dict()[name]
+    assert thing.tuplesetting == (1, 2)  # _settings_dict returns a list.
     setting_file = _get_setting_file(server, "thing")
     del server
     setting_json = json.dumps(
+        # Note: these are not the default values.
         _settings_dict(
             floatsetting=3.0,
             stringsetting="bar",
@@ -285,12 +315,12 @@ def test_settings_load(tempdir, caplog):
         file_obj.write(setting_json)
     with caplog.at_level(logging.WARNING):
         # Add thing to server and check new settings are loaded
-        server = lt.ThingServer.from_things(
-            {"thing": ThingWithSettings}, settings_folder=tempdir
-        )
+        server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
     assert len(caplog.records) == 0
     thing = server.things["thing"]
-    assert isinstance(thing, ThingWithSettings)
+    assert isinstance(thing, cls)
+    # boolsetting is modified in __init__ for one class, but as it's loaded
+    # from the file, we always get the value in _settings_dict
     assert not thing.boolsetting
     assert thing.stringsetting == "bar"
     assert thing.floatsetting == 3.0
@@ -374,3 +404,49 @@ def test_try_loading_setting_file_without_mapping(tempdir, caplog):
         assert caplog.records[0].name == "labthings_fastapi.things.thing"
         expected_msg = "The file does not contain a Mapping"
         assert expected_msg in caplog.records[0].message
+
+
+@pytest.mark.parametrize(
+    ("cls", "cls_name"),
+    [
+        (ThingWithSettings, "ThingWithSettings"),
+        (SubclassOfThingWithSettings, "SubclassOfThingWithSettings"),
+    ],
+)
+def test_class_name_appears_in_settings_filename(tempdir, cls, cls_name):
+    """Check that the class name is included in the settings file name."""
+    server = lt.ThingServer.from_things({"thing": cls}, settings_folder=tempdir)
+    assert _get_setting_file(server, "thing").endswith(f"Settings-{cls_name}.json")
+
+
+def test_classes_dont_share_settings(tempdir):
+    """Check that Things don't share settings between classes.
+
+    If the class of a Thing is changed, it should not load the settings from
+    the config file. This is achieved by the filename being different between
+    the two classes.
+
+    This test verifies that the settings are reset. It doesn't test the filename
+    directly, that's done by the previous test.
+    """
+    server = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
+    with server.test_client():
+        assert server.things["thing"].stringsetting == "foo"  # starts at default
+        server.things["thing"].stringsetting = "changed"  # should save to file
+    del server  # protect against typos in later bits of this test using `server`
+
+    server2 = lt.ThingServer.from_things(
+        {"thing": SubclassOfThingWithSettings}, settings_folder=tempdir
+    )
+    with server2.test_client():
+        # This server should ignore the previous settings file
+        assert server2.things["thing"].stringsetting == "foo"
+    del server2  # protect against typos
+
+    server3 = lt.ThingServer.from_things(
+        {"thing": ThingWithSettings}, settings_folder=tempdir
+    )
+    with server3.test_client():
+        assert server3.things["thing"].stringsetting == "changed"  # loads from file

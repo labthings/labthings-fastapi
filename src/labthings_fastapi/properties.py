@@ -46,10 +46,12 @@ Adding a "setter" to properties is optional, and makes them read-write.
 """
 
 from __future__ import annotations
+
 import builtins
 from collections.abc import Mapping
 from types import EllipsisType
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Any,
     Callable,
@@ -57,12 +59,10 @@ from typing import (
     Literal,
     TypeVar,
     overload,
-    TYPE_CHECKING,
 )
-from typing_extensions import Self, TypedDict
-from weakref import WeakSet
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Response
+from fastapi.responses import JSONResponse
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -72,37 +72,40 @@ from pydantic import (
     create_model,
     with_config,
 )
+from typing_extensions import Self, TypedDict
 
-from .thing_description import type_to_dataschema
-from .thing_description._model import (
+from labthings_fastapi.base_descriptor import (
+    DescriptorInfoCollection,
+    FieldTypedBaseDescriptor,
+    FieldTypedBaseDescriptorInfo,
+)
+from labthings_fastapi.exceptions import (
+    FeatureNotAvailableError,
+    NotConnectedToServerError,
+    PropertyRedefinitionError,
+    ReadOnlyPropertyError,
+    UnserialisableTypeError,
+    UnsupportedConstraintError,
+)
+from labthings_fastapi.message_broker import Message
+from labthings_fastapi.problem_details import exceptions_to_problem_details
+from labthings_fastapi.thing_class_settings import get_validate_properties_on_set
+from labthings_fastapi.thing_description import type_to_dataschema
+from labthings_fastapi.thing_description._model import (
     DataSchema,
     Form,
     PropertyAffordance,
     PropertyOp,
 )
-from .utilities import (
-    LabThingsRootModelWrapper,
-    labthings_data,
-    wrap_plain_types_in_rootmodel,
+from labthings_fastapi.utilities import (
+    RootModelWrapper,
+    serialise_from_user_code,
+    validate_from_user_code,
 )
-from .utilities.introspection import return_type
-from .base_descriptor import (
-    DescriptorInfoCollection,
-    FieldTypedBaseDescriptor,
-    FieldTypedBaseDescriptorInfo,
-)
-from .exceptions import (
-    FeatureNotAvailableError,
-    NotConnectedToServerError,
-    PropertyRedefinitionError,
-    ReadOnlyPropertyError,
-    MissingTypeError,
-    UnsupportedConstraintError,
-)
-from .thing_class_settings import get_validate_properties_on_set
+from labthings_fastapi.utilities.introspection import return_type
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 # Note on ignored linter codes:
@@ -403,6 +406,14 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         except UnsupportedConstraintError:
             raise
 
+    observable: bool = False
+    """Whether or not the property may be observed.
+
+    If `observable` is `True` then a websocket connection can register to be notified
+    when the property changes. By default this is `True` for data properties and
+    `False` for functional properties.
+    """
+
     @staticmethod
     def _validate_constraints(constraints: Mapping[str, Any]) -> FieldConstraints:
         """Validate an untyped dictionary of constraints.
@@ -464,12 +475,19 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
         subclass, this returns it unchanged.
 
         :return: a Pydantic model for the property's type.
+        :raises UnserialisableTypeError: if the property can't be serialised
+            by `pydantic` to JSON.
         """
         if self._model is None:
-            self._model = wrap_plain_types_in_rootmodel(
-                self.value_type,
-                constraints=self.constraints,
-            )
+            try:
+                self._model = RootModelWrapper.wrap_type(
+                    self.value_type,
+                    constraints=self.constraints,
+                    name=f"{self.name.title()}Value",
+                )
+            except UnserialisableTypeError as e:
+                e.set_source_class(self.owning_class, self.name)
+                raise
         return self._model
 
     def get_default(self, obj: Owner | None) -> Value:
@@ -538,10 +556,12 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             # The function is initially defined with a ``body`` argument of type
             # ``Any`` but this will be replaced with the correct annotation a
             # few lines below.
-            def set_property(body: Any) -> None:
+            @exceptions_to_problem_details(logger=thing.logger)
+            def set_property(body: Any) -> Response:
                 if isinstance(body, RootModel):
                     body = body.root
                 self.__set__(thing, body)
+                return JSONResponse(None, status_code=201)
 
             set_property.__annotations__["body"] = Annotated[self.model, Body()]
             app.put(
@@ -559,8 +579,19 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
             summary=self.title,
             description=f"## {self.title}\n\n{self.description or ''}",
         )
-        def get_property() -> Any:
-            return self.__get__(thing)
+        @exceptions_to_problem_details(logger=thing.logger)
+        def get_property() -> Response:
+            instance = validate_from_user_code(
+                model=self.model,
+                value=self.__get__(thing),
+                description=f"{thing.name}.{self.name}",
+                code=(self.owning_class, self.name),
+            )
+            return serialise_from_user_code(
+                model_instance=instance,
+                description=f"{thing.name}.{self.name}",
+                code=(self.owning_class, self.name),
+            )
 
         if self.is_resettable(thing):
 
@@ -578,8 +609,10 @@ class BaseProperty(FieldTypedBaseDescriptor[Owner, Value], Generic[Owner, Value]
                     rf"with the ``name`` argument set to ``{self.name}``\ ."
                 ),
             )
-            def reset() -> None:
+            @exceptions_to_problem_details(logger=thing.logger)
+            def reset() -> Response:
                 self.reset(thing)
+                return JSONResponse(None, status_code=200)
 
     def property_affordance(
         self, thing: Owner, path: str | None = None
@@ -755,9 +788,7 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             obj.__dict__[self.name] = self._default_factory()
         return obj.__dict__[self.name]
 
-    def __set__(
-        self, obj: Owner, value: Value, emit_changed_event: bool = True
-    ) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the property's value.
 
         This sets the property's value, and notifies any observers.
@@ -768,7 +799,6 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
 
         :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value for the property.
-        :param emit_changed_event: whether to emit a changed event.
         """
         with obj._thing_server_interface._optionally_hold_global_lock(
             self.use_global_lock
@@ -778,8 +808,16 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
                 obj.__dict__[self.name] = property_info.validate(value)
             else:
                 obj.__dict__[self.name] = value
-            if emit_changed_event:
-                self.emit_changed_event(obj, value)
+            obj._thing_server_interface.publish(
+                Message(obj.name, self.name, "property", value)
+            )
+
+    observable: bool = True
+    """Whether or not the property may be observed.
+
+    If `observable` is `True` then a websocket connection can register to be notified
+    when the property changes. By default this is `True` for data properties.
+    """
 
     def get_default(self, obj: Owner | None) -> Value:
         """Return the default value of this property.
@@ -801,56 +839,6 @@ class DataProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param obj: the `~lt.Thing` instance we want to reset.
         """
         self.__set__(obj, self.get_default(obj))
-
-    def _observers_set(self, obj: Thing) -> WeakSet:
-        """Return the observers of this property.
-
-        Each observer in this set will be notified when the property is changed.
-        See ``.DataProperty.emit_changed_event``
-
-        :param obj: the `~lt.Thing` to which we are attached.
-
-        :return: the set of observers corresponding to ``obj``.
-        """
-        ld = labthings_data(obj)
-        if self.name not in ld.property_observers:
-            ld.property_observers[self.name] = WeakSet()
-        return ld.property_observers[self.name]
-
-    def emit_changed_event(self, obj: Thing, value: Value) -> None:
-        """Notify subscribers that the property has changed.
-
-        This function is run when properties are updated. It must be run from
-        within a thread. This could be the `Invocation` thread of a running action, or
-        the property should be updated over via a client/http. It must be run from a
-        thread as it is communicating with the event loop via an `asyncio` blocking
-        portal and can cause deadlock if run in the event loop.
-
-        This method will raise a `.ServerNotRunningError` if the event loop is not
-        running, and should only be called after the server has started.
-
-        :param obj: the `~lt.Thing` to which we are attached.
-        :param value: the new property value, to be sent to observers.
-        """
-        obj._thing_server_interface.start_async_task_soon(
-            self.emit_changed_event_async,
-            obj,
-            value,
-        )
-
-    async def emit_changed_event_async(self, obj: Thing, value: Value) -> None:
-        """Notify subscribers that the property has changed.
-
-        This function may only be run in the `anyio` event loop. See
-        `.DataProperty.emit_changed_event`.
-
-        :param obj: the `~lt.Thing` to which we are attached.
-        :param value: the new property value, to be sent to observers.
-        """
-        for observer in self._observers_set(obj):
-            await observer.send(
-                {"messageType": "propertyStatus", "data": {self._name: value}}
-            )
 
 
 class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
@@ -883,8 +871,6 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
         :param use_global_lock: may be set to `False` to disable the global lock
             for setting this property. By default, if global locking is enabled,
             we hold the global lock while setting the property.
-
-        :raises MissingTypeError: if the getter does not have a return type annotation.
         """
         super().__init__(constraints=constraints, use_global_lock=use_global_lock)
         self._fget = fget
@@ -893,23 +879,9 @@ class FunctionalProperty(BaseProperty[Owner, Value], Generic[Owner, Value]):
             # If there is a docstring on the getter, use it as the property's docstring.
             # BaseDescriptor parses __doc__ to generate the title and description.
             self.__doc__ = fget.__doc__
-        if self._type is None:
-            msg = (
-                f"{fget} does not have a valid type. "
-                "Return type annotations are required for property getters."
-            )
-            raise MissingTypeError(msg)
         self._fset: Callable[[Owner, Value], None] | None = None  # setter function
         # `_freset` should reset the property to its default value.
-        self._freset: (
-            Callable[
-                [
-                    Owner,
-                ],
-                None,
-            ]
-            | None
-        ) = None
+        self._freset: Callable[[Owner], None] | None = None
         # `_default_factory` should return a default value.
         self._default_factory: Callable[[], Value] | None = None
         self.readonly: bool = True
@@ -1224,6 +1196,11 @@ class PropertyInfo(
         return self.get_descriptor().get_default(self.owning_object)
 
     @builtins.property
+    def is_observable(self) -> bool:  # noqa: DOC201
+        """Whether the property may be observed."""
+        return self.get_descriptor().observable
+
+    @builtins.property
     def is_resettable(self) -> bool:  # noqa: DOC201
         """Whether the property may be reset using the ``reset()`` method."""
         return self.get_descriptor().is_resettable(self.owning_object)
@@ -1256,7 +1233,7 @@ class PropertyInfo(
             with its value type. This should never happen.
         """
         try:
-            if issubclass(self.model, LabThingsRootModelWrapper):
+            if issubclass(self.model, RootModelWrapper):
                 # If a plain type has been wrapped in a RootModel, use that to validate
                 # and then set the property to the root value.
                 model = self.model.model_validate(value)
@@ -1269,7 +1246,7 @@ class PropertyInfo(
                 return self.value_type.model_validate(value)
 
             # This should be unreachable, because `model` is a
-            # `LabThingsRootModelWrapper` wrapping the value type, or the value type
+            # `RootModelWrapper` wrapping the value type, or the value type
             # should be a BaseModel.
             msg = f"Property {self.name} has an inconsistent model. This is "
             msg += f"most likely a LabThings bug. {self.model=}, {self.value_type=}"
@@ -1421,20 +1398,6 @@ class BaseSetting(BaseProperty[Owner, Value], Generic[Owner, Value]):
     two concrete implementations: `.DataSetting` and `.FunctionalSetting`\ .
     """
 
-    def set_without_emit(self, obj: Owner, value: Value) -> None:
-        """Set the setting's value without emitting an event.
-
-        This is used to set the setting's value without notifying observers.
-        It is used during initialisation to set the value from disk before
-        the server is fully started.
-
-        :param obj: the `~lt.Thing` to which we are attached.
-        :param value: the new value of the setting.
-
-        :raises NotImplementedError: this method should be implemented in subclasses.
-        """
-        raise NotImplementedError("This method should be implemented in subclasses.")
-
     def descriptor_info(self, owner: Owner | None = None) -> SettingInfo[Owner, Value]:
         r"""Return an object that allows access to this descriptor's metadata.
 
@@ -1464,31 +1427,16 @@ class DataSetting(
     The setting otherwise acts just like a normal variable.
     """
 
-    def __set__(
-        self, obj: Owner, value: Value, emit_changed_event: bool = True
-    ) -> None:
+    def __set__(self, obj: Owner, value: Value) -> None:
         """Set the setting's value.
 
         This will cause the settings to be saved to disk.
 
         :param obj: the `~lt.Thing` to which we are attached.
         :param value: the new value of the setting.
-        :param emit_changed_event: whether to emit a changed event.
         """
-        super().__set__(obj, value, emit_changed_event)
+        super().__set__(obj, value)
         obj.save_settings()
-
-    def set_without_emit(self, obj: Owner, value: Value) -> None:
-        """Set the property's value, but do not emit event to notify the server.
-
-        This function is not expected to be used externally. It is called during
-        initial setup so that the setting can be set from disk before the server
-        is fully started.
-
-        :param obj: the `~lt.Thing` to which we are attached.
-        :param value: the new value of the setting.
-        """
-        super().__set__(obj, value, emit_changed_event=False)
 
 
 class FunctionalSetting(
@@ -1522,33 +1470,11 @@ class FunctionalSetting(
         super().__set__(obj, value)
         obj.save_settings()
 
-    def set_without_emit(self, obj: Owner, value: Value) -> None:
-        """Set the property's value, but do not emit event to notify the server.
-
-        This function is not expected to be used externally. It is called during
-        initial setup so that the setting can be set from disk before the server
-        is fully started.
-
-        :param obj: the `~lt.Thing` to which we are attached.
-        :param value: the new value of the setting.
-        """
-        # FunctionalProperty does not emit changed events, so no special
-        # behaviour is needed.
-        super().__set__(obj, value)
-
 
 class SettingInfo(
     PropertyInfo[BaseSetting[Owner, Value], Owner, Value], Generic[Owner, Value]
 ):
     """Access to the metadata of a setting."""
-
-    def set_without_emit(self, value: Value) -> None:
-        """Set the value of the setting, but don't emit a notification.
-
-        :param value: the new value for the setting.
-        """
-        obj = self.owning_object_or_error()
-        self.get_descriptor().set_without_emit(obj, value)
 
 
 class SettingCollection(DescriptorInfoCollection[Owner, SettingInfo], Generic[Owner]):

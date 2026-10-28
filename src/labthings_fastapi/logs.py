@@ -4,13 +4,13 @@ This module currently contains code that allows us to filter out logs by invocat
 ID, so that they may be returned when invocations are queried.
 """
 
-from collections.abc import MutableSequence
 import logging
+from collections.abc import MutableSequence
 from uuid import UUID
 from weakref import WeakValueDictionary
-from .invocation_contexts import get_invocation_id
-from .exceptions import LogConfigurationError, NoInvocationContextError
 
+from labthings_fastapi.exceptions import LogConfigurationError, NoInvocationContextError
+from labthings_fastapi.invocation_contexts import get_invocation_id
 
 THING_LOGGER = logging.getLogger("labthings_fastapi.things")
 
@@ -39,7 +39,7 @@ class DequeByInvocationIDHandler(logging.Handler):
 
     def __init__(
         self,
-        level: int = logging.INFO,
+        level: int = logging.NOTSET,
     ) -> None:
         """Set up a log handler that appends messages to a deque.
 
@@ -48,8 +48,10 @@ class DequeByInvocationIDHandler(logging.Handler):
             the list. It's best to use a `deque` with a finite capacity
             to avoid memory leaks.
 
-        :param level: sets the level of the logger. For most invocations,
-            a log level of `logging.INFO` is appropriate.
+        :param level: sets the level of the handler. Usually
+            a log level of `logging.NOTSET` is appropriate. This does not
+            do any extra filtering, and so will use the log level of the
+            logger to which it is attached.
         """
         super().__init__()
         self.setLevel(level)
@@ -105,6 +107,28 @@ def configure_thing_logger(level: int | None = None) -> None:
         isinstance(h, DequeByInvocationIDHandler) for h in THING_LOGGER.handlers
     ):
         THING_LOGGER.addHandler(DequeByInvocationIDHandler())
+
+
+def get_thing_logger(thing_name: str | None = None) -> logging.Logger:
+    r"""Return the Thing Logger, or a child logger.
+
+    This function returns either the Thing logger, or a child of it. Any messages
+    logged to this logger will be picked up by invocation logs, if they are
+    logged from an invocation thread/context.
+
+    ``thing.logger`` is equivalent to ``get_thing_logger(thing.name)`` for any
+    `~lt.Thing` instance.
+
+    :param thing_name: the name of a `lt.Thing`\ . If supplied, we will get a child
+        logger (i.e. ``labthings_fastapi.things.{thing_name}``). By default,
+        the root Thing logger (``labthings_fastapi.things``) is returned.
+    :return: the Thing logger or a child of it.
+    """
+    if thing_name:
+        logger = THING_LOGGER.getChild(thing_name)
+    else:
+        logger = THING_LOGGER
+    return logger
 
 
 def add_thing_log_destination(

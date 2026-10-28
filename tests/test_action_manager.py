@@ -1,9 +1,11 @@
-import pytest
-import httpx
-from .temp_client import poll_task
 import time
+
+import httpx2
+import pytest
+
 import labthings_fastapi as lt
 from labthings_fastapi.actions import ACTION_INVOCATIONS_PATH
+from tests.temp_client import poll_task
 
 
 class CounterThing(lt.Thing):
@@ -57,7 +59,7 @@ def test_action_expires(client):
     invocation["status"] = "running"  # Force an extra poll
     # When the second action runs, the first one should expire
     # so polling it again should give a 404.
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(httpx2.HTTPStatusError):
         poll_task(client, invocation)
 
 
@@ -74,4 +76,7 @@ def test_actions_list(client):
     r2 = client.get(ACTION_INVOCATIONS_PATH)
     r2.raise_for_status()
     invocations = r2.json()
+    # Some keys aren't present in the list for performance/safety reasons
+    for k in ["input", "output", "log", "error"]:
+        del invocation[k]
     assert invocations == [invocation]

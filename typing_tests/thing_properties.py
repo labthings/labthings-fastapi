@@ -20,12 +20,12 @@ check compatibility, and also check ``None`` is OK as a default.
 See README.md for how it's run.
 """
 
-import labthings_fastapi as lt
-from labthings_fastapi.properties import FunctionalProperty
-
-from typing_extensions import assert_type
 import typing
 
+from typing_extensions import assert_type
+
+import labthings_fastapi as lt
+from labthings_fastapi.properties import FunctionalProperty
 from labthings_fastapi.testing import create_thing_without_server
 
 

@@ -5,9 +5,15 @@ in the context of a ``ThingServer`` in, for example, ``test_action_logging`` and
 ``test_action_cancel`` .
 """
 
-import pytest
 import uuid
 from threading import Thread
+
+import pytest
+
+from labthings_fastapi.exceptions import (
+    InvocationCancelledError,
+    NoInvocationContextError,
+)
 from labthings_fastapi.invocation_contexts import (
     CancelEvent,
     ThreadWithInvocationID,
@@ -19,11 +25,7 @@ from labthings_fastapi.invocation_contexts import (
     raise_if_cancelled,
     set_invocation_id,
 )
-from labthings_fastapi.exceptions import (
-    NoInvocationContextError,
-    InvocationCancelledError,
-)
-from .utilities import assert_takes_time
+from tests.utilities import assert_takes_time
 
 
 def append_invocation_id(ids: list):

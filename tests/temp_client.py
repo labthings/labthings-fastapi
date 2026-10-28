@@ -1,7 +1,6 @@
 # TODO: tidy the functions below into a client library
 import time
 
-
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
 
 

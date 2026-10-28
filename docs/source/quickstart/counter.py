@@ -1,6 +1,7 @@
 """An example Thing that implements a counter."""
 
 import time
+
 import labthings_fastapi as lt
 
 

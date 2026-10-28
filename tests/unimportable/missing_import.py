@@ -6,5 +6,4 @@ See test_server_config_model.py.
 
 from missing_module import missing_submodule
 
-
 missing_submodule.missing_function()  # Stop Ruff flagging an unused import.

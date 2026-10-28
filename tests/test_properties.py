@@ -3,19 +3,24 @@ from tempfile import TemporaryDirectory
 from threading import Thread
 from typing import Any
 
-from annotated_types import Ge, Le, Gt, Lt, MultipleOf, MinLen, MaxLen
-from pydantic import BaseModel, RootModel, ValidationError
 import pytest
+from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen, MultipleOf
+from pydantic import BaseModel, RootModel, ValidationError
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
+    ClientPropertyError,
     NotBoundToInstanceError,
-    ServerNotRunningError,
+    UnserialisableTypeError,
     UnsupportedConstraintError,
 )
 from labthings_fastapi.properties import BaseProperty, PropertyInfo
 from labthings_fastapi.testing import create_thing_without_server, mock_thing_instance
-from .temp_client import poll_task
+from tests.temp_client import poll_task
+
+
+class Unjsonable:
+    """A class that pydantic can't serialise."""
 
 
 class PropertyTestThing(lt.Thing):
@@ -276,7 +281,7 @@ def test_instantiation_with_model() -> None:
     assert Dummy.func_prop.value_type is MyModel
 
 
-def test_property_get_and_set(server):
+def test_property_get_and_set_and_reset(server):
     """Use PUT and GET requests to check the property.
 
     PUT sets the value and GET retrieves it, so we use a PUT
@@ -289,10 +294,15 @@ def test_property_get_and_set(server):
         response = client.put("/thing/stringprop", json=test_str)
         # Check for a successful response code
         assert response.status_code == 201
+        assert response.content == b"null"
         # Check it was written successfully
         after_value = client.get("/thing/stringprop")
         assert after_value.status_code == 200
         assert after_value.json() == test_str
+        # Reset the property over HTTP
+        response = client.post("/thing/stringprop/reset")
+        assert response.status_code == 200
+        assert response.json() is None
 
 
 def test_boolprop(server):
@@ -384,18 +394,6 @@ def test_setting_from_thread(server):
         r = client.get("/thing/boolprop")
         assert r.status_code == 200
         assert r.json() is True
-
-
-def test_setting_without_event_loop():
-    """Test DataProperty raises an error if set without an event loop."""
-    # This test may need to change, if we change the intended behaviour
-    # Currently it should never be necessary to change properties from the
-    # main thread, so we raise an error if you try to do so
-    server = lt.ThingServer.from_things({"thing": PropertyTestThing})
-    thing = server.things["thing"]
-    assert isinstance(thing, PropertyTestThing)
-    with pytest.raises(ServerNotRunningError):
-        thing.boolprop = False  # Can't call it until the event loop's running
 
 
 @pytest.mark.parametrize("prop_info", CONSTRAINED_PROPS)
@@ -612,3 +610,60 @@ def test_title_and_description(name, title, description):
         description = title
     # If a description is present, ignore any trailing whitespace.
     assert (prop.description.rstrip() if prop.description else None) == description
+
+
+def test_bad_type():
+    """Test an obviously un-serialisable type raises an error.
+
+    Because type hints may be deferred, we don't attempt to build the model for a
+    property until it's needed. The ``broken`` property is typed as
+    ``Unjsonable | None`` and ``Unjsonable`` is not a class that `pydantic` can
+    serialise. We should therefore get an error when we attempt to build the model,
+    telling us that serialisation will fail.
+
+    We could type the property as `typing.Any` which would not cause a problem
+    in this test, but would then fail later when we attempt to serialise the value.
+
+    This is tested in `test_bad_values` below.
+    """
+
+    class BrokenThing(lt.Thing):
+        broken: Unjsonable | None = lt.property(default=None)
+
+    with pytest.raises(UnserialisableTypeError, match="BrokenThing.broken"):
+        _ = BrokenThing.properties["broken"].model
+
+
+def test_bad_values():
+    """Ensure bad values in properties generate sensible HTTP errors."""
+
+    class BrokenThing(lt.Thing):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            # Set bad values here because we shouldn't have invalid defaults.
+            self.__dict__["intprop"] = 4.2
+            self.__dict__["anyprop"] = Unjsonable()
+
+        # The first property won't validate it's initial value of 4.2
+        # This will result in a validation error, which should be handled.
+        intprop: int = lt.property(default=0)
+
+        # The second property won't serialise, but will validate as it's
+        # typed as `Any`.
+        anyprop: Any = lt.property(default=None)
+
+    server = lt.ThingServer.from_things({"broken": BrokenThing})
+    with server.test_client() as client:
+        tc = lt.ThingClient.from_url("/broken/", client=client)
+
+        # The first property won't validate
+        with pytest.raises(
+            ClientPropertyError, match="Error validating broken.intprop"
+        ):
+            _ = tc.intprop
+
+        # The second property won't serialise
+        with pytest.raises(
+            ClientPropertyError, match="Error serialising broken.anyprop"
+        ):
+            _ = tc.anyprop

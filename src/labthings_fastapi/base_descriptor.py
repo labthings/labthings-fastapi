@@ -24,30 +24,32 @@ objects, and may be used to retrieve all descriptors of a particular type on a
 """
 
 from __future__ import annotations
+
 import ast
 import builtins
-from collections.abc import Iterator
 import inspect
-from itertools import pairwise
 import textwrap
-from typing import Any, overload, Generic, Mapping, TypeVar, TYPE_CHECKING
-from types import MappingProxyType
 import typing
+from collections.abc import Iterator
+from itertools import pairwise
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Generic, Mapping, TypeVar, overload
 from weakref import WeakKeyDictionary, ref
+
 from typing_extensions import Self
 
-from .utilities.introspection import get_docstring, get_summary
-from .exceptions import (
-    MissingTypeError,
-    InconsistentTypeError,
-    NotBoundToInstanceError,
-    DescriptorNotAddedToClassError,
+from labthings_fastapi.exceptions import (
     DescriptorAddedToClassTwiceError,
+    DescriptorNotAddedToClassError,
+    InconsistentTypeError,
+    MissingTypeError,
+    NotBoundToInstanceError,
     UnexpectedGarbageCollectionError,
 )
+from labthings_fastapi.utilities.introspection import get_docstring, get_summary
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 Value = TypeVar("Value")
 """The value returned by the descriptor, when called on an instance."""
@@ -101,12 +103,12 @@ class OptionallyBoundInfo(Generic[Owner]):
 
     @property
     def owning_class(self) -> type[Owner]:
-        """Retrieve the class this info object is describing."""
+        """The class this info object is describing."""
         return self._descriptor_cls
 
     @property
     def owning_object(self) -> Owner | None:
-        """Retrieve the object to which this info object is bound, if present."""
+        """The object to which this info object is bound, if present."""
         return self._bound_to_obj
 
     @property

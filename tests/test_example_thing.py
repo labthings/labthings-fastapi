@@ -1,11 +1,11 @@
-from labthings_fastapi.example_things import (
-    MyThing,
-    ThingWithBrokenAffordances,
-    ThingThatCantInstantiate,
-    ThingThatCantStart,
-)
 import pytest
 
+from labthings_fastapi.example_things import (
+    MyThing,
+    ThingThatCantInstantiate,
+    ThingThatCantStart,
+    ThingWithBrokenAffordances,
+)
 from labthings_fastapi.testing import create_thing_without_server
 
 

@@ -3,11 +3,13 @@ This tests the log that is returned in an action invocation
 """
 
 import logging
+
 import pytest
-from .temp_client import poll_task
+
 import labthings_fastapi as lt
 from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.logs import THING_LOGGER
+from tests.temp_client import poll_task
 
 
 class ThingThatLogsAndErrors(lt.Thing):
@@ -65,6 +67,16 @@ def test_unhandled_error_logs(caplog, client):
         assert caplog.records[0].levelname == "ERROR"
         # There is a traceback
         assert caplog.records[0].exc_info is not None
+        # Check the "error" property is populated correctly.
+        problem_details = invocation["error"]
+        assert isinstance(problem_details, dict)
+        assert problem_details == {
+            "type": "https://docs.python.org/3/library/exceptions.html#RuntimeError",
+            "detail": "I was asked to raise this error.",
+            "title": "RuntimeError",
+            "status": 500,  # this is the default status
+            "instance": None,
+        }
 
 
 def test_invocation_error_logs(caplog, client):
@@ -78,6 +90,20 @@ def test_invocation_error_logs(caplog, client):
         assert caplog.records[0].levelname == "ERROR"
         # There is not a traceback
         assert caplog.records[0].exc_info is None
+        # Check the "error" property is populated correctly.
+        problem_details = invocation["error"]
+        assert isinstance(problem_details, dict)
+        assert problem_details == {
+            "type": (
+                "https://labthings-fastapi.readthedocs.io/en/latest/autoapi/"
+                "labthings_fastapi/exceptions/index.html#labthings_fastapi."
+                "exceptions.InvocationError"
+            ),
+            "detail": "This is an error, but I handled it!",
+            "title": "InvocationError",
+            "status": 500,  # this is the default status
+            "instance": None,
+        }
 
 
 def test_logrecordmodel():

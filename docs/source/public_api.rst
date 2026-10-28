@@ -307,7 +307,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         Whether the server is in debug mode.
 
 
-.. py:class:: ThingServerInterface(server: ThingServer, name: str)
+.. py:class:: ThingServerInterface(server: ThingServer, name: str, class_name: str)
 
    An interface for Things to interact with their server. This is available as `Thing._thing_server_interface` and should not normally be created except by the `ThingServer`\ .
 
@@ -333,7 +333,7 @@ This page summarises the parts of the LabThings API that should be most frequent
         :no-index:
 
    .. py:property:: global_lock
-        :type GlobalLock | None:
+        :type: GlobalLock | None
 
         A global lock object that is used to restrict concurrent execution of actions and setting of properties.
 
@@ -401,8 +401,25 @@ This page summarises the parts of the LabThings API that should be most frequent
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.enable_global_lock
         :no-index:
 
+   .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.global_lock_log_level
+        :no-index:
+
    .. autoattribute:: labthings_fastapi.server.config_model.ThingServerConfig.application_config
         :no-index:
+
+
+.. py:function:: get_thing_logger(thing_name: str | None = None) -> logging.Logger
+
+    Return the parent logger of all the `~lt.Thing.logger` instances.
+    
+    This logger is where invocation logs are collected, so if you are writing code that
+    is not part of a `~lt.Thing` but still wants to show up in the log associated with
+    a particular invocation, you should create a child of this logger.
+
+    Full details are at `labthings_fastapi.logs.get_thing_logger`\ .
+
+    :param thing_name: if supplied, a child logger is returned, using this name.
+    :return: the Thing logger, or a child of it.
 
 
 .. py:class:: ThingClient

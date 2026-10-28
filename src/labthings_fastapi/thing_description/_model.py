@@ -26,18 +26,19 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import (
-    Any,
     Annotated,
+    Any,
     Dict,
-    List,
-    Optional,
-    Union,
-    TypeVar,
     Generic,
-    Mapping,
+    List,
     Literal,
+    Mapping,
+    Optional,
+    TypeVar,
+    Union,
 )
-from pydantic import AnyUrl, BaseModel, Field, ConfigDict, AfterValidator
+
+from pydantic import AfterValidator, AnyUrl, BaseModel, ConfigDict, Field
 
 from labthings_fastapi.middleware.url_for import URLFor
 
@@ -179,7 +180,7 @@ class DataSchema(BaseModel):
     contentEncoding: Optional[str] = None
     contentMediaType: Optional[str] = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
 
 class Response(BaseModel):

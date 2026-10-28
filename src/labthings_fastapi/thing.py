@@ -6,41 +6,45 @@ for how it fits with the rest of the library.
 """
 
 from __future__ import annotations
+
 import json
-from typing import TYPE_CHECKING, Any, Optional
-from pydantic import ValidationError
-from typing_extensions import Self
-from collections.abc import Mapping
 import logging
 import os
+from collections.abc import Mapping
 from json.decoder import JSONDecodeError
-from fastapi.encoders import jsonable_encoder
-from fastapi import Request, WebSocket
-from anyio.abc import ObjectSendStream
-from anyio.to_thread import run_sync
+from typing import TYPE_CHECKING, Any, Optional
 
-from .logs import THING_LOGGER
-from .properties import (
-    BaseProperty,
-    DataProperty,
+from anyio.to_thread import run_sync
+from fastapi import Request, WebSocket
+from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
+from typing_extensions import Self
+
+from labthings_fastapi.actions import ActionCollection
+from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor
+from labthings_fastapi.invocation_contexts import get_invocation_id
+from labthings_fastapi.logs import get_thing_logger
+from labthings_fastapi.properties import (
     PropertyCollection,
     SettingCollection,
 )
-from .actions import ActionCollection, ActionDescriptor
-from .base_descriptor import OptionallyBoundDescriptor
-from .thing_description._model import ThingDescription, NoSecurityScheme
-from .utilities import class_attributes
-from .thing_description import validation
-from .utilities.introspection import get_summary, get_docstring
-from .websockets import websocket_endpoint
-from .exceptions import PropertyNotObservableError
-from .thing_server_interface import ThingServerInterface
-from .invocation_contexts import get_invocation_id
-from .thing_class_settings import ThingClassSettings, validate_thing_class_settings
+from labthings_fastapi.thing_class_settings import (
+    ThingClassSettings,
+    validate_thing_class_settings,
+)
+from labthings_fastapi.thing_description import validation
+from labthings_fastapi.thing_description._model import (
+    NoSecurityScheme,
+    ThingDescription,
+)
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.utilities import class_attributes
+from labthings_fastapi.utilities.introspection import get_docstring, get_summary
+from labthings_fastapi.websockets import websocket_endpoint
 
 if TYPE_CHECKING:
-    from .server import ThingServer
-    from .actions import ActionManager
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 class Thing:
@@ -118,7 +122,10 @@ class Thing:
             `.create_thing_without_server` which generates a mock interface.
         """
         self._thing_server_interface = thing_server_interface
-        self._disable_saving_settings: bool = False
+        # Prevent settings being saved to the settings file before
+        # they have been loaded from the settings file (which would overwrite
+        # the file with default values).
+        self._disable_saving_settings: bool = True
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         r"""Validate the class settings.
@@ -141,7 +148,7 @@ class Thing:
     @property
     def logger(self) -> logging.Logger:
         """A logger, named after this Thing."""
-        return THING_LOGGER.getChild(self.name)
+        return get_thing_logger(self.name)
 
     async def __aenter__(self) -> Self:
         """Context management is used to set up/close the thing.
@@ -210,7 +217,7 @@ class Thing:
 
         @server.app.websocket(self.path + "ws")
         async def websocket(ws: WebSocket) -> None:
-            await websocket_endpoint(self, ws)
+            await websocket_endpoint(self, ws, server.message_broker)
 
     def _read_settings_file(self) -> Mapping[str, Any] | None:
         """Read the settings file and return a mapping of saved settings or None.
@@ -271,7 +278,11 @@ class Thing:
         """
         settings = self._read_settings_file()
         if settings is None:
-            # Return if no settings can be loaded from file.
+            # If no settings were read, we don't need to update their values.
+            # We should, however, allow the settings file to be saved, as we
+            # have established that we're not going to overwrite anything of
+            # value.
+            self._disable_saving_settings = False
             return
 
         # Stop recursion by not allowing settings to be saved as we're reading them.
@@ -281,7 +292,7 @@ class Thing:
                 try:
                     setting = self.settings[name]
                     # Load the key from the JSON file using the setting's model
-                    setting.set_without_emit(setting.validate(value))
+                    setting.set(setting.validate(value))
                 except ValidationError:
                     self.logger.warning(
                         f"Could not load setting {name} from settings file "
@@ -342,7 +353,7 @@ class Thing:
 
     @property
     def thing_state(self) -> Mapping:
-        """Return a dictionary summarising our current state.
+        """A dictionary summarising our current state.
 
         This is intended to be an easy way to collect metadata from a Thing that
         summarises its state. It might be used, for example, to record metadata
@@ -429,36 +440,6 @@ class Thing:
         td: ThingDescription = self.thing_description(path=path, base=base)
         td_dict: dict = td.model_dump(exclude_none=True, by_alias=True)
         return jsonable_encoder(td_dict)
-
-    def observe_property(self, property_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive property change notifications.
-
-        :param property_name: the property to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        :raise PropertyNotObservableError: if the property is not observable.
-        """
-        prop = getattr(self.__class__, property_name, None)
-        if not isinstance(prop, BaseProperty):
-            raise KeyError(f"{property_name} is not a LabThings Property")
-        if not isinstance(prop, DataProperty):
-            raise PropertyNotObservableError(f"{property_name} is not observable.")
-        prop._observers_set(self).add(stream)
-
-    def observe_action(self, action_name: str, stream: ObjectSendStream) -> None:
-        """Register a stream to receive action status change notifications.
-
-        :param action_name: the action to register for.
-        :param stream: the stream used to send events.
-
-        :raise KeyError: if the requested name is not defined on this Thing.
-        """
-        action = getattr(self.__class__, action_name, None)
-        if not isinstance(action, ActionDescriptor):
-            raise KeyError(f"{action_name} is not an LabThings Action")
-        observers = action._observers_set(self)
-        observers.add(stream)
 
     def get_current_invocation_logs(self) -> list[logging.LogRecord]:
         """Get the log records for an on going action.

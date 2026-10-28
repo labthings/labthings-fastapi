@@ -1,6 +1,6 @@
 [project]
 name = "labthings-fastapi"
-version = "0.2.1"
+version = "0.3.0"
 authors = [
   { name="Richard Bowman", email="richard.bowman@cantab.net" },
 ]
@@ -8,7 +8,10 @@ description = "An implementation of LabThings using FastAPI"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
-  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
@@ -18,7 +21,7 @@ dependencies = [
   "jsonschema",
   "typing_extensions",
   "anyio ~=4.0",
-  "httpx",
+  "httpx2",
   "fastapi[all]~=0.135.0",
   "zeroconf >=0.28.0",
 ]
@@ -42,6 +45,7 @@ dev = [
   "sphinx-autoapi",
   "sphinx-toolbox",
   "sphobjinv",
+  "myst-parser<5",
   "tomli; python_version < '3.11'",
   "codespell",
 ]
@@ -65,11 +69,9 @@ artifacts = ["src/*.json", "src/*.jinja"]
 
 [tool.pytest.ini_options]
 addopts = [
-    "--cov=labthings_fastapi",
-    "--cov-report=term",
-    "--cov-report=xml:coverage.xml",
-    "--cov-report=html:htmlcov",
+    "--cov=src",
     "--cov-report=lcov",
+    "--cov-report=json",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -86,6 +88,7 @@ filterwarnings = [
     # with the line below.
     "ignore:.get_validate_properties_on_set. will become .True. by default:DeprecationWarning",
 ]
+anyio_mode = "auto"
 
 [tool.ruff]
 target-version = "py310"
@@ -107,7 +110,10 @@ select = [
   "D",     # pydoclint (recommended by the developers over flake8 plugin)
   "DOC",   # pydocstyle (limited support for sphinx style: see ignores)
   "FAST",  # FastAPI rules
+  "I",     # Sort imports
+  "RUF022",# Sort __all__
   "S",     # flake8-bandit - notably, this disallows `assert`
+  "TID",   # flake8-tidy-imports (prevents relative imports)
 ]
 ignore = [
     "D203",  # incompatible with D204

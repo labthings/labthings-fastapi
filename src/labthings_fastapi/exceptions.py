@@ -4,6 +4,8 @@
 # An __all__ for this module is less than helpful, unless we have an
 # automated check that everything's included.
 
+from collections.abc import Callable
+
 
 class NotConnectedToServerError(RuntimeError):
     """The Thing is not connected to a server.
@@ -41,7 +43,7 @@ class ReadOnlyPropertyError(AttributeError):
 class PropertyNotObservableError(RuntimeError):
     """The property is not observable.
 
-    This exception is raised when `~lt.Thing.observe_property` is called with a
+    This exception is raised when trying to observe a
     property that is not observable. Currently, only data properties are
     observable: functional properties (using a getter/setter) may not be
     observed.
@@ -254,6 +256,83 @@ class NoInvocationContextError(RuntimeError):
     """
 
 
+class CausedByUserCodeError(Exception):
+    """A mixin to allow exceptions to refer to downstream code."""
+
+    def _append_to_args(self, message: str) -> None:
+        """Add a message to the exception's arguments.
+
+        The message will be appended to the first (and usually only) argument.
+        If the first argument isn't a string, we'll append another argument with the
+        message.
+
+        If there's no argument, or the argument is an empty string, it will be replaced
+        by the message.
+
+        :param message: the message to append.
+        """
+        # The line below ensures () and ("", ) are treated equivalently.
+        first_arg = self.args[0] if len(self.args) > 0 else ""
+        if isinstance(first_arg, str):
+            if len(first_arg) > 0:
+                first_arg += "\n"
+            # Note: the second term is an empty tuple if len(self.args) < 2
+            self.args = (first_arg + message,) + self.args[1:]
+        else:
+            self.args += (message,)
+
+    def set_source_function(self, func: Callable) -> None:
+        """Add the location of a user-supplied function to the error message.
+
+        :param func: the function that caused this error.
+        """
+        code = func.__code__
+        self._append_to_args(
+            f"This was likely caused by function '{code.co_name}' "
+            f"at {code.co_filename}:{code.co_firstlineno}"
+        )
+
+    def set_source_class(self, cls: type, attr: str | None = None) -> None:
+        """Add a reference to a class (and optionally attribute).
+
+        :param cls: the class that caused this error.
+        :param attr: the attribute name that caused this error.
+        """
+        name = f"{cls.__module__}.{cls.__qualname__}"
+        if attr:
+            name += f".{attr}"
+        self._append_to_args(f"\nThis was likely caused by '{name}'.")
+
+
+class InvalidReturnValueError(CausedByUserCodeError, RuntimeError):
+    r"""The return value from a method cannot be serialised by LabThings.
+
+    This error is raised when an action returns a value that can't be serialised.
+    This usually means that either it doesn't match the declared return type of
+    the function, or the declared return type permits un-serialisable values.
+
+    If an action's return type is missing or `Any`\ , it's possible to return a
+    value that can't be serialised, which will cause this error.
+
+    The solution is usually to ensure that the return type of your action is
+    either a simple type that can be serialised to JSON, or a Pydantic model.
+    You should also check that the function's return value matches the declared
+    type, ideally by regularly running a type checker like `mypy` on your code.
+    """
+
+
+class UnserialisableTypeError(CausedByUserCodeError, TypeError):
+    r"""A type has been specified that can't be serialised to JSON.
+
+    This error generally means a property or action has a type that cannot be
+    serialised to JSON. This might be an instance of a custom class, or another
+    datatype that doesn't have a ready representation using JSON-compatible types.
+
+    This error can often be fixed using `pydantic` annotations, or by using simple
+    Python types instead of custom ones.
+    """
+
+
 class LogConfigurationError(RuntimeError):
     """There is a problem with logging configuration.
 
@@ -268,6 +347,17 @@ class NoBlobManagerError(RuntimeError):
 
     Any access to an invocation output must have BlobIOContextDep as a dependency, as
     the output may be a blob, and the blob needs this context to resolve its URL.
+    """
+
+
+class MediaTypeMismatchError(ValueError):
+    r"""Raised if a `Blob` is created with a media type that doesn't match its class.
+
+    This error indicates that the ``media_type` specified when creating a `Blob`
+    instance doesn't match its host class. The base `~blob.Blob` class does not impose
+    any constraints. This error usually appears if a specific blob subclass is being
+    created, for example with ``BlobSubclass.from_bytes(data, media_type)`` and the
+    supplied ``media_type`` doesn't match the type defined in ``BlobSubclass``\ .
     """
 
 
@@ -380,4 +470,19 @@ class GlobalLockBusyError(TimeoutError):
     This exception is raised when code needs the global lock but cannot acquire
     it. It indicates that the LabThings server is busy running another action or
     property setter.
+    """
+
+    status_code = 409
+
+
+class MessageDroppedWarning(RuntimeWarning):
+    """A message was dropped by the message broker.
+
+    This warning is emitted when a message can't be sent to a subscribed stream
+    because the stream's buffer is full. The message broker won't block, as
+    doing so could result in a potentially infinite number of stalled tasks.
+
+    If you see this warning, it means that a stream has been subscribed to
+    messages, but is not being read. Most likely, this means the stream was
+    not closed or deleted properly.
     """

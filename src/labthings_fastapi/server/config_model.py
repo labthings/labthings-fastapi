@@ -7,19 +7,20 @@ with `.ServerConfigModel`\ . These models are used by the
 files or strings.
 """
 
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Annotated, Any, Literal, TypeAlias
+
 from pydantic import (
     AfterValidator,
+    AliasChoices,
     BaseModel,
     Field,
     ImportString,
-    AliasChoices,
-    field_validator,
+    ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
-    ValidationError,
+    field_validator,
 )
-from typing import Any, Annotated, TypeAlias
-from collections.abc import Mapping, Sequence, Iterable
 
 
 class ThingImportFailure(BaseException):
@@ -232,6 +233,14 @@ class ThingServerConfig(BaseModel):
             The intention here is that a running action shouldn't need to worry about
             other code on the server changing things while it runs.
             """
+        ),
+    )
+
+    global_lock_log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO",
+        description=(
+            "The log level to use when an action can't start due to the global lock "
+            "being busy."
         ),
     )
 

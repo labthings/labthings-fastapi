@@ -1,11 +1,12 @@
 r"""Interface between `~lt.Thing` subclasses and the `~lt.ThingServer`\ ."""
 
 from __future__ import annotations
+
+import os
 from collections.abc import Iterator
 from concurrent.futures import Future
 from contextlib import contextmanager
 from copy import deepcopy
-import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,15 +16,15 @@ from typing import (
     ParamSpec,
     TypeVar,
 )
-from weakref import ref, ReferenceType
+from weakref import ReferenceType, ref
 
+from labthings_fastapi.exceptions import FeatureNotEnabledError, ServerNotRunningError
 from labthings_fastapi.global_lock import GlobalLock
-
-from .exceptions import FeatureNotEnabledError, ServerNotRunningError
+from labthings_fastapi.message_broker import Message
 
 if TYPE_CHECKING:
-    from .server import ThingServer
-    from .actions import ActionManager
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
 
 
 Params = ParamSpec("Params")
@@ -47,7 +48,7 @@ class ThingServerInterface:
     as ``self._thing_server_interface``\ .
     """
 
-    def __init__(self, server: ThingServer, name: str) -> None:
+    def __init__(self, server: ThingServer, name: str, class_name: str) -> None:
         """Initialise a ThingServerInterface.
 
         The ThingServerInterface sits between a Thing and its ThingServer,
@@ -62,8 +63,11 @@ class ThingServerInterface:
             This will be retained as a weak reference.
         :param name: the name of the `~lt.Thing` instance this interface
             is provided for.
+        :param class_name: The name of the class of the Thing, used as part of the
+            settings filename.
         """
         self._name: str = name
+        self._class_name: str = class_name
         self._server: ReferenceType[ThingServer] = ref(server)
 
     def _get_server(self) -> ThingServer:
@@ -136,6 +140,22 @@ class ThingServerInterface:
             raise ServerNotRunningError("Can't run async code without an event loop.")
         return portal.call(async_function, *args)
 
+    def publish(self, message: Message) -> None:
+        """Publish an event.
+
+        Use the async event loop to notify subscribers that something has
+        happened. The message should contain the name of the `~lt.Thing` and affordance.
+
+        Note that this function will do nothing if the event loop is not yet running.
+
+        :param message: the message being published.
+        """
+        try:
+            broker = self._get_server().message_broker
+            self.start_async_task_soon(broker.publish, message)
+        except ServerNotRunningError:
+            pass  # If the server isn't running yet, we can't publish events.
+
     @property
     def settings_folder(self) -> str:
         """The path to a folder where persistent files may be saved."""
@@ -145,7 +165,7 @@ class ThingServerInterface:
     @property
     def settings_file_path(self) -> str:
         """The path where settings should be loaded and saved as JSON."""
-        return os.path.join(self.settings_folder, "settings.json")
+        return os.path.join(self.settings_folder, f"Settings-{self._class_name}.json")
 
     @property
     def name(self) -> str:

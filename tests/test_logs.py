@@ -5,24 +5,25 @@ in ``test_action_logging`` with bottom-up tests for code in the
 `.logs` module.
 """
 
-from collections import deque
 import json
 import logging
+from collections import deque
 from types import EllipsisType
-import pytest
 from uuid import UUID, uuid4
+
+import pytest
+
+import labthings_fastapi as lt
 from labthings_fastapi import logs
-from labthings_fastapi.invocations import LogRecordModel
+from labthings_fastapi.exceptions import LogConfigurationError
 from labthings_fastapi.invocation_contexts import (
     fake_invocation_context,
     set_invocation_id,
 )
-import labthings_fastapi as lt
-from labthings_fastapi.exceptions import LogConfigurationError
-from labthings_fastapi.testing import create_thing_without_server
+from labthings_fastapi.invocations import LogRecordModel
 from labthings_fastapi.server.cli import serve_from_cli
-
-from .temp_client import poll_task
+from labthings_fastapi.testing import create_thing_without_server
+from tests.temp_client import poll_task
 
 
 class ThingThatLogs(lt.Thing):
@@ -129,7 +130,7 @@ def test_inject_invocation_id_withcontext():
 def test_dequebyinvocationidhandler():
     """Check the custom log handler works as expected."""
     handler = logs.DequeByInvocationIDHandler()
-    assert handler.level == logging.INFO
+    assert handler.level == logging.NOTSET
 
     destinations = {
         uuid4(): deque(),
@@ -301,3 +302,11 @@ def test_action_logs_over_http():
     for log in logs:
         log_as_model = LogRecordModel(**log)
         assert log_as_model.message == "foobar"
+
+
+def test_get_thing_logger():
+    """Check the convenience function to get the thing logger."""
+    assert lt.get_thing_logger() is logs.THING_LOGGER
+    child = lt.get_thing_logger("thing_name")
+    assert isinstance(child, logging.Logger)
+    assert child.name == logs.THING_LOGGER.name + ".thing_name"

@@ -1,14 +1,13 @@
-import time
-from typing import Callable, TypeVar, ParamSpec
 import functools
-from threading import RLock, Event, Thread
+import time
+from threading import Event, RLock, Thread
+from typing import Callable, ParamSpec, TypeVar
 
 import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.testing import create_thing_without_server
-from .temp_client import poll_task
-
+from tests.temp_client import poll_task
 
 Value = TypeVar("Value")
 Params = ParamSpec("Params")

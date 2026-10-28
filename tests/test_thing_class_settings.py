@@ -1,17 +1,18 @@
 r"""Test the machinery behind `.Thing._class_settings`."""
 
-import pytest
 import warnings
 
+import pytest
+
 import labthings_fastapi as lt
+from labthings_fastapi.exceptions import (
+    DefaultWillChangeWarning,
+    InvalidClassSettingsError,
+)
 from labthings_fastapi.thing_class_settings import (
     get_class_settings,
-    validate_thing_class_settings,
     get_validate_properties_on_set,
-)
-from labthings_fastapi.exceptions import (
-    InvalidClassSettingsError,
-    DefaultWillChangeWarning,
+    validate_thing_class_settings,
 )
 
 

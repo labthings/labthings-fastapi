@@ -11,24 +11,18 @@ in particular checking `lt.property` and `lt.setting` work in the
 same way.
 """
 
-from dataclasses import dataclass
 import json
-from typing import Any
 import warnings
+from dataclasses import dataclass
+from typing import Any
 
 import fastapi
-from fastapi.testclient import TestClient
 import pydantic
 import pytest
+from fastapi.testclient import TestClient
+
+import labthings_fastapi as lt
 from labthings_fastapi import properties
-from labthings_fastapi.properties import (
-    BaseProperty,
-    DataProperty,
-    FunctionalProperty,
-    MissingDefaultError,
-    OverspecifiedDefaultError,
-    default_factory_from_arguments,
-)
 from labthings_fastapi.base_descriptor import DescriptorAddedToClassTwiceError
 from labthings_fastapi.exceptions import (
     FeatureNotAvailableError,
@@ -37,9 +31,16 @@ from labthings_fastapi.exceptions import (
     NotConnectedToServerError,
     PropertyRedefinitionError,
 )
-import labthings_fastapi as lt
+from labthings_fastapi.properties import (
+    BaseProperty,
+    DataProperty,
+    FunctionalProperty,
+    MissingDefaultError,
+    OverspecifiedDefaultError,
+    default_factory_from_arguments,
+)
 from labthings_fastapi.testing import create_thing_without_server
-from .utilities import raises_or_is_caused_by
+from tests.utilities import raises_or_is_caused_by
 
 
 def test_default_factory_from_arguments():
@@ -230,8 +231,9 @@ def test_baseproperty_add_to_fastapi():
         """
         prop._type = str | None
 
-        # Add a path attribute, so we can use Example as a mock Thing.
+        # Add path and logger, so we can use Example as a mock Thing.
         path = "/example/"
+        logger = None
 
     # Make a FastAPI app and retrieve the OpenAPI document
     app = fastapi.FastAPI()
@@ -312,6 +314,32 @@ def test_premature_api_and_affordance(mocker):
         Example.prop.add_to_fastapi(mocker.Mock(), example)
     with pytest.raises(NotConnectedToServerError):
         Example.prop.property_affordance(example, None)
+
+
+def test_functionalproperty_initialisation():
+    """Tests for `FunctionalProperty.__init__` including errors."""
+
+    def intgetter(self: lt.Thing) -> int:
+        """An integer getter with a docstring."""
+        pass
+
+    # Check we can make a property, and that it picks up type and docstring
+    class Example:
+        prop = FunctionalProperty(intgetter)
+
+    assert Example.prop.value_type is int
+    assert Example.prop.__doc__ and "integer getter" in Example.prop.__doc__
+
+    def untyped(self: lt.Thing):
+        """A function without a return type."""
+
+    # Check that missing type annotations are `Any`
+    class Example2:
+        prop = FunctionalProperty(untyped)
+
+    assert Example2.prop._type is Any
+    assert Example2.prop.value_type is Any
+    assert "Any" in str(Example2.prop.model)
 
 
 def test_propertyinfo(mocker):

@@ -8,12 +8,12 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.base_ref }}
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: 3.12
 
@@ -22,11 +22,11 @@ jobs:
 
       - name: Test with pytest
         run: |
-          pytest --cov=src --cov-report=lcov
+          pytest
           mv coverage.lcov base-coverage.lcov
 
       - name: Upload code coverage for base branch
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: base-coverage.lcov
           path: ./base-coverage.lcov
@@ -34,7 +34,7 @@ jobs:
   pip_audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pypa/gh-action-pip-audit@v1.1.0
         with:
@@ -47,10 +47,10 @@ jobs:
         python: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
 
@@ -77,13 +77,15 @@ jobs:
         run: flake8 src
 
       - name: Test with pytest
-        run: pytest --cov=src --cov-report=lcov
+        run: pytest
 
       - name: Upload code coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.python }}
-          path: ./coverage.lcov
+          path: |
+            ./coverage.lcov
+            ./coverage.json
       
       - name: Analyse with MyPy
         run: mypy
@@ -95,15 +97,15 @@ jobs:
         python: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
 
       - name: Install Dependencies
-        run: pip install -e .[dev]
+        run: pip install -r dev-requirements.txt
       
       - name: Print installed packages
         run: pip freeze
@@ -121,7 +123,7 @@ jobs:
 
       - name: Test with pytest
         if: success() || failure()
-        run: pytest --cov=src --cov-report=lcov
+        run: pytest
 
       - name: Check quickstart, including installation
         if: success() || failure()
@@ -132,14 +134,34 @@ jobs:
     needs: [base_coverage, test]
     steps:
       - name: Download code coverage report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-3.12
+
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Update Coverage Badge
+        # Only run this on the main branch so PRs don't overwrite the main badge
+        if: github.ref == 'refs/heads/main'
+        uses: Schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 936bcec8e1815a49d1e7f947924ffa3f
+          filename: labthings-fastapi-coverage.json
+          label: coverage
+          message: ${{ steps.get-coverage.outputs.coverage }}%
+          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          maxColorRange: 90
+          minColorRange: 50
 
       - name: Download code coverage report for base branch
         id: download-base-coverage
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: base-coverage.lcov
         
@@ -176,9 +198,9 @@ jobs:
     env:
       REF: v3
     steps: &test-against-ofm-steps
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -215,6 +237,23 @@ jobs:
 
       - name: Run OFM lifecycle test
         run: tests/lifecycle_test/testfile.py
+      
+      - name: Generate OpenAPI and Thing Description.
+        # Note: we need to move the files into the original
+        # repo directory, so they're found by the next step.
+        run: |
+          mkdir -p ./apidocs/http/
+          python ./generate_http_api_data.py
+          mv apidocs ../labthings-fastapi
+      
+      - name: Upload OpenAPI and Thing Description
+        uses: actions/upload-artifact@v7
+        with:
+          name: api_docs
+          path: |  # Note: this ignores working-directory
+            apidocs/http/openapi.json
+            apidocs/http/thing_descriptions.json
+          if-no-files-found: error
       
       - name: Type check with `mypy`
         run: mypy src

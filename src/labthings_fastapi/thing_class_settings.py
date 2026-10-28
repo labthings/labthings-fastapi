@@ -5,16 +5,19 @@ how it interacts with LabThings. Most of this module is intended for internal
 use: the only user-facing item is the type `ThingClassSettings`
 """
 
-from labthings_fastapi.exceptions import InvalidClassSettingsError
-from pydantic import with_config, ConfigDict, TypeAdapter
-from typing_extensions import TypedDict, ReadOnly
-from typing import TYPE_CHECKING
 import warnings
+from typing import TYPE_CHECKING
 
-from .exceptions import DefaultWillChangeWarning
+from pydantic import ConfigDict, TypeAdapter, with_config
+from typing_extensions import ReadOnly, TypedDict
+
+from labthings_fastapi.exceptions import (
+    DefaultWillChangeWarning,
+    InvalidClassSettingsError,
+)
 
 if TYPE_CHECKING:
-    from .thing import Thing
+    from labthings_fastapi.thing import Thing
 
 
 @with_config(ConfigDict(extra="forbid"))

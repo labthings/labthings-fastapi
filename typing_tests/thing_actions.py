@@ -4,11 +4,10 @@ This module will be checked by `mypy` and is intended to ensure that methods
 decorated as `lt.action` have the correct type signatures.
 """
 
-import labthings_fastapi as lt
-from labthings_fastapi.actions import ActionDescriptor
-
 from typing_extensions import assert_type
 
+import labthings_fastapi as lt
+from labthings_fastapi.actions import ActionDescriptor
 from labthings_fastapi.testing import create_thing_without_server
 
 

@@ -18,16 +18,15 @@ For examples of how to run the server from the command line, see
 the tutorial page :ref:`tutorial_running`.
 """
 
-from argparse import ArgumentParser, Namespace
 import sys
+from argparse import ArgumentParser, Namespace
 from typing import Optional
 
-from pydantic import ValidationError
 import uvicorn
+from pydantic import ValidationError
 
-from . import ThingServer
-from . import fallback
-from .config_model import ThingServerConfig, ThingImportFailure
+from labthings_fastapi.server import ThingServer, fallback
+from labthings_fastapi.server.config_model import ThingImportFailure, ThingServerConfig
 
 
 def get_default_parser() -> ArgumentParser:

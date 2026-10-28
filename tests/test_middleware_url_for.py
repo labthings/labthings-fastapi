@@ -1,16 +1,17 @@
 """Test the URLFor class and associated supporting code."""
 
 import threading
+
 import pytest
+from fastapi import FastAPI
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticSerializationError
-from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from labthings_fastapi.exceptions import NoUrlForContextError
 from labthings_fastapi.middleware import url_for
 from labthings_fastapi.middleware.url_for import URLFor, url_for_middleware
 from labthings_fastapi.testing import use_dummy_url_for
-from labthings_fastapi.exceptions import NoUrlForContextError
 
 
 class ModelWithURL(BaseModel):

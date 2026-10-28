@@ -6,6 +6,7 @@ against the JSONSchema directly, rather than my port of it to Pydantic).
 """
 
 import pytest
+
 import labthings_fastapi.thing_description._model as model
 
 OLD_CONTEXT = "https://www.w3.org/2019/wot/td/v1"

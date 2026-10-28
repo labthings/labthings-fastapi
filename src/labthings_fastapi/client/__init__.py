@@ -1,26 +1,30 @@
 """Code to access `~lt.Thing` features over HTTP.
 
 This module defines a base class for controlling LabThings-FastAPI over HTTP.
-It is based on `httpx`, and attempts to create a simple wrapper such that
+It is based on `httpx2`, and attempts to create a simple wrapper such that
 each Action becomes a method and each Property becomes an attribute.
 """
 
 from __future__ import annotations
+
 import time
-from typing import Any, Optional, Union
-from typing_extensions import Self  # 3.9, 3.10 compatibility
 from collections.abc import Mapping
-import httpx
-from urllib.parse import urlparse, urljoin
+from typing import Any, Optional, Union
+from urllib.parse import urljoin, urlparse
 
-from pydantic import BaseModel, TypeAdapter
+import httpx2
+from pydantic import BaseModel, TypeAdapter, ValidationError
+from typing_extensions import Self  # 3.9, 3.10 compatibility
 
-from ..outputs.blob import Blob, RemoteBlobData
-from ..exceptions import (
-    FailedToInvokeActionError,
-    ServerActionError,
+from labthings_fastapi.exceptions import (
     ClientPropertyError,
+    FailedToInvokeActionError,
+    GlobalLockBusyError,
+    InvocationCancelledError,
+    ServerActionError,
 )
+from labthings_fastapi.outputs.blob import Blob, RemoteBlobData
+from labthings_fastapi.problem_details import ProblemDetails, docs_url
 
 __all__ = ["ThingClient", "poll_invocation"]
 ACTION_RUNNING_KEYWORDS = ["idle", "pending", "running"]
@@ -82,7 +86,7 @@ def invocation_href(invocation: dict) -> str:
 
 
 def poll_invocation(
-    client: httpx.Client,
+    client: httpx2.Client,
     invocation: dict,
     interval: float = 0.5,
     first_interval: float = 0.05,
@@ -95,21 +99,30 @@ def poll_invocation(
     has completed, whether it was successful, and retrieve its
     output.
 
-    :param client: the `httpx.Client` to use for HTTP requests.
+    :param client: the `httpx2.Client` to use for HTTP requests.
     :param invocation: the dictionary returned from the initial POST request.
     :param interval: sets how frequently we poll, in seconds.
     :param first_interval: sets how long we wait before the first
         polling request. Often, it makes sense for this to be a short
         interval, in case the action fails (or returns) immediately.
-
+    :raises ServerActionError: if an HTTP error is found during polling.
     :return: the completed invocation as a dictionary.
     """
     first_time = True
     while invocation["status"] in ACTION_RUNNING_KEYWORDS:
         time.sleep(first_interval if first_time else interval)
-        r = client.get(invocation_href(invocation))
-        r.raise_for_status()
-        invocation = r.json()
+        response = client.get(invocation_href(invocation))
+        if response.is_error:
+            try:
+                message = response.json()["detail"]
+            except KeyError:
+                message = response.text
+            raise ServerActionError(
+                f"The server returned error {response.status_code} while polling "
+                f"action '{invocation['action']}' with id '{invocation['id']}'. "
+                f"The error message was:\n{message}."
+            )
+        invocation = response.json()
         first_time = False
     return invocation
 
@@ -126,12 +139,12 @@ class ThingClient:
         creates a subclass with the right attributes.
     """
 
-    def __init__(self, base_url: str, client: Optional[httpx.Client] = None) -> None:
+    def __init__(self, base_url: str, client: Optional[httpx2.Client] = None) -> None:
         """Create a ThingClient connected to a remote Thing.
 
         :param base_url: the base URL of the Thing. This should be the URL
             of the Thing Description document.
-        :param client: an optional `httpx.Client` object to use for all
+        :param client: an optional `httpx2.Client` object to use for all
             HTTP requests. This may be a `fastapi.TestClient` object for
             testing purposes.
         """
@@ -139,7 +152,7 @@ class ThingClient:
         server = f"{parsed.scheme}://{parsed.netloc}"
         self.server = server
         self.path = parsed.path
-        self.client = client or httpx.Client(base_url=server)
+        self.client = client or httpx2.Client(base_url=server)
 
     def get_property(self, path: str) -> Any:
         """Make a GET request to retrieve the value of a property.
@@ -182,7 +195,7 @@ class ThingClient:
 
             raise ClientPropertyError(f"Failed to set property {path}: {err_msg}")
 
-    def invoke_action(self, path: str, **kwargs: Any) -> Any:
+    def invoke_action(self, path: str, **kwargs: Any) -> Any:  # noqa: DOC503
         r"""Invoke an action on the Thing.
 
         This method will make the initial POST request to invoke an action,
@@ -203,6 +216,8 @@ class ThingClient:
         :raise FailedToInvokeActionError: if the action fails to start.
         :raise ServerActionError: is raised if the action does not complete
             successfully.
+        :raise GlobalLockBusyError: if the action fails because of the global lock.
+        :raise InvocationCancelledError: if the action is cancelled.
         """
         for k in kwargs.keys():
             value = kwargs[k]
@@ -234,10 +249,11 @@ class ThingClient:
                     )
                 )
             return invocation["output"]
-        message = _construct_invocation_error_message(invocation)
-        raise ServerActionError(message)
+        # Note that flake8 is confused by the error below - this is why we ignore
+        # error DOC503 for this function.
+        raise _invocation_error(invocation)
 
-    def follow_link(self, response: dict, rel: str) -> httpx.Response:
+    def follow_link(self, response: dict, rel: str) -> httpx2.Response:
         """Follow a link in a response object, by its `rel` attribute.
 
         :param response: is the dictionary returned by e.g. `.poll_invocation`.
@@ -252,7 +268,7 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, client: Optional[httpx.Client] = None) -> Self:
+    def from_url(cls, thing_url: str, client: Optional[httpx2.Client] = None) -> Self:
         """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
@@ -260,7 +276,7 @@ class ThingClient:
 
         :param thing_url: The base URL of the Thing, which should also be the
             URL of its Thing Description.
-        :param client: is an optional `httpx.Client` object. If not present,
+        :param client: is an optional `httpx2.Client` object. If not present,
             one will be created. This is particularly useful if you need to
             set HTTP options, or if you want to work with a local server
             object for testing purposes (see `fastapi.TestClient`).
@@ -268,7 +284,7 @@ class ThingClient:
         :return: a `~lt.ThingClient` subclass with properties and methods that
             match the retrieved Thing Description (see :ref:`wot_thing`).
         """
-        td_client = client or httpx
+        td_client = client or httpx2
         r = td_client.get(thing_url)
         r.raise_for_status()
         subclass = cls.subclass_from_td(r.json())
@@ -444,7 +460,7 @@ def add_property(cls: type[ThingClient], property_name: str, property: dict) -> 
     )
 
 
-def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> str:
+def _construct_failed_to_invoke_message(path: str, response: httpx2.Response) -> str:
     """Format an error for ThingClient to raise if an invocation fails to start.
 
     :param path: The path of the action
@@ -465,7 +481,7 @@ def _construct_failed_to_invoke_message(path: str, response: httpx.Response) -> 
     return message
 
 
-def _construct_invocation_error_message(invocation: Mapping[str, Any]) -> str:
+def _invocation_error(invocation: Mapping[str, Any]) -> BaseException:
     """Format an error for ThingClient to raise if an invocation ends in and error.
 
     :param invocation: The invocation dictionary returned.
@@ -475,19 +491,49 @@ def _construct_invocation_error_message(invocation: Mapping[str, Any]) -> str:
     action_name = invocation["action"].split("/")[-1]
 
     err_message = "Unknown error"
+    log = invocation.get("log", [])
+    last_log = log[-1] if log else None
+    traceback: str | None = None
 
-    if len(invocation.get("log", [])) > 0:
-        last_log = invocation["log"][-1]
+    # If there's a log item, use the traceback and possibly the message.
+    # we don't currently check if this message actually is an error.
+    # We'll overwrite the message later, if "error" is populated.
+    if last_log:
         err_message = last_log.get("message", err_message)
 
         exception_type = last_log.get("exception_type")
         if exception_type is not None:
             err_message = f"[{exception_type}]: {err_message}"
 
+        # If there's a traceback, put it i
         traceback = last_log.get("traceback")
-        if traceback is not None:
-            err_message += "\n\nSERVER TRACEBACK START:\n\n"
-            err_message += traceback
-            err_message += "\n\nSERVER TRACEBACK END\n\n"
 
-    return f"Action {action_name} (ID: {inv_id}) failed with error:\n{err_message}"
+    # If there's an error specified, use that in preference to the message
+    # extracted from the logs.
+    try:
+        pd = ProblemDetails.model_validate(invocation.get("error", None))
+        if pd.type == docs_url(GlobalLockBusyError):
+            # GlobalLockBusyError is worth handling specially: it's likely to
+            # happen quite a bit, and "we couldn't start the action because
+            # we were busy" feels like it doesn't want to be lumped in with
+            # other failures.
+            return GlobalLockBusyError(pd.detail)
+        if pd.type == docs_url(InvocationCancelledError):
+            # Similarly, InvocationCancelledError means the action was cancelled,
+            # so it feels right to raise this instead
+            return InvocationCancelledError(pd.detail)
+        if pd.detail:
+            err_message = pd.detail
+        if pd.title:
+            err_message = f"[{pd.title}]: {err_message}"
+    except ValidationError:
+        pass  # If it's not a valid problem details object, ignore it and move on.
+
+    # Append the server traceback, if we have one.
+    if traceback is not None:
+        err_message += "\n\nSERVER TRACEBACK START:\n\n"
+        err_message += traceback
+        err_message += "\n\nSERVER TRACEBACK END\n\n"
+    return ServerActionError(
+        f"Action {action_name} (ID: {inv_id}) failed with error:\n{err_message}"
+    )

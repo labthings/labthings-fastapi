@@ -8,7 +8,7 @@ with a context manager that acquires the lock using a short timeout.
 from threading import RLock
 from types import EllipsisType, TracebackType
 
-from .exceptions import GlobalLockBusyError
+from labthings_fastapi.exceptions import GlobalLockBusyError
 
 
 class GlobalLock:

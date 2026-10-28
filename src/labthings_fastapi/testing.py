@@ -1,32 +1,34 @@
 """Test harnesses to help with writitng tests for things.."""
 
 from __future__ import annotations
+
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from contextlib import contextmanager
+from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
+    Iterable,
     Mapping,
     ParamSpec,
     TypeVar,
-    Iterable,
 )
-from tempfile import TemporaryDirectory
 from unittest.mock import Mock
 
 from labthings_fastapi.global_lock import GlobalLock
-
-from .utilities import class_attributes
-from .thing_slots import ThingSlot
-from .thing_server_interface import ThingServerInterface
-from .middleware.url_for import set_url_for_context, dummy_url_for
+from labthings_fastapi.message_broker import Message
+from labthings_fastapi.middleware.url_for import dummy_url_for, set_url_for_context
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.thing_slots import ThingSlot
+from labthings_fastapi.utilities import class_attributes
 
 if TYPE_CHECKING:
-    from .thing import Thing
-    from .actions import ActionManager
+    from labthings_fastapi.actions import ActionManager
+    from labthings_fastapi.server import ThingServer
+    from labthings_fastapi.thing import Thing
 
 Params = ParamSpec("Params")
 ReturnType = TypeVar("ReturnType")
@@ -49,12 +51,15 @@ class MockThingServerInterface(ThingServerInterface):
     def __init__(
         self,
         name: str,
+        class_name: str,
         settings_folder: str | None = None,
         enable_global_lock: bool = False,
     ) -> None:
         """Initialise a ThingServerInterface.
 
         :param name: The name of the Thing we're providing an interface to.
+        :param class_name: The name of the class of the Thing, used as part of the
+            settings filename.
         :param settings_folder: The location where we should save settings.
             By default, this is a temporary directory.
         :param enable_global_lock: Whether to create a global lock object, to
@@ -66,7 +71,16 @@ class MockThingServerInterface(ThingServerInterface):
         self._settings_tempdir: TemporaryDirectory | None = None
         self._settings_folder = settings_folder
         self._global_lock = GlobalLock() if enable_global_lock else None
-        self._mocks: list[Mock] = []
+        self._mocks: list[Thing] = []
+        self._class_name = class_name
+
+    def _get_server(self) -> ThingServer:
+        """Raise `NotImplementedError` as this is not mocked.
+
+        :return: the server to which we are connected.
+        :raises NotImplementedError: because this function is not mocked.
+        """
+        raise NotImplementedError("`_get_server` is not mocked.")
 
     def start_async_task_soon(
         self, async_function: Callable[Params, Awaitable[ReturnType]], *args: Any
@@ -91,6 +105,12 @@ class MockThingServerInterface(ThingServerInterface):
         f: Future[ReturnType] = Future()
         f.cancel()
         return f
+
+    def publish(self, message: Message) -> None:
+        """Silently ignore published events.
+
+        :param message: a message to publish.
+        """
 
     @property
     def settings_folder(self) -> str:
@@ -133,7 +153,7 @@ class MockThingServerInterface(ThingServerInterface):
 
     @property
     def application_config(self) -> None:
-        """Return an empty application configuration when mocking.
+        """An empty application configuration when mocking.
 
         :return: None
         """
@@ -141,7 +161,7 @@ class MockThingServerInterface(ThingServerInterface):
 
     @property
     def global_lock(self) -> GlobalLock | None:
-        """Return a global lock."""
+        """A global lock."""
         return self._global_lock
 
 
@@ -188,6 +208,7 @@ def create_thing_without_server(
 
     msi = MockThingServerInterface(
         name=name,
+        class_name=cls.__name__,
         settings_folder=settings_folder,
         enable_global_lock=enable_global_lock,
     )
@@ -206,14 +227,19 @@ def create_thing_without_server(
 def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
     """Create a mock Thing instance, with some important attributes.
 
+    This provides ``__name__``, ``__module__``, and ``_thing_server_interface``
+    properties that work correctly, which is convenient when mocking `lt.thing_slot`
+    connections.
+
     :param spec: the Thing subclass we're mocking an instance of. Pass
         `lt.Thing` if it doesn't matter.
     :return: a Mock instance that pretends to be an instance of `spec`.
     """
     mock = Mock(spec=spec)
     mock.__name__ = "Mock{spec.__name__}"
+    mock.name = mock.__name__.lower()
     mock.__module__ = "mock_module"
-    mock._thing_server_interface = MockThingServerInterface(mock.__name__)
+    mock._thing_server_interface = MockThingServerInterface(mock.name, mock.__name__)
     return mock
 
 

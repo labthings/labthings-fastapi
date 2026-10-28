@@ -6,48 +6,53 @@ provides the tools to serve and manage `~lt.Thing` instances.
 See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 """
 
-import warnings
-from fastapi.testclient import TestClient
-from pydantic import ValidationError
-from typing import Any, AsyncGenerator, Optional, TypeVar, overload
-from fastapi.responses import JSONResponse
-from typing_extensions import Self
-import os
 import logging
+import os
+import warnings
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from types import MappingProxyType
+from typing import Any, AsyncGenerator, Optional, TypeVar, overload
 
+import uvicorn
+from anyio.from_thread import BlockingPortal
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from anyio.from_thread import BlockingPortal
-from contextlib import asynccontextmanager, AsyncExitStack, contextmanager
-from collections.abc import Iterator, Mapping, Sequence
-from types import MappingProxyType
-import uvicorn
+from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
+from typing_extensions import Self
 
+from labthings_fastapi.actions import ActionManager
 from labthings_fastapi.exceptions import GlobalLockBusyError
-
-from ..middleware.url_for import url_for_middleware
-from ..thing_slots import ThingSlot
-from ..utilities import class_attributes
-
-from ..actions import ActionManager
-from ..logs import configure_thing_logger
-from ..thing import Thing
-from ..thing_server_interface import ThingServerInterface
-from ..thing_description._model import ThingDescription
-from ..global_lock import GlobalLock
-from .config_model import (
-    ThingsConfig,
-    ThingServerConfig,
-    normalise_things_config as normalise_things_config,
-)
+from labthings_fastapi.global_lock import GlobalLock
+from labthings_fastapi.logs import configure_thing_logger
+from labthings_fastapi.message_broker import MessageBroker
+from labthings_fastapi.middleware.url_for import url_for_middleware
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from labthings_fastapi.outputs import blob
+from labthings_fastapi.server.config_model import (
+    ThingsConfig,
+    ThingServerConfig,
+)
+from labthings_fastapi.server.config_model import (
+    normalise_things_config as normalise_things_config,
+)
+from labthings_fastapi.thing import Thing
+from labthings_fastapi.thing_description._model import ThingDescription
+from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.thing_slots import ThingSlot
+from labthings_fastapi.utilities import class_attributes
 
 __all__ = ["ThingServer"]
 
 
 ThingSubclass = TypeVar("ThingSubclass", bound=Thing)
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ThingServer:
@@ -141,11 +146,12 @@ class ThingServer:
             self._config = ThingServerConfig(**kwargs)
         if self._config.settings_folder is None:
             self._config.settings_folder = "./settings"
-        self.app = FastAPI(lifespan=self.lifespan)
+        self.app = FastAPI(lifespan=self.lifespan, separate_input_output_schemas=False)
         self._set_cors_middleware()
         self._set_url_for_middleware()
         self._add_exception_handlers()
         self.action_manager = ActionManager()
+        self.message_broker = MessageBroker()
         self.app.include_router(self.action_manager.router(), prefix=self.api_prefix)
         self.app.include_router(blob.router, prefix=self.api_prefix)
         self.app.include_router(self._things_view_router(), prefix=self.api_prefix)
@@ -248,6 +254,16 @@ class ThingServer:
                 content={"detail": repr(exc)},
             )
 
+        @self.app.exception_handler(PydanticSerializationError)
+        async def serialisation_error_handler(
+            request: Request, exc: PydanticSerializationError
+        ) -> JSONResponse:
+            LOGGER.error(
+                f"Couldn't serialise response to {request.url} because of error: \n"
+                f"{exc}"
+            )
+            return JSONResponse(status_code=500, content={"detail": str(exc)})
+
     @property
     def debug(self) -> bool:
         """Whether the server is in debug mode."""
@@ -275,7 +291,7 @@ class ThingServer:
 
     @property
     def application_config(self) -> Mapping[str, Any] | None:
-        """Return the application configuration from the config file.
+        """The application configuration from the config file.
 
         :return: The custom configuration as specified in the configuration
             file.
@@ -290,6 +306,14 @@ class ThingServer:
         end with a slash. Validation is performed in `~lt.ThingServerConfig`\ .
         """
         return self._config.api_prefix
+
+    @property
+    def global_lock_log_level(self) -> int:
+        """The level at which to log when the global lock is busy."""
+        # Note that the config entry below is validated by the config
+        # model, to be one of DEBUG, INFO, WARNING or ERROR.
+        levelname = self._config.global_lock_log_level
+        return getattr(logging, levelname)
 
     ThingInstance = TypeVar("ThingInstance", bound=Thing)
 
@@ -354,7 +378,9 @@ class ThingServer:
         for name, config in self._config.thing_configs.items():
             if not issubclass(config.cls, Thing):
                 raise TypeError(f"{config.cls} is not a Thing subclass.")
-            interface = ThingServerInterface(name=name, server=self)
+            interface = ThingServerInterface(
+                name=name, class_name=config.cls.__name__, server=self
+            )
             os.makedirs(interface.settings_folder, exist_ok=True)
             # This is where we instantiate the Thing
             things[name] = config.cls(
