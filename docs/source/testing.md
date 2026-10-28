@@ -9,7 +9,7 @@ You can find out more about contributing code in our [Contributor Guidelines].
 
 Here is what the CI pipeline tests:
 
-* **Matrix Testing:** We run the core test suite (`pytest`) and static type checks (`mypy`) across Python versions 3.10, 3.11, 3.12, and 3.13.
+* **Matrix Testing:** We run the core test suite (`pytest`) and static type checks (`mypy`) across Python versions 3.11, 3.12, and 3.13.
 * **Code Quality & Security:** The pipeline runs `ruff` (formatting and linting), `flake8` (docstrings), `codespell` (spelling), and a `pip-audit` to check for dependency vulnerabilities.
 * **Coverage:** We track code coverage. A report is generated on your PR to show if your changes increased or decreased overall test coverage.
 * **Dependency Checks:** We run the tests twice: once with pinned dependencies (`dev-requirements.txt`) for reproducibility, and once with unpinned dependencies (`.[dev]`) to catch upstream breakages early.

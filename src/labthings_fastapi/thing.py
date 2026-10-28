@@ -12,13 +12,12 @@ import logging
 import os
 from collections.abc import Mapping
 from json.decoder import JSONDecodeError
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 from anyio.to_thread import run_sync
 from fastapi import Request, WebSocket
 from fastapi.encoders import jsonable_encoder
 from pydantic import ValidationError
-from typing_extensions import Self
 
 from labthings_fastapi.actions import ActionCollection
 from labthings_fastapi.base_descriptor import OptionallyBoundDescriptor

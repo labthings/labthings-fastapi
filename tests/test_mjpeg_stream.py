@@ -55,20 +55,19 @@ def client():
 def test_mjpeg_stream(client):
     """Verify the MJPEG stream contains at least one frame marker.
 
-    A limitation of the TestClient is that it can't actually stream.
-    This means that all of the frames sent by our test Thing will
-    arrive in a single packet.
-
-    For now, we just check it starts with the frame separator,
-    but it might be possible in the future to check there are three
-    images there.
+    Each time a new frame is sent, the stream actually emits three chunks
+    of data: the frame separator, the frame itself, and a newline.
     """
     with client.stream("GET", "/telly/stream") as stream:
         stream.raise_for_status()
         received = 0
         for b in stream.iter_bytes():
             received += 1
-            assert b.startswith(b"--frame")
+            if received % 3 == 1:
+                # We yield three times per frame, with
+                # the separator, the frame data, and a newline.
+                # This checks for the frame separator.
+                assert b.startswith(b"--frame")
 
 
 if __name__ == "__main__":

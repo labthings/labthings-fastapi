@@ -57,6 +57,7 @@ from typing import (
     Callable,
     Generic,
     Literal,
+    Self,
     TypeVar,
     overload,
 )
@@ -72,7 +73,7 @@ from pydantic import (
     create_model,
     with_config,
 )
-from typing_extensions import Self, TypedDict
+from typing_extensions import TypedDict
 
 from labthings_fastapi.base_descriptor import (
     DescriptorInfoCollection,
