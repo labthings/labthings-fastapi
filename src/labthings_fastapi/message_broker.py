@@ -6,6 +6,7 @@ all the pub-sub messaging in LabThings.
 
 import logging
 import warnings
+from collections.abc import AsyncGenerator
 from typing import Any, Literal
 from weakref import WeakSet
 
@@ -36,7 +37,7 @@ class Message:
 
     thing: str
     affordance: str
-    message_type: Literal["property", "action"]
+    message_type: Literal["property", "action", "stream"]
     payload: Any
 
 
@@ -82,6 +83,46 @@ class MessageBroker:
         affordances = self._subscriptions.setdefault(thing, {})
         streams = affordances.setdefault(affordance, WeakSet())
         streams.add(stream)
+
+    async def messages_for_affordance(
+        self,
+        thing: str,
+        affordance: str,
+        max_buffer_size: int = 1,
+    ) -> AsyncGenerator[Message, None]:
+        """Yield messages from one affordance as an async generator.
+
+        Note that there's no timeout: standard `anyio` commands may be used to do that.
+
+        :param thing: The name of the `.Thing` being subscribed to.
+        :param affordance: The name of the affordance being subscribed to.
+        :param max_buffer_size: The buffer size of the underlying streams.
+            The default will buffer up to one message.
+        :yield: messages from the specified affordance.
+        """
+        send, recv = anyio.create_memory_object_stream[Message](
+            max_buffer_size=max_buffer_size,
+        )
+        await self.subscribe(thing, affordance, send)
+        async for message in recv:
+            yield message
+        # The stream isn't explicitly closed because it will now be discarded: the
+        # broker doesn't hold a strong reference.
+
+    async def next_message(self, thing: str, affordance: str) -> Message:
+        """Get the next message from a particular affordance.
+
+        Note that there's no timeout: standard `anyio` commands may be used to do that.
+
+        :param thing: The name of the `.Thing` being subscribed to.
+        :param affordance: The name of the affordance being subscribed to.
+        :return: the next message from the specified affordance.
+        :raises GeneratorExit: if the stream closes before a message is received.
+        """
+        # Note: the for loop below will do at most one iteration.
+        async for message in self.messages_for_affordance(thing, affordance):
+            return message
+        raise GeneratorExit("The message stream closed before anything was received.")
 
     async def unsubscribe(
         self, thing: str, affordance: str, stream: MemoryObjectSendStream[Message]
@@ -129,8 +170,13 @@ class MessageBroker:
                 subscriptions_to_remove.add(stream)
             except anyio.WouldBlock:
                 msg = f"Could not pass notification to {stream} as it was full."
-                LOGGER.warning(msg)
-                warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
+                if message.message_type == "stream":
+                    # It's expected that streams might drop messages, so we
+                    # only log this at debug level.
+                    LOGGER.debug(msg)
+                else:
+                    LOGGER.warning(msg)
+                    warnings.warn(MessageDroppedWarning(msg), stacklevel=1)
         for stream in subscriptions_to_remove:
             # discard rather than remove, so that if the stream has been finalised
             # since it was closed, we don't get an error.
@@ -148,3 +194,22 @@ class MessageBroker:
                 for subs in thing_subs.values():
                     for stream in subs:
                         tg.start_soon(stream.aclose)
+
+    async def close_streams_for_affordance(self, thing: str, affordance: str) -> int:
+        """Close all streams subscribed to a particular affordance.
+
+        This may be called to signal that a stream has stopped.
+
+        :param thing: the Thing name.
+        :param affordance: the affordance name.
+        :return: the number of streams that were closed.
+        """
+        try:
+            streams = self._subscriptions[thing][affordance]
+        except KeyError:
+            return 0  # If there are no streams, ignore it.
+        async with anyio.create_task_group() as tg:
+            n = len(streams)
+            for stream in streams:
+                tg.start_soon(stream.aclose)
+        return n
