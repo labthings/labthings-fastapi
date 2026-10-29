@@ -167,7 +167,11 @@ It may be possible to have actions return binary data directly in the future, bu
 Class structure
 ---------------
 
-The public interface is provided by `.Blob`, which is the only class most code should need to interact with. Internally, `.BlobData` is responsible for implementing the different back-end methods that manage data in memory or on disk. In principle it would be possible to implement a custom `.BlobData` subclass, though this is not currently considered part of the public LabThings API. `.BlobData` is subclassed into `.LocalBlobData` and `.RemoteBlobData`, and local is further subclassed to use either a file or a `bytes` object to store the data.
+The public interface is provided by `.Blob`, which is the only class most code should need to interact with. The intention is that most code will subclass `.Blob` to specify a media type. Each `.Blob` object uses one `.BlobData` object to manage its data.
+
+Internally, `.BlobData` is responsible for implementing the different back-end methods that manage data in memory or on disk. In principle it would be possible to implement a custom `.BlobData` subclass, though this is not currently considered part of the public LabThings API. `.BlobData` is subclassed into `.LocalBlobData` and `.RemoteBlobData`, and local is further subclassed to use either a file or a `bytes` object to store the data. The UML class diagram below shows the relationship of the various `.Blob` and `.BlobData` classes.
+
+.. mermaid:: diagrams/blob_and_blobdata.mermaid
 
 
 Memory management and retention
