@@ -59,13 +59,13 @@ class Telly(lt.Thing):
 
         i = 0
         while self._streaming and (i < self.frame_limit or self.frame_limit < 0):
-            self.stream.add_frame(jpegs[i % len(jpegs)])
-            i = i + 1
             if self.frame_event:
                 self.frame_event.wait()
                 self.frame_event.clear()
             else:
                 time.sleep(1 / self.framerate)
+            self.stream.add_frame(jpegs[i % len(jpegs)])
+            i = i + 1
         self.stream.stop()
         self._streaming = False
 
@@ -319,48 +319,43 @@ def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
     Each time a new frame is sent, the stream actually emits three chunks
     of data: the frame separator, the frame itself, and a newline.
 
-    For now, we download all the data and then chop it up afterwards.
-
-    The `Telly` will send exactly 3 JPEGs, with a short delay at
-    the start to make sure the `StreamingResponse` is created and
-    doesn't miss any frames.
+    The `Telly` will send exactly 3 JPEGs. A `threading.Event` is used
+    to keep the `Telly` and the receiver in sync. Without this, we would
+    either have to rely on slowing down the test with `time.sleep` or
+    risk dropped frames.
 
     This test also verifies the stream is shut down by the server
     when it's stopped - if it wasn't terminated by the server, the
     `client.stream()` call would hang indefinitely.
     """
     telly.frame_limit = 3  # stream 3 frames and then stop
-    telly.initial_delay = 0.05  # give the client time to start listening
+    telly.frame_event = threading.Event()
     with server.test_client() as client:
         with client.stream("GET", "/telly/stream") as response:
-            # Note: we don't actually enter this `with` block until after
-            # the camera background thread has finished and the stream
-            # has been closed.
+            telly.frame_event.set()  # Start the images streaming
             response.raise_for_status()
-            parts = 0
             chunks = []
             for b in response.iter_bytes():
+                print(f"got {len(b)} bytes")
                 # Each JPEG results in 3 parts - separator, frame, and newline.
                 # the first one should be a separator (we'll error if it's not)
                 if b.startswith(SEPARATOR):
                     chunks.append(b)
                 else:
                     chunks[-1] += b
-            assert len(chunks) == 3
+                if b == b"\r\n":
+                    # We've got the end of a frame - send the next one
+                    telly.frame_event.set()
 
     # Check the received data contained the expected number of frames
-    # We split chunks using the known header, and remove extra white
-    # space before checking for JPEG start/end bytes.
-    n = 0
+    assert len(chunks) == 3
     for chunk in chunks:
         assert chunk.startswith(SEPARATOR)
         # Check each chunk is a JPEG
-        stripped = chunk[len(SEPARATOR):].strip(b"\r\n")
-        if len(stripped) > 10:  # If the chunk doesn't look empty
-            assert_magic_bytes(stripped)
-            n += 1
+        stripped = chunk[len(SEPARATOR) :].strip(b"\r\n")
+        assert len(stripped) > 10, "empty frame received"
+        assert_magic_bytes(stripped)
     assert telly.stream.last_frame_i == 2
-    assert n == telly.frame_limit
 
 
 if __name__ == "__main__":
