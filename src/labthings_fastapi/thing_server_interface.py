@@ -20,7 +20,7 @@ from weakref import ReferenceType, ref
 
 from labthings_fastapi.exceptions import FeatureNotEnabledError, ServerNotRunningError
 from labthings_fastapi.global_lock import GlobalLock
-from labthings_fastapi.message_broker import Message
+from labthings_fastapi.message_broker import Message, MessageBroker
 
 if TYPE_CHECKING:
     from labthings_fastapi.actions import ActionManager
@@ -155,6 +155,11 @@ class ThingServerInterface:
             self.start_async_task_soon(broker.publish, message)
         except ServerNotRunningError:
             pass  # If the server isn't running yet, we can't publish events.
+
+    @property
+    def message_broker(self) -> MessageBroker:
+        """The message broker, coordinating pub/sub messaging."""
+        return self._get_server().message_broker
 
     @property
     def settings_folder(self) -> str:
