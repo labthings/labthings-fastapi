@@ -1,0 +1,39 @@
+classDiagram
+  direction LR
+  class Blob {
+    + media_type: str
+    + description: str | None
+    + content: bytes
+    + save()
+    + open()
+    + from_bytes()$
+    + from_file()$
+    + from_temporary_directory()$
+  }
+  class BlobData {
+    + media_type: str
+    + content: bytes
+    + get_href()
+    + save()
+    + open()
+  }
+  class RemoteBlobData {
+    - _href: str
+  }
+  class LocalBlobData {
+    + id: str
+    + response()
+    + from_id()$
+  }
+  class BlobBytes {
+    - _bytes: bytes
+  }
+  class BlobFile {
+    - _file_path: str
+  }
+  Blob "1" --> "1" BlobData : _data
+  BlobData <|-- RemoteBlobData
+  BlobData <|-- LocalBlobData
+  LocalBlobData <|-- BlobBytes
+  LocalBlobData <|-- BlobFile
+  
