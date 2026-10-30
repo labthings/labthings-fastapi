@@ -7,13 +7,14 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 import labthings_fastapi as lt
-from labthings_fastapi.actions import ActionInfo
+from labthings_fastapi.actions import ActionInfo, Invocation
 from labthings_fastapi.example_things import MyThing
 from labthings_fastapi.exceptions import (
     FailedToInvokeActionError,
     ServerActionError,
     UnserialisableTypeError,
 )
+from labthings_fastapi.invocations import InvocationStatus
 from labthings_fastapi.testing import create_thing_without_server
 from tests.temp_client import get_link, poll_task
 
@@ -86,6 +87,37 @@ def test_action_info():
     assert move_eyes.name == "move_eyes"
     assert move_eyes.description == "Take one input and no outputs"
     assert move_eyes.is_bound is True
+
+
+@pytest.mark.parametrize(
+    ("action_name", "input", "output"),
+    [("say_hello", None, "Hello World."), ("move_eyes", {"direction": "left"}, None)],
+)
+def test_invocation(action_name, input, output, mocker):
+    """Test the Invocation class"""
+    mocker.patch("labthings_fastapi.actions.add_thing_log_destination")
+    action_man = create_thing_without_server(ActionMan)
+    id = uuid.uuid4()
+    action = action_man.actions[action_name]
+    invocation = Invocation(
+        action=action,
+        id=id,
+        input=input,
+    )
+    assert invocation.id == id
+    assert invocation.action is action
+    with pytest.warns(DeprecationWarning):
+        assert invocation.action_ref == action._descriptor_ref
+    assert invocation.thing is action_man
+    # These should change when we run it.
+    assert invocation.status == InvocationStatus.PENDING
+    assert invocation.output is None
+    # Run the action
+    invocation.start()
+    invocation.join()
+    # It should complete successfully
+    assert invocation.status == InvocationStatus.COMPLETED
+    assert invocation.output is output
 
 
 def test_get_action_invocations(client):

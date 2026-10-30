@@ -20,6 +20,7 @@ import datetime
 import inspect
 import logging
 import uuid
+import warnings
 from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -38,6 +39,7 @@ from typing import (
     TypeVar,
     overload,
 )
+from weakref import ref
 
 from fastapi import APIRouter, BackgroundTasks, Body, FastAPI, HTTPException, Response
 from pydantic import BaseModel, create_model
@@ -208,6 +210,21 @@ class Invocation(Thread):
     def action(self) -> ActionInfo:
         """The `.ActionInfo` object we're running."""
         return self._action
+
+    @property
+    def action_ref(self) -> ref[ActionDescriptor]:
+        """A weak reference to the descriptor object.
+
+        Note that this is deprecated in favour of `.action` which returns
+        an `ActionInfo` object.
+        """
+        warnings.warn(
+            DeprecationWarning(
+                "Invocation.action_ref() is deprecated in favour of Invocation.action"
+            ),
+            stacklevel=2,
+        )
+        return self.action._descriptor_ref
 
     @property
     def thing(self) -> Thing:
