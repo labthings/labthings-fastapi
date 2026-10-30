@@ -20,7 +20,6 @@ import datetime
 import inspect
 import logging
 import uuid
-import weakref
 from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -118,8 +117,7 @@ class Invocation(Thread):
 
     def __init__(
         self,
-        action: ActionDescriptor,
-        thing: Thing,
+        action: ActionInfo,
         id: uuid.UUID,
         input: Optional[BaseModel] = None,
         dependencies: Optional[dict[str, Any]] = None,
@@ -128,11 +126,7 @@ class Invocation(Thread):
         """Create a thread to run an action and track its outputs.
 
         :param action: provides the function that we run, as well as metadata
-            and type information. The descriptor is not bound to an object, so we
-            supply the `~lt.Thing` it's bound to when the function is run.
-        :param thing: is the object on which we are running the ``action``, i.e.
-            it is supplied to the function wrapped by ``action`` as the ``self``
-            argument.
+            and type information.
         :param id: is a `uuid.UUID` used to identify the invocation, for example
             when polling its status via HTTP.
         :param input: is a `pydantic.BaseModel` representing the body of the HTTP
@@ -146,8 +140,7 @@ class Invocation(Thread):
         Thread.__init__(self, daemon=True)
 
         # keep track of the corresponding ActionDescriptor
-        self.action_ref = weakref.ref(action)
-        self.thing_ref = weakref.ref(thing)
+        self._action = action
         self.input = input if input is not None else EmptyInput()
         self.dependencies = dependencies if dependencies is not None else {}
 
@@ -212,32 +205,16 @@ class Invocation(Thread):
                 return ProblemDetails.from_exception(self._exception)
 
     @property
-    def action(self) -> ActionDescriptor:
-        """The `.ActionDescriptor` object running in this thread.
-
-        :raises RuntimeError: if the action descriptor has been deleted.
-            This should never happen, as the descriptor is a property of
-            a class, which won't be deleted.
-        """
-        action = self.action_ref()
-        if action is None:  # pragma: no cover
-            # Action descriptors should only be deleted after the server has
-            # stopped, so this error should never occur.
-            raise RuntimeError("The action for an `Invocation` has been deleted!")
-        return action
+    def action(self) -> ActionInfo:
+        """The `.ActionInfo` object we're running."""
+        return self._action
 
     @property
     def thing(self) -> Thing:
-        """The `~lt.Thing` to which the action is bound, i.e. this is ``self``.
-
-        :raises RuntimeError: if the Thing no longer exists.
-        """
-        thing = self.thing_ref()
-        if thing is None:  # pragma: no cover
-            # this error block is primarily for mypy: the Thing will exist as
-            # long as the server is running, so we should never hit this error.
-            raise RuntimeError("The `Thing` on which an action was run is missing!")
-        return thing
+        """The `~lt.Thing` to which the action is bound, i.e. this is ``self``."""
+        # Note: this should never error, because there's no way to start an
+        # Invocation without a bound Thing.
+        return self.action.owning_object_or_error()
 
     @property
     def cancel_hook(self) -> invocation_contexts.CancelEvent:
@@ -267,7 +244,7 @@ class Invocation(Thread):
             return InvocationSummary(
                 status=self.status,
                 id=self.id,
-                action=self.thing.path + self.action.name,  # type: ignore[attr-defined]
+                action=self.thing.path + self.action.name,
                 href=URLFor("action_invocation", id=self.id),
                 timeStarted=self._start_time,
                 timeCompleted=self._end_time,
@@ -287,7 +264,7 @@ class Invocation(Thread):
         # The line below confuses MyPy because self.action **evaluates to** a Descriptor
         # object (i.e. we don't call __get__ on the descriptor).
         with self._status_lock:
-            return self.action.invocation_model(  # type: ignore[attr-defined]
+            return self.action.invocation_model(
                 **dict(self.summary_model()),
                 input=self.input,
                 output=self.output_model_instance,
@@ -303,7 +280,7 @@ class Invocation(Thread):
         self.thing._thing_server_interface.publish(
             Message(
                 thing=self.thing.name,
-                affordance=self.action.name,  # type: ignore[attr-defined]
+                affordance=self.action.name,
                 message_type="action",
                 payload=self._status.value,
             )
@@ -336,16 +313,13 @@ class Invocation(Thread):
 
         :raises RuntimeError: if there is no Thing associated with the invocation.
         """
-        # self.action evaluates to an ActionDescriptor. This confuses mypy,
-        # which thinks we are calling ActionDescriptor.__get__.
-        action: ActionDescriptor = self.action  # type: ignore[assignment]
         logger = self.thing.logger
         # The line below saves records matching our ID to ``self._log``
         add_thing_log_destination(self.id, self._log)
         with invocation_contexts.set_invocation_id(self.id):
             try:
                 self._publish_status()
-
+                action = self.action.get_descriptor()
                 thing = self.thing
                 kwargs = model_to_dict(self.input)
                 if thing is None:  # pragma: no cover
@@ -439,8 +413,7 @@ class ActionManager:
 
     def invoke_action(
         self,
-        action: ActionDescriptor,
-        thing: Thing,
+        action: ActionInfo,
         input: Any,
         dependencies: dict[str, Any],
     ) -> Invocation:
@@ -449,11 +422,7 @@ class ActionManager:
         See `.Invocation` for more details.
 
         :param action: provides the function that we run, as well as metadata
-            and type information. The descriptor is not bound to an object, so we
-            supply the `~lt.Thing` it's bound to when the function is run.
-        :param thing: is the object on which we are running the ``action``, i.e.
-            it is supplied to the function wrapped by ``action`` as the ``self``
-            argument.
+            and type information.
         :param input: is a `pydantic.BaseModel` representing the body of the HTTP
             request that invoked the action. It is supplied to the function as
             keyword arguments.
@@ -464,7 +433,6 @@ class ActionManager:
         """
         thread = Invocation(
             action=action,
-            thing=thing,
             input=input,
             dependencies=dependencies,
             id=uuid.uuid4(),
@@ -484,8 +452,8 @@ class ActionManager:
 
     def list_invocations(
         self,
-        action: Optional[ActionDescriptor] = None,
-        thing: Optional[Thing] = None,
+        action: str | None = None,
+        thing: str | None = None,
     ) -> list[InvocationSummary]:
         """All of the invocations currently managed.
 
@@ -494,20 +462,19 @@ class ActionManager:
         not yet expired.
 
         :param action: filters out only the invocations of a particular
-            `.ActionDescriptor`. Note that if there are two Things
-            of the same subclass, filtering by action will return invocations
-            on either `~lt.Thing`.
-        :param thing: returns only invocations of actions on a particular `~lt.Thing`.
-            This will often be combined with filtering by ``action`` to give the
-            list of invocations returned by a GET request on an action endpoint.
+            action, identified by its name. Note that this will match an action
+            of that name on any `~lt.Thing`.
+        :param thing: returns only invocations of actions on a particular `~lt.Thing`,
+            identified by its name. This will often be combined with filtering by
+            ``action``.
 
         :return: A list of invocations, optionally filtered by Thing and/or Action.
         """
         return [
             i.summary_model()
             for i in self.invocations
-            if thing is None or i.thing == thing
-            if action is None or i.action == action
+            if thing is None or i.thing.name == thing
+            if action is None or i.action.name == action
         ]
 
     def expire_invocations(self) -> None:
@@ -553,7 +520,7 @@ class ActionManager:
                 return serialise_from_user_code(
                     model_instance=invocation.response(),
                     description=f"invocation '{id}' of ",
-                    code=invocation.action.func,  # type: ignore[attr-defined]
+                    code=invocation.action.func,
                 )
             except KeyError as e:
                 raise HTTPException(
@@ -726,7 +693,7 @@ class ActionInfo(
         return self.get_descriptor().output_model
 
     @property
-    def invocation_model(self) -> type[BaseModel]:
+    def invocation_model(self) -> type[InvocationModel]:
         """A Pydantic model for an invocation of this action."""
         return self.get_descriptor().invocation_model
 
@@ -949,8 +916,7 @@ class ActionDescriptor(
         ) -> Response:
             action_manager = thing._thing_server_interface._action_manager
             invocation = action_manager.invoke_action(
-                action=self,
-                thing=thing,
+                action=thing.actions[self.name],
                 input=body,
                 dependencies=dependencies,
             )
@@ -1024,7 +990,11 @@ class ActionDescriptor(
         )
         def list_invocations() -> list[InvocationSummary]:
             action_manager = thing._thing_server_interface._action_manager
-            return action_manager.list_invocations(self, thing)
+            invocations = action_manager.list_invocations(
+                action=self.name, thing=thing.name
+            )
+            print(f"list invocations: {invocations}")
+            return invocations
 
     def action_affordance(
         self, thing: Thing, path: Optional[str] = None
