@@ -73,7 +73,7 @@ class ThingWithDependency(ThingThatTracksStartup):
     r"""A Thing that relies on a connected Thing during ``__enter__``\ ."""
 
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot(
-        start_first=True
+        deferred=False
     )
 
     def __enter__(self):
@@ -82,7 +82,7 @@ class ThingWithDependency(ThingThatTracksStartup):
 
 
 class ThingWithoutDependency(ThingThatTracksStartup):
-    """A Thing with a slot that has start_first=False (default)."""
+    """A Thing with a slot that has deferred=True (default)."""
 
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot()
 
@@ -90,7 +90,7 @@ class ThingWithoutDependency(ThingThatTracksStartup):
 class ThingWithCircularDependency(ThingThatTracksStartup):
     """A Thing that will cause a dependency cycle."""
 
-    other_thing: ThingWithDependency = lt.thing_slot(start_first=True)
+    other_thing: ThingWithDependency = lt.thing_slot(deferred=False)
 
 
 class Dummy:
@@ -501,6 +501,16 @@ def test_mapping_and_multiple():
         assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
         assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}
+
+
+def test_deferred_default():
+    """Check that the default value of `deferred` is True."""
+    slot = lt.thing_slot()
+    assert slot.deferred
+    slot = ThingSlot()
+    assert slot.deferred
+    # The Thing definition below doesn't specify `deferred`
+    assert ThingWithoutDependency.other_thing.deferred is True
 
 
 def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:

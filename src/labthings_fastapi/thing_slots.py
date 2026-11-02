@@ -110,7 +110,7 @@ class ThingSlot(
         self,
         *,
         default: str | None | Iterable[str] | EllipsisType = ...,
-        start_first: bool = False,
+        deferred: bool = True,
     ) -> None:
         """Declare a ThingSlot.
 
@@ -126,21 +126,24 @@ class ThingSlot(
 
             If the type is a mapping of `str` to `~lt.Thing` the default should be
             of type `Iterable[str]` (and could be an empty list).
-        :param start_first: Whether the connected Things should be started before
+        :param deferred: Whether the connected Things should be started before
             the Thing on which the slot is defined.
 
-            When this is `False` (the default), an error will be raised if the slot
-            is accessed during ``__enter__`` and there's no constraint on the order
-            in which things will be started. If it is set to `True` then LabThings
+            When this is `True` (the default), there's no constraint on the order
+            in which things will be started: it's assumed the slot will not be
+            accessed until all Things have started.
+
+            If `deferred` is set to `False` then LabThings
             will ensure the connected Thing(s) have ``__enter__`` called before it
-            is called on this Thing.
+            is called on this Thing, i.e. it's safe to use the slot during
+            ``__enter__``
         """
         super().__init__()
         self._default = default
         self._things: WeakKeyDictionary[
             "Thing", ReferenceType["Thing"] | WeakValueDictionary[str, "Thing"] | None
         ] = WeakKeyDictionary()
-        self._start_first = start_first
+        self._deferred = deferred
 
     @property
     def thing_type(self) -> tuple[type, ...]:
@@ -183,9 +186,9 @@ class ThingSlot(
         return self._default
 
     @property
-    def start_first(self) -> bool:
+    def deferred(self) -> bool:
         """Whether the connected Things must be started before this one."""
-        return self._start_first
+        return self._deferred
 
     def _pick_things(
         self,
@@ -393,7 +396,7 @@ def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
     for name, thing in things.items():
         deps = set()
         for _, slot in class_attributes(thing, ThingSlot):
-            if slot.start_first:
+            if not slot.deferred:
                 deps = deps.union(slot._connected_thing_names(thing))
         dependencies[name] = deps
 
@@ -425,7 +428,7 @@ def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
 
 def thing_slot(
     default: str | Iterable[str] | None | EllipsisType = ...,
-    start_first: bool = False,
+    deferred: bool = True,
 ) -> Any:
     r"""Declare a connection to another `~lt.Thing` in the same server.
 
@@ -454,7 +457,7 @@ def thing_slot(
     The main reason to use the function is that it suppresses type errors when
     using static type checkers such as `mypy` or `pyright` (see note below).
 
-    The type hint of a Thing Connection should be one of the following:
+    The type hint of a Thing Slot should be one of the following:
 
     * A `~lt.Thing` subclass. An instance of this subclass will be returned when
         the attribute is accessed.
@@ -514,14 +517,17 @@ def thing_slot(
         If the default is omitted or set to ``...`` the server will attempt to find
         a matching `~lt.Thing` instance (or instances). A default value of `None` is
         allowed if the connection is type hinted as optional.
-    :param start_first: Whether the connected Things should be started before
+    :param deferred: Whether the connected Things should be started before
         the Thing on which the slot is defined.
 
-        When this is `False` (the default), an error will be raised if the slot
-        is accessed during ``__enter__`` and there's no constraint on the order
-        in which things will be started. If it is set to `True` then LabThings
+        When this is `True` (the default), there's no constraint on the order
+        in which things will be started: it's assumed the slot will not be
+        accessed until all Things have started.
+
+        If `deferred` is set to `False` then LabThings
         will ensure the connected Thing(s) have ``__enter__`` called before it
-        is called on this Thing.
+        is called on this Thing, i.e. it's safe to use the slot during
+        ``__enter__``
     :return: A `.ThingSlot` descriptor.
 
     Typing notes:
@@ -536,4 +542,4 @@ def thing_slot(
     and it is done by established libraries such as `pydantic`\ .
 
     """
-    return ThingSlot(default=default, start_first=start_first)
+    return ThingSlot(default=default, deferred=deferred)
