@@ -1010,7 +1010,6 @@ class ActionDescriptor(
             invocations = action_manager.list_invocations(
                 action=self.name, thing=thing.name
             )
-            print(f"list invocations: {invocations}")
             return invocations
 
     def action_affordance(

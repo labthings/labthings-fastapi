@@ -114,10 +114,11 @@ def test_invocation(action_name, input, output, mocker):
     assert invocation.output is None
     # Run the action
     invocation.start()
-    invocation.join()
+    invocation.join(timeout=1)
+    assert not invocation.is_alive()  # fail rather than hang
     # It should complete successfully
     assert invocation.status == InvocationStatus.COMPLETED
-    assert invocation.output is output
+    assert invocation.output == output
 
 
 def test_get_action_invocations(client):
