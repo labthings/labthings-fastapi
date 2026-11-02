@@ -20,7 +20,6 @@ the tutorial page :ref:`tutorial_running`.
 
 import sys
 from argparse import ArgumentParser, Namespace
-from typing import Optional
 
 import uvicorn
 from pydantic import ValidationError
@@ -63,7 +62,7 @@ def get_default_parser() -> ArgumentParser:
     return parser
 
 
-def parse_args(argv: Optional[list[str]] = None) -> Namespace:
+def parse_args(argv: list[str] | None = None) -> Namespace:
     r"""Process command line arguments for the server.
 
     The arguments are defined in `.get_default_parser`\ .
@@ -112,7 +111,7 @@ def config_from_args(args: Namespace) -> ThingServerConfig:
         raise RuntimeError("No configuration (or empty configuration) provided")
 
 
-def serve_from_cli(argv: Optional[list[str]] = None) -> ThingServer:
+def serve_from_cli(argv: list[str] | None = None) -> ThingServer:
     r"""Start the server from the command line.
 
     This function will parse command line arguments, load configuration,

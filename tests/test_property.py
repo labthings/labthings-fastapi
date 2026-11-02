@@ -226,7 +226,7 @@ def test_baseproperty_add_to_fastapi():
     class Example:
         prop = MyProperty()
         """A docstring with a title.
-        
+
         A docstring body.
         """
         prop._type = str | None
@@ -369,7 +369,7 @@ def test_propertyinfo(mocker):
             default_factory=lambda: pydantic.RootModel[int | None](root=None)
         )
         """A very verbosely defined optional integer.
-        
+
         This tests a model that's also a subscripted generic.
         """
 

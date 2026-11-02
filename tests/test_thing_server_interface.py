@@ -3,7 +3,7 @@
 import gc
 import os
 import tempfile
-from typing import Mapping
+from collections.abc import Mapping
 from unittest.mock import Mock
 
 import pytest

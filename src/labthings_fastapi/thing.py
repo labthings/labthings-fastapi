@@ -12,7 +12,7 @@ import logging
 import os
 from collections.abc import Mapping
 from json.decoder import JSONDecodeError
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from anyio.to_thread import run_sync
 from fastapi import Request, WebSocket
@@ -237,7 +237,7 @@ class Thing:
 
         # Load the settings.
         try:
-            with open(setting_storage_path, "r", encoding="utf-8") as file_obj:
+            with open(setting_storage_path, encoding="utf-8") as file_obj:
                 settings = json.load(file_obj)
         except (FileNotFoundError, PermissionError, JSONDecodeError):
             # Note that if the settings file is missing, we should already have
@@ -320,7 +320,7 @@ class Thing:
         with open(path, "w", encoding="utf-8") as file_obj:
             file_obj.write(setting_json)
 
-    properties: OptionallyBoundDescriptor["Thing", PropertyCollection] = (
+    properties: OptionallyBoundDescriptor[Thing, PropertyCollection] = (
         OptionallyBoundDescriptor(PropertyCollection)
     )
     r"""Access to metadata and functions of this `~lt.Thing`\ 's properties.
@@ -330,7 +330,7 @@ class Thing:
     this includes settings, as they are a subclass of properties.
     """
 
-    settings: OptionallyBoundDescriptor["Thing", SettingCollection] = (
+    settings: OptionallyBoundDescriptor[Thing, SettingCollection] = (
         OptionallyBoundDescriptor(SettingCollection)
     )
     r"""Access to settings-related metadata and functions.
@@ -339,7 +339,7 @@ class Thing:
     convenient access to metadata of the settings of this `~lt.Thing`\ .
     """
 
-    actions: OptionallyBoundDescriptor["Thing", ActionCollection] = (
+    actions: OptionallyBoundDescriptor[Thing, ActionCollection] = (
         OptionallyBoundDescriptor(ActionCollection)
     )
     r"""Access to metadata for the actions of this `~lt.Thing`\ .
@@ -348,7 +348,7 @@ class Thing:
     convenient access to metadata of each action.
     """
 
-    _labthings_thing_state: Optional[dict] = None
+    _labthings_thing_state: dict | None = None
 
     @property
     def thing_state(self) -> Mapping:
@@ -374,12 +374,12 @@ class Thing:
         td = self.thing_description_dict()
         return validation.validate_thing_description(td)
 
-    _cached_thing_description: Optional[
-        tuple[Optional[str], Optional[str], ThingDescription]
-    ] = None
+    _cached_thing_description: (
+        tuple[str | None, str | None, ThingDescription] | None
+    ) = None
 
     def thing_description(
-        self, path: Optional[str] = None, base: Optional[str] = None
+        self, path: str | None = None, base: str | None = None
     ) -> ThingDescription:
         """Generate a w3c Thing Description representing this thing.
 
@@ -423,8 +423,8 @@ class Thing:
 
     def thing_description_dict(
         self,
-        path: Optional[str] = None,
-        base: Optional[str] = None,
+        path: str | None = None,
+        base: str | None = None,
     ) -> dict:
         r"""Describe this Thing with a Thing Description as a simple dict.
 

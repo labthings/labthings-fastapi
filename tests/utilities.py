@@ -1,8 +1,8 @@
 """Useful functions for test code."""
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Iterator
 
 import pytest
 
@@ -10,7 +10,7 @@ import pytest
 @contextmanager
 def raises_or_is_caused_by(
     exception_cls: type[Exception],
-) -> Iterator[pytest.ExceptionInfo]:
+) -> Generator[pytest.ExceptionInfo, None, None]:
     r"""Wrap `pytest.raises` to cope with exceptions that are wrapped in another error.
 
     Some errors raised during class creation are wrapped in a `RuntimeError` on older

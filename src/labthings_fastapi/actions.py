@@ -22,7 +22,7 @@ import logging
 import uuid
 import weakref
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import partial, wraps
 from threading import Lock, RLock, Thread
@@ -30,7 +30,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Concatenate,
     Generic,
     Literal,
@@ -121,8 +120,8 @@ class Invocation(Thread):
         action: ActionDescriptor,
         thing: Thing,
         id: uuid.UUID,
-        input: Optional[BaseModel] = None,
-        dependencies: Optional[dict[str, Any]] = None,
+        input: BaseModel | None = None,
+        dependencies: dict[str, Any] | None = None,
         log_len: int = 1000,
     ) -> None:
         """Create a thread to run an action and track its outputs.
@@ -156,18 +155,16 @@ class Invocation(Thread):
 
         # How long to keep the invocation after it finishes
         self.retention_time = action.retention_time
-        self.expiry_time: Optional[datetime.datetime] = None
+        self.expiry_time: datetime.datetime | None = None
 
         # Private state properties
         self._status_lock = RLock()  # This Lock protects properties below
         self._status: InvocationStatus = InvocationStatus.PENDING  # Task status
-        self._output_model_instance: Optional[BaseModel] = None  # Return value
+        self._output_model_instance: BaseModel | None = None  # Return value
         self._request_time: datetime.datetime = datetime.datetime.now()
-        self._start_time: Optional[datetime.datetime] = None  # Task start time
-        self._end_time: Optional[datetime.datetime] = None  # Task end time
-        self._exception: Optional[BaseException] = (
-            None  # Propagate exceptions helpfully
-        )
+        self._start_time: datetime.datetime | None = None  # Task start time
+        self._end_time: datetime.datetime | None = None  # Task end time
+        self._exception: BaseException | None = None  # Propagate exceptions helpfully
         self._log: deque = deque(maxlen=log_len)  # log entries for this thread
 
     @property
@@ -484,8 +481,8 @@ class ActionManager:
 
     def list_invocations(
         self,
-        action: Optional[ActionDescriptor] = None,
-        thing: Optional[Thing] = None,
+        action: ActionDescriptor | None = None,
+        thing: Thing | None = None,
     ) -> list[InvocationSummary]:
         """All of the invocations currently managed.
 
@@ -856,7 +853,7 @@ class ActionDescriptor(
             )
 
     @contextmanager
-    def context_for_func(self, obj: OwnerT) -> Iterator[None]:
+    def context_for_func(self, obj: OwnerT) -> Generator[None, None, None]:
         """Create the context in which ``func`` runs.
 
         Currently, if global locking is enabled and this action hasn't opted out,
@@ -992,7 +989,9 @@ class ActionDescriptor(
             responses[200]["model"] = self.output_model
             pass
         except AttributeError:
-            print(f"Failed to generate response model for action {self.name}")
+            thing.logger.warning(
+                f"Failed to generate response model for action {self.name}"
+            )
         # Add an additional media type if we may return a file
         if hasattr(self.output_model, "media_type"):
             responses[200]["content"][self.output_model.media_type] = {}
@@ -1027,7 +1026,7 @@ class ActionDescriptor(
             return action_manager.list_invocations(self, thing)
 
     def action_affordance(
-        self, thing: Thing, path: Optional[str] = None
+        self, thing: Thing, path: str | None = None
     ) -> ActionAffordance:
         """Represent the property in a Thing Description.
 

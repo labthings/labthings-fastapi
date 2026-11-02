@@ -122,7 +122,7 @@ class ThingSlot(
         super().__init__()
         self._default = default
         self._things: WeakKeyDictionary[
-            "Thing", ReferenceType["Thing"] | WeakValueDictionary[str, "Thing"] | None
+            Thing, ReferenceType[Thing] | WeakValueDictionary[str, Thing] | None
         ] = WeakKeyDictionary()
 
     @property

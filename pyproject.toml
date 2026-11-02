@@ -113,7 +113,9 @@ select = [
   "I",     # Sort imports
   "RUF022",# Sort __all__
   "S",     # flake8-bandit - notably, this disallows `assert`
+  "T",     # flake8-print - no print statements in production
   "TID",   # flake8-tidy-imports (prevents relative imports)
+  "W",     # whitespace checks
 ]
 ignore = [
     "D203",  # incompatible with D204
@@ -137,12 +139,17 @@ preview = true
     "DOC",    # Tests are not yet fully covered by docstrings
     "ANN",    # We don't require type hints in test code.
     "S101",   # S101 disallows assert. That's not appropriate for tests.
+    "T",      # Some tests use `print` to provide useful output on failure
 ]
 # Typing tests do have docstrings, but it's not helpful to insist on imperative
 # mood etc.
 "typing_tests/*" = ["D404", "D401"]
 # The docs config file is a python file, but doesn't conform to the usual rules.
 "docs/source/conf.py" = ["D", "DOC", "ANN"]
+# Print statements are OK in documentation and associated utilities
+"docs/*" = ["T"]
+# The CLI module should be allowed to use print
+"src/labthings_fastapi/server/cli.py" = ["T"]
 
 [tool.ruff.lint.pydocstyle]
 # This lets the D401 checker understand that decorated thing properties and thing

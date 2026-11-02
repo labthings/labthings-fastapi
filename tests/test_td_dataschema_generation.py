@@ -154,7 +154,7 @@ def test_recursive_type():
     """Check that a recursive model fails with a `RecursionError`."""
 
     class Recursive(BaseModel):
-        child: "Recursive"
+        child: Recursive
 
     with pytest.raises(RecursionError):
         type_to_dataschema(Recursive)

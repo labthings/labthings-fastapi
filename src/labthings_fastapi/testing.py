@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Generator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from concurrent.futures import Future
 from contextlib import contextmanager
 from tempfile import TemporaryDirectory
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Iterable,
-    Mapping,
     ParamSpec,
     TypeVar,
 )
@@ -292,7 +295,7 @@ def _mock_slots(thing: Thing) -> None:
 
 
 @contextmanager
-def use_dummy_url_for() -> Iterator[None]:
+def use_dummy_url_for() -> Generator[None, None, None]:
     """Use the dummy URL for function in the context variable."""
     with set_url_for_context(dummy_url_for):
         yield

@@ -15,14 +15,12 @@ more detail.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from functools import partial, wraps
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
-    Mapping,
-    Optional,
 )
 
 from fastapi import FastAPI
@@ -45,7 +43,7 @@ class EndpointDescriptor(BaseDescriptor):
         self,
         func: Callable,
         http_method: HTTPMethod = "get",
-        path: Optional[str] = None,
+        path: str | None = None,
         **kwargs: Mapping[str, Any],
     ) -> None:
         r"""Initialise an EndpointDescriptor.
@@ -121,7 +119,7 @@ class EndpointDescriptor(BaseDescriptor):
 
 
 def endpoint(
-    method: HTTPMethod, path: Optional[str] = None, **kwargs: Any
+    method: HTTPMethod, path: str | None = None, **kwargs: Any
 ) -> Callable[[Callable], EndpointDescriptor]:
     r"""Mark a function as a FastAPI endpoint without making it an action.
 

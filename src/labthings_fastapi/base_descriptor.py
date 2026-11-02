@@ -30,10 +30,10 @@ import builtins
 import inspect
 import textwrap
 import typing
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from itertools import pairwise
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Generic, Mapping, Self, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar, overload
 from weakref import WeakKeyDictionary, ref
 
 from labthings_fastapi.exceptions import (

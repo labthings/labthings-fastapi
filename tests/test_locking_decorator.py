@@ -1,7 +1,8 @@
 import functools
 import time
+from collections.abc import Callable
 from threading import Event, RLock, Thread
-from typing import Callable, ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar
 
 import pytest
 

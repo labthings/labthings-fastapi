@@ -8,16 +8,14 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncGenerator,
     Literal,
-    Optional,
     Self,
-    Union,
     overload,
 )
 
@@ -149,7 +147,7 @@ class MJPEGStream:
         self._thing_server_interface = thing_server_interface
         self.reset(ringbuffer_size=ringbuffer_size)
 
-    def reset(self, ringbuffer_size: Optional[int] = None) -> None:
+    def reset(self, ringbuffer_size: int | None = None) -> None:
         """Reset the stream and optionally change the ringbuffer size.
 
         Discard all frames from the ringbuffer and reset the frame index.
@@ -283,7 +281,7 @@ class MJPEGStream:
         """
         return MJPEGStreamResponse(self.frame_async_generator())
 
-    def add_frame(self, frame: bytes, timestamp: Optional[datetime] = None) -> None:
+    def add_frame(self, frame: bytes, timestamp: datetime | None = None) -> None:
         """Add a JPEG to the MJPEG stream.
 
         This function adds a frame to the stream. It may be called from
@@ -377,8 +375,8 @@ class MJPEGStreamDescriptor:
     def __get__(self, obj: Thing, type: type | None = None) -> MJPEGStream: ...  # noqa: D105
 
     def __get__(
-        self, obj: Optional[Thing], type: type[Thing] | None = None
-    ) -> Union[MJPEGStream, Self]:
+        self, obj: Thing | None, type: type[Thing] | None = None
+    ) -> MJPEGStream | Self:
         """Return the MJPEG Stream, or the descriptor object.
 
         When accessed on the class, this ``__get__`` method will return the descriptor

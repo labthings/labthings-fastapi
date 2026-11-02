@@ -15,7 +15,7 @@ class CancellableCountingThing(lt.Thing):
     counter: int = lt.property(default=0)
     check: bool = lt.property(default=False)
     """Whether the count has been cancelled.
-    
+
     This variable is used to check that the action can detect a cancel event
     and react by performing another task, in this case, setting this variable.
     """
