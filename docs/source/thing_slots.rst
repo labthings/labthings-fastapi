@@ -84,5 +84,40 @@ file:
         }
     }
 
+
+Influencing start-up order
+--------------------------
+
+Sometimes it's useful to require that other Things start before this one. For example, if you share a serial port between several functions, you might want to use it via a `~lt.thing_slot` during start-up of a different Thing. This is possible if you specify `deferred=False` when creating the slot:
+
+.. code-block:: python
+
+    import labthings_fastapi as lt
+
+
+    class SerialPort(lt.Thing):
+        """A port for communicating serially."""
+
+        def query(self, msg: str) -> str:
+            ...
+    
+    class SerialLight(lt.Thing):
+        """A light that communicates over serial"""
+
+        _ser: SerialPort = lt.thing_slot(deferred=False)
+
+        def __enter__(self):
+            """Start up the Thing."""
+            # LabThings will ensure self._ser has already had
+            # __enter__ called, so it's running.
+            self._version = self._ser.query("version?")
+
+
+Without specifying ``deferred=False``, there's no guarantee which Thing will start up first. If the `SerialPort` starts after the ``SerialLight``, most likely the attempt to communicate during ``SerialLight.__enter__`` would fail. Specifying `deferred=False` instructs LabThings to ensure that the Thing connected to the slot starts up *before* the Thing on which the slot is defined.
+
+
+More detail
+-----------
+
 More detail can be found in the description of `~lt.thing_slot` or the
 :mod:`.thing_slots` module documentation.
