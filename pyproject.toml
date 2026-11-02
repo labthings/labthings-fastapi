@@ -114,6 +114,7 @@ select = [
   "S",     # flake8-bandit - notably, this disallows `assert`
   "T",     # flake8-print - no print statements in production
   "TID",   # flake8-tidy-imports (prevents relative imports)
+  "W",     # whitespace checks
 ]
 ignore = [
     "D203",  # incompatible with D204

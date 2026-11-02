@@ -54,7 +54,7 @@ class Example:
 
     my_property_with_nice_docs = MockProperty()
     """Title goes here.
-    
+
     The docstring should have a one-line title followed by
     a body giving a longer description of what's going on.
     """
@@ -501,7 +501,7 @@ def test_descriptorinfo(mocker):
     class Example7:
         intfield: int = FieldTypedBaseDescriptor()
         """The descriptor's title.
-        
+
         A description from a multiline docstring.
         """
 

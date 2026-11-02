@@ -97,10 +97,10 @@ class TestPropertyDefaultsMatch(lt.Thing):
 
     listprop: list[int] = lt.property(default_factory=list)
     """A list property with a default factory.
-    
+
     Note the default factory is a less specific type.
-    
-    Default types must be compatible with the attribute type, but not 
+
+    Default types must be compatible with the attribute type, but not
     necessarily the same. This tests a common scenario, where the default (an
     empty list) is compatible, but not the same as ``list[int]`` .
 
