@@ -32,7 +32,7 @@ custom type that works with `pydantic` to convert endpoint names to URLs at
 serialisation time.
 """
 
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Self
@@ -52,7 +52,7 @@ url_for_ctx: ContextVar[Callable[..., URL]] = ContextVar("url_for_ctx")
 @contextmanager
 def set_url_for_context(
     url_for_function: Callable[..., URL],
-) -> Iterator[None]:
+) -> Generator[None, None, None]:
     """Set the url_for context variable for the duration of the context.
 
     :param url_for_function: The url_for function to set in the context variable.

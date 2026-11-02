@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import Any, Optional, Self, Union
+from typing import Any, Self
 from urllib.parse import urljoin, urlparse
 
 import httpx2
@@ -138,7 +138,7 @@ class ThingClient:
         creates a subclass with the right attributes.
     """
 
-    def __init__(self, base_url: str, client: Optional[httpx2.Client] = None) -> None:
+    def __init__(self, base_url: str, client: httpx2.Client | None = None) -> None:
         """Create a ThingClient connected to a remote Thing.
 
         :param base_url: the base URL of the Thing. This should be the URL
@@ -267,7 +267,7 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, client: Optional[httpx2.Client] = None) -> Self:
+    def from_url(cls, thing_url: str, client: httpx2.Client | None = None) -> Self:
         """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
@@ -329,11 +329,11 @@ class PropertyClientDescriptor:
 
 def property_descriptor(
     property_name: str,
-    model: Union[type, BaseModel],
-    description: Optional[str] = None,
+    model: type | BaseModel,
+    description: str | None = None,
     readable: bool = True,
     writeable: bool = True,
-    property_path: Optional[str] = None,
+    property_path: str | None = None,
 ) -> PropertyClientDescriptor:
     """Create a correctly-typed descriptor that gets and/or sets a property.
 
@@ -367,8 +367,8 @@ def property_descriptor(
 
         def __get__(
             self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
+            obj: ThingClient | None = None,
+            _objtype: type[ThingClient] | None = None,
         ) -> Any:
             if obj is None:
                 return self
@@ -377,8 +377,8 @@ def property_descriptor(
 
         def __get__(
             self: PropertyClientDescriptor,
-            obj: Optional[ThingClient] = None,
-            _objtype: Optional[type[ThingClient]] = None,
+            obj: ThingClient | None = None,
+            _objtype: type[ThingClient] | None = None,
         ) -> Any:
             raise ClientPropertyError("This property may not be read.")
 

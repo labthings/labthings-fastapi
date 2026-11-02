@@ -3,16 +3,13 @@ r"""Interface between `~lt.Thing` subclasses and the `~lt.ThingServer`\ ."""
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Generator, Mapping
 from concurrent.futures import Future
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Mapping,
     ParamSpec,
     TypeVar,
 )
@@ -217,7 +214,7 @@ class ThingServerInterface:
     @contextmanager
     def _optionally_hold_global_lock(
         self, enabled: bool | None = True
-    ) -> Iterator[None]:
+    ) -> Generator[None, None, None]:
         """Hold the global lock, if required, as a context manager.
 
         This function will hold the global lock if necessary while a block of code runs.
@@ -251,7 +248,9 @@ class ThingServerInterface:
                 yield
 
     @contextmanager
-    def hold_global_lock(self, *, error_if_unavailable: bool = True) -> Iterator[None]:
+    def hold_global_lock(
+        self, *, error_if_unavailable: bool = True
+    ) -> Generator[None, None, None]:
         """Hold the global lock for the duration of a with block.
 
         This context manager will hold the global lock while a ``with:`` block runs.

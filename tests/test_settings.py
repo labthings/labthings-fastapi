@@ -210,7 +210,7 @@ def test_functional_settings_save(tempdir):
         # We check the value with a GET request
         r = client.get("/thing/floatsetting")
         assert r.json() == 2.0
-        with open(setting_file, "r", encoding="utf-8") as file_obj:
+        with open(setting_file, encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(floatsetting=2.0)
 
@@ -238,7 +238,7 @@ def test_data_settings_save(tempdir):
         # After successfully writing to the setting, it should
         # have created a settings file.
         assert os.path.isfile(setting_file)
-        with open(setting_file, "r", encoding="utf-8") as file_obj:
+        with open(setting_file, encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(boolsetting=True)
 
@@ -256,7 +256,7 @@ def test_settings_dict_save(tempdir):
     with server.test_client():
         thing.dictsetting = {"c": 3}
         assert os.path.isfile(setting_file)
-        with open(setting_file, "r", encoding="utf-8") as file_obj:
+        with open(setting_file, encoding="utf-8") as file_obj:
             # Check settings on file match expected dictionary
             assert json.load(file_obj) == _settings_dict(dictsetting={"c": 3})
 

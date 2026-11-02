@@ -11,8 +11,9 @@ from functions by analysing their signatures.
 
 import inspect
 from collections import OrderedDict
+from collections.abc import Callable, Sequence
 from inspect import Parameter, signature
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Type, get_type_hints
+from typing import Any, get_type_hints
 
 from fastapi.dependencies.utils import analyze_param, get_typed_signature
 from pydantic import BaseModel, ConfigDict, Field, RootModel
@@ -37,7 +38,7 @@ class EmptyInput(RootModel):
     This may be either a dictionary or ``None``.
     """
 
-    root: Optional[EmptyObject] = None
+    root: EmptyObject | None = None
 
 
 class StrictEmptyInput(EmptyInput):
@@ -46,13 +47,13 @@ class StrictEmptyInput(EmptyInput):
     This may be either an empty dictionary or ``None``.
     """
 
-    root: Optional[StrictEmptyObject] = None
+    root: StrictEmptyObject | None = None
 
 
 def input_model_from_signature(
     func: Callable,
     remove_first_positional_arg: bool = False,
-    ignore: Optional[Sequence[str]] = None,
+    ignore: Sequence[str] | None = None,
 ) -> type[BaseModel]:
     """Create a pydantic model for a function's signature.
 
@@ -83,7 +84,7 @@ def input_model_from_signature(
     """
     parameters: OrderedDict[str, Parameter] = OrderedDict(signature(func).parameters)
     if remove_first_positional_arg:
-        name, parameter = next(iter((parameters.items())))  # get the first parameter
+        name, parameter = next(iter(parameters.items()))  # get the first parameter
         if parameter.kind in (Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWORD):
             raise ValueError("Can't remove first positional argument: there is none.")
         del parameters[name]
@@ -103,7 +104,7 @@ def input_model_from_signature(
     takes_v_kwargs = False  # will be updated later
     # fields is a dictionary of tuples of (type, default) that defines the input model
     type_hints = get_type_hints(func, include_extras=True)
-    fields: Dict[str, Tuple[type, Any]] = {}
+    fields: dict[str, tuple[type, Any]] = {}
     for name, p in parameters.items():
         if ignore and name in ignore:
             continue
@@ -166,7 +167,7 @@ def fastapi_dependency_params(func: Callable) -> Sequence[Parameter]:
     return dependencies
 
 
-def return_type(func: Callable) -> Type:
+def return_type(func: Callable) -> type:
     """Determine the return type of a function.
 
     :param func: a function to inspect
@@ -183,7 +184,7 @@ def return_type(func: Callable) -> Type:
         return type_hints["return"]
 
 
-def get_docstring(obj: Any, remove_summary: bool = False) -> Optional[str]:
+def get_docstring(obj: Any, remove_summary: bool = False) -> str | None:
     """Return the docstring of an object.
 
     Get the docstring of an object, optionally removing the initial "summary"
@@ -212,7 +213,7 @@ def get_docstring(obj: Any, remove_summary: bool = False) -> Optional[str]:
     return inspect.cleandoc(ds)  # Strip spurious indentation/newlines
 
 
-def get_summary(obj: Any) -> Optional[str]:
+def get_summary(obj: Any) -> str | None:
     """Return the first line of the dosctring of an object.
 
     :param obj: Any Python object

@@ -9,10 +9,10 @@ See the :ref:`tutorial` for examples of how to set up a `~lt.ThingServer`.
 import logging
 import os
 import warnings
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Generator, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from types import MappingProxyType
-from typing import Any, AsyncGenerator, Optional, Self, TypeVar, overload
+from typing import Any, Self, TypeVar, overload
 
 import uvicorn
 from anyio.from_thread import BlockingPortal
@@ -154,7 +154,7 @@ class ThingServer:
         self.app.include_router(self.action_manager.router(), prefix=self.api_prefix)
         self.app.include_router(blob.router, prefix=self.api_prefix)
         self.app.include_router(self._things_view_router(), prefix=self.api_prefix)
-        self.blocking_portal: Optional[BlockingPortal] = None
+        self.blocking_portal: BlockingPortal | None = None
         self.startup_status: dict[str, str | dict] = {"things": {}}
         global _thing_servers  # noqa: F824
         self.global_lock = GlobalLock() if self._config.enable_global_lock else None
@@ -533,7 +533,7 @@ class ThingServer:
         uvicorn.run(self.app, host=host, port=port, ws="websockets-sansio")
 
     @contextmanager
-    def test_client(self) -> Iterator[TestClient]:
+    def test_client(self) -> Generator[TestClient, None, None]:
         """A context manager to test out a server without binding to a port.
 
         This context manager will start up the server and run an event loop, but

@@ -4,9 +4,10 @@ This module defines a model and supporting functions that help to create
 "Problem Details" objects to represent errors in HTTP responses.
 """
 
+from collections.abc import Callable
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable, ParamSpec, Self, TypeVar
+from typing import Any, ParamSpec, Self, TypeVar
 
 from fastapi import Response
 from fastapi.responses import JSONResponse

@@ -48,13 +48,12 @@ Adding a "setter" to properties is optional, and makes them read-write.
 from __future__ import annotations
 
 import builtins
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from types import EllipsisType
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Generic,
     Literal,
     Self,

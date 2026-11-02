@@ -5,7 +5,7 @@ moved into the unit tests.
 """
 
 import time
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from pydantic import Field
 
@@ -28,7 +28,7 @@ class MyThing(Thing):
             str, Field(description="the title of the invocation")
         ] = "Untitled",
         attempts: Annotated[
-            Optional[list[str]],
+            list[str] | None,
             Field(
                 description="Names for each attempt - I suggest final, Final, FINAL."
             ),
@@ -61,16 +61,16 @@ class MyThing(Thing):
     @action
     def make_a_dict(
         self,
-        extra_key: Optional[str] = None,
-        extra_value: Optional[str] = None,
-    ) -> dict[str, Optional[str]]:
+        extra_key: str | None = None,
+        extra_value: str | None = None,
+    ) -> dict[str, str | None]:
         """Do something that returns a dict.
 
         :param extra_key: An additional key.
         :param extra_value: An additional value.
         :return: a dictionary.
         """
-        out: dict[str, Optional[str]] = {"key": "value"}
+        out: dict[str, str | None] = {"key": "value"}
         if extra_key is not None:
             out[extra_key] = extra_value
         return out

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -160,7 +160,7 @@ def check_recursion(depth: int, limit: int) -> None:
 
 def jsonschema_to_dataschema(
     d: JSONSchema,
-    root_schema: Optional[JSONSchema] = None,
+    root_schema: JSONSchema | None = None,
     recursion_depth: int = 0,
     recursion_limit: int = 99,
 ) -> JSONSchema:

@@ -23,16 +23,14 @@ the version current when it was written.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import Enum
 from typing import (
     Annotated,
     Any,
-    Dict,
     Generic,
-    List,
     Literal,
-    Mapping,
     Optional,
     TypeVar,
     Union,
@@ -54,12 +52,12 @@ class Version(BaseModel):
 
 AnyUri = str
 Description = str
-Descriptions = Optional[Dict[str, str]]
+Descriptions = Optional[dict[str, str]]
 Title = str
-Titles = Optional[Dict[str, str]]
-Security = Union[List[str], str]
-Scopes = Union[List[str], str]
-TypeDeclaration = Union[str, List[str]]
+Titles = Optional[dict[str, str]]
+Security = Union[list[str], str]
+Scopes = Union[list[str], str]
+TypeDeclaration = Union[str, list[str]]
 
 # From the spec, TypeDeclaration should be in:
 # boolean, integer, number, string, object,
@@ -79,7 +77,7 @@ THING_CONTEXT_URL_v1 = "https://www.w3.org/2019/wot/td/v1"
 
 
 ThingContextType = Union[
-    List[Union[AnyUri, Dict]],
+    list[AnyUri | dict],
     AnyUri,
 ]
 
@@ -144,41 +142,41 @@ class DataSchema(BaseModel):
     See https://www.w3.org/TR/wot-thing-description11/#dataschema.
     """
 
-    field_type: Optional[TypeDeclaration] = Field(None, alias="@type")
-    description: Optional[Description] = None
-    title: Optional[Title] = None
-    descriptions: Optional[Descriptions] = None
-    titles: Optional[Titles] = None
-    writeOnly: Optional[bool] = None
-    readOnly: Optional[bool] = None
-    oneOf: Optional[list[DataSchema]] = None
-    unit: Optional[str] = None
-    enum: Optional[list] = None
+    field_type: TypeDeclaration | None = Field(None, alias="@type")
+    description: Description | None = None
+    title: Title | None = None
+    descriptions: Descriptions | None = None
+    titles: Titles | None = None
+    writeOnly: bool | None = None
+    readOnly: bool | None = None
+    oneOf: list[DataSchema] | None = None
+    unit: str | None = None
+    enum: list | None = None
     # enum was `Field(None, min_length=1, unique_items=True)` but this failed with
     # generic models
-    format: Optional[str] = None
-    const: Optional[Any] = None
-    default: Optional[Any] = None
-    type: Optional[Type] = None
+    format: str | None = None
+    const: Any | None = None
+    default: Any | None = None
+    type: Type | None = None
     # The fields below should be empty unless type==Type.array
-    items: Optional[Union[DataSchema, List[DataSchema]]] = None
-    maxItems: Optional[int] = Field(None, ge=0)
-    minItems: Optional[int] = Field(None, ge=0)
+    items: DataSchema | list[DataSchema] | None = None
+    maxItems: int | None = Field(None, ge=0)
+    minItems: int | None = Field(None, ge=0)
     # The fields below should be empty unless type==Type.number or Type.integer
-    minimum: Optional[Union[int, float]] = None
-    maximum: Optional[Union[int, float]] = None
-    exclusiveMinimum: Optional[Union[int, float]] = None
-    exclusiveMaximum: Optional[Union[int, float]] = None
-    multipleOf: Optional[Union[int, float]] = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+    exclusiveMinimum: int | float | None = None
+    exclusiveMaximum: int | float | None = None
+    multipleOf: int | float | None = None
     # The fields below should be empty unless type==Type.object
-    properties: Optional[Mapping[str, DataSchema]] = None
-    required: Optional[list[str]] = None
+    properties: Mapping[str, DataSchema] | None = None
+    required: list[str] | None = None
     # The fields below should be empty unless type==Type.string
-    minLength: Optional[int] = None
-    maxLength: Optional[int] = None
-    pattern: Optional[str] = None
-    contentEncoding: Optional[str] = None
-    contentMediaType: Optional[str] = None
+    minLength: int | None = None
+    maxLength: int | None = None
+    pattern: str | None = None
+    contentEncoding: str | None = None
+    contentMediaType: str | None = None
 
     model_config = ConfigDict(extra="allow")
 
@@ -186,7 +184,7 @@ class DataSchema(BaseModel):
 class Response(BaseModel):
     """See https://www.w3.org/TR/wot-thing-description11/#expectedresponse."""
 
-    contentType: Optional[str] = None
+    contentType: str | None = None
 
 
 class PropertyOp(Enum):
@@ -244,13 +242,13 @@ class Form(BaseModel, Generic[OpT]):
     model_config = ConfigDict(extra="allow")
 
     href: URLFor | AnyUri
-    op: Optional[Union[OpT, List[OpT]]] = None
-    contentType: Optional[str] = None
-    contentCoding: Optional[str] = None
-    subprotocol: Optional[Subprotocol] = None
-    security: Optional[Security] = None
-    scopes: Optional[Scopes] = None
-    response: Optional[Response] = None
+    op: OpT | list[OpT] | None = None
+    contentType: str | None = None
+    contentCoding: str | None = None
+    subprotocol: Subprotocol | None = None
+    security: Security | None = None
+    scopes: Scopes | None = None
+    response: Response | None = None
 
 
 class InteractionAffordance(BaseModel):
@@ -258,40 +256,40 @@ class InteractionAffordance(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    description: Optional[Description] = None
-    descriptions: Optional[Descriptions] = None
-    title: Optional[Title] = None
-    titles: Optional[Titles] = None
-    forms: List[Form] = Field(..., min_length=1)
-    uriVariables: Optional[Dict[str, DataSchema]] = None
+    description: Description | None = None
+    descriptions: Descriptions | None = None
+    title: Title | None = None
+    titles: Titles | None = None
+    forms: list[Form] = Field(..., min_length=1)
+    uriVariables: dict[str, DataSchema] | None = None
 
 
 class PropertyAffordance(InteractionAffordance, DataSchema):
     """See https://www.w3.org/TR/wot-thing-description11/#propertyaffordance."""
 
-    observable: Optional[bool] = None
-    forms: List[Form[PropertyOp]] = Field(..., min_length=1)
+    observable: bool | None = None
+    forms: list[Form[PropertyOp]] = Field(..., min_length=1)
 
 
 class ActionAffordance(InteractionAffordance):
     """See https://www.w3.org/TR/wot-thing-description11/#actionaffordance."""
 
-    field_type: Optional[TypeDeclaration] = Field(None, alias="@type")
-    input: Optional[DataSchema] = None
-    output: Optional[DataSchema] = None
-    safe: Optional[bool] = None
-    idempotent: Optional[bool] = None
-    forms: List[Form[ActionOp]] = Field(..., min_length=1)
+    field_type: TypeDeclaration | None = Field(None, alias="@type")
+    input: DataSchema | None = None
+    output: DataSchema | None = None
+    safe: bool | None = None
+    idempotent: bool | None = None
+    forms: list[Form[ActionOp]] = Field(..., min_length=1)
 
 
 class EventAffordance(BaseModel):
     """See https://www.w3.org/TR/wot-thing-description11/#eventaffordance."""
 
-    field_type: Optional[TypeDeclaration] = Field(None, alias="@type")
-    subscription: Optional[DataSchema] = None
-    data: Optional[DataSchema] = None
-    cancellation: Optional[DataSchema] = None
-    forms: List[Form[EventOp]] = Field(..., min_length=1)
+    field_type: TypeDeclaration | None = Field(None, alias="@type")
+    subscription: DataSchema | None = None
+    data: DataSchema | None = None
+    cancellation: DataSchema | None = None
+    forms: list[Form[EventOp]] = Field(..., min_length=1)
 
 
 class LinkElement(BaseModel):
@@ -300,12 +298,12 @@ class LinkElement(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     href: URLFor | AnyUri
-    type: Optional[str] = None
-    rel: Optional[str] = None
-    anchor: Optional[AnyUri] = None
+    type: str | None = None
+    rel: str | None = None
+    anchor: AnyUri | None = None
 
 
-Links = Optional[List[LinkElement]]
+Links = Optional[list[LinkElement]]
 
 
 class SecuritySchemeEnum(Enum):
@@ -345,10 +343,10 @@ class Flow(Enum):
 class BaseSecurityScheme(BaseModel):
     """See https://www.w3.org/TR/wot-thing-description11/#securityscheme."""
 
-    field_type: Optional[TypeDeclaration] = Field(None, alias="@type")
-    description: Optional[Description] = None
-    descriptions: Optional[Descriptions] = None
-    proxy: Optional[AnyUri] = None
+    field_type: TypeDeclaration | None = Field(None, alias="@type")
+    description: Description | None = None
+    descriptions: Descriptions | None = None
+    proxy: AnyUri | None = None
     scheme: SecuritySchemeEnum
 
 
@@ -356,7 +354,7 @@ class NoSecurityScheme(BaseSecurityScheme):
     """See https://www.w3.org/TR/wot-thing-description11/#nosecurityscheme."""
 
     scheme: Literal[SecuritySchemeEnum.nosec] = SecuritySchemeEnum.nosec
-    description: Optional[Description] = Field(
+    description: Description | None = Field(
         default_factory=lambda: Description("No security")
     )
 
@@ -364,8 +362,8 @@ class NoSecurityScheme(BaseSecurityScheme):
 class NameAndIn(BaseModel):
     """Fields used by various security schemas."""
 
-    in_: Optional[In] = Field(None, alias="in")  # for scheme=basic,digest,apikey,bearer
-    name: Optional[str] = None  # for scheme=basic,digest,apikey,bearer
+    in_: In | None = Field(None, alias="in")  # for scheme=basic,digest,apikey,bearer
+    name: str | None = None  # for scheme=basic,digest,apikey,bearer
 
 
 class BasicSecurityScheme(BaseSecurityScheme, NameAndIn):
@@ -378,7 +376,7 @@ class DigestSecurityScheme(BaseSecurityScheme, NameAndIn):
     """See https://www.w3.org/TR/wot-thing-description11/#digestsecurityscheme."""
 
     scheme: Literal[SecuritySchemeEnum.digest] = SecuritySchemeEnum.digest
-    qop: Optional[Qop] = None  # for scheme=digest
+    qop: Qop | None = None  # for scheme=digest
 
 
 class APISecurityScheme(BaseSecurityScheme, NameAndIn):
@@ -391,27 +389,27 @@ class BearerSecurityScheme(BaseSecurityScheme, NameAndIn):
     """See https://www.w3.org/TR/wot-thing-description11/#bearersecurityscheme."""
 
     scheme: Literal[SecuritySchemeEnum.bearer] = SecuritySchemeEnum.bearer
-    authorization: Optional[AnyUri] = None  # for scheme=bearer,oauth2
-    alg: Optional[str] = None  # for scheme=bearer
-    format: Optional[str] = None  # for scheme=bearer
+    authorization: AnyUri | None = None  # for scheme=bearer,oauth2
+    alg: str | None = None  # for scheme=bearer
+    format: str | None = None  # for scheme=bearer
 
 
 class PskSecurityScheme(BaseSecurityScheme):
     """See https://www.w3.org/TR/wot-thing-description11/#psksecurityscheme."""
 
     scheme: Literal[SecuritySchemeEnum.psk] = SecuritySchemeEnum.psk
-    identity: Optional[str] = None  # for scheme=psk
+    identity: str | None = None  # for scheme=psk
 
 
 class Oauth2SecurityScheme(BaseSecurityScheme):
     """See https://www.w3.org/TR/wot-thing-description11/#oauth2securityscheme."""
 
     scheme: Literal[SecuritySchemeEnum.oauth2] = SecuritySchemeEnum.oauth2
-    authorization: Optional[AnyUri] = None  # for scheme=bearer,oauth2
-    token: Optional[AnyUri] = None  # for schema=oauth2
-    refresh: Optional[AnyUri] = None  # for scheme=oauth2
-    scopes: Optional[Union[List[str], str]] = None  # oauth2
-    flow: Optional[Flow] = None  # for scheme=oauth2
+    authorization: AnyUri | None = None  # for scheme=bearer,oauth2
+    token: AnyUri | None = None  # for schema=oauth2
+    refresh: AnyUri | None = None  # for scheme=oauth2
+    scopes: list[str] | str | None = None  # oauth2
+    flow: Flow | None = None  # for scheme=oauth2
 
 
 SecurityScheme = Union[
@@ -431,24 +429,24 @@ class WotTdSchema16October2019(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    id: Optional[AnyUrl] = None
+    id: AnyUrl | None = None
     title: Title
-    titles: Optional[Titles] = None
-    properties: Optional[Dict[str, PropertyAffordance]] = None
-    actions: Optional[Dict[str, ActionAffordance]] = None
-    events: Optional[Dict[str, EventAffordance]] = None
-    description: Optional[Description] = None
-    descriptions: Optional[Descriptions] = None
-    version: Optional[Version] = None
+    titles: Titles | None = None
+    properties: dict[str, PropertyAffordance] | None = None
+    actions: dict[str, ActionAffordance] | None = None
+    events: dict[str, EventAffordance] | None = None
+    description: Description | None = None
+    descriptions: Descriptions | None = None
+    version: Version | None = None
     links: Links = None
-    forms: Optional[List[Form[RootOp]]] = Field(None, min_length=1)
-    base: Optional[URLFor | AnyUri] = None
-    securityDefinitions: Dict[str, SecurityScheme]
-    support: Optional[AnyUri] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
-    security: Union[str, List[str]]
-    field_type: Optional[TypeDeclaration] = Field(None, alias="@type")
+    forms: list[Form[RootOp]] | None = Field(None, min_length=1)
+    base: URLFor | AnyUri | None = None
+    securityDefinitions: dict[str, SecurityScheme]
+    support: AnyUri | None = None
+    created: datetime | None = None
+    modified: datetime | None = None
+    security: str | list[str]
+    field_type: TypeDeclaration | None = Field(None, alias="@type")
     field_context: ThingContext = Field(
         THING_CONTEXT_URL,
         alias="@context",

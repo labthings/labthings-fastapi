@@ -23,7 +23,7 @@ Complex numbers are currently not supported, again this is left for the future.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, List, Union
+from typing import Annotated, Any, TypeAlias
 
 import numpy as np
 from pydantic import (
@@ -35,22 +35,21 @@ from pydantic import (
     WithJsonSchema,
     WrapSerializer,
 )
-from typing_extensions import TypeAlias
 
 # Define a nested list of floats with 0-6 dimensions
 # This would be most elegantly defined as a recursive type
 # but the below gets the job done for now.
-Number: TypeAlias = Union[int, float]
-NestedListOfNumbers: TypeAlias = Union[
-    Number,
-    List[Number],
-    List[List[Number]],
-    List[List[List[Number]]],
-    List[List[List[List[Number]]]],
-    List[List[List[List[List[Number]]]]],
-    List[List[List[List[List[List[Number]]]]]],
-    List[List[List[List[List[List[List]]]]]],
-]
+Number: TypeAlias = int | float
+NestedListOfNumbers: TypeAlias = (
+    Number
+    | list[Number]
+    | list[list[Number]]
+    | list[list[list[Number]]]
+    | list[list[list[list[Number]]]]
+    | list[list[list[list[list[Number]]]]]
+    | list[list[list[list[list[list[Number]]]]]]
+    | list[list[list[list[list[list[list]]]]]]
+)
 
 
 class NestedListOfNumbersModel(RootModel):
@@ -75,7 +74,7 @@ def np_to_listoflists(arr: np.ndarray) -> NestedListOfNumbers:
     return arr.tolist()
 
 
-def listoflists_to_np(lol: Union[NestedListOfNumbers, np.ndarray]) -> np.ndarray:
+def listoflists_to_np(lol: NestedListOfNumbers | np.ndarray) -> np.ndarray:
     """Convert a list of lists to a numpy array (or pass-through ndarrays).
 
     :param lol: a nested list of numbers.

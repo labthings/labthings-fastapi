@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from types import FunctionType
-from typing import Any, Dict, Generic, Iterable, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from fastapi import Response
 from pydantic import (
@@ -267,7 +267,7 @@ def serialise_from_user_code(
         raise InvalidReturnValueError(msg) from exc
 
 
-def model_to_dict(model: Optional[BaseModel]) -> Dict[str, Any]:
+def model_to_dict(model: BaseModel | None) -> dict[str, Any]:
     """Convert a pydantic model to a dictionary, non-recursively.
 
     We convert only the top level model, i.e. we do not recurse into submodels.

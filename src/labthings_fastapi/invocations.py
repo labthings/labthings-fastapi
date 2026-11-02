@@ -8,9 +8,10 @@ from __future__ import annotations
 import logging
 import traceback
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generic, Optional, Sequence, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -51,8 +52,8 @@ class LogRecordModel(BaseModel):
     created: datetime
 
     # Optional exception info
-    exception_type: Optional[str] = None
-    traceback: Optional[str] = None
+    exception_type: str | None = None
+    traceback: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -99,9 +100,9 @@ class InvocationSummary(BaseModel):
     id: uuid.UUID
     action: str
     href: URLFor
-    timeStarted: Optional[datetime]
-    timeRequested: Optional[datetime]
-    timeCompleted: Optional[datetime]
+    timeStarted: datetime | None
+    timeRequested: datetime | None
+    timeCompleted: datetime | None
     links: Links = None
 
 

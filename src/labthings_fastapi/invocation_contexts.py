@@ -15,11 +15,11 @@ the current invocation ID.
 """
 
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Event, Thread
-from typing import Any, Callable, Self
+from typing import Any, Self
 from uuid import UUID, uuid4
 from weakref import WeakValueDictionary
 
@@ -59,7 +59,7 @@ def get_invocation_id() -> UUID:
 
 
 @contextmanager
-def set_invocation_id(id: UUID) -> Iterator[None]:
+def set_invocation_id(id: UUID) -> Generator[None, None, None]:
     """Set the invocation ID associated with the current context.
 
     This is the preferred way to create a new invocation context. As well
@@ -79,7 +79,7 @@ def set_invocation_id(id: UUID) -> Iterator[None]:
 
 
 @contextmanager
-def fake_invocation_context() -> Iterator[UUID]:
+def fake_invocation_context() -> Generator[UUID, None, None]:
     """Set a dummy invocation ID for a block of code.
 
     This function should be used in a ``with:`` block.

@@ -88,13 +88,12 @@ import os
 import re
 import shutil
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from tempfile import TemporaryDirectory
 from typing import (
     Any,
     ClassVar,
     Literal,
-    Mapping,
     Self,
 )
 from weakref import WeakValueDictionary
@@ -257,7 +256,7 @@ class LocalBlobData(BlobData):
     See `.BlobBytes` or `.BlobFile` for concrete implementations.
     """
 
-    _all_blobdata: ClassVar[WeakValueDictionary[uuid.UUID, "LocalBlobData"]] = (
+    _all_blobdata: ClassVar[WeakValueDictionary[uuid.UUID, LocalBlobData]] = (
         WeakValueDictionary()
     )
     """A way to retrieve `.LocalBlobData` objects by their ID.
@@ -278,7 +277,7 @@ class LocalBlobData(BlobData):
         self._all_blobdata[self._id] = self
 
     @classmethod
-    def from_id(cls, id: uuid.UUID) -> "LocalBlobData":
+    def from_id(cls, id: uuid.UUID) -> LocalBlobData:
         """Retrieve a `.LocalBlobData` object by its ID.
 
         Note that this does not imply `.LocalBlobData` objects are
@@ -416,11 +415,11 @@ class BlobFile(LocalBlobData):
             attributes. This may be used to stop temporary directories
             from being garbage collected while the `.Blob` exists.
 
-        :raise IOError: if the file specified does not exist.
+        :raise OSError: if the file specified does not exist.
         """
         super().__init__(media_type=media_type)
         if not os.path.exists(file_path):
-            raise IOError("Tried to return a file that doesn't exist.")
+            raise OSError("Tried to return a file that doesn't exist.")
         self._file_path = file_path
         for key, val in kwargs.items():
             setattr(self, key, val)
