@@ -398,6 +398,9 @@ def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
         for _, slot in class_attributes(thing, ThingSlot):
             if not slot.deferred:
                 deps = deps.union(slot._connected_thing_names(thing))
+            # Having a Thing depend on itself makes no sense, so we ignore
+            # self-dependencies.
+            deps.discard(name)
         dependencies[name] = deps
 
     # We add Things to the list iteratively, when they are able to be added.

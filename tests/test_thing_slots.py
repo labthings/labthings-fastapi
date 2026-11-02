@@ -93,6 +93,16 @@ class ThingWithCircularDependency(ThingThatTracksStartup):
     other_thing: ThingWithDependency = lt.thing_slot(deferred=False)
 
 
+class ThingThatDependsOnEverything(ThingThatTracksStartup):
+    """A Thing that depends on all other Things.
+
+    It's not a great idea to do this in practice, because only one
+    Thing can demand to be started last...
+    """
+
+    all_other_things: Mapping[str, lt.Thing] = lt.thing_slot(deferred=False)
+
+
 class Dummy:
     """A dummy thing-like class."""
 
@@ -567,3 +577,18 @@ def test_circular_startup_dependency():
     )
     with pytest.raises(ThingSlotCircularDependencyError):
         _determine_startup_order(things)
+
+
+def test_all_startup_dependency():
+    """Check the error for a dependency on all Things with start_first==True"""
+    things = connected_things(
+        {
+            "a": ThingThatDependsOnEverything,
+            "b": ThingThree,
+            "c": ThingThree,
+        }
+    )
+    # Self-dependencies are ignored, so this should work
+    order = _determine_startup_order(things)
+    # The ThingThatDependsOnEverthing should start last
+    assert order[-1] == "a"
