@@ -394,7 +394,7 @@ def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
     """
     dependencies: dict[str, set[str]] = {}
     for name, thing in things.items():
-        deps = set()
+        deps: set[str] = set()
         for _, slot in class_attributes(thing, ThingSlot):
             if not slot.deferred:
                 deps = deps.union(slot._connected_thing_names(thing))
