@@ -975,7 +975,9 @@ class ActionDescriptor(
             responses[200]["model"] = self.output_model
             pass
         except AttributeError:
-            print(f"Failed to generate response model for action {self.name}")
+            thing.logger.warning(
+                f"Failed to generate response model for action {self.name}"
+            )
         # Add an additional media type if we may return a file
         if hasattr(self.output_model, "media_type"):
             responses[200]["content"][self.output_model.media_type] = {}

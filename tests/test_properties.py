@@ -55,7 +55,7 @@ class PropertyTestThing(lt.Thing):
 
     floatprop_with_description: float = lt.property(default=0)
     """A float data property with a description.
-    
+
     The description is the body of the docstring.
     """
 

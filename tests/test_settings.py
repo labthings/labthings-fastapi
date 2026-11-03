@@ -47,7 +47,7 @@ class ThingWithSettings(lt.Thing):
 
     tuplesetting: tuple[int, int] = lt.setting(default=(1, 2))
     """A tuple setting that specifies component types.
-    
+
     This is a "subscripted generic" and so has a tendency to break `isinstance` tests.
     """
 

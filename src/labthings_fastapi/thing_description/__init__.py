@@ -279,7 +279,7 @@ def type_to_dataschema(t: type, **kwargs: Any) -> DataSchema:
     try:
         return DataSchema(**schema_dict)
     except ValidationError as ve:
-        print(
+        ve.add_note(
             "Error while constructing DataSchema from the "
             "following dictionary:\n"
             + json.dumps(schema_dict, indent=2)
