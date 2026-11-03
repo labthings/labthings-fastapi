@@ -31,6 +31,7 @@ from labthings_fastapi.exceptions import (
     NotConnectedToServerError,
     PropertyRedefinitionError,
 )
+from labthings_fastapi.message_broker import Message
 from labthings_fastapi.properties import (
     BaseProperty,
     DataProperty,
@@ -706,6 +707,53 @@ def test_reading_default_and_factory():
     assert Example.prop_df.default == 42
     assert Example.prop_df.default_factory is not None
     assert Example.prop_df.default_factory() == 42
+
+
+def test_notifications(mocker):
+    """Test property change notifications are sent at the appropriate time."""
+
+    class Example(lt.Thing):
+        dataprop: int = lt.property(default=0)
+
+        @lt.property
+        def funcprop(self) -> int:
+            return 42
+
+        @funcprop.setter
+        def _set_funcprop(self, val: int) -> None:
+            pass
+
+        funcprop.observable = True
+
+    example = create_thing_without_server(Example)
+    publish = mocker.spy(example._thing_server_interface, "publish")
+
+    # Check that writing to a data property publishes a message
+    example.dataprop = 42
+    assert publish.call_count == 1
+    message = publish.call_args.args[0]
+    assert isinstance(message, Message)
+    assert message.thing == example.name
+    assert message.affordance == "dataprop"
+    assert message.payload == 42
+
+    # Check that explicitly publishing a data property duplicates the message
+    example.properties["dataprop"].publish()
+    assert publish.call_count == 2
+    message2 = publish.call_args.args[0]
+    assert message2 == message
+
+    # Writing to a functional property, even an observable one, does not publish
+    example.funcprop = 0
+    assert publish.call_count == 2
+
+    # Functional properties may be published explicitly
+    example.properties["funcprop"].publish()
+    assert publish.call_count == 3
+    message = publish.call_args.args[0]
+    assert message.thing == example.name
+    assert message.affordance == "funcprop"
+    assert message.payload == 42
 
 
 def test_bad_reset_decorator():
