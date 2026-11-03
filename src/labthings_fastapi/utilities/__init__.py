@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from types import FunctionType
-from typing import Any, Dict, Generic, Iterable, Optional, TypeVar
+from typing import Any, Dict, Generic, Iterable, Optional, TypeVar, overload
 
 from fastapi import Response
 from pydantic import (
@@ -34,9 +34,19 @@ __all__ = [
 AttrT = TypeVar("AttrT")
 
 
+@overload
+def class_attributes(obj: Any) -> Iterable[tuple[str, Any]]: ...
+
+
+@overload
 def class_attributes(
-    obj: Any, filter_type: type[AttrT] = object
-) -> Iterable[tuple[str, AttrT]]:
+    obj: Any, filter_type: type[AttrT]
+) -> Iterable[tuple[str, AttrT]]: ...
+
+
+def class_attributes(
+    obj: Any, filter_type: type[AttrT] | None = None
+) -> Iterable[tuple[str, AttrT]] | Iterable[tuple[str, Any]]:
     """List all the attributes of an object's class.
 
     This function gets all class attributes, including inherited ones.
@@ -59,7 +69,7 @@ def class_attributes(
         if name.startswith("__"):
             continue
         value = getattr(cls, name)
-        if isinstance(value, filter_type):
+        if filter_type is None or isinstance(value, filter_type):
             yield name, value
 
 
