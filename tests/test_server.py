@@ -5,6 +5,7 @@ be helpful to have some more bottom-up unit testing in this file.
 """
 
 import pytest
+from anyio.from_thread import BlockingPortal
 from starlette.routing import Route
 
 import labthings_fastapi as lt
@@ -232,3 +233,38 @@ def test_server_init():
     # Invalid configuration raises a TypeError, with upgrade message
     with pytest.raises(TypeError, match="from_things"):
         lt.ThingServer(config_dict["things"])
+
+
+@pytest.fixture
+def server_with_mock_thing(mocker):
+    """A ThingServer with a mocked Thing.
+
+    The server is set up with no things, then we add the thing
+    in manually.
+    """
+    dummy_thing = mocker.AsyncMock(spec=lt.Thing)
+    server = lt.ThingServer.from_things({})
+    server._things = {"thing": dummy_thing}
+    server._startup_order = ("thing",)
+    print(set(server._things.keys()))
+    print(set(server._startup_order))
+    return server
+
+
+async def test_thingserver_lifespan(mocker, server_with_mock_thing):
+    """Check the lifespan function."""
+    server = server_with_mock_thing
+    thing = server._things["thing"]
+    async with server.lifespan(mocker.Mock()):
+        assert isinstance(server.blocking_portal, BlockingPortal)
+        assert thing.__aenter__.call_count == 1
+    assert thing.__aenter__.call_count == 1
+
+
+async def test_startup_order_mismatch(mocker, server_with_mock_thing):
+    """Check the lifespan function errors if _startup_order is wrong."""
+    server = server_with_mock_thing
+    server._startup_order = tuple[str]()
+    with pytest.RaisesGroup(RuntimeError):
+        async with server.lifespan(mocker.Mock()):
+            pass
