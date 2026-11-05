@@ -12,6 +12,7 @@ from labthings_fastapi.exceptions import (
 )
 from labthings_fastapi.testing import (
     MockThingServerInterface,
+    mock_thing_instance,
 )
 from labthings_fastapi.thing_slots import ThingSlot, _determine_startup_order
 from labthings_fastapi.utilities import class_attributes
@@ -364,6 +365,25 @@ def test_referenceerror():
     gc.collect()
     with pytest.raises(ReferenceError):
         _ = obj.single_no_default
+
+
+def test_connected_thing_names(mocker):
+    """Check `_connected_thing_names` works for all cases."""
+    host = mock_thing_instance(lt.Thing)
+    other = mock_thing_instance(lt.Thing)
+    slot = mocker.Mock()
+    # Case 1: the slot is empty (and has been connected)
+    slot.instance_get.return_value = None
+    assert ThingSlot._connected_thing_names(slot, host) == set()
+    # Case 2: the slot is an empty mapping
+    slot.instance_get.return_value = {}
+    assert ThingSlot._connected_thing_names(slot, host) == set()
+    # Case 3: the slot is connected to a single Thing
+    slot.instance_get.return_value = other
+    assert ThingSlot._connected_thing_names(slot, host) == {other.name}
+    # Case 3: a mapping slot is connected to a single Thing
+    slot.instance_get.return_value = {other.name: other}
+    assert ThingSlot._connected_thing_names(slot, host) == {other.name}
 
 
 # The tests below use real Things and a real ThingServer to do more
