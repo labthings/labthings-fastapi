@@ -545,6 +545,33 @@ def test_readonly_metadata():
         assert td.properties[name].readOnly is True
 
 
+def test_observable_metadata():
+    """Check the observable flag propagates to the Thing Description."""
+
+    class Example(lt.Thing):
+        prop: int = lt.property(default=0)
+
+        @lt.property
+        def funcprop(self) -> int:
+            return 42
+
+        @lt.property
+        def observable_funcprop(self) -> int:
+            return 42
+
+        observable_funcprop.observable = True
+
+    example = create_thing_without_server(Example)
+
+    td = example.thing_description()
+    assert td.properties is not None  # This is mostly for type checking
+
+    # Data properties are observable by default, functional properties are not.
+    assert td.properties["prop"].observable is True
+    assert td.properties["funcprop"].observable is False
+    assert td.properties["observable_funcprop"].observable is True
+
+
 @dataclass
 class PropertyDefaultInfo:
     name: str
