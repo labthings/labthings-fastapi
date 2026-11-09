@@ -38,7 +38,7 @@ jobs:
     # If that job didn't find a feature branch, it will be an empty string
     # so this job won't run.
     needs: analyse-pr-description
-    if: needs.analyse-pr-description.outputs.feature-branch != ''
+    if: needs.analyse-pr-description.outputs.skip-ofm-flag == '' || needs.analyse-pr-description.outputs.skip-ofm-flag == ''
     runs-on: ubuntu-latest
     defaults:
       run:
