@@ -346,10 +346,10 @@ class ThingSlot(
         The return statements here consequently have their types ignored.
 
         """
-        msg = f"{self.name} has not been connected to a Thing yet."
         try:
             val = self._things[obj]
         except KeyError as e:
+            msg = f"{self.name} has not been connected to a Thing yet."
             raise ThingNotConnectedError(msg) from e
         if isinstance(val, ReferenceType):
             thing = val()

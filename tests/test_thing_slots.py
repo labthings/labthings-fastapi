@@ -2,16 +2,20 @@
 
 import gc
 from collections.abc import Mapping
+from weakref import WeakValueDictionary, ref
 
 import pytest
 
 import labthings_fastapi as lt
 from labthings_fastapi.exceptions import (
+    ThingNotConnectedError,
     ThingSlotCircularDependencyError,
     ThingSlotError,
 )
 from labthings_fastapi.testing import (
     MockThingServerInterface,
+    mock_set_name,
+    mock_thing_instance,
 )
 from labthings_fastapi.thing_slots import ThingSlot, _determine_startup_order
 from labthings_fastapi.utilities import class_attributes
@@ -182,7 +186,10 @@ DEFAULTS = ["no_default", "default_none", "default_str", "default_seq"]
 @pytest.mark.parametrize("conn_type", CONN_TYPES)
 @pytest.mark.parametrize("default", DEFAULTS)
 def test_type_analysis(conn_type, default):
-    """Check the type of things and thing connections is correctly determined."""
+    """Check the type of things and thing connections is correctly determined.
+
+    This targets `ThingSlot.is_mapping` and `ThingSlot.is_optional`.
+    """
     attr = getattr(ThingWithManyConnections, f"{conn_type}_{default}")
 
     # All the attributes use the same type of Thing, Dummy1
@@ -200,6 +207,26 @@ def test_type_analysis_strings(conn_type):
     assert attr.thing_type == (DummyFromTheFuture,)
     assert attr.is_optional is (conn_type == "optional")
     assert attr.is_mapping is (conn_type == "multiple")
+
+
+def test_deferred_default():
+    """Check that the default value of `deferred` is True.
+
+    Note: startup ordering (which uses `deferred`) is tested later.
+    """
+    slot = lt.thing_slot()
+    assert slot.deferred
+    slot = ThingSlot()
+    assert slot.deferred
+    # The Thing definition below doesn't specify `deferred`
+    assert ThingWithoutDependency.other_thing.deferred is True
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_deferred_remembered(value):
+    """Check that the descriptor remembers `deferred`."""
+    slot = lt.thing_slot(deferred=value)
+    assert slot.deferred is value
 
 
 def test_pick_things(mixed_things):
@@ -366,6 +393,67 @@ def test_referenceerror():
         _ = obj.single_no_default
 
 
+def test_instance_get_and_connected_thing_names_single():
+    """Check that instance_get and connected_thing_names work as expected.
+
+    There are three cases that matter:
+    * Slot not connected yet
+    * Slot is empty (`connect` called but no Thing was connected)
+    * Slot has one Thing in it
+
+    These need to be checked for both mapping and single slots. This test
+    deals with single slots, mappings are in the next test.
+
+    Much of this is re-tested later on. This test is fairly well isolated
+    from the rest of the codebase, and the later tests are less isolated.
+    """
+    host = mock_thing_instance(spec=lt.Thing, name="host")
+    other = mock_thing_instance(spec=lt.Thing, name="other")
+
+    slot = ThingSlot()
+    mock_set_name(slot, "lt.Thing", "slot")
+    # Case 1: slot has not been connected yet
+    with pytest.raises(ThingNotConnectedError):
+        slot.instance_get(host)
+    # Case 2: slot has been connected, but is empty
+    slot._things[host] = None
+    assert slot.__get__(host) is None
+    assert slot.instance_get(host) is None
+    assert slot._connected_thing_names(host) == set()
+    # Case 3: slot has been connected to one Thing
+    slot._things[host] = ref(other)
+    assert slot.__get__(host) is other
+    assert slot.instance_get(host) is other
+    assert slot._connected_thing_names(host) == {"other"}
+
+
+def test_instance_get_and_connected_thing_names_mapping():
+    """Check that instance_get and connected_thing_names work as expected.
+
+    This test is the same as the previous one, but using a slot
+    that can take multiple things. It was easier to duplicate
+    than to parametrize.
+    """
+    host = mock_thing_instance(spec=lt.Thing, name="host")
+    other = mock_thing_instance(spec=lt.Thing, name="other")
+
+    slot = ThingSlot()
+    mock_set_name(slot, "Mapping[str, lt.Thing]", "slot")
+    # Case 1: slot has not been connected yet
+    with pytest.raises(ThingNotConnectedError):
+        slot.instance_get(host)
+    # Case 2: slot has been connected, but is empty
+    slot._things[host] = WeakValueDictionary()
+    assert slot.__get__(host) == {}
+    assert slot.instance_get(host) == {}
+    assert slot._connected_thing_names(host) == set()
+    # Case 3: slot has been connected to one Thing
+    slot._things[host][other.name] = other
+    assert slot.__get__(host) == {"other": other}
+    assert slot.instance_get(host) == {"other": other}
+    assert slot._connected_thing_names(host) == {"other"}
+
+
 # The tests below use real Things and a real ThingServer to do more
 # realistic tests. These are not as exhaustive as the tests above,
 # but I think there's no harm in taking both approaches.
@@ -511,16 +599,6 @@ def test_mapping_and_multiple():
         assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
         assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}
-
-
-def test_deferred_default():
-    """Check that the default value of `deferred` is True."""
-    slot = lt.thing_slot()
-    assert slot.deferred
-    slot = ThingSlot()
-    assert slot.deferred
-    # The Thing definition below doesn't specify `deferred`
-    assert ThingWithoutDependency.other_thing.deferred is True
 
 
 def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:
