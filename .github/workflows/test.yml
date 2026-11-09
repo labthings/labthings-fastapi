@@ -3,6 +3,11 @@ name: Test
 on:
   - pull_request
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
 jobs:
   pip_audit:
     runs-on: ubuntu-latest
@@ -106,22 +111,41 @@ jobs:
   coverage:
     needs: [test]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      checks: write
     steps:
       - uses: actions/checkout@v4  # Needed to generate the PR diff
+
       - name: Download code coverage report
         uses: actions/download-artifact@v8
         with:
           name: coverage-3.12
+
       - name: Report Diff Coverage
         uses: Affanmir/diff-cover-action@v2
         with:
           compare-branch: origin/main
           coverage-files: coverage.xml
           fail-under: '100'
+
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Update Coverage Badge
+        # Only run this on the main branch so PRs don't overwrite the main badge
+        if: github.ref == 'refs/heads/main'
+        uses: Schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 936bcec8e1815a49d1e7f947924ffa3f
+          filename: labthings-fastapi-coverage.json
+          label: coverage
+          message: ${{ steps.get-coverage.outputs.coverage }}%
+          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          maxColorRange: 90
+          minColorRange: 50
+
 
   test-against-ofm-v3:
     runs-on: ubuntu-latest
