@@ -126,6 +126,8 @@ class Thing:
         # the file with default values).
         self._disable_saving_settings: bool = True
         self._pointless: bool = True
+        if False:
+            self._pointless = False
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         r"""Validate the class settings.
