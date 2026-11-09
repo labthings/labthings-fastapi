@@ -115,12 +115,11 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: coverage-3.12
-      - uses: 5monkeys/cobertura-action@master
+      - name: Report Diff Coverage
+        uses: Affanmir/diff-cover-action@v2
         with:
-          path: coverage.xml
-          minimum_coverage: 100
-          fail_below_threshold: true
-          only_changed_files: true
+          coverage-files: coverage.xml
+          fail-under: '100'
 
   test-against-ofm-v3:
     runs-on: ubuntu-latest
