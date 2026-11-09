@@ -111,6 +111,7 @@ jobs:
       pull-requests: write
       checks: write
     steps:
+      - uses: actions/checkout@v4  # Needed to generate the PR diff
       - name: Download code coverage report
         uses: actions/download-artifact@v8
         with:
@@ -118,6 +119,7 @@ jobs:
       - name: Report Diff Coverage
         uses: Affanmir/diff-cover-action@v2
         with:
+          compare-branch: origin/main
           coverage-files: coverage.xml
           fail-under: '100'
 
