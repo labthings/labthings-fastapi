@@ -129,6 +129,10 @@ class Thing:
         if False:
             self._pointless = False
 
+    def extra_method(self) -> None:
+        """Run a pointless extra method."""
+        pass
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         r"""Validate the class settings.
 
