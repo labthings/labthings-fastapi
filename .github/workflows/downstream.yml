@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       feature-branch: ${{ steps.feature-branch-match.outputs.group1 }}
-      skip-ofm-flag: ${{ steps.skip-ofm-match.outputs.match }}
+      skip-ofm-flag: ${{ steps.skip-ofm-match.outputs.group1 }}
     steps:
       - name: Check the pull request body for an OFM feature branch
         id: feature-branch-match
@@ -24,7 +24,7 @@ jobs:
         uses: KyoriPowered/action-regex-match@v3
         with:
           text: ${{ github.event.pull_request.body }}
-          regex: '^[ \t]*Skip[ \-_]OFM[ \-_]v3[ \-_]Test'
+          regex: '^[ \t]*(Skip[ \-_]OFM[ \-_]v3[ \-_]Test)'
           flags: 'mi'
 
       - name: Print the recovered branch
