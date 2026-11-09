@@ -1,4 +1,4 @@
-name: Test
+name: Downstream
 
 on:
   - pull_request
