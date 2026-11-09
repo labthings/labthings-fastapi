@@ -68,11 +68,6 @@ artifacts = ["src/*.json", "src/*.jinja"]
 artifacts = ["src/*.json", "src/*.jinja"]
 
 [tool.pytest.ini_options]
-addopts = [
-    "--cov=src",
-    "--cov-report=lcov",
-    "--cov-report=json",
-]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
