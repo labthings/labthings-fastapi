@@ -1,0 +1,122 @@
+name: Test
+
+on:
+  - pull_request
+
+jobs:
+  analyse-pr-description:
+    # This job uses a regex to match the feature branch specified in the
+    # PR description. If there isn't one, it should be an empty string.
+    runs-on: ubuntu-latest
+    outputs:
+      feature-branch: ${{ steps.feature-branch-match.outputs.group1 }}
+      skip-ofm-flag: ${{ steps.skip-ofm-match.outputs.match }}
+    steps:
+      - name: Check the pull request body for an OFM feature branch
+        id: feature-branch-match
+        uses: KyoriPowered/action-regex-match@v3
+        with:
+          text: ${{ github.event.pull_request.body }}
+          regex: '^\s*OFM[ \-_]Feature[ \-_]Branch:\s*([\w\-./]+)'
+          flags: 'mi'
+      - name: Check the pull request body for a skip command
+        id: skip-ofm-match
+        uses: KyoriPowered/action-regex-match@v3
+        with:
+          text: ${{ github.event.pull_request.body }}
+          regex: '^\s*Skip[ \-_]OFM[ \-_]v3[ \-_]Test'
+          flags: 'mi'
+
+      - name: Print the recovered branch
+        run: |
+          echo "Matched string: '${{ steps.feature-branch-match.outputs.match }}'"
+          echo "Matched group: '${{ steps.feature-branch-match.outputs.group1 }}'"
+          echo "Matched skip string: '${{ steps.skip-ofm-match.outputs.match }}'"
+
+  test-against-ofm-v3:
+    # This job uses the feature branch found by `analyse-pr-description`.
+    # If that job didn't find a feature branch, it will be an empty string
+    # so this job won't run.
+    needs: analyse-pr-description
+    if: needs.analyse-pr-description.outputs.feature-branch != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ../openflexure-microscope-server/
+    env:
+      REF: v3
+    steps: &test-against-ofm-steps
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Clone OpenFlexure Microscope Server
+        working-directory: ..  # This step creates the default working directory
+        run: |
+          git clone https://gitlab.com/openflexure/openflexure-microscope-server.git
+      
+      - name: Check out OpenFlexure Microscope Server
+        run: "git checkout $REF"
+      
+      - name: Install OpenFlexure Microscope Server
+        run: "pip install -e ../openflexure-microscope-server/[dev]"
+
+      - name: Install LabThings-FastAPI
+        run: "pip install -e ../labthings-fastapi"
+
+      - name: Print installed packages
+        run: "pip freeze"
+      
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "Sir Unit of Test"
+          git config --global user.email "bogus@email.com"
+      
+      - name: Pull OFM web app
+        run: python ./pull_webapp.py
+      
+      - name: Run OFM unit tests
+        run: pytest
+
+      - name: Run OFM integration tests
+        run: pytest tests/integration_tests
+
+      - name: Run OFM lifecycle test
+        run: tests/lifecycle_test/testfile.py
+      
+      - name: Generate OpenAPI and Thing Description.
+        # Note: we need to move the files into the original
+        # repo directory, so they're found by the next step.
+        run: |
+          mkdir -p ./apidocs/http/
+          python ./generate_http_api_data.py
+          mv apidocs ../labthings-fastapi
+      
+      - name: Upload OpenAPI and Thing Description
+        uses: actions/upload-artifact@v7
+        with:
+          name: api_docs
+          path: |  # Note: this ignores working-directory
+            apidocs/http/openapi.json
+            apidocs/http/thing_descriptions.json
+          if-no-files-found: error
+      
+      - name: Type check with `mypy`
+        run: mypy src
+
+  test-against-ofm-feature-branch:
+    # This job uses the feature branch found by `analyse-pr-description`.
+    # If that job didn't find a feature branch, it will be an empty string
+    # so this job won't run.
+    needs: analyse-pr-description
+    if: needs.analyse-pr-description.outputs.feature-branch != ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: ../openflexure-microscope-server/
+    env:
+      REF: ${{ needs.analyse-pr-description.outputs.feature-branch }}
+    steps: *test-against-ofm-steps
