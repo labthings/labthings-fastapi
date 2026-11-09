@@ -125,13 +125,6 @@ class Thing:
         # they have been loaded from the settings file (which would overwrite
         # the file with default values).
         self._disable_saving_settings: bool = True
-        self._pointless: bool = True
-        if False:
-            self._pointless = False
-
-    def extra_method(self) -> None:
-        """Run a pointless extra method."""
-        pass
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         r"""Validate the class settings.
