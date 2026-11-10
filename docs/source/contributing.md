@@ -113,6 +113,15 @@ All changes to the codebase must go via pull requests. Unless you are a core mai
 * **Unpinned Dependencies:** Note that we have a specific CI job called `test-with-unpinned-dependencies`. It is acceptable to merge code if only this specific job fails, provided the failure is due to upstream dependency issues. We prefer to deal with upstream dependency issues in a separate PR, particularly when the required fixes are distinct from the code in your current PR. The same applies to the `pip-audit` job.
 * Update documentation (`docs/` or docstrings) if your changes modify existing behavior or add new features.
 
+## Use of AI in development
+
+It's permitted to use AI tools when developing contributions to LabThings, but this must be declared. Declaring AI use is a condition of certain funders, and is important when considering copyright/licensing of the code. In this project, we ask that:
+
+* Discourse related to the project (forum posts, issue threads, pull requests) must be written by a human. AI-generated posts may be summarily removed.
+* Use of AI tools must be declared in commit messages for transparency.
+* All AI generated code must be reviewed by the pull request creator before submitting it for review by the development team.
+* Pull requests should include the "AI Contributions" section of our Pull Request template.
+
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
 [GitHub Issues page]: https://github.com/labthings/labthings-fastapi/issues
 [OpenFlexure Forum]: https://openflexure.discourse.group/
