@@ -15,23 +15,32 @@ from pydantic import RootModel
 from labthings_fastapi.types.numpy import Base64NDArrayModel, NDArrayAnnotation
 
 ARRAYS = (
-    [np.arange(0, 255, dtype=d) for d in [np.uint8, np.uint16, np.uint32, np.uint64]]
-    + [np.arange(-100, 100, dtype=d) for d in [np.int8, np.int16, np.int32, np.int64]]
-    + [
+    [  # Unsigned integer types
+        np.arange(0, 255, dtype=d) for d in [np.uint8, np.uint16, np.uint32, np.uint64]
+    ]
+    + [  # Signed integer types
+        np.arange(-100, 100, dtype=d) for d in [np.int8, np.int16, np.int32, np.int64]
+    ]
+    + [  # Floating point types
         3 ** np.arange(-5, 5, dtype=d)
         for d in [np.float16, np.float32, np.float64, np.float128]
     ]
-    + [
+    + [  # Complex types
         np.array([0.4 + 0.7j, 35 + 85j, 89, -49j], dtype=d)
         for d in [np.complex64, np.complex128, np.complex256]
     ]
-    + [np.array([False, True, False, True], dtype=np.bool)]
-    + [
+    + [  # Boolean arrays
+        np.array([False, True, False, True], dtype=np.bool)
+    ]
+    + [  # Scalars
         np.array(1000),  # scalar int
         np.array(10.0),  # scalar float
     ]
-    + [
-        np.array([0.0, 1.0, np.inf, -np.inf, np.nan])  # special float values
+    + [  # Non-numeric float values
+        np.array([0.0, 1.0, np.inf, -np.inf, np.nan])
+    ]
+    + [  # Both little- and big-endian arrays
+        np.array([0, -4, 16, 255], dtype=d) for d in ["<i2", ">i2", "<i8", ">i8"]
     ]
 )
 
@@ -48,6 +57,8 @@ UNSUPPORTED_ARRAYS = [
     np.array(["an", "array", "of", "strings"]),
     # Bytes aren't supported
     np.array(b"01234"),
+    # A record array with one record might confuse things
+    np.array([1.0, 2.0], dtype=[("name", "<f8")]),
 ]
 
 
@@ -110,7 +121,7 @@ def test_rootmodel_annotation(array):
 
 
 @pytest.mark.parametrize("array", ARRAYS)
-def test_rootmodel_annotatio_json(array):
+def test_rootmodel_annotation_json(array):
     """Test that the annotated type validates and serialises correctly in JSON."""
 
     class NDArrayRootModel(RootModel):
