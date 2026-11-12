@@ -204,8 +204,11 @@ class Base64NDArrayModel(BaseModel):
     shape: tuple[int, ...]
     """The shape of the array, i.e. the length in each dimension."""
 
-    array_order: Literal["c-contiguous", "fortran-contiguous"]
-    """Whether the array elements are in C or fortran order."""
+    array_order: Literal["c-contiguous"]
+    """Whether the array elements are in C or fortran order.
+
+    Currently only c order is supported.
+    """
 
     data: Base64Bytes
     """The data for the array, Base64 encoded."""
