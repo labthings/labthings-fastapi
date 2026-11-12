@@ -103,6 +103,37 @@ def test_array_unsupported(array):
         Base64NDArrayModel.from_array(array)
 
 
+def test_descr_mismatch():
+    """Check the error that occurs when `dtype.descr` doesn't match.
+
+    This is an error I don't ever expect in reality. We already check
+    the relevant properties of an array's datatype, and raise an
+    error if it's not supported (see previous test).
+
+    As a belt-and-braces check, we generate the `numpy.dtype.descr`
+    value we'd expect given the datatype, element size, and endianness
+    that we have recorded, and check our array has the expected
+    value.
+
+    This `numpy`-specific string is what gets recorded in a ``npz`` file
+    to allow the data to be reinflated, so it's a very good check that
+    we have correctly recorded the array's parameters.
+
+    Any array that's not properly supported will fail before we check
+    ``descr`` so this test mocks the property to trigger the error.
+    """
+
+    class ArrayModelWithBrokenDescr(Base64NDArrayModel):
+        """This feels simpler and clearer than mocking the class."""
+
+        @property
+        def _descr(self) -> list[tuple[str, str]]:
+            return [("", "!!!")]
+
+    with pytest.raises(ValueError, match="dtype.descr"):
+        ArrayModelWithBrokenDescr.from_array(np.array([1, 2, 3]))
+
+
 @pytest.mark.parametrize("array", ARRAYS)
 def test_rootmodel_annotation(array):
     """Test that the annotated type validates and serialises correctly in Python."""
