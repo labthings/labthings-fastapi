@@ -18,6 +18,7 @@ from typing import (
 )
 from unittest.mock import Mock
 
+from labthings_fastapi.base_descriptor import BaseDescriptor
 from labthings_fastapi.global_lock import GlobalLock
 from labthings_fastapi.message_broker import Message
 from labthings_fastapi.middleware.url_for import dummy_url_for, set_url_for_context
@@ -224,7 +225,9 @@ def create_thing_without_server(
     return thing
 
 
-def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
+def mock_thing_instance(
+    spec: type[ThingSubclass], name: str | None = None
+) -> ThingSubclass:
     """Create a mock Thing instance, with some important attributes.
 
     This provides ``__name__``, ``__module__``, and ``_thing_server_interface``
@@ -233,11 +236,12 @@ def mock_thing_instance(spec: type[ThingSubclass]) -> ThingSubclass:
 
     :param spec: the Thing subclass we're mocking an instance of. Pass
         `lt.Thing` if it doesn't matter.
+    :param name: the name of the Thing. Defaults to ``spec.__name__`` in lower case.
     :return: a Mock instance that pretends to be an instance of `spec`.
     """
     mock = Mock(spec=spec)
     mock.__name__ = "Mock{spec.__name__}"
-    mock.name = mock.__name__.lower()
+    mock.name = name or mock.__name__.lower()
     mock.__module__ = "mock_module"
     mock._thing_server_interface = MockThingServerInterface(mock.name, mock.__name__)
     return mock
@@ -330,3 +334,25 @@ def manually_connect_thing_slot(
         things = {t.name: t for t in target}
     slot = getattr(host.__class__, slot_name)
     slot.connect(host, target=names, things=things)
+
+
+def mock_set_name(
+    descriptor: BaseDescriptor, annotation: str | None = None, name: str = "attr"
+) -> None:
+    """Mock Python's behaviour calling `__set_name__` after class definition.
+
+    This function should allow descriptor instances to function without having
+    to include them in a class definition.
+
+    :param descriptor: the descriptor we're pretending to add as a class attribute.
+    :param annotation: a string annotation on the attribute.
+    :param name: the name of the attribute.
+    """
+
+    class MockThing:
+        pass
+
+    if annotation:
+        MockThing.__annotations__[name] = annotation
+
+    descriptor.__set_name__(MockThing, name)

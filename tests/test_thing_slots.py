@@ -2,11 +2,23 @@
 
 import gc
 from collections.abc import Mapping
+from weakref import WeakValueDictionary, ref
 
 import pytest
 
 import labthings_fastapi as lt
-from labthings_fastapi.exceptions import ThingSlotError
+from labthings_fastapi.exceptions import (
+    ThingNotConnectedError,
+    ThingSlotCircularDependencyError,
+    ThingSlotError,
+)
+from labthings_fastapi.testing import (
+    MockThingServerInterface,
+    mock_set_name,
+    mock_thing_instance,
+)
+from labthings_fastapi.thing_slots import ThingSlot, _determine_startup_order
+from labthings_fastapi.utilities import class_attributes
 
 
 class ThingOne(lt.Thing):
@@ -32,13 +44,67 @@ class ThingN(lt.Thing):
 class ThingThree(lt.Thing):
     """A Thing that has no other attributes."""
 
-    pass
+    started = False
+
+    def __enter__(self):
+        self.started = True
+
+    def __exit__(self, *args, **kwargs):
+        pass
 
 
 class ThingThatMustBeConfigured(lt.Thing):
     """A Thing that has a default that won't work."""
 
     other_thing: lt.Thing = lt.thing_slot(None)
+
+
+class ThingThatTracksStartup(lt.Thing):
+    """A Thing that sets a flag when it starts."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.started = False
+
+    def __enter__(self):
+        self.started = True
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+
+class ThingWithDependency(ThingThatTracksStartup):
+    r"""A Thing that relies on a connected Thing during ``__enter__``\ ."""
+
+    other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot(
+        deferred=False
+    )
+
+    def __enter__(self):
+        assert self.other_thing.started
+        super().__enter__()
+
+
+class ThingWithoutDependency(ThingThatTracksStartup):
+    """A Thing with a slot that has deferred=True (default)."""
+
+    other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot()
+
+
+class ThingWithCircularDependency(ThingThatTracksStartup):
+    """A Thing that will cause a dependency cycle."""
+
+    other_thing: ThingWithDependency = lt.thing_slot(deferred=False)
+
+
+class ThingThatDependsOnEverything(ThingThatTracksStartup):
+    """A Thing that depends on all other Things.
+
+    It's not a great idea to do this in practice, because only one
+    Thing can demand to be started last...
+    """
+
+    all_other_things: Mapping[str, lt.Thing] = lt.thing_slot(deferred=False)
 
 
 class Dummy:
@@ -120,7 +186,10 @@ DEFAULTS = ["no_default", "default_none", "default_str", "default_seq"]
 @pytest.mark.parametrize("conn_type", CONN_TYPES)
 @pytest.mark.parametrize("default", DEFAULTS)
 def test_type_analysis(conn_type, default):
-    """Check the type of things and thing connections is correctly determined."""
+    """Check the type of things and thing connections is correctly determined.
+
+    This targets `ThingSlot.is_mapping` and `ThingSlot.is_optional`.
+    """
     attr = getattr(ThingWithManyConnections, f"{conn_type}_{default}")
 
     # All the attributes use the same type of Thing, Dummy1
@@ -138,6 +207,26 @@ def test_type_analysis_strings(conn_type):
     assert attr.thing_type == (DummyFromTheFuture,)
     assert attr.is_optional is (conn_type == "optional")
     assert attr.is_mapping is (conn_type == "multiple")
+
+
+def test_deferred_default():
+    """Check that the default value of `deferred` is True.
+
+    Note: startup ordering (which uses `deferred`) is tested later.
+    """
+    slot = lt.thing_slot()
+    assert slot.deferred
+    slot = ThingSlot()
+    assert slot.deferred
+    # The Thing definition below doesn't specify `deferred`
+    assert ThingWithoutDependency.other_thing.deferred is True
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_deferred_remembered(value):
+    """Check that the descriptor remembers `deferred`."""
+    slot = lt.thing_slot(deferred=value)
+    assert slot.deferred is value
 
 
 def test_pick_things(mixed_things):
@@ -161,11 +250,11 @@ def test_pick_things(mixed_things):
     # If there are other Things, they should be filtered by type.
     for names1 in [[], ["thing1_a"], ["thing1_a", "thing1_b"]]:
         for names2 in [[], ["thing2_a"], ["thing2_a", "thing2_b"]]:
-            mixed_things = {
+            things = {
                 **dummy_things(names1, Dummy1),
                 **dummy_things(names2, Dummy2),
             }
-            assert picked_names(mixed_things, ...) == set(names1)
+            assert picked_names(things, ...) == set(names1)
 
     # If a string is specified, it works when it exists and it's the right type.
     for target in ["thing1_a", "thing1_b"]:
@@ -302,6 +391,67 @@ def test_referenceerror():
     gc.collect()
     with pytest.raises(ReferenceError):
         _ = obj.single_no_default
+
+
+def test_instance_get_and_connected_thing_names_single():
+    """Check that instance_get and connected_thing_names work as expected.
+
+    There are three cases that matter:
+    * Slot not connected yet
+    * Slot is empty (`connect` called but no Thing was connected)
+    * Slot has one Thing in it
+
+    These need to be checked for both mapping and single slots. This test
+    deals with single slots, mappings are in the next test.
+
+    Much of this is re-tested later on. This test is fairly well isolated
+    from the rest of the codebase, and the later tests are less isolated.
+    """
+    host = mock_thing_instance(spec=lt.Thing, name="host")
+    other = mock_thing_instance(spec=lt.Thing, name="other")
+
+    slot = ThingSlot()
+    mock_set_name(slot, "lt.Thing", "slot")
+    # Case 1: slot has not been connected yet
+    with pytest.raises(ThingNotConnectedError):
+        slot.instance_get(host)
+    # Case 2: slot has been connected, but is empty
+    slot._things[host] = None
+    assert slot.__get__(host) is None
+    assert slot.instance_get(host) is None
+    assert slot._connected_thing_names(host) == set()
+    # Case 3: slot has been connected to one Thing
+    slot._things[host] = ref(other)
+    assert slot.__get__(host) is other
+    assert slot.instance_get(host) is other
+    assert slot._connected_thing_names(host) == {"other"}
+
+
+def test_instance_get_and_connected_thing_names_mapping():
+    """Check that instance_get and connected_thing_names work as expected.
+
+    This test is the same as the previous one, but using a slot
+    that can take multiple things. It was easier to duplicate
+    than to parametrize.
+    """
+    host = mock_thing_instance(spec=lt.Thing, name="host")
+    other = mock_thing_instance(spec=lt.Thing, name="other")
+
+    slot = ThingSlot()
+    mock_set_name(slot, "Mapping[str, lt.Thing]", "slot")
+    # Case 1: slot has not been connected yet
+    with pytest.raises(ThingNotConnectedError):
+        slot.instance_get(host)
+    # Case 2: slot has been connected, but is empty
+    slot._things[host] = WeakValueDictionary()
+    assert slot.__get__(host) == {}
+    assert slot.instance_get(host) == {}
+    assert slot._connected_thing_names(host) == set()
+    # Case 3: slot has been connected to one Thing
+    slot._things[host][other.name] = other
+    assert slot.__get__(host) == {"other": other}
+    assert slot.instance_get(host) == {"other": other}
+    assert slot._connected_thing_names(host) == {"other"}
 
 
 # The tests below use real Things and a real ThingServer to do more
@@ -449,3 +599,74 @@ def test_mapping_and_multiple():
         assert thing_one.optional_thing is not None
         assert thing_one.optional_thing.name == "thing_3"
         assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}
+
+
+def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:
+    """Instantiate and connect a list of Things."""
+    things = {}
+    for k, v in classes.items():
+        tsi = MockThingServerInterface(name=k, class_name=v.__name__)
+        things[k] = v(thing_server_interface=tsi)
+    for thing in things.values():
+        for _, attr in class_attributes(thing, ThingSlot):
+            attr.connect(thing, things, ...)
+    return things
+
+
+THING_CLASSES_AND_ORDERS = [
+    # If there are no constraints, the order doesn't matter
+    ({"a": ThingThree, "b": ThingThree}, {("a", "b"), ("b", "a")}),
+    ({"b": ThingThree, "a": ThingThree}, {("a", "b"), ("b", "a")}),
+    # A thing_slot that doesn't declare `start_first` can have any order
+    ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b"), ("b", "a")}),
+    # If start_first==True, the list order can take only one value
+    ({"a": ThingWithDependency, "b": ThingThree}, {("b", "a")}),
+    # Try with swapped names, just in case something is sorting alphabetically
+    ({"b": ThingWithDependency, "a": ThingThree}, {("a", "b")}),
+]
+
+
+@pytest.mark.parametrize(("thing_classes", "orders"), THING_CLASSES_AND_ORDERS)
+def test_determine_startup_order(thing_classes, orders):
+    """Check the logic to figure out the order in which Things should be started."""
+    things = connected_things(thing_classes)
+    assert _determine_startup_order(things) in orders
+
+
+@pytest.mark.parametrize(("thing_classes", "orders"), THING_CLASSES_AND_ORDERS)
+def test_determine_startup_order_server(thing_classes, orders):
+    """Check the logic to figure out the order in which Things should be started."""
+    server = lt.ThingServer.from_things(thing_classes)
+    assert server._startup_order in orders
+    with server.test_client():
+        # There's an assertion in the relevant Thing's `__enter__` method, and
+        # it sets `started=True`
+        assert server.things["a"].started is True
+        assert server.things["b"].started is True
+
+
+def test_circular_startup_dependency():
+    """Check the error for a circular dependency from slots with start_first==True"""
+    things = connected_things(
+        {
+            "a": ThingWithDependency,
+            "b": ThingWithCircularDependency,
+        }
+    )
+    with pytest.raises(ThingSlotCircularDependencyError):
+        _determine_startup_order(things)
+
+
+def test_all_startup_dependency():
+    """Check the error for a dependency on all Things with start_first==True"""
+    things = connected_things(
+        {
+            "a": ThingThatDependsOnEverything,
+            "b": ThingThree,
+            "c": ThingThree,
+        }
+    )
+    # Self-dependencies are ignored, so this should work
+    order = _determine_startup_order(things)
+    # The ThingThatDependsOnEverthing should start last
+    assert order[-1] == "a"
