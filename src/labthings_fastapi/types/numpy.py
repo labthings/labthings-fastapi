@@ -236,7 +236,9 @@ def byte_order_name(native: bool) -> Literal["little", "big"]:
 
 
 class Base64NDArrayModel(BaseModel):
-    """A Pydantic model for numpy arrays."""
+    """Numeric arrays that can be serialised to JSON."""
+
+    model_config = {"use_attribute_docstrings": True}
 
     element_type: ElementType
     """The datatype of each array element."""
