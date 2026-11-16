@@ -5,12 +5,13 @@ It's intended that the old tests (`../test_numpy_type.py`) will be
 removed once the old types are retired.
 """
 
+import base64
 from datetime import datetime
 from typing import Annotated
 
 import numpy as np
 import pytest
-from pydantic import RootModel
+from pydantic import RootModel, ValidationError
 
 from labthings_fastapi.types.numpy import Base64NDArrayModel, NDArrayAnnotation
 
@@ -101,6 +102,60 @@ def test_array_unsupported(array):
     """Check unsupported arrays give a good exception."""
     with pytest.raises(ValueError, match="not supported"):
         Base64NDArrayModel.from_array(array)
+
+
+@pytest.mark.parametrize(
+    ("input", "msg"),
+    [
+        (  # Booleans must be 1 byte long
+            {
+                "element_type": "bool",
+                "element_length": 2,
+                "byte_order": "little",
+                "array_order": "c-contiguous",
+                "shape": (1,),
+                "data": b"",
+            },
+            "unsupported_length",
+        ),
+        (  # Ints >1 byte must have byte_order
+            {
+                "element_type": "int",
+                "element_length": 2,
+                "array_order": "c-contiguous",
+                "shape": (1,),
+                "data": b"",
+            },
+            "byte_order",
+        ),
+        (  # 3 byte ints are not a thing!
+            {
+                "element_type": "int",
+                "element_length": 3,
+                "byte_order": "little",
+                "array_order": "c-contiguous",
+                "shape": (1,),
+                "data": b"",
+            },
+            "unsupported_length",
+        ),
+        (  # Mismatched length
+            {
+                "element_type": "uint",
+                "element_length": 1,
+                "byte_order": "little",
+                "array_order": "c-contiguous",
+                "shape": (3,),
+                "data": base64.b64encode(b"0000"),
+            },
+            "length_mismatch",
+        ),
+    ],
+)
+def test_invalid_json(input, msg):
+    """Test invalid input fails at validation stage, not afterwards."""
+    with pytest.raises(ValidationError, match=msg):
+        Base64NDArrayModel.model_validate(input)
 
 
 def test_descr_mismatch():

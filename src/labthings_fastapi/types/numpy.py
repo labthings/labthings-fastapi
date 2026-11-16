@@ -32,14 +32,17 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
     PlainSerializer,
     PlainValidator,
     RootModel,
     SerializerFunctionWrapHandler,
     WithJsonSchema,
     WrapSerializer,
+    model_validator,
 )
-from pydantic_core import core_schema
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import PydanticCustomError, core_schema
 from typing_extensions import TypeAlias
 
 # Define a nested list of floats with 0-6 dimensions
@@ -177,6 +180,49 @@ KINDS_BY_ELEMENT_TYPE = {etype: kind for kind, etype in ELEMENT_TYPES_BY_KIND.it
 """A mapping from element type names to `numpy.dtype.kind` values."""
 
 
+INT_LENGTHS = (1, 2, 4, 8)
+"""Allowed lengths (in bytes) for integer types."""
+
+
+FLOAT_LENGTHS = (2, 4, 8, np.dtype(np.longdouble).itemsize)
+"""Allowed lengths (in bytes) for floating point types.
+
+Note that the highest-precision type is 12 or 16 bytes depending on
+the platform.
+"""
+
+
+COMPLEX_LENGTHS = (8, 16, np.dtype(np.clongdouble).itemsize)
+"""Allowed lengths (in bytes) for complex types.
+
+Note that the highest-precision type is 12 or 16 bytes depending on
+the platform.
+"""
+
+
+def _check_length(length: int, allowed: tuple[int, ...], etype: ElementType) -> bool:
+    """Check a datatype length is in the list of allowed lengths.
+
+    :param length: the specified element length.
+    :param allowed: the allowed lengths.
+    :param etype: the element type.
+    :return: `True` if the length is allowed.
+    :raises PydanticCustomError: if the length is not allowed.
+    """
+    if length in allowed:
+        return True
+    raise PydanticCustomError(
+        "unsupported_length",
+        "'element_length' must be in {allowed_lengths} for {element_type} "
+        "but '{element_length}' was specified.",
+        {
+            "element_length": length,
+            "allowed_lengths": allowed,
+            "element_type": etype,
+        },
+    )
+
+
 def byte_order_name(native: bool) -> Literal["little", "big"]:
     """Return the name for a byte order.
 
@@ -198,8 +244,17 @@ class Base64NDArrayModel(BaseModel):
     element_length: int
     """The length of each array element in bytes."""
 
-    byte_order: Literal["little", "big"]
-    """Whether the data is in little-endian or big-endian format."""
+    byte_order: Literal["little", "big"] | None = None
+    """Whether the data is in little-endian or big-endian format.
+
+    Note that order is irrelevant for data types that are only
+    one byte long, i.e. ``element_length==1``. In that case, `None`
+    is the only allowed value, though implementations may decide
+    to ignore this field.
+
+    For data types longer than one byte, ``byte_order`` must always
+    be specified and must be either `"little"` or `"big"`.
+    """
 
     shape: tuple[int, ...]
     """The shape of the array, i.e. the length in each dimension."""
@@ -221,7 +276,7 @@ class Base64NDArrayModel(BaseModel):
     @property
     def _endian_char(self) -> str:
         """A one-character string describing endianness."""
-        if self.element_length == 1:
+        if self.byte_order is None:
             return "|"  # one-byte values have no endianness
         return "<" if self.byte_order == "little" else ">"
 
@@ -233,6 +288,66 @@ class Base64NDArrayModel(BaseModel):
         to match exactly. If it doesn't, we have found an edge case.
         """
         return [("", f"{self._endian_char}{self._kind}{self.element_length}")]
+
+    @model_validator(mode="after")
+    def check_dtype(self) -> Self:
+        """Check that the data type is supported.
+
+        This validator ensures that a byte order is specified for element lengths
+        of more than one byte, and that no byte order is specified for one-byte
+        element types.
+
+        We also check that the element length is valid for the type specified.
+
+        Finally, we construct a `numpy.dtype` object to check that the
+        datatype is supported.
+
+        :return: the array model (with `byte_order` coerced if needed).
+        :raises PydanticCustomError: if the model is not valid.
+        """
+        if self.element_length > 1:
+            if self.byte_order is None:
+                raise PydanticCustomError(
+                    "missing_byte_order",
+                    "'byte_order' must be 'little' or 'big' when element_length > 1.",
+                )
+        else:
+            # For one-byte values, ignore the specified `byte_order`
+            # We could raise a validation error if it's not None, but
+            # coercing feels reasonable.
+            self.byte_order = None
+        if self.element_type == "bool":
+            _check_length(self.element_length, (1,), "bool")
+        elif self.element_type in ("int", "uint"):
+            _check_length(self.element_length, INT_LENGTHS, self.element_type)
+        elif self.element_type == "float":
+            _check_length(self.element_length, FLOAT_LENGTHS, self.element_type)
+        elif self.element_type == "complex":
+            _check_length(self.element_length, COMPLEX_LENGTHS, self.element_type)
+
+        # Finally, check we can construct a `dtype` object. If this fails,
+        # something has gone wrong with the checks above.
+        np.dtype(self._descr)
+
+        return self
+
+    @model_validator(mode="after")
+    def check_size(self) -> Self:
+        """Check that the specified size matches the data.
+
+        :return: the array model, unchanged.
+        :raises PydanticCustomError: if the length of the data is incorrect.
+        """
+        size = self.element_length
+        for dimension in self.shape:
+            size *= dimension
+        if len(self.data) != size:
+            raise PydanticCustomError(
+                "length_mismatch",
+                "The data supplied was {length} bytes but we expected {expected}.",
+                {"length": len(self.data), "expected": size},
+            )
+        return self
 
     @classmethod
     def from_array(cls, array: np.ndarray) -> Self:
@@ -251,7 +366,7 @@ class Base64NDArrayModel(BaseModel):
         _model = cls.model_construct(
             element_type=ELEMENT_TYPES_BY_KIND[dtype.kind],
             element_length=dtype.itemsize,
-            byte_order=byte_order_name(dtype.isnative),
+            byte_order=None if dtype.itemsize == 1 else byte_order_name(dtype.isnative),
             shape=array.shape,
             array_order="c-contiguous",
             data=array.tobytes(order="C"),
@@ -326,21 +441,21 @@ class NDArrayAnnotation:
             ),
         )
 
-    # @classmethod
-    # def __get_pydantic_json_schema__(
-    #     cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
-    # ) -> JsonSchemaValue:
-    #     """Customise the JSON Schema to include the media_type.
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Customise the JSON Schema to include the media_type.
 
-    #     :param core_schema: The core schema.
-    #     :param handler: The pydantic JSON schema handler.
-    #     :return: The JSON schema for the type, with media_type included.
-    #     """
-    #     json_schema = handler(core_schema)
-    #     json_schema = handler.resolve_ref_schema(json_schema)
-    #     # Set the title to the class name, not BlobModel
-    #     json_schema["title"] = "Numeric Array"
-    #     return json_schema
+        :param core_schema: The core schema.
+        :param handler: The pydantic JSON schema handler.
+        :return: The JSON schema for the type, with media_type included.
+        """
+        json_schema = handler(core_schema)
+        json_schema = handler.resolve_ref_schema(json_schema)
+        # Set a nicer title
+        json_schema["title"] = "Numeric Array"
+        return json_schema
 
     @classmethod
     def _validate(
