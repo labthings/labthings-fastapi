@@ -237,10 +237,7 @@ def test_annotation_jsonschema():
         "complex",
     }
     assert schema["properties"]["element_length"]["type"] == "integer"
-    assert schema["properties"]["byte_order"]["anyOf"] == [
-        {"enum": ["little", "big"], "type": "string"},
-        {"type": "null"},
-    ]
+    assert set(schema["properties"]["byte_order"]["enum"]) == {"little", "big", None}
     # We only support c-contiguous arrays. Check that's clear.
     assert schema["properties"]["array_order"]["const"] == "c-contiguous"
     assert schema["properties"]["shape"]["type"] == "array"

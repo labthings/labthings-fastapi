@@ -252,7 +252,7 @@ class Base64NDArrayModel(BaseModel):
     per element.
     """
 
-    byte_order: Literal["little", "big"] | None = None
+    byte_order: Literal["little", "big", None] = None
     """Whether the data is in little-endian or big-endian format.
 
     Note that order is irrelevant for data types that are only
