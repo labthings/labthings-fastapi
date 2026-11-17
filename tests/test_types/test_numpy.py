@@ -73,6 +73,10 @@ FIELDS = {
 }
 
 
+class NDArrayRootModel(RootModel):
+    root: Annotated[np.ndarray, NDArrayAnnotation]
+
+
 @pytest.mark.parametrize("array", ARRAYS)
 def test_array_roundtrip_json(array):
     """Check an array can be serialised and reconstructed from JSON."""
@@ -192,10 +196,6 @@ def test_descr_mismatch():
 @pytest.mark.parametrize("array", ARRAYS)
 def test_rootmodel_annotation(array):
     """Test that the annotated type validates and serialises correctly in Python."""
-
-    class NDArrayRootModel(RootModel):
-        root: Annotated[np.ndarray, NDArrayAnnotation]
-
     model = NDArrayRootModel(array)
     dumped = model.model_dump()
     assert set(dumped.keys()) == FIELDS
@@ -209,10 +209,6 @@ def test_rootmodel_annotation(array):
 @pytest.mark.parametrize("array", ARRAYS)
 def test_rootmodel_annotation_json(array):
     """Test that the annotated type validates and serialises correctly in JSON."""
-
-    class NDArrayRootModel(RootModel):
-        root: Annotated[np.ndarray, NDArrayAnnotation]
-
     model = NDArrayRootModel(array)
     dumped = model.model_dump_json()
     for field in FIELDS:
@@ -222,3 +218,33 @@ def test_rootmodel_annotation_json(array):
     assert array.dtype == reconstructed_array.dtype
     assert array.dtype.descr == reconstructed_array.dtype.descr
     assert np.array_equal(array, reconstructed_array, equal_nan=True)
+
+
+def test_annotation_jsonschema():
+    """Make sure the JSON Schema is as expected."""
+    schema = NDArrayRootModel.model_json_schema()
+    assert schema["title"] == "Numeric Array"  # customised by the annotation
+    assert schema["properties"]["element_type"]["description"] == (
+        # Check that docstrings are correctly pulled through as descriptions
+        "The datatype of each array element."
+    )
+    assert set(schema["properties"]["element_type"]["enum"]) == {
+        # Check the datatype options match what's expected
+        "bool",
+        "int",
+        "uint",
+        "float",
+        "complex",
+    }
+    assert schema["properties"]["element_length"]["type"] == "integer"
+    assert schema["properties"]["byte_order"]["anyOf"] == [
+        {"enum": ["little", "big"], "type": "string"},
+        {"type": "null"},
+    ]
+    # We only support c-contiguous arrays. Check that's clear.
+    assert schema["properties"]["array_order"]["const"] == "c-contiguous"
+    assert schema["properties"]["shape"]["type"] == "array"
+    assert schema["properties"]["shape"]["items"] == {"type": "integer"}
+    assert schema["properties"]["data"]["format"] == "base64"
+    for v in schema["properties"].values():
+        assert len(v["description"]) > 0, "All properties should have a description."
