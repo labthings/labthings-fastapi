@@ -115,12 +115,17 @@ All changes to the codebase must go via pull requests. Unless you are a core mai
 
 ## Use of AI in development
 
-It's permitted to use AI tools when developing contributions to LabThings, but this must be declared. Declaring AI use is a condition of certain funders, and is important when considering copyright/licensing of the code. In this project, we ask that:
+LabThings has a small developer team and all code is reviewed by at least one member of that team before it's merged. If you submit a large merge request, please don't be offended if you are asked to split it up or justify the structure/architecture *before* anyone looks at the code. We can't guarantee to review everything, and you're encouraged to open an issue or draft Pull Request to discuss your plans with the team before asking for review. 
+
+AI tools can generate large amounts of plausible-looking code that have unintended and hard-to-anticipate side effects. This creates a lot of work for reviewers, who must ensure they understand how the new code interacts with the rest of the codebase. While we do have an extensive test suite, this does not substitute for an understanding of the internal architecture of LabThings and how each contribution changes that. Large Pull Requests where AI tools or agents are heavily used are likely to be queried or closed. On any large pull request, the contributor needs to demonstrate that they fully understand the design decisions and architecture used, and how the contributed code interacts with the existing codebase.
+
+All AI generated code in contributions to the LabThings codebase must be declared. Declaring AI use is a condition of certain funders, and is important when considering copyright/licensing of the code. In this project, we ask that:
 
 * Discourse related to the project (forum posts, issue threads, pull requests) must be written by a human. AI-generated posts may be summarily removed.
 * Use of AI tools must be declared in commit messages for transparency.
 * All AI generated code must be reviewed by the pull request creator before submitting it for review by the development team.
 * Pull requests should include the "AI Contributions" section of our Pull Request template.
+* Pull requests should demonstrate that the human making the request fully understands the code and design decisions. If this isn't clear, the code changes may not be reviewed.
 
 [readthedocs]: https://labthings-fastapi.readthedocs.io/
 [GitHub Issues page]: https://github.com/labthings/labthings-fastapi/issues
