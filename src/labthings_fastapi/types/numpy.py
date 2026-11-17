@@ -244,7 +244,13 @@ class Base64NDArrayModel(BaseModel):
     """The datatype of each array element."""
 
     element_length: int
-    """The length of each array element in bytes."""
+    """The length of each array element in bytes.
+
+    Valid lengths are platform-dependent, but usually include
+    1, 2, 4, 8 for integers and 2, 4, 8 and either 12 or 16 for
+    floating point numbers. Boolean arrays always use one byte
+    per element.
+    """
 
     byte_order: Literal["little", "big"] | None = None
     """Whether the data is in little-endian or big-endian format.
@@ -252,7 +258,7 @@ class Base64NDArrayModel(BaseModel):
     Note that order is irrelevant for data types that are only
     one byte long, i.e. ``element_length==1``. In that case, `None`
     is the only allowed value, though implementations may decide
-    to ignore this field.
+    to ignore this field rather than raise an error.
 
     For data types longer than one byte, ``byte_order`` must always
     be specified and must be either `"little"` or `"big"`.
@@ -268,11 +274,19 @@ class Base64NDArrayModel(BaseModel):
     """
 
     data: Base64Bytes
-    """The data for the array, Base64 encoded."""
+    """The data for the array, Base64 encoded.
+
+    When accessing a valid `Base64NDArrayModel` in Python, or when creating
+    one using `model_construct`, this field holds the array's data as a `bytes`
+    object. When constructing the model with `model_validate` or the constructor,
+    the value of ``data`` should be a Base64 encoded `bytes` object.
+
+    The value in a JSON string will always be Base64 encoded.
+    """
 
     @property
     def _kind(self) -> str:
-        """A one-character string describing the element_type."""
+        """A one-character string matching `numpy.dtype.kind`."""
         return KINDS_BY_ELEMENT_TYPE[self.element_type]
 
     @property
@@ -287,7 +301,8 @@ class Base64NDArrayModel(BaseModel):
         """The expected value of `numpy.dtype.descr` for this array.
 
         This property may be compared with `array.dtype.descr` and ought
-        to match exactly. If it doesn't, we have found an edge case.
+        to match exactly. If it doesn't, we have found an edge case and
+        it's likely validation/serialisation will fail.
         """
         return [("", f"{self._endian_char}{self._kind}{self.element_length}")]
 
