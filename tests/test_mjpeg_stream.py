@@ -360,7 +360,7 @@ def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
 
 if __name__ == "__main__":
     """This block allows you to connect manually with a web browser.
-    
+
     That's helpful, because the tests above don't actually stream anything
     as noted in `test_mjpeg_stream_http`.
     """
