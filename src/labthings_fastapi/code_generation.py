@@ -13,6 +13,7 @@ a module to a file, allowing static analysis.
 # `run` is used explaining reasoning on security. That requires us to
 # ignore the S404 code when we import from subprocess.
 import ast
+import keyword
 import re
 import sys
 import tempfile
@@ -25,6 +26,7 @@ from types import EllipsisType, ModuleType, NoneType
 from typing import TYPE_CHECKING, Literal, Sequence
 from uuid import uuid4
 
+from labthings_fastapi.exceptions import IllegalNameError
 from labthings_fastapi.thing_description._model import (
     DataSchema,
     InteractionAffordance,
@@ -86,7 +88,34 @@ def title_to_camel_case(title: str) -> str:
     return snake_to_camel_case(title_to_snake_case(title))
 
 
-def _name(name: str, ctx: Literal["load", "store"] = "load") -> ast.Name:
+def assert_legal_name(name: str, allow_keywords: bool = False) -> None:
+    """Determine whether a string is a legal Python name.
+
+    See https://docs.python.org/3/reference/lexical_analysis.html#names-identifiers-and-keywords
+
+    Note that this doesn't cope with non-ASCII characters yet.
+    That's a conservative design choice that may be changed in the future
+    once we have a better testing regime.
+
+    :param name: the name to test.
+    :param allow_keywords: whether to allow Python keywords as names (by default,
+        keywords raise an error).
+    :raises IllegalNameError: if the name isn't allowed.
+    """
+    if len(name) == 0:
+        raise IllegalNameError("Names can't be empty.")
+    if (not allow_keywords) and keyword.iskeyword(name):
+        raise IllegalNameError(f"'{name}' is a Python keyword.")
+    if name[0] in "0123456789":
+        raise IllegalNameError(f"'{name}' starts with a number.")
+    m = re.match("^[a-zA-Z_][0-9a-zA-Z_]*$", name)
+    if not m:
+        raise IllegalNameError(f"'{name}' contains a character that's not allowed.")
+
+
+def _name(
+    name: str, ctx: Literal["load", "store"] = "load", keyword: bool = False
+) -> ast.Name:
     r"""Generate a Name object (shorthand for `ast.Name`).
 
     Return an `ast.Name` object, with ``id`` set to the ``name``
@@ -98,8 +127,12 @@ def _name(name: str, ctx: Literal["load", "store"] = "load") -> ast.Name:
 
     :param name: the string to be used as a name.
     :param ctx: the context (``"load"`` or ``"store"``).
+    :param keyword: whether the supplied name may be a keyword. By default,
+        an error is raised for keywords. If this is set to `True`, keywords are
+        permitted.
     :return: an `ast.Name` object.
     """
+    assert_legal_name(name, allow_keywords=keyword)
     return ast.Name(id=name, ctx=ast.Store() if ctx == "store" else ast.Load())
 
 
@@ -146,6 +179,7 @@ def _class(name: str, bases: list[ast.expr], body: list[ast.stmt]) -> ast.ClassD
     :param body: the body of the class definition.
     :return: an `ast` class definition.
     """
+    assert_legal_name(name)
     if sys.version_info < (3, 12):
         return ast.ClassDef(
             name=name,
@@ -177,6 +211,7 @@ def _function(
     :param returns: a return type annotation.
     :return: a function definition object.
     """
+    assert_legal_name(name)
     if sys.version_info < (3, 12):
         return ast.FunctionDef(
             name=name,
@@ -208,6 +243,12 @@ def _import_from(module: str, names: list[str]) -> ast.ImportFrom:
     :param names: the names to import
     :return: an `ast.ImportFrom` object.
     """
+    for part in module.split("."):
+        # Module names may contain dots, but each part between dots
+        # must be a legal name.
+        assert_legal_name(part)
+    for n in names:
+        assert_legal_name(n)
     return ast.ImportFrom(
         module=module,
         names=[ast.alias(name=name) for name in names],
@@ -312,7 +353,7 @@ class DataSchemaConverter:
         elif schema.type == Type.boolean:
             return _name("bool")
         elif schema.type == Type.null:
-            return _name("None")
+            return _name("None", keyword=True)
         elif schema.type == Type.array:
             if isinstance(schema.items, Sequence):
                 # The WoT spec is based on JSONSchema 2019

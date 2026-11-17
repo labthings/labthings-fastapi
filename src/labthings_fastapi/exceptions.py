@@ -475,6 +475,14 @@ class GlobalLockBusyError(TimeoutError):
     status_code = 409
 
 
+class IllegalNameError(ValueError):
+    """A supplied name is not a legal Python name.
+
+    This exception is raised when code generation receives a string
+    that would be used as a Python name, but it's not legal.
+    """
+
+
 class MessageDroppedWarning(RuntimeWarning):
     """A message was dropped by the message broker.
 

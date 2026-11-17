@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import Any, Generic, Optional, Self, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 from urllib.parse import urljoin, urlparse
 
 import httpx2
@@ -295,7 +295,9 @@ class ThingClient:
         return r
 
     @classmethod
-    def from_url(cls, thing_url: str, client: Optional[httpx2.Client] = None) -> Self:
+    def from_url(
+        cls, thing_url: str, client: Optional[httpx2.Client] = None
+    ) -> ThingClient:
         """Create a ThingClient from a URL.
 
         This will dynamically create a subclass with properties and actions,
