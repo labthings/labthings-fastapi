@@ -6,13 +6,13 @@ agent-detector==2.0.0
     # via fastapi-cloud-cli
 alabaster==1.0.0
     # via sphinx
-annotated-doc==0.0.5
+annotated-doc==0.0.6
     # via
     #   fastapi
     #   typer
 annotated-types==0.8.0
     # via pydantic
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   httpx
     #   httpx2
@@ -38,7 +38,7 @@ beautifulsoup4==4.15.0
     # via sphinx-toolbox
 boolean-py==5.0
     # via license-expression
-cachecontrol==0.14.4
+cachecontrol==0.15.0
     # via
     #   pip-audit
     #   sphinx-toolbox
@@ -52,14 +52,14 @@ certifi==2026.10.23
     #   sphobjinv
 charset-normalizer==3.5.2
     # via requests
-click==8.5.0
+click==8.5.1
     # via
     #   pydoclint
     #   rich-toolkit
     #   uvicorn
 codespell==2.4.3
     # via labthings-fastapi
-coverage==7.17.0
+coverage==7.17.3
     # via pytest-cov
 cyclonedx-python-lib==11.12.0
     # via pip-audit
@@ -69,7 +69,7 @@ detect-installer==0.2.1
     # via fastapi-cloud-cli
 dict2css==0.6.0
     # via sphinx-toolbox
-dnspython==2.9.0
+dnspython==2.9.2
     # via email-validator
 docstring-parser-fork==0.0.16
     # via pydoclint
@@ -88,23 +88,23 @@ domdf-python-tools==3.11.0
     #   apeye-core
     #   dict2css
     #   sphinx-toolbox
-email-validator==2.3.0
+email-validator==2.4.0
     # via
     #   fastapi
     #   pydantic
 fastapi==0.135.4
     # via labthings-fastapi
-fastapi-cli==0.0.32
+fastapi-cli==0.0.34
     # via fastapi
-fastapi-cloud-cli==0.26.0
+fastapi-cloud-cli==0.28.0
     # via fastapi-cli
 fastar==0.12.0
     # via fastapi-cloud-cli
-filelock==4.2.4
+filelock==4.2.11
     # via
     #   cachecontrol
     #   sphinx-toolbox
-flake8==7.4.1
+flake8==7.5.0
     # via
     #   flake8-pyproject
     #   flake8-rst
@@ -126,7 +126,7 @@ html5lib==1.1
     # via sphinx-toolbox
 httpcore==1.0.9
     # via httpx
-httpcore2==2.16.0
+httpcore2==2.16.2
     # via httpx2
 httptools==0.9.0
     # via uvicorn
@@ -134,7 +134,7 @@ httpx==0.28.1
     # via
     #   fastapi
     #   fastapi-cloud-cli
-httpx2==2.16.0
+httpx2==2.16.2
     # via labthings-fastapi
 idna==3.20
     # via
@@ -183,7 +183,7 @@ markupsafe==3.0.4
     #   sphinx-jinja2-compat
 mccabe==0.7.0
     # via flake8
-mdit-py-plugins==0.6.1
+mdit-py-plugins==0.7.0
     # via myst-parser
 mdurl==0.1.2
     # via markdown-it-py
@@ -191,7 +191,7 @@ msgpack==1.2.4
     # via cachecontrol
 mypy==1.20.2
     # via labthings-fastapi
-mypy-extensions==1.1.0
+mypy-extensions==1.2.0
     # via mypy
 myst-parser==4.0.1
     # via labthings-fastapi
@@ -211,7 +211,7 @@ pathspec==1.1.1
     # via mypy
 pillow==13.0.0
     # via labthings-fastapi
-pip==26.2.2
+pip==26.3
     # via pip-api
 pip-api==0.0.35
     # via pip-audit
@@ -219,7 +219,7 @@ pip-audit==2.10.1
     # via labthings-fastapi
 pip-requirements-parser==32.0.1
     # via pip-audit
-platformdirs==4.13.6
+platformdirs==4.14.5
     # via
     #   apeye
     #   pip-audit
@@ -227,26 +227,27 @@ pluggy==1.7.0
     # via
     #   pytest
     #   pytest-cov
-py-serializable==2.1.0
+py-serializable==2.2.0
     # via cyclonedx-python-lib
 pycodestyle==2.15.0
     # via flake8
-pydantic==2.14.1
+pydantic==2.14.3
     # via
     #   fastapi
     #   fastapi-cloud-cli
     #   labthings-fastapi
     #   pydantic-extra-types
     #   pydantic-settings
-pydantic-core==2.50.1
+    #   typer
+pydantic-core==2.50.4
     # via pydantic
 pydantic-extra-types==2.11.1
     # via fastapi
-pydantic-settings==2.16.1
+pydantic-settings==2.16.3
     # via fastapi
-pydoclint==0.11.1
+pydoclint==0.12.0
     # via labthings-fastapi
-pyflakes==4.0.3
+pyflakes==4.1.0
     # via flake8
 pygments==2.21.0
     # via
@@ -271,7 +272,7 @@ python-dotenv==1.2.4
     # via
     #   pydantic-settings
     #   uvicorn
-python-multipart==0.0.32
+python-multipart==0.0.34
     # via fastapi
 pyyaml==6.0.3
     # via
@@ -317,9 +318,9 @@ rpds-py==2026.9.1
     #   referencing
 ruamel-yaml==0.19.1
     # via sphinx-toolbox
-ruff==0.17.3
+ruff==0.17.5
     # via labthings-fastapi
-sentry-sdk==2.73.0
+sentry-sdk==2.75.0
     # via fastapi-cloud-cli
 shellingham==1.5.4
     # via typer
@@ -329,7 +330,7 @@ snowballstemmer==3.1.1
     # via sphinx
 sortedcontainers==2.4.0
     # via cyclonedx-python-lib
-soupsieve==3.0.4
+soupsieve==4.1.1
     # via beautifulsoup4
 sphinx==8.2.3
     # via
@@ -344,7 +345,7 @@ sphinx==8.2.3
     #   sphinx-toolbox
     #   sphinxcontrib-jquery
     #   sphinxcontrib-mermaid
-sphinx-autoapi==3.8.0
+sphinx-autoapi==3.9.0
     # via labthings-fastapi
 sphinx-autodoc-typehints==3.5.2
     # via sphinx-toolbox
@@ -368,7 +369,7 @@ sphinxcontrib-jquery==4.1
     # via sphinx-rtd-theme
 sphinxcontrib-jsmath==2.0.0
     # via sphinx
-sphinxcontrib-mermaid==2.1.0
+sphinxcontrib-mermaid==2.1.1
     # via labthings-fastapi
 sphinxcontrib-qthelp==2.0.0
     # via sphinx
@@ -390,7 +391,7 @@ truststore==0.10.5
     # via
     #   httpcore2
     #   httpx2
-typer==0.27.3
+typer==0.29.1
     # via
     #   fastapi-cli
     #   fastapi-cloud-cli
@@ -415,7 +416,7 @@ typing-extensions==4.16.0
     #   sphinx-toolbox
     #   starlette
     #   typing-inspection
-typing-inspection==0.4.4
+typing-inspection==0.4.5
     # via
     #   fastapi
     #   pydantic
@@ -438,7 +439,7 @@ webencodings==0.6.1
     # via
     #   html5lib
     #   tinycss2
-websockets==17.3
+websockets==17.4
     # via uvicorn
-zeroconf==0.151.5
+zeroconf==0.154.0
     # via labthings-fastapi
