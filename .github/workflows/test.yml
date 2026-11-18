@@ -1,12 +1,12 @@
 name: Test
 
 on:
-  - pull_request
+  pull_request:
+    # All pushes to a PR should run this workflow
+  push:
+    branches:
+      - main
 
-permissions:
-  contents: read
-  pull-requests: write
-  checks: write
 
 jobs:
   pip_audit:
@@ -108,8 +108,47 @@ jobs:
         if: success() || failure()
         run: bash ./docs/source/quickstart/test_quickstart_example.sh
 
+  base-coverage:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    outputs:
+      coverage: ${{ steps.get-coverage.outputs.coverage }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.12
+
+      - name: Install Dependencies
+        run: pip install -e . -r dev-requirements.txt
+
+      - name: Test with pytest
+        run: |
+          pytest --cov="src" --cov-report="xml" --cov-report="lcov" --cov-report="json"
+          mv coverage.lcov base-coverage.lcov
+
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload code coverage for base branch
+        uses: actions/upload-artifact@v7
+        with:
+          name: base-coverage.lcov
+          path: ./base-coverage.lcov
+
   coverage:
-    needs: [test]
+    needs: [test, base-coverage]
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4  # Needed to generate the PR diff
@@ -119,7 +158,7 @@ jobs:
         with:
           name: coverage-3.12
 
-      - name: Report Diff Coverage
+      - name: Report diff coverage
         uses: Affanmir/diff-cover-action@v2
         with:
           compare-branch: origin/main
@@ -132,7 +171,7 @@ jobs:
           COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
 
-      - name: Update Coverage Badge
+      - name: Update coverage badge
         # Only run this on the main branch so PRs don't overwrite the main badge
         if: github.ref == 'refs/heads/main'
         uses: Schneegans/dynamic-badges-action@v1.7.0
@@ -145,3 +184,20 @@ jobs:
           valColorRange: ${{ steps.get-coverage.outputs.coverage }}
           maxColorRange: 90
           minColorRange: 50
+
+      - name: Compute the change in coverage
+        id: coverage-delta
+        env:
+          BASE_COV: ${{ needs.base-coverage.outputs.coverage }}
+          BRANCH_COV: ${{ steps.get-coverage.outputs.coverage}}
+        run: |
+          change=$(echo "$BRANCH_COV - $BASE_COV" | bc)
+          echo "Coverage changed by $change %"
+          echo "delta=$change" >> $GITHUB_OUTPUT
+      
+      - name: Check coverage tolerance
+        if: ${{ steps.coverage-delta.outputs.delta < -0.2 }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+              core.setFailed('Coverage has decreased too much.')
