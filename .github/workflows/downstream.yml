@@ -39,9 +39,10 @@ jobs:
           echo "Matched skip string: '${{ steps.skip-ofm-match.outputs.match }}'"
 
   test-against-ofm-v3:
-    # This job uses the feature branch found by `analyse-pr-description`.
-    # If that job didn't find a feature branch, it will be an empty string
-    # so this job won't run.
+    # This job checks for a skip command in the PR description, and will run unless
+    # it's explicitly skipped. If there's no OFM feature branch specified, we ignore
+    # the skip command, because either this job or test-against-ofm-feature-branch
+    # must always run.
     needs: analyse-pr-description
     if: needs.analyse-pr-description.outputs.skip-ofm-flag == '' || needs.analyse-pr-description.outputs.feature-branch == ''
     runs-on: ubuntu-latest
