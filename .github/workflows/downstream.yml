@@ -1,7 +1,12 @@
 name: Downstream
 
 on:
-  - pull_request
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: downstream-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   analyse-pr-description:
