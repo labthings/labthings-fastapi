@@ -33,7 +33,7 @@ assignees: ''
 * [ ] New or changed features have been added to (or updated in) the conceptual documentation.
 * [ ] Any new or updated dependencies have been added to the project configuration (e.g., `pyproject.toml`).
 * [ ] New functionality is fully tested.
-* [ ] Any decrease in test coverage has been justified.
+* [ ] Any new lines of code not covered by tests have been justified.
 * [ ] Either the `test-against-ofm-v3` job passes, or `test-against-ofm-feature-branch` passes.
 * [ ] New features have been used in a branch of the OpenFlexure Microscope, which is tested in `test-against-ofm-feature-branch`.
       <!-- Note: uncomment the `OFM-Feature-Branch: branchname` line above to test against a feature branch in CI. -->
