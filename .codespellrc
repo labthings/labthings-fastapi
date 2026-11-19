@@ -19,6 +19,7 @@ skip = *.git,
        coverage.lcov,
        coverage.xml,
        LICENSE,
+       *.bib
 
 # The regex allows it to also check snake case strings. This stops codespell doing
 # autocorrection. If a lot of changes are needed this can be commented out.
