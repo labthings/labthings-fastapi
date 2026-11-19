@@ -87,6 +87,7 @@ INVALID_NAMES = [
     "exciting!",
     "for",
     "if",
+    "",
 ]
 
 
@@ -121,3 +122,10 @@ def test_name_invalid(name):
 def test_constant(val, code):
     """Check constants are escaped and quoted as needed."""
     assert ast.unparse(_constant(val)) == code
+
+
+@pytest.mark.parametrize("val", [object(), 1 + 2j])
+def test_constant_typeerror(val):
+    """Check _constant rejects types it doesn't understand."""
+    with pytest.raises(TypeError):
+        _constant(val)
