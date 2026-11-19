@@ -1,11 +1,16 @@
 """Tests for code generation."""
 
 import ast
+import sys
 
 import pytest
 
 from labthings_fastapi.code_generation import (
+    NO_ARGUMENTS,
+    _class,
     _constant,
+    _function,
+    _import_from,
     _name,
     assert_legal_name,
     snake_to_camel_case,
@@ -81,6 +86,8 @@ INVALID_NAMES = [
     "name.with.dot",
     'name"withquote',
     "45",
+    "class",
+    "def",
     "(illegal)",
     "#comment",
     "name-with-dashes",
@@ -93,11 +100,25 @@ INVALID_NAMES = [
 
 @pytest.mark.parametrize("name", INVALID_NAMES)
 def test_name_invalid(name):
-    """Check that invalid names raise an error."""
+    """Check that invalid names raise an error.
+
+    We check `assert_legal_name` but also every function
+    that takes a string as an argument and produces an AST
+    object.
+
+    This is important to make sure there's no way for strings
+    to leak through unsanitised.
+    """
     with pytest.raises(IllegalNameError):
         assert_legal_name(name)
     with pytest.raises(IllegalNameError):
         _name(name)
+    with pytest.raises(IllegalNameError):
+        _class(name, [], [])
+    with pytest.raises(IllegalNameError):
+        _function(name, NO_ARGUMENTS, [], None)
+    with pytest.raises(IllegalNameError):
+        _import_from(name, _name("valid"))
 
 
 @pytest.mark.parametrize(
@@ -129,3 +150,31 @@ def test_constant_typeerror(val):
     """Check _constant rejects types it doesn't understand."""
     with pytest.raises(TypeError):
         _constant(val)
+
+
+def test_python_version_dependence(mocker):
+    """Check that we really do need to use different syntax before/after Python 3.12.
+
+    `ast.ClassDef` and `ast.FunctionDef` changed in Python 3.12, so the
+    wrapper functions use an if statement to pick the right form.
+    Supplying the extra argument doesn't actually cause an error, but MyPy will fail,
+    and ignoring the type error will cause MyPy to fail on newer Python versions.
+
+    This test stops a spurious coverage warning.
+    It *is* covered because the test suite runs on several versions - but this test
+    marks the branch not used by the current Python version as covered.
+    """
+    if sys.version_info < (3, 12):
+        mocker.patch("sys.version_info")
+        sys.version_info.__lt__.return_value = False
+        cls = _class("MyClass", [], [])
+        assert isinstance(cls, ast.ClassDef)
+        func = _function("my_func", NO_ARGUMENTS, [], None)
+        assert isinstance(func, ast.FunctionDef)
+    else:
+        mocker.patch("sys.version_info")
+        sys.version_info.__lt__.return_value = True
+        cls = _class("MyClass", [], [])
+        assert isinstance(cls, ast.ClassDef)
+        func = _function("my_func", NO_ARGUMENTS, [], None)
+        assert isinstance(func, ast.FunctionDef)
