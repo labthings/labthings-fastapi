@@ -134,7 +134,7 @@ jobs:
       - name: Parse coverage percentage
         id: get-coverage
         run: |
-          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          COVERAGE=$(jq -r '.totals.percent_covered' coverage.json)
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
 
       - name: Upload code coverage for base branch
@@ -168,8 +168,10 @@ jobs:
       - name: Parse coverage percentage
         id: get-coverage
         run: |
-          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          COVERAGE=$(jq -r '.totals.percent_covered' coverage.json)
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage_display=$COVERAGE" >> $GITHUB_OUTPUT
 
       - name: Update coverage badge
         # Only run this on the main branch so PRs don't overwrite the main badge
@@ -180,8 +182,8 @@ jobs:
           gistID: 936bcec8e1815a49d1e7f947924ffa3f
           filename: labthings-fastapi-coverage.json
           label: coverage
-          message: ${{ steps.get-coverage.outputs.coverage }}%
-          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          message: ${{ steps.get-coverage.outputs.coverage_display }}%
+          valColorRange: ${{ steps.get-coverage.outputs.coverage_display }}
           maxColorRange: 90
           minColorRange: 50
 
