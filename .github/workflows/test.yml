@@ -158,13 +158,6 @@ jobs:
         with:
           name: coverage-3.12
 
-      - name: Report diff coverage
-        uses: Affanmir/diff-cover-action@v2
-        with:
-          compare-branch: origin/main
-          coverage-files: coverage.xml
-          fail-under: '100'
-
       - name: Parse coverage percentage
         id: get-coverage
         run: |
@@ -196,6 +189,13 @@ jobs:
           change=$(echo "$BRANCH_COV - $BASE_COV" | bc)
           echo "Coverage changed by $change %"
           echo "delta=$change" >> $GITHUB_OUTPUT
+
+      - name: Report diff coverage
+        uses: Affanmir/diff-cover-action@v2
+        with:
+          compare-branch: origin/main
+          coverage-files: coverage.xml
+          fail-under: '100'
       
       - name: Check coverage tolerance
         if: ${{ steps.coverage-delta.outputs.delta < -0.2 }}
