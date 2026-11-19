@@ -180,24 +180,13 @@ def _class(name: str, bases: list[ast.expr], body: list[ast.stmt]) -> ast.ClassD
     :return: an `ast` class definition.
     """
     assert_legal_name(name)
-    if sys.version_info < (3, 12):
-        return ast.ClassDef(
-            name=name,
-            bases=bases,
-            keywords=[],
-            body=body,
-            decorator_list=[],
-        )
-    else:
-        # Since 3.12, we need to add type_params
-        return ast.ClassDef(
-            name=name,
-            bases=bases,
-            keywords=[],
-            body=body,
-            decorator_list=[],
-            type_params=[],
-        )
+    return ast.ClassDef(
+        name=name,
+        bases=bases,
+        keywords=[],
+        body=body,
+        decorator_list=[],
+    )
 
 
 def _function(
@@ -212,25 +201,14 @@ def _function(
     :return: a function definition object.
     """
     assert_legal_name(name)
-    if sys.version_info < (3, 12):
-        return ast.FunctionDef(
-            name=name,
-            args=args,
-            body=body,
-            decorator_list=[],
-            returns=returns,
-            type_comment=None,
-        )
-    else:
-        return ast.FunctionDef(
-            name=name,
-            args=args,
-            body=body,
-            decorator_list=[],
-            returns=returns,
-            type_comment=None,
-            type_params=[],
-        )
+    return ast.FunctionDef(
+        name=name,
+        args=args,
+        body=body,
+        decorator_list=[],
+        returns=returns,
+        type_comment=None,
+    )
 
 
 def _import_from(module: str, names: list[str]) -> ast.ImportFrom:
