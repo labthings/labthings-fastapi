@@ -1,11 +1,13 @@
 """Tests for code generation."""
 
 import ast
+from typing import Any
 
 import pytest
 
 from labthings_fastapi.code_generation import (
     NO_ARGUMENTS,
+    DataSchemaConverter,
     _class,
     _constant,
     _function,
@@ -17,6 +19,7 @@ from labthings_fastapi.code_generation import (
     title_to_snake_case,
 )
 from labthings_fastapi.exceptions import IllegalNameError
+from labthings_fastapi.thing_description import type_to_dataschema
 
 NAMES_FOR_CONVERSION = (
     ["mixed", "title", "camel", "snake"],
@@ -151,3 +154,55 @@ def test_constant_typeerror(val):
     """Check _constant rejects types it doesn't understand."""
     with pytest.raises(TypeError):
         _constant(val)
+
+
+def test_import_from():
+    """Check _import_from allows dots."""
+    stmt = _import_from("foo.bar", ["baz"])
+    assert ast.unparse(stmt) == "from foo.bar import baz"
+
+
+@pytest.mark.parametrize(
+    ("type_", "unparsed"),
+    [
+        (Any, "Any"),
+        (str, "str"),
+        (int, "int"),
+        (float, "float"),
+        (bool, "bool"),
+        (None, "None"),
+        (list, "list[Any]"),  # this is equivalent.
+        (list[str], "list[str]"),
+        (list[list[list[int]]], "list[list[list[int]]]"),
+        (tuple[str, int], "tuple[str, int]"),
+        (tuple[int, tuple[float, float]], "tuple[int, tuple[float, float]]"),
+        (list[tuple[list[float], int]], "list[tuple[list[float], int]]"),
+        (dict, "dict"),
+        (int | float, "Union[int, float]"),  # this is equivalent
+        # The types below get distorted.
+        (tuple[str, ...], "list[str]"),
+        (object, "Any"),
+    ],
+)
+def test_dataschemaconverter_roundtrip(type_, unparsed):
+    """Test the schema converter can do round-trips.
+
+    This converts Python types to dataschemas, then back to
+    a Python type (as an unparsed string).
+
+    This only tests valid cases, but it allows us to do quite a direct
+    comparison and keeps the test case definitions succinct.
+    """
+    schema = type_to_dataschema(type_)
+    converter = DataSchemaConverter()
+    expression = converter.convert(schema)
+    assert ast.unparse(expression) == unparsed
+
+
+def test_dataschema_convert_max_depth():
+    """Check the converter won't recurse forever."""
+    converter = DataSchemaConverter(max_depth=2)
+    schema = type_to_dataschema(list[list[list[list[list]]]])
+    with pytest.warns(match="Recursion depth exceeded"):
+        expression = converter.convert(schema)
+    assert ast.unparse(expression) == "list[list[list[Any]]]"
