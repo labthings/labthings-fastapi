@@ -262,6 +262,118 @@ class DataSchemaConverter:
         self.max_depth = max_depth
         self.warn_on_fallback = warn_on_fallback
 
+    def _convert_union(self, schema: DataSchema, depth: int) -> ast.expr | None:
+        """Convert a DataSchema representing a union to a Python type.
+
+        If the schema does not represent a union type, we return None.
+        Union types should use `anyOf` in the schema.
+
+        :param schema: the schema to convert.
+        :param depth: how many times we've recursed through `convert`.
+        :return: an `ast.expr` describing the type or `None` if it's not a union.
+        """
+        if isinstance(schema.oneOf, Sequence) and len(schema.oneOf) > 0:
+            types = [self.convert(s, depth + 1) for s in schema.oneOf]
+            return _subscript(_name("Union"), _tuple(*types))
+        return None
+
+    def _convert_simple(self, schema: DataSchema, depth: int) -> ast.expr | None:
+        """Convert a DataSchema representing a simple type to a Python type.
+
+        If the schema does not represent a simple type, we return None.
+        This function deals with `str`, `int`, `float`, `bool` and `None`.
+
+        Note that `None` types still result in an `ast.expr` object, not a
+        literal `None`. A literal `None` signifies the schema didn't match.
+
+        :param schema: the schema to convert.
+        :param depth: how many times we've recursed through `convert`.
+        :return: an `ast.expr` describing the type or `None` if it's not simple.
+        """
+        if schema.type == Type.string:
+            return _name("str")
+        elif schema.type == Type.integer:
+            return _name("int")
+        elif schema.type == Type.number:
+            return _name("float")
+        elif schema.type == Type.boolean:
+            return _name("bool")
+        elif schema.type == Type.null:
+            return _name("None", keyword=True)
+        return None
+
+    def _convert_array(self, schema: DataSchema, depth: int) -> ast.expr | None:
+        """Convert a DataSchema representing an array to a Python type.
+
+        If the schema does not represent an array, we return None.
+        An array with defined items is represented as a tuple.
+        An array with a single item type becomes `list[<type>]`
+        An array without further types becomes `list[Any]`
+
+        :param schema: the schema to convert.
+        :param depth: how many times we've recursed through `convert`.
+        :return: an `ast.expr` describing the type or `None` if it's not an array.
+        """
+        if schema.type != Type.array:
+            return None
+        if isinstance(schema.items, Sequence):
+            # The WoT spec is based on JSONSchema 2019
+            # If `items` is a sequence, it behaves as `prefixItems` in the 2023
+            # draft, i.e. it describes a tuple.
+            # https://json-schema.org/understanding-json-schema/reference/array#tupleValidation
+            types = [self.convert(s, depth + 1) for s in schema.items]
+            return _subscript(_name("tuple"), _tuple(*types))
+        if isinstance(schema.items, DataSchema):
+            # If a single item type is specified (including if it's a union), return
+            # a specifically-typed list.
+            return _subscript(_name("list"), self.convert(schema.items, depth + 1))
+        if schema.items is None:
+            # A dataschema with no `items` member gets typed as a plain list
+            return _name("list")
+        return None
+
+    def _convert_object(self, schema: DataSchema, depth: int) -> ast.expr | None:
+        """Convert a DataSchema representing an object to a Python type.
+
+        If the schema does not represent an object, we return None.
+        This function deals with `object`s, which become either `dict` (if
+        there are no properties specified) or a `pydantic.BaseModel` subclass
+        (if there are properties specified).
+
+        :param schema: the schema to convert.
+        :param depth: how many times we've recursed through `convert`.
+        :return: an `ast.expr` describing the type or `None` if it's not an object.
+        """
+        if schema.type != Type.object:
+            return None
+        # If the object has no properties, return a generic dict
+        if isinstance(schema.properties, Mapping):
+            return self.convert_to_model(schema, recursion_depth=depth)
+        return _name("dict")
+
+    def _convert_any(self, schema: DataSchema, depth: int) -> ast.expr | None:
+        """Convert an empty DataSchema to the `Any` type.
+
+        If the schema doesn't have a type specified, use `Any`. This function won't
+        raise a warning because the schema is effectively specifying `Any`. That's
+        different from falling back to `Any` because we can't or won't convert
+        something.
+
+        :param schema: the schema to convert.
+        :param depth: how many times we've recursed through `convert`.
+        :return: an `ast.expr` describing the type or `None` if there's no match.
+        """
+        if (
+            schema.type is None
+            and schema.enum is None
+            and schema.oneOf is None
+            and schema.const is None
+        ):
+            # If the schema is really empty, it should be `Any` and there's no need for
+            # a warning.
+            return _name("Any")
+        return None
+
     def convert(self, schema: DataSchema, recursion_depth: int = 0) -> ast.expr:
         r"""Convert a DataSchema to a Python type.
 
@@ -319,52 +431,19 @@ class DataSchemaConverter:
                 stacklevel=1,
             )
             return _name("Any")
-        if isinstance(schema.oneOf, Sequence) and len(schema.oneOf) > 0:
-            types = [self.convert(s) for s in schema.oneOf]
-            return _subscript(_name("Union"), _tuple(*types))
-        if schema.type == Type.string:
-            return _name("str")
-        elif schema.type == Type.integer:
-            return _name("int")
-        elif schema.type == Type.number:
-            return _name("float")
-        elif schema.type == Type.boolean:
-            return _name("bool")
-        elif schema.type == Type.null:
-            return _name("None", keyword=True)
-        elif schema.type == Type.array:
-            if isinstance(schema.items, Sequence):
-                # The WoT spec is based on JSONSchema 2019
-                # If `items` is a sequence, it behaves as `prefixItems` in the 2023
-                # draft, i.e. it describes a tuple.
-                # https://json-schema.org/understanding-json-schema/reference/array#tupleValidation
-                types = [self.convert(s, recursion_depth + 1) for s in schema.items]
-                return _subscript(_name("tuple"), _tuple(*types))
-            if isinstance(schema.items, DataSchema):
-                # If a single item type is specified (including if it's a union), return
-                # a specifically-typed list.
-                return _subscript(
-                    _name("list"), self.convert(schema.items, recursion_depth + 1)
-                )
-            if schema.items is None:
-                # A dataschema with no `items` member gets typed as a plain list
-                return _name("list")
-        elif schema.type == Type.object:
-            # If the object has no properties, return a generic dict
-            if isinstance(schema.properties, Mapping):
-                return self.convert_to_model(schema, recursion_depth=recursion_depth)
-            return _name("dict")
-        elif (
-            schema.type is None
-            and schema.enum is None
-            and schema.oneOf is None
-            and schema.const is None
-        ):
-            # If the schema is really empty, it should be `Any` and there's no need for
-            # a warning.
-            return _name("Any")
+        # We try each of the converter functions in turn, returning the first match.
+        for converter in [
+            self._convert_union,
+            self._convert_simple,
+            self._convert_array,
+            self._convert_object,
+            self._convert_any,
+        ]:
+            expr = converter(schema, recursion_depth)
+            if expr is not None:  # None means it didn't match, so we try the next one.
+                return expr
+        # If there wasn't a `_convert` function that matched, fall back to `Any`
         if self.warn_on_fallback:
-            # If we've found a type that we don't understand, warn then use `Any`
             warnings.warn(
                 f"Could not convert {schema} to a Python type, falling back to `Any`.",
                 stacklevel=1,
