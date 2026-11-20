@@ -1,36 +1,14 @@
 name: Test
 
 on:
-  - pull_request
+  pull_request:
+    # All pushes to a PR should run this workflow
+  push:
+    branches:
+      - main
+
 
 jobs:
-  base_coverage:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.base_ref }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: 3.12
-
-      - name: Install Dependencies
-        run: pip install -e . -r dev-requirements.txt
-
-      - name: Test with pytest
-        run: |
-          pytest
-          mv coverage.lcov base-coverage.lcov
-
-      - name: Upload code coverage for base branch
-        uses: actions/upload-artifact@v7
-        with:
-          name: base-coverage.lcov
-          path: ./base-coverage.lcov
-  
   pip_audit:
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +55,7 @@ jobs:
         run: flake8 src
 
       - name: Test with pytest
-        run: pytest
+        run: pytest --cov="src" --cov-report="xml" --cov-report="lcov" --cov-report="json"
 
       - name: Upload code coverage
         uses: actions/upload-artifact@v7
@@ -86,6 +64,7 @@ jobs:
           path: |
             ./coverage.lcov
             ./coverage.json
+            ./coverage.xml
       
       - name: Analyse with MyPy
         run: mypy
@@ -129,10 +108,51 @@ jobs:
         if: success() || failure()
         run: bash ./docs/source/quickstart/test_quickstart_example.sh
 
-  coverage:
+  base-coverage:
+    continue-on-error: true
     runs-on: ubuntu-latest
-    needs: [base_coverage, test]
+    outputs:
+      coverage: ${{ steps.get-coverage.outputs.coverage }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.base_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.12
+
+      - name: Install Dependencies
+        run: pip install -e . -r dev-requirements.txt
+
+      - name: Test with pytest
+        run: |
+          pytest --cov="src" --cov-report="xml" --cov-report="lcov" --cov-report="json"
+          mv coverage.lcov base-coverage.lcov
+
+      - name: Parse coverage percentage
+        id: get-coverage
+        run: |
+          COVERAGE=$(jq -r '.totals.percent_covered' coverage.json)
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload code coverage for base branch
+        uses: actions/upload-artifact@v7
+        with:
+          name: base-coverage.lcov
+          path: ./base-coverage.lcov
+
+  coverage:
+    needs: [test, base-coverage]
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4  # Needed to generate the PR diff
+
       - name: Download code coverage report
         uses: actions/download-artifact@v8
         with:
@@ -141,10 +161,12 @@ jobs:
       - name: Parse coverage percentage
         id: get-coverage
         run: |
-          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          COVERAGE=$(jq -r '.totals.percent_covered' coverage.json)
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          COVERAGE=$(jq -r '.totals.percent_covered_display' coverage.json)
+          echo "coverage_display=$COVERAGE" >> $GITHUB_OUTPUT
 
-      - name: Update Coverage Badge
+      - name: Update coverage badge
         # Only run this on the main branch so PRs don't overwrite the main badge
         if: github.ref == 'refs/heads/main'
         uses: Schneegans/dynamic-badges-action@v1.7.0
@@ -153,39 +175,31 @@ jobs:
           gistID: 936bcec8e1815a49d1e7f947924ffa3f
           filename: labthings-fastapi-coverage.json
           label: coverage
-          message: ${{ steps.get-coverage.outputs.coverage }}%
-          valColorRange: ${{ steps.get-coverage.outputs.coverage }}
+          message: ${{ steps.get-coverage.outputs.coverage_display }}%
+          valColorRange: ${{ steps.get-coverage.outputs.coverage_display }}
           maxColorRange: 90
           minColorRange: 50
 
-      - name: Download code coverage report for base branch
-        id: download-base-coverage
-        continue-on-error: true
-        uses: actions/download-artifact@v8
+      - name: Compute the change in coverage
+        id: coverage-delta
+        env:
+          BASE_COV: ${{ needs.base-coverage.outputs.coverage }}
+          BRANCH_COV: ${{ steps.get-coverage.outputs.coverage}}
+        run: |
+          change=$(echo "$BRANCH_COV - $BASE_COV" | bc)
+          echo "Coverage changed by $change %"
+          echo "delta=$change" >> $GITHUB_OUTPUT
+
+      - name: Report diff coverage
+        uses: Affanmir/diff-cover-action@v2
         with:
-          name: base-coverage.lcov
-        
-      - name: Generate Code Coverage report
-        # Note, due to continue on error (to make job pass) we need to check the
-        # Status of the step directly not just use success() or failure()
-        if: steps.download-base-coverage.outcome == 'success'
-        id: code-coverage
-        uses: barecheck/code-coverage-action@v1
+          compare-branch: origin/main
+          coverage-files: coverage.xml
+          fail-under: '100'
+      
+      - name: Check coverage tolerance
+        if: ${{ steps.coverage-delta.outputs.delta < -0.2 }}
+        uses: actions/github-script@v9
         with:
-          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
-          lcov-file: "./coverage.lcov"
-          base-lcov-file: "./base-coverage.lcov"
-          minimum-ratio: 0
-          send-summary-comment: true
-          show-annotations: "warning"
-        
-      - name: Generate Code Coverage report if base job fails
-        if: steps.download-base-coverage.outcome == 'failure'
-        id: code-coverage-without-base
-        uses: barecheck/code-coverage-action@v1
-        with:
-          barecheck-github-app-token: ${{ secrets.BARECHECK_GITHUB_APP_TOKEN }}
-          lcov-file: "./coverage.lcov"
-          minimum-ratio: 0
-          send-summary-comment: true
-          show-annotations: "warning"
+          script: |
+              core.setFailed('Coverage has decreased too much.')
