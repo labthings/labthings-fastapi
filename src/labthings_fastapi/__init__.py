@@ -27,6 +27,7 @@ code does not break if modules are rearranged.
 from labthings_fastapi import outputs
 from labthings_fastapi.actions import action
 from labthings_fastapi.client import ThingClient
+from labthings_fastapi.computed_properties import computed_property
 from labthings_fastapi.endpoints import endpoint
 from labthings_fastapi.invocation_contexts import (
     ThreadWithInvocationID,
@@ -64,6 +65,7 @@ __all__ = [
     "blob",
     "cancellable_sleep",
     "cli",
+    "computed_property",
     "endpoint",
     "get_thing_logger",
     "outputs",
