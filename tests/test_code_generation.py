@@ -199,10 +199,17 @@ def test_dataschemaconverter_roundtrip(type_, unparsed):
     assert ast.unparse(expression) == unparsed
 
 
-def test_dataschema_convert_max_depth():
+@pytest.mark.parametrize(
+    ("type_", "unparsed"),
+    [
+        (list[list[list[list[list]]]], "list[list[list[Any]]]"),
+        (list[tuple[list[tuple[int,]],]], "list[tuple[list[Any],]]"),
+    ],
+)
+def test_dataschema_convert_max_depth(type_, unparsed):
     """Check the converter won't recurse forever."""
     converter = DataSchemaConverter(max_depth=2)
-    schema = type_to_dataschema(list[list[list[list[list]]]])
+    schema = type_to_dataschema(type_)
     with pytest.warns(match="Recursion depth exceeded"):
         expression = converter.convert(schema)
-    assert ast.unparse(expression) == "list[list[list[Any]]]"
+    assert ast.unparse(expression) == unparsed
