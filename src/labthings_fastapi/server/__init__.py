@@ -18,7 +18,11 @@ import uvicorn
 from anyio.from_thread import BlockingPortal
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import (
+    get_swagger_ui_html,
+    get_swagger_ui_oauth2_redirect_html,
+)
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from pydantic_core import PydanticSerializationError
@@ -145,7 +149,12 @@ class ThingServer:
             self._config = ThingServerConfig(**kwargs)
         if self._config.settings_folder is None:
             self._config.settings_folder = "./settings"
-        self.app = FastAPI(lifespan=self.lifespan, separate_input_output_schemas=False)
+        # docs_url=None prevents the default docs page so labthings-fastapi
+        # can customise its own
+        self.app = FastAPI(
+            lifespan=self.lifespan, separate_input_output_schemas=False, docs_url=None
+        )
+        self._add_swagger_ui()
         self._set_cors_middleware()
         self._set_url_for_middleware()
         self._add_exception_handlers()
@@ -162,6 +171,34 @@ class ThingServer:
         self._things = self._create_things()
         self._connect_things()
         self._attach_things_to_server()
+
+    def _add_swagger_ui(self) -> None:
+        """Replace FastAPI's default Swagger UI with a pinned version."""
+        # Swagger UI 5.33 introduced virtualization, so Ctrl+F misses endpoints
+        # that haven't been rendered. Pin 5.32.15 to keep browser Find working.
+        assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
+        openapi_url = self.app.openapi_url
+        oauth2_redirect_url = self.app.swagger_ui_oauth2_redirect_url
+        assert openapi_url is not None and oauth2_redirect_url is not None  # noqa: S101
+
+        async def swagger_ui_html(request: Request) -> HTMLResponse:
+            root_path = request.scope.get("root_path", "").rstrip("/")
+            # Recreate the docs page with the pinned JavaScript and CSS assets.
+            return get_swagger_ui_html(
+                openapi_url=root_path + openapi_url,
+                title=f"{self.app.title} - Swagger UI",
+                oauth2_redirect_url=root_path + oauth2_redirect_url,
+                swagger_js_url=f"{assets}/swagger-ui-bundle.js",
+                swagger_css_url=f"{assets}/swagger-ui.css",
+            )
+
+        async def swagger_ui_redirect(_request: Request) -> HTMLResponse:
+            return get_swagger_ui_oauth2_redirect_html()
+
+        self.app.add_route("/docs", swagger_ui_html, include_in_schema=False)
+        self.app.add_route(
+            oauth2_redirect_url, swagger_ui_redirect, include_in_schema=False
+        )
 
     @classmethod
     def from_things(
