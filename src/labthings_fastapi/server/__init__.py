@@ -179,7 +179,8 @@ class ThingServer:
         assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
         openapi_url = self.app.openapi_url
         oauth2_redirect_url = self.app.swagger_ui_oauth2_redirect_url
-        assert openapi_url is not None and oauth2_redirect_url is not None  # noqa: S101
+        if openapi_url is None or oauth2_redirect_url is None:
+            raise ValueError("Swagger UI requires OpenAPI and OAuth2 redirect URLs.")
 
         async def swagger_ui_html(request: Request) -> HTMLResponse:
             root_path = request.scope.get("root_path", "").rstrip("/")
