@@ -18,7 +18,6 @@ import re
 import sys
 import tempfile
 import warnings
-from collections.abc import Mapping
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from subprocess import DEVNULL, run  # noqa: S404
@@ -28,8 +27,10 @@ from uuid import uuid4
 
 from labthings_fastapi.exceptions import IllegalNameError
 from labthings_fastapi.thing_description._model import (
+    ActionAffordance,
     DataSchema,
     InteractionAffordance,
+    PropertyAffordance,
     ThingDescription,
     Type,
 )
@@ -258,7 +259,6 @@ class DataSchemaConverter:
         :param warn_on_fallback: whether to raise a warning when we return `typing.Any`
             if a schema can't be converted.
         """
-        self.model_definitions: list[ast.ClassDef] = []
         self.max_depth = max_depth
         self.warn_on_fallback = warn_on_fallback
 
@@ -336,9 +336,8 @@ class DataSchemaConverter:
         """Convert a DataSchema representing an object to a Python type.
 
         If the schema does not represent an object, we return None.
-        This function deals with `object`s, which become either `dict` (if
-        there are no properties specified) or a `pydantic.BaseModel` subclass
-        (if there are properties specified).
+        This function deals with `object`s, which currently become `dict` annotations.
+        The properties and their types are currently ignored.
 
         :param schema: the schema to convert.
         :param depth: how many times we've recursed through `convert`.
@@ -346,9 +345,7 @@ class DataSchemaConverter:
         """
         if schema.type != Type.object:
             return None
-        # If the object has no properties, return a generic dict
-        if isinstance(schema.properties, Mapping):
-            return self.convert_to_model(schema, recursion_depth=depth)
+        # All `object` DataSchemas become simple dictionaries.
         return _name("dict")
 
     def _convert_any(self, schema: DataSchema, depth: int) -> ast.expr | None:
@@ -414,8 +411,7 @@ class DataSchemaConverter:
               `Tuple Validation <tuple_validation>`_
 
         ``"object"``
-            is either mapped to `dict` or to a generated `pydantic.BaseModel` subclass,
-            depending on whether the ``properties`` key is set.
+            is mapped to `dict`. Properties are currently ignored.
 
         :param schema: the `DataSchema` to convert.
         :param recursion_depth: how many levels of recursion we've currently worked
@@ -449,132 +445,6 @@ class DataSchemaConverter:
                 stacklevel=1,
             )
         return _name("Any")
-
-    def convert_to_model(self, schema: DataSchema, recursion_depth: int) -> ast.Name:
-        """Convert a DataSchema to a Pydantic model.
-
-        This will iterate through the required and optional ``properties`` of the
-        `DataSchema` and build a class definition for a `pydantic.BaseModel` subclass.
-
-        We will then check to see if an equivalent model has been built already: if so,
-        we will reference it. We built the model first, so that we can check based on
-        the generated model, rather than the input schema or the name.
-
-        If the model we've just built is unique, we'll add it to
-        ``self.model_definitions`` with a unique name, and return a reference to the
-        new model.
-
-        :param schema: the DataSchema instance.
-        :param recursion_depth: how deep we are within a nested type.
-        :return: an `ast.Name` object referencing the generated model.
-        :raises TypeError: if there is no ``properties`` field.
-        :raises KeyError: if the schema requires a property that doesn't exist in
-            ``properties``.
-        """
-        if schema.properties is None:
-            msg = f"Can't generate a model from schema '{schema}' without properties."
-            raise TypeError(msg)
-
-        # The class body will consist of a docstring,
-        # one line setting `_model_config` and
-        # one annotated assignment for each property.
-        class_body: list[ast.stmt] = []
-        if schema.description:  # Add a docstring, if there is a description
-            class_body.append(ast.Expr(_constant(schema.description)))
-        class_body.append(
-            ast.Assign(
-                targets=[_name("_model_config", "store")],
-                value=ast.Dict(keys=[_constant("extra")], values=[_constant("allow")]),
-            )
-        )
-        # Start with the required properties - these look like ``pname: type``
-        required = schema.required or []
-        for pname in required:
-            try:
-                prop = schema.properties[pname]
-            except KeyError as e:
-                msg = f"Schema requires a non-existent property '{pname}': {schema}"
-                raise KeyError(msg) from e
-            class_body.append(
-                ast.AnnAssign(  # Note there is no value, because it's a required field.
-                    target=_name(pname, "store"),
-                    annotation=self.convert(prop, recursion_depth + 1),
-                    simple=1,
-                )
-            )
-        # Now the optional ones: these look like
-        # ``pname: type = Field(default_factory=optional)``
-        # Note that ``optional`` will return `...` so we must always serialise with
-        # ``exclude_unset=True`` or we'll get an error.
-        for pname, prop in schema.properties.items():
-            if pname in required:
-                continue  # we already dealt with required properties above.
-            class_body.append(
-                ast.AnnAssign(
-                    target=_name(pname, "store"),
-                    annotation=self.convert(prop, recursion_depth + 1),
-                    value=ast.Call(
-                        _name("Field"),
-                        [],
-                        [ast.keyword("default_factory", _name("_optional"))],
-                    ),
-                    simple=1,
-                )
-            )
-
-        # Deduplicate: if a model with this body already exists, return that name.
-        existing_name = self.find_model_definition_by_body(class_body)
-        if existing_name:
-            return existing_name
-
-        # We need to make a new model definition
-        name = self.make_unique_model_name(schema)
-        self.model_definitions.append(
-            _class(
-                name=name,
-                bases=[_name("BaseModel")],
-                body=class_body,
-            )
-        )
-        ast.fix_missing_locations(self.model_definitions[-1])
-        return _name(name)
-
-    def find_model_definition_by_body(self, body: list[ast.stmt]) -> ast.Name | None:
-        r"""Locate a model definition with the supplied class body, or return `None`\ .
-
-        :param body: the body of the model definition.
-        :return: the name, as an `ast.Name` object, or `None` if the supplied body is
-            new.
-        """
-        for statement in body:
-            ast.fix_missing_locations(statement)
-        body_statements = [ast.unparse(s) for s in body]
-        for model in self.model_definitions:
-            model_statements = [ast.unparse(s) for s in model.body]
-            if model_statements == body_statements:
-                return _name(model.name)
-        return None
-
-    def make_unique_model_name(
-        self, schema: DataSchema, name: str = "UnnamedModel"
-    ) -> str:
-        """Generate a unique name for a schema.
-
-        :param schema: the schema we're naming.
-        :param name: a name for the schema, used if it has no title.
-        :return: a unique name.
-        """
-        if schema.title:
-            model_name = title_to_camel_case(schema.title + "_model")
-        else:
-            model_name = title_to_camel_case(name)
-        model_names = [m.name for m in self.model_definitions]
-        # Append a number to the model name until it's unique.
-        i = 0
-        while model_name in model_names:
-            i += 1
-            model_name = f"{model_name}{i}"
-        return model_name
 
     def input_model_to_arguments(self, model: DataSchema) -> ast.arguments:
         """Convert an input model to an arguments object.
@@ -639,6 +509,96 @@ def _append_docstring_if_present(
         body.append(ast.Expr(_constant(doc)))
 
 
+def _property_definition(
+    name: str, property: PropertyAffordance, converter: DataSchemaConverter
+) -> ast.AnnAssign:
+    """Generate an AST representation of a Property.
+
+    This should render as code that looks like:
+
+    .. code-block::python
+
+       name_in_snake_case: datatype = client_property()
+
+    It won't include a docstring - that may be appended later.
+
+    :param name: the name of the property affordance.
+    :param property: the property affordance object.
+    :param converter: the converter object to use for the datatype.
+    :return: an annotated assignment defining the property.
+    """
+    pname = title_to_snake_case(name)
+    dtype = converter.convert(property)
+    return ast.AnnAssign(
+        target=_name(pname, "store"),
+        annotation=dtype,
+        value=ast.Call(
+            func=_name("client_property"),
+            args=[],
+            keywords=[
+                ast.keyword(arg="read_only", value=_constant(property.readOnly)),
+                ast.keyword(arg="write_only", value=_constant(property.writeOnly)),
+            ],
+        ),
+        simple=1,
+    )
+
+
+def _action_definition(
+    name: str, action: ActionAffordance, converter: DataSchemaConverter
+) -> ast.FunctionDef:
+    """Generate an AST representation of an Action.
+
+    This should render as code that looks like:
+
+    .. code-block::python
+
+       def name_in_snake_case(arg: argtype) -> outputtype:
+           "Docstring from the description"
+           ...
+
+    :param name: the name of the property affordance.
+    :param action: the action affordance object.
+    :param converter: the converter object to use for the datatypes.
+    :return: a function definition describing the action.
+    """
+    aname = title_to_snake_case(name)
+    if action.input:
+        args = converter.input_model_to_arguments(action.input)
+    else:
+        args = NO_ARGUMENTS
+    if action.output:
+        rtype = converter.convert(action.output)
+    else:
+        rtype = _name("Any")
+    # The function body simply passes the arguments through to `invoke_action`.
+    function_body: list[ast.stmt] = []
+    _append_docstring_if_present(function_body, action)
+    function_body.append(
+        ast.Return(
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=_name("self"), attr="invoke_action", ctx=ast.Load()
+                ),
+                args=[_constant(name)],
+                keywords=[
+                    ast.keyword(arg=arg.arg, value=_name(arg.arg))
+                    for arg in args.kwonlyargs
+                ]
+                + [
+                    ast.keyword(value=_name("kwargs"))  # pass additional kwargs
+                ],
+            )
+        )
+    )
+    return _function(
+        name=aname,
+        args=args,
+        body=function_body,
+        returns=rtype,
+    )
+
+
 def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.Module]:
     """Generate a client from a Thing Description.
 
@@ -670,70 +630,14 @@ def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.M
     # `propname: ValueType = client_property(...)`
     properties = thing_description.properties or {}
     for name, property in properties.items():
-        pname = title_to_snake_case(name)
-        dtype = converter.convert(property)
-        class_body.append(
-            ast.AnnAssign(
-                target=_name(pname, "store"),
-                annotation=dtype,
-                value=ast.Call(
-                    func=_name("client_property"),
-                    args=[],
-                    keywords=[
-                        ast.keyword(
-                            arg="read_only", value=_constant(property.readOnly)
-                        ),
-                        ast.keyword(
-                            arg="write_only", value=_constant(property.writeOnly)
-                        ),
-                    ],
-                ),
-                simple=1,
-            )
-        )
+        class_body.append(_property_definition(name, property, converter))
         _append_docstring_if_present(class_body, property)
 
     # Each action will be a method definition, with appropriately typed arguments and
     # return values. These are then passed straight through to `self.invoke_action`
     actions = thing_description.actions or {}
     for name, action in actions.items():
-        aname = title_to_snake_case(name)
-        if action.input:
-            args = converter.input_model_to_arguments(action.input)
-        else:
-            args = NO_ARGUMENTS
-        if action.output:
-            rtype = converter.convert(action.output)
-        else:
-            rtype = _name("Any")
-        # The function body simply passes the arguments through to `invoke_action`.
-        function_body: list[ast.stmt] = []
-        _append_docstring_if_present(function_body, action)
-        function_body.append(
-            ast.Return(
-                value=ast.Call(
-                    func=ast.Attribute(
-                        value=_name("self"), attr="invoke_action", ctx=ast.Load()
-                    ),
-                    args=[_constant(name)],
-                    keywords=[
-                        ast.keyword(arg=arg.arg, value=_name(arg.arg))
-                        for arg in args.kwonlyargs
-                    ]
-                    + [
-                        ast.keyword(value=_name("kwargs"))  # pass additional kwargs
-                    ],
-                )
-            )
-        )
-        class_body.append(
-            _function(
-                name=aname,
-                args=args,
-                body=function_body,
-                returns=rtype,
-            )
-        )
+        class_body.append(_action_definition(name, action, converter))
 
     # The class definition is here: this includes `class_body` defined above, with the
     # actions/properties.
@@ -756,8 +660,6 @@ def generate_client_ast(thing_description: ThingDescription) -> tuple[str, ast.M
     )
     code.append(_import_from("typing", ["Any", "Union"]))
     code.append(_import_from("pydantic", ["BaseModel", "Field"]))
-
-    code += converter.model_definitions
 
     code.append(class_definition)
 
