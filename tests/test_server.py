@@ -28,6 +28,20 @@ def test_swagger_ui_assets():
     client.get("/docs/oauth2-redirect").raise_for_status()
 
 
+@pytest.mark.parametrize(
+    "url_attribute", ["openapi_url", "swagger_ui_oauth2_redirect_url"]
+)
+def test_swagger_ui_requires_urls(url_attribute):
+    """Raise ValueError if either URL required by Swagger UI is missing."""
+    server = lt.ThingServer.from_things({})
+    setattr(server.app, url_attribute, None)
+
+    with pytest.raises(
+        ValueError, match="Swagger UI requires OpenAPI and OAuth2 redirect URLs"
+    ):
+        server._add_swagger_ui()
+
+
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
     with pytest.raises(TypeError, match="not a Thing"):
