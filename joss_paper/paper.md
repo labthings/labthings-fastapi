@@ -97,6 +97,12 @@ We also may want figures in this section.-->
 
 The wider OpenFlexure project has supported research across a range of microscopy and laboratory applications [@collins2020; @knapper2024]. Within OpenFlexure Microscope version 3, `labthings-fastapi` provides the framework through which microscope functionality is exposed as a documented HTTP interface and represented through Web of Things concepts.
 
+HTTP interface allows for operations across several devices in a single network from one host machine. The devices in the network can be duplicates of the same device or multiple distinct devices, each with it's own set of commands. For example, ten Openflexure Microscopes have been installed and controlled through a single windows PC via a newtork switch and ethernet connection. The host PC was able to control all connected microscopes simultaneously using one Python script allowing characterisation and methods to be tested across multiple devices to ensure repeatability.
+
+In the same network, 2 microscopes were fitted with MCP9808 Temperature Sensors (PiHut, 1782) to monitor temperature in 3 different locations on the microscope during characterisation tests. `labthings-fastapi` enabled temperature monitoring to be added to existing protocols with ease.
+
+One such protocol, although not one where temperature monitoring was required, was automated range of motion measurements for testing new hardware revisions and characterising already printed stages[@range_of_motion]. Automated calibration of the stage requires synchronous use of the stage, camera and camera to stage mapping. `labthings-fastapi` allowed for the calibration routine to be written in a clear and obvious way where a code reviewer can clearly see what aspect of the microscope is being called upon within the code.
+
 <!-- TODO (Ben/Joe/Richard): Add concrete evidence of the impact specifically
 attributable to labthings-fastapi rather than OpenFlexure generally.
 
