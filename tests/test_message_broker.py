@@ -193,6 +193,26 @@ async def test_close_streams():
         await receive_stream.receive()
 
 
+async def test_close_streams_for_affordance():
+    """Check that we can close all the streams for an affordance"""
+    broker = MessageBroker()
+    send_stream, receive_stream = anyio.create_memory_object_stream(max_buffer_size=1)
+
+    # If we call it before any subscriptions exist, there should be no error
+    assert 0 == await broker.close_streams_for_affordance("thing", "prop")
+
+    # Subscribe to the affordance and then close the stream
+    await broker.subscribe("thing", "prop", send_stream)
+    # It should close 1 stream
+    assert 1 == await broker.close_streams_for_affordance("thing", "prop")
+    assert send_stream._closed is True
+    # Calling it again should do nothing, and not raise an error.
+    # Note that we still get a 1 returned: the stream was closed, but wasn't
+    # unsubscribed yet - so as far as the broker was concerned, it still closed
+    # one stream.
+    assert 1 == await broker.close_streams_for_affordance("thing", "prop")
+
+
 @pytest.mark.parametrize("action", ["close_send", "close_receive", "delete_send"])
 async def test_sending_to_closed_streams(caplog, action):
     """Check that closing a stream causes it to unsubscribe."""
