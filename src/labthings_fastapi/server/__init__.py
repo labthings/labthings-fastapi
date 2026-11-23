@@ -173,7 +173,10 @@ class ThingServer:
         self._attach_things_to_server()
 
     def _add_swagger_ui(self) -> None:
-        """Replace FastAPI's default Swagger UI with a pinned version."""
+        """Replace FastAPI's default Swagger UI with a pinned version.
+
+        :raises ValueError: If the OpenAPI or OAuth2 redirect URL is missing.
+        """
         # Swagger UI 5.33 introduced virtualization, so Ctrl+F misses endpoints
         # that haven't been rendered. Pin 5.32.15 to keep browser Find working.
         assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
