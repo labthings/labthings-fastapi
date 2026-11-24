@@ -5,7 +5,6 @@ be helpful to have some more bottom-up unit testing in this file.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.routing import Route
 
 import labthings_fastapi as lt
@@ -16,16 +15,16 @@ from labthings_fastapi.server.config_model import ThingServerConfig
 def test_swagger_ui_assets():
     """Check that the docs use the pinned assets and respect the root path."""
     server = lt.ThingServer.from_things({})
-    client = TestClient(server.app, root_path="/lab")
-    response = client.get("/docs")
-    response.raise_for_status()
+    with server.test_client() as client:
+        response = client.get("/docs")
+        response.raise_for_status()
 
-    assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
-    assert f'{assets}/swagger-ui-bundle.js"' in response.text
-    assert f'{assets}/swagger-ui.css"' in response.text
-    assert "url: '/lab/openapi.json'" in response.text
-    assert "'/lab/docs/oauth2-redirect'" in response.text
-    client.get("/docs/oauth2-redirect").raise_for_status()
+        assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
+        assert f'{assets}/swagger-ui-bundle.js"' in response.text
+        assert f'{assets}/swagger-ui.css"' in response.text
+        assert "url: '/openapi.json'" in response.text
+        assert "'/docs/oauth2-redirect'" in response.text
+        client.get("/docs/oauth2-redirect").raise_for_status()
 
 
 @pytest.mark.parametrize(
