@@ -11,6 +11,7 @@ from labthings_fastapi.code_generation import (
     NO_ARGUMENTS,
     RUFF_BINARY,
     DataSchemaConverter,
+    _action_definition,
     _class,
     _constant,
     _function,
@@ -25,7 +26,7 @@ from labthings_fastapi.code_generation import (
 from labthings_fastapi.exceptions import IllegalNameError
 from labthings_fastapi.testing import create_thing_without_server
 from labthings_fastapi.thing_description import type_to_dataschema
-from labthings_fastapi.thing_description._model import DataSchema
+from labthings_fastapi.thing_description._model import ActionAffordance, DataSchema
 
 from .example_things.thing_with_simple_types import SimpleTypeThing
 
@@ -280,7 +281,25 @@ def test_dataschemaconverter_input_model_to_arguments_errors():
     assert args is NO_ARGUMENTS
 
 
-def test_generated_client():
+def test_action_definition_missinginputoutput(mocker):
+    """Test odd ActionAffordances with no input/output.
+
+    LabThings will always include an input/output, even if they are None or Any.
+    We manually create an affordance description here with neither.
+    """
+    func = _action_definition(
+        "action_name",
+        ActionAffordance.model_construct(
+            forms=[],
+        ),
+        mocker.Mock(),
+    )
+    assert func.args is NO_ARGUMENTS
+    assert func.returns is not None
+    assert ast.unparse(func.returns) == "Any"
+
+
+def test_write_client_module():
     """Test the generated client code matches our expectation.
 
     This compares a generated client module to a previously-generated file.
