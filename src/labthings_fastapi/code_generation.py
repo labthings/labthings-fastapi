@@ -19,6 +19,7 @@ import sys
 import tempfile
 import warnings
 from importlib.util import module_from_spec, spec_from_file_location
+from os import PathLike
 from pathlib import Path
 from subprocess import DEVNULL, run  # noqa: S404
 from types import EllipsisType, ModuleType, NoneType
@@ -330,7 +331,9 @@ class DataSchemaConverter:
         if schema.items is None:
             # A dataschema with no `items` member gets typed as a plain list
             return _name("list")
-        return None
+        # We should never reach here. If we do, there's an implicit `return None` so
+        # `convert` will continue trying to convert the type, and will warn if nothing
+        # else matches it.
 
     def _convert_object(self, schema: DataSchema, depth: int) -> ast.expr | None:
         """Convert a DataSchema representing an object to a Python type.
@@ -697,8 +700,8 @@ def load_ast_as_module(cls_name: str, tree: ast.Module) -> ModuleType:
         # The code that generates this
         # client class is very careful only to pass through user values as (1) names or
         # (2) string constants. The use of `ast` to do this ensures that we don't fall
-        # foul of string escaping issues, and names are constrained only ever to work as
-        # names.
+        # foul of string escaping issues. Strings from the Thing Description are
+        # sanitised and checked before being used as names.
         module_name = f"labthings_fastapi.generated_clients.{cls_name}.{uuid4()}"
         spec = spec_from_file_location(module_name, fname)
         if spec is None:
@@ -716,7 +719,7 @@ def load_ast_as_module(cls_name: str, tree: ast.Module) -> ModuleType:
         # Note that we need to keep the temp file until after executing the module,
         # so the file still exists. It will be deleted at the end of this indented
         # block.
-    # Finally, access the class in the now-executed module.
+    # Finally, return the now-executed module.
     return module
 
 
@@ -736,7 +739,9 @@ def generate_client_class(thing_description: ThingDescription) -> "type[ThingCli
 
 
 def write_client_module(
-    thing_description: ThingDescription, destination: str, use_ruff: bool = True
+    thing_description: ThingDescription,
+    destination: str | PathLike,
+    use_ruff: bool = True,
 ) -> tuple[str, Path]:
     r"""Generate a client for a Thing, and write it as a Python file.
 
@@ -785,7 +790,7 @@ def write_client_module(
         # written, and `ruff` won't execute that file.
         # Tidy up docstrings and unused imports
         run(  # noqa: S603
-            [RUFF_BINARY, "check", dest, "--select", "D209,F401", "--fix"],
+            [RUFF_BINARY, "check", dest, "--select", "D209,F401,I", "--fix"],
             stdout=DEVNULL,
         )
         # Format the file nicely
