@@ -53,6 +53,8 @@ Laboratory automation software addresses the connection between experimental pro
 
 `labthings-fastapi` occupies a distinct position within this ecosystem. Existing frameworks typically focus on hardware abstraction, instrument-specific control, experiment orchestration, or general-purpose WoT infrastructure. In contrast, labthings-fastapi addresses the intermediate problem of publishing scientific instruments and laboratory software as standards-based network services. By automatically generating OpenAPI and WoT descriptions directly from Python implementations while providing lifecycle and concurrency semantics appropriate for physical hardware, it enables instruments to be exposed as interoperable, self-describing services with minimal additional software engineering effort. Provision in the Web of Things standard for semantic annotations provides the possibility of allowing bottom-up standardisation, where individual instruments may conform to one or many of the higher-level abstractions defined by existing domain-specific frameworks.
 
+<!--Should Labview be discussed as a comparison? BC-->
+
 # Software Design
 
 `labthings-fastapi` represents units of hardware or software as subclasses of `Thing`. Properties and actions exposed by each Thing are defined using Python attributes, methods, type annotations, and decorators, allowing the implementation and network-facing description of the instrument to be maintained together. FastAPI and Pydantic use the type information to validate data and generate an OpenAPI description of the HTTP API, avoiding separate endpoint and schema definitions for much of the instrument interface.
