@@ -101,6 +101,8 @@ The wider OpenFlexure project has supported research across a range of microscop
 
 Calibration and characterisation of hardware are key for the OpenFlexure Project. To enable rapid testing of new calibration techniques and quantitative analysis of new hardware designs, a test bed where multiple OpenFlexure microscopes could be controlled via a single host PC was assembled. The host PC was able to control all connected microscopes simultaneously using one Python script allowing characterisation and calibration methods to be tested across multiple devices to ensure repeatability.
 
+<!-- Do we want to do some more experiments on the Farm to demonstrate Labthings? -->
+
 In the same network, 2 microscopes were fitted with MCP9808 Temperature Sensors (PiHut, 1782) to monitor temperature in 3 different locations on the microscope during characterisation tests. `labthings-fastapi` enabled temperature monitoring to be added to existing protocols with ease.
 
 One such protocol, although not one where temperature monitoring was required, was automated range of motion measurements for testing new hardware revisions and characterising already printed stages[@range_of_motion]. Automated calibration of the stage requires synchronous use of the stage, camera and camera to stage mapping `Things`. `labthings-fastapi` allowed for the calibration routine to be written in a clear and obvious way where a code reviewer can clearly see what aspect of the microscope is being called upon within the code.
