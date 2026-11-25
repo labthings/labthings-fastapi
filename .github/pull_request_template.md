@@ -1,11 +1,3 @@
----
-name: Pull request
-about: Proposed changes to the software.
-title: ''
-labels: ''
-assignees: ''
----
-
 **REPLACE ME** with a short summary of the context for this merge request.
 <!-- Add summary of what this MR does above this comment -->
 
