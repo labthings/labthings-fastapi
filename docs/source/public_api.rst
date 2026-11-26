@@ -164,7 +164,7 @@ This page summarises the parts of the LabThings API that should be most frequent
        of `.ActionDescriptor`.
 
 
-.. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ..., deferred: bool = True) -> Any
+.. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ..., start_before: bool = False) -> Any
 
    Declare a connection to another `~lt.Thing` in the same server.
 
@@ -193,10 +193,8 @@ This page summarises the parts of the LabThings API that should be most frequent
        If the default is omitted or set to ``...`` the server will attempt to find
        a matching `~lt.Thing` instance (or instances). A default value of `None` is
        allowed if the connection is type hinted as optional.
-   :param deferred: Whether the connected Thing may be started after the host Thing. By default
-       this is `True` so the start up order is not specified. Setting ``deferred=False`` instructs
-       LabThings to make sure the connected Thing is available during start-up, i.e. its
-       ``__enter__`` method will be called first.
+    :param start_before: Whether the connected Thing(s) should be started before
+        the Thing on which the slot is defined.
    :return: A `.ThingSlot` descriptor.
 
 

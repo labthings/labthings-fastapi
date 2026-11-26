@@ -74,7 +74,7 @@ class ThingWithDependency(ThingThatTracksStartup):
     r"""A Thing that relies on a connected Thing during ``__enter__``\ ."""
 
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot(
-        deferred=False
+        start_before=True
     )
 
     def __enter__(self):
@@ -83,7 +83,7 @@ class ThingWithDependency(ThingThatTracksStartup):
 
 
 class ThingWithoutDependency(ThingThatTracksStartup):
-    """A Thing with a slot that has deferred=True (default)."""
+    """A Thing with a slot that has start_before=False (default)."""
 
     other_thing: "ThingThree | ThingWithCircularDependency" = lt.thing_slot()
 
@@ -91,7 +91,7 @@ class ThingWithoutDependency(ThingThatTracksStartup):
 class ThingWithCircularDependency(ThingThatTracksStartup):
     """A Thing that will cause a dependency cycle."""
 
-    other_thing: ThingWithDependency = lt.thing_slot(deferred=False)
+    other_thing: ThingWithDependency = lt.thing_slot(start_before=True)
 
 
 class ThingThatDependsOnEverything(ThingThatTracksStartup):
@@ -101,7 +101,7 @@ class ThingThatDependsOnEverything(ThingThatTracksStartup):
     Thing can demand to be started last...
     """
 
-    all_other_things: Mapping[str, lt.Thing] = lt.thing_slot(deferred=False)
+    all_other_things: Mapping[str, lt.Thing] = lt.thing_slot(start_before=True)
 
 
 class Dummy:
@@ -533,14 +533,14 @@ def test_mapping_and_multiple():
         assert set(thing_one.n_things.keys()) == {f"thing_{i + 3}" for i in range(3)}
 
 
-def test_deferred_default():
-    """Check that the default value of `deferred` is True."""
+def test_start_before_default():
+    """Check that the default value of `start_before` is True."""
     slot = lt.thing_slot()
-    assert slot.deferred
+    assert slot.start_before is False
     slot = ThingSlot()
-    assert slot.deferred
-    # The Thing definition below doesn't specify `deferred`
-    assert ThingWithoutDependency.other_thing.deferred is True
+    assert slot.start_before is False
+    # The Thing definition below doesn't specify `start_before`
+    assert ThingWithoutDependency.other_thing.start_before is False
 
 
 def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:
@@ -559,10 +559,10 @@ THING_CLASSES_AND_ORDERS = [
     # If there are no constraints, the order follows the dict
     ({"a": ThingThree, "b": ThingThree}, {("a", "b")}),
     ({"b": ThingThree, "a": ThingThree}, {("b", "a")}),
-    # A thing_slot that doesn't declare `start_first` can have any order
+    # A thing_slot that doesn't declare `start_before` can have any order
     ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b")}),
     ({"b": ThingThree, "a": ThingWithoutDependency}, {("b", "a")}),
-    # If start_first==True, the list order can take only one value
+    # If start_before==True, the list order can take only one value
     ({"a": ThingWithDependency, "b": ThingThree}, {("b", "a")}),
     ({"b": ThingThree, "a": ThingWithoutDependency}, {("b", "a")}),
     # Try with swapped names, just in case something is sorting alphabetically
@@ -591,7 +591,7 @@ def test_determine_startup_order_server(thing_classes, orders):
 
 
 def test_circular_startup_dependency():
-    """Check the error for a circular dependency from slots with start_first==True"""
+    """Check the error for a circular dependency from slots with start_before==True"""
     things = connected_things(
         {
             "a": ThingWithDependency,
@@ -603,7 +603,7 @@ def test_circular_startup_dependency():
 
 
 def test_all_startup_dependency():
-    """Check the error for a dependency on all Things with start_first==True"""
+    """Check the error for a dependency on all Things with start_before==True"""
     things = connected_things(
         {
             "a": ThingThatDependsOnEverything,
