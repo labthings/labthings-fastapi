@@ -7,6 +7,7 @@ import threading
 import time
 from datetime import datetime
 from subprocess import PIPE  # noqa: S404  All subprocess commands are static strings
+from unittest import mock
 
 import anyio
 import httpx2
@@ -40,6 +41,11 @@ class Telly(lt.Thing):
     initial_delay: float = 0
 
     stream = lt.outputs.MJPEGStreamDescriptor()
+
+    def __init__(self, break_shutdown: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        if break_shutdown:
+            MessageBroker.close_streams = mock.AsyncMock()
 
     def __enter__(self):
         self._streaming = True
@@ -364,7 +370,8 @@ def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
 
 
 @pytest.mark.slow
-async def test_clean_shutdown_with_connected_stream():
+@pytest.mark.parametrize("broken", [False, True])
+async def test_clean_shutdown_with_connected_stream(broken):
     """Check that the server closes the connection when it's shut down."""
     # Because we're using a Thing defined in this module, we need to make it
     # importable (in the subprocess).
@@ -379,7 +386,14 @@ async def test_clean_shutdown_with_connected_stream():
             "--port",
             "0",
             "--json",
-            '{"things": {"telly": "tests.test_mjpeg_stream:Telly"}}',
+            lt.ThingServerConfig(
+                things={
+                    "telly": {
+                        "cls": "tests.test_mjpeg_stream:Telly",
+                        "kwargs": {"break_shutdown": broken},
+                    }
+                }
+            ).model_dump_json(),
         ],
         env=env,
         stdout=PIPE,
@@ -388,7 +402,7 @@ async def test_clean_shutdown_with_connected_stream():
     assert process.stderr is not None
     port: int | None = None
     for _ in range(10):
-        with anyio.fail_after(1):
+        with anyio.fail_after(2):
             msg = await process.stderr.receive()
             pattern = r"Uvicorn running on http://127.0.0.1:(\d+) "
             match = re.search(pattern, msg.decode())
@@ -413,8 +427,15 @@ async def test_clean_shutdown_with_connected_stream():
         terminate_called = time.time()
         async for _data in aiter:
             # keep receiving until the stream stops or we time out
-            if time.time() - terminate_called > 1:
-                raise TimeoutError("Stream is still going :(")
+            if time.time() - terminate_called > 0.1:
+                if broken:
+                    # Without the graceful shutdown code, this loop will
+                    # go on forever. Terminate it after it's run for 100ms
+                    # to avoid a horribly long test.
+                    break
+                else:
+                    # If the stream hasn't closed within 100ms, fail the test.
+                    raise TimeoutError("Stream is still going :(")
 
     # Stop the server, and check it shuts down within 1s.
     with anyio.fail_after(1):
