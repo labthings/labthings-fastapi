@@ -19,7 +19,10 @@ class ServerWithShutdownHandler(Server):
 
         :param sockets: a list of sockets that are open.
         """
-        if self.shutdown_callback is not None:
-            logger.info("Awaiting shutdown callback.")
-            await self.shutdown_callback()
-        await super().shutdown(sockets=sockets)
+        try:
+            if self.shutdown_callback is not None:
+                logger.info("Awaiting shutdown callback.")
+                await self.shutdown_callback()
+        finally:
+            # Make sure we shut down, even if there's an error.
+            await super().shutdown(sockets=sockets)
