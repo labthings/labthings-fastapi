@@ -12,6 +12,35 @@ from labthings_fastapi.example_things import MyThing
 from labthings_fastapi.server.config_model import ThingServerConfig
 
 
+def test_swagger_ui_assets():
+    """Check that the docs use the pinned assets and respect the root path."""
+    server = lt.ThingServer.from_things({})
+    with server.test_client() as client:
+        response = client.get("/docs")
+        response.raise_for_status()
+
+        assets = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15"
+        assert f'{assets}/swagger-ui-bundle.js"' in response.text
+        assert f'{assets}/swagger-ui.css"' in response.text
+        assert "url: '/openapi.json'" in response.text
+        assert "'/docs/oauth2-redirect'" in response.text
+        client.get("/docs/oauth2-redirect").raise_for_status()
+
+
+@pytest.mark.parametrize(
+    "url_attribute", ["openapi_url", "swagger_ui_oauth2_redirect_url"]
+)
+def test_swagger_ui_requires_urls(url_attribute):
+    """Raise ValueError if either URL required by Swagger UI is missing."""
+    server = lt.ThingServer.from_things({})
+    setattr(server.app, url_attribute, None)
+
+    with pytest.raises(
+        ValueError, match="Swagger UI requires OpenAPI and OAuth2 redirect URLs"
+    ):
+        server._add_swagger_ui()
+
+
 def test_server_from_config_non_thing_error():
     """Test a typeerror is raised if something that's not a Thing is added."""
     with pytest.raises(TypeError, match="not a Thing"):
