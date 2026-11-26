@@ -182,7 +182,8 @@ def test_cli_debug_flag(mocker):
     Test that using the --debug flag sets the logger level to DEBUG,
     and that not using it leaves the logger level at INFO.
     """
-    mocker.patch("uvicorn.run")
+    # We don't actually want to run the server, so mock uvicorn.Server.run.
+    mocker.patch("uvicorn.Server.run")
     # Reset logger level to INFO
     reset_thing_logger()
 
@@ -211,7 +212,7 @@ def test_cli_debug_flag_with_thing(caplog, mocker):
     """
     Test that using the --debug flag allows capturing debug logs during __init__.
     """
-    mocker.patch("uvicorn.run")
+    mocker.patch("uvicorn.Server.run")
 
     # Reset logger level to INFO
     reset_thing_logger()
