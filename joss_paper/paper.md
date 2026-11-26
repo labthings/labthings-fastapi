@@ -116,6 +116,8 @@ We also may want figures in this section-->
 
 Both the many-to-one and one-to-many functionality of `labthings-fastapi` has been instrumental in the uptake of the OpenFlexure Microscope in recent fieldwork and collaborations. At Butare Teaching Hospital in Rwanda, researchers used a single laptop to control four OpenFlexure Microscopes running version 3 of the microscope software. This setup allowed them to scan up to four biopsy specimens in parallel with a single controlling device. 
 
+Parallel scanning also supported a feasibility study of AI-assisted cervical biopsy triage at the University of Michigan [@corrielus2026], and related work describes the use of OpenFlexure Microscopes to digitise gynaecological specimens in Rwanda and Brazil [@knapper2026].
+
 Medical training sessions using the OpenFlexure Microscope have taken the form of a single lecturer controlling the microscope, while students connect to the server from their own computer or mobile device. This allows students to view the active stream live, and use the `labthings-fastapi` endpoint to capture images, without interfering with other users' access.
 
 # AI Usage Disclosure
