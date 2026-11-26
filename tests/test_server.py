@@ -246,8 +246,6 @@ def server_with_mock_thing(mocker):
     server = lt.ThingServer.from_things({})
     server._things = {"thing": dummy_thing}
     server._startup_order = ("thing",)
-    print(set(server._things.keys()))
-    print(set(server._startup_order))
     return server
 
 

@@ -46,15 +46,15 @@ def class_attributes(
 
 def class_attributes(
     obj: Any, filter_type: type[AttrT] | None = None
-) -> Iterable[tuple[str, AttrT]] | Iterable[tuple[str, Any]]:
+) -> Iterable[tuple[str, Any]]:
     """List all the attributes of an object's class.
 
     This function gets all class attributes, including inherited ones.
     It is used to obtain the various descriptors used to represent
-    properties and actions. It calls `.attributes` on ``obj.__class__``.
+    properties and actions. It calls ``dir(obj.__class__)`` and filters.
 
     If a ``filter_type`` argument is supplied, only attributes that match the
-    supplied type will be returned. The default (`object`) matches all
+    supplied type will be returned. The default (`None`) matches all
     attributes.
 
     Attributes starting with a double underscore will be ignored.
