@@ -1,10 +1,16 @@
 import io
 import logging
+import os
+import re
+import sys
 import threading
 import time
 from datetime import datetime
+from subprocess import PIPE  # noqa: S404  All subprocess commands are static strings
+from unittest import mock
 
 import anyio
+import httpx2
 import pytest
 from anyio import from_thread, to_thread
 from PIL import Image
@@ -30,11 +36,16 @@ class Telly(lt.Thing):
     _stream_thread: threading.Thread
     _streaming: bool = False
     framerate: float = 1000
-    frame_limit: int = 999
+    frame_limit: int = 9999
     frame_event: threading.Event | None = None
     initial_delay: float = 0
 
     stream = lt.outputs.MJPEGStreamDescriptor()
+
+    def __init__(self, break_shutdown: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        if break_shutdown:
+            MessageBroker.close_streams = mock.AsyncMock()
 
     def __enter__(self):
         self._streaming = True
@@ -358,15 +369,89 @@ def test_mjpeg_stream_http(server: lt.ThingServer, telly: Telly):
     assert telly.stream.last_frame_i == 2
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("broken", [False, True])
+async def test_clean_shutdown_with_connected_stream(broken):
+    """Check that the server closes the connection when it's shut down."""
+    # Because we're using a Thing defined in this module, we need to make it
+    # importable (in the subprocess).
+    # This is done by setting `PYTHONPATH` in the subprocess.
+    tests_folder = os.path.dirname(__file__)
+    path_with_tests_appended = os.pathsep.join(sys.path + [tests_folder])
+    env = os.environ.copy() | {"PYTHONPATH": path_with_tests_appended}
+    logging.info("Starting server in a subprocess...")
+    process = await anyio.open_process(
+        [
+            "labthings-server",
+            "--port",
+            "0",
+            "--json",
+            lt.ThingServerConfig(
+                things={
+                    "telly": {
+                        "cls": "tests.test_mjpeg_stream:Telly",
+                        "kwargs": {"break_shutdown": broken},
+                    }
+                }
+            ).model_dump_json(),
+        ],
+        env=env,
+        stdout=PIPE,
+        stderr=PIPE,
+    )  # noqa: S607
+    assert process.stderr is not None
+    port: int | None = None
+    for _ in range(10):
+        with anyio.fail_after(2):
+            msg = await process.stderr.receive()
+            pattern = r"Uvicorn running on http://127.0.0.1:(\d+) "
+            match = re.search(pattern, msg.decode())
+            if match:
+                port = int(match.group(1))
+                break
+    logging.info(f"Started up successfully on port {port}")
+    # Connect to the MJPEG stream
+    client = httpx2.AsyncClient(base_url=f"http://127.0.0.1:{port}/")
+    async with client.stream("GET", "/telly/stream") as response:
+        response.raise_for_status()
+        # Receive 3 frames to verify it's streaming images
+        aiter = response.aiter_bytes()
+        for _ in range(3):
+            # Each JPEG results in 3 parts - separator, frame, and newline.
+            # the first one should be a separator (we'll error if it's not)
+            assert (await anext(aiter)).startswith(SEPARATOR)
+            assert_magic_bytes((await anext(aiter)))
+            assert (await anext(aiter)) == b"\r\n"
+        # Tell the server to stop while the stream is still open
+        process.terminate()
+        terminate_called = time.time()
+        async for _data in aiter:
+            # keep receiving until the stream stops or we time out
+            if time.time() - terminate_called > 0.1:
+                if broken:
+                    # Without the graceful shutdown code, this loop will
+                    # go on forever. Terminate it after it's run for 100ms
+                    # to avoid a horribly long test.
+                    break
+                else:
+                    # If the stream hasn't closed within 100ms, fail the test.
+                    raise TimeoutError("Stream is still going :(")
+
+    # Stop the server, and check it shuts down within 1s.
+    with anyio.fail_after(1):
+        await process.wait()
+
+
 if __name__ == "__main__":
     """This block allows you to connect manually with a web browser.
 
-    That's helpful, because the tests above don't actually stream anything
-    as noted in `test_mjpeg_stream_http`.
+    This is intended to allow manual testing with a web browser.
+    The newer tests now do actually start a real server, so this isn't
+    as crucial as it once was.
     """
     thing_server = lt.ThingServer.from_things({"telly": Telly})
-    telly = thing_server.things["telly"]
-    assert isinstance(telly, Telly)
-    telly.framerate = 6
-    telly.frame_limit = -1
+    tv = thing_server.things["telly"]
+    assert isinstance(tv, Telly)
+    tv.framerate = 6
+    tv.frame_limit = -1
     thing_server.serve()

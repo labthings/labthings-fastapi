@@ -36,6 +36,7 @@ from labthings_fastapi.middleware.url_for import url_for_middleware
 
 # `_thing_servers` is used as a global from `ThingServer.__init__`
 from labthings_fastapi.outputs import blob
+from labthings_fastapi.server._catch_uvicorn_shutdown import ServerWithShutdownHandler
 from labthings_fastapi.server.config_model import (
     ThingsConfig,
     ThingServerConfig,
@@ -559,19 +560,35 @@ class ThingServer:
 
         return router
 
-    def serve(self, host: str = "localhost", port: int = 5000) -> None:
+    def serve(self, host: str = "localhost", port: int = 5000, **kwargs: Any) -> None:
         r"""Run the server in `uvicorn`\ .
 
         This method will run the server from Python, using `uvicorn.run`\ .
         This is the most convenient way to run a LabThings server from Python, and
         is identical to what happens when it is run from the command line.
 
+        Note that this function uses a subclass of `uvicorn.Server` in order to catch
+        shutdown events. This allows us to terminate active connections on the server
+        side, in order to shut down cleanly even if websockets or MJPEG streams are
+        active.
+
         :param host: The IP address or hostname on which to serve. By default, this
             is ``localhost`` which is only accessible from your computer. To serve
             over a network on all available IPv4 addresses, use ``"0.0.0.0"``.
         :param port: The port on which to serve. This defaults to 5000.
+        :param \**kwargs: Additional keyword arguments are handled as if passed
+            to `uvicorn.run`.
         """
-        uvicorn.run(self.app, host=host, port=port, ws="websockets-sansio")
+        config = uvicorn.Config(
+            self.app, host=host, port=port, ws="websockets-sansio", **kwargs
+        )
+        server = ServerWithShutdownHandler(config)
+        server.shutdown_callback = self.message_broker.close_streams
+        try:
+            server.run()
+        except KeyboardInterrupt:
+            # KeyboardInterrupt is used to close the server, and shouldn't propagate
+            pass
 
     @contextmanager
     def test_client(self) -> Iterator[TestClient]:

@@ -261,3 +261,26 @@ def test_server_init():
     # Invalid configuration raises a TypeError, with upgrade message
     with pytest.raises(TypeError, match="from_things"):
         lt.ThingServer(config_dict["things"])
+
+
+def test_server_serve_keyboardinterrupt(mocker):
+    """Check the server closes cleanly from the command line.
+
+    When run from the command line, `KeyboardInterrupt` is raised when the
+    server is shut down interactively with `Ctrl` + `C`.
+
+    This test checks the exception does not propagate.
+    """
+    server = lt.ThingServer.from_things({})
+    raised = False
+
+    def raise_keyboardinterrupt(*args):
+        nonlocal raised
+        raised = True
+        raise KeyboardInterrupt()
+
+    mocker.patch("uvicorn.Server.run", raise_keyboardinterrupt)
+
+    server.serve()
+
+    assert raised
