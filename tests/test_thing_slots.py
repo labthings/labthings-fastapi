@@ -556,15 +556,18 @@ def connected_things(classes: dict[str, type[lt.Thing]]) -> dict[str, lt.Thing]:
 
 
 THING_CLASSES_AND_ORDERS = [
-    # If there are no constraints, the order doesn't matter
-    ({"a": ThingThree, "b": ThingThree}, {("a", "b"), ("b", "a")}),
-    ({"b": ThingThree, "a": ThingThree}, {("a", "b"), ("b", "a")}),
+    # If there are no constraints, the order follows the dict
+    ({"a": ThingThree, "b": ThingThree}, {("a", "b")}),
+    ({"b": ThingThree, "a": ThingThree}, {("b", "a")}),
     # A thing_slot that doesn't declare `start_first` can have any order
-    ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b"), ("b", "a")}),
+    ({"a": ThingWithoutDependency, "b": ThingThree}, {("a", "b")}),
+    ({"b": ThingThree, "a": ThingWithoutDependency}, {("b", "a")}),
     # If start_first==True, the list order can take only one value
     ({"a": ThingWithDependency, "b": ThingThree}, {("b", "a")}),
+    ({"b": ThingThree, "a": ThingWithoutDependency}, {("b", "a")}),
     # Try with swapped names, just in case something is sorting alphabetically
     ({"b": ThingWithDependency, "a": ThingThree}, {("a", "b")}),
+    ({"a": ThingThree, "b": ThingWithDependency}, {("a", "b")}),
 ]
 
 

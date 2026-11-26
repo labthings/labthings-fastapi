@@ -409,14 +409,15 @@ def _determine_startup_order(things: "Mapping[str, Thing]") -> tuple[str, ...]:
     # If we reach an iteration where we can't add anything, we have a deadlock
     # and we must raise an exception.
     order: list[str] = []
-    remaining = set(things.keys())
+    remaining = list(things.keys())
     while remaining:
         # If a Thing's dependencies are a subset of the things that are already
         # started, we can now add it to the order.
-        things_to_add = {n for n in remaining if dependencies[n].issubset(order)}
+        things_to_add = [n for n in remaining if dependencies[n].issubset(order)]
         if things_to_add:
-            order += list(things_to_add)
-            remaining = remaining.difference(things_to_add)
+            order += things_to_add
+            for thing in things_to_add:
+                remaining.remove(thing)
         else:
             msg = (
                 f"There is no order in which the Things may be started.\n"
