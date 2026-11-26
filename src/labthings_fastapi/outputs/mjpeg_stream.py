@@ -6,33 +6,26 @@ MJPEG stream. See `.MJPEGStreamDescriptor`.
 
 from __future__ import annotations
 
-import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime
 from typing import (
-    TYPE_CHECKING,
     Any,
     AsyncGenerator,
-    Literal,
     Optional,
-    Self,
-    Union,
-    overload,
 )
 
-import anyio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-if TYPE_CHECKING:
-    from labthings_fastapi.thing import Thing
-    from labthings_fastapi.thing_server_interface import ThingServerInterface
+from labthings_fastapi.base_descriptor import BaseDescriptor
+from labthings_fastapi.message_broker import Message, MessageBroker
+from labthings_fastapi.thing import Thing
 
 
 @dataclass
-class RingbufferEntry:
-    """A single entry in a ringbuffer.
+class Frame:
+    """A single frame in the stream.
 
     This structure comprises one frame as a JPEG, plus a timestamp and
     a buffer index. Each time a frame is added to the stream, it is
@@ -42,6 +35,7 @@ class RingbufferEntry:
 
     frame: bytes
     """The frame as a `bytes` object, which is a JPEG image for an MJPEG stream."""
+
     timestamp: datetime
     """The time the frame was captured.
     If the capture time is unknown then the timestamp is
@@ -49,6 +43,30 @@ class RingbufferEntry:
 
     index: int
     """The index of the frame within the stream."""
+
+    def __repr__(self) -> str:
+        """Represent the object as a string.
+
+        :return: a representation of the object as a string.
+        """
+        return (
+            f"Frame(index={self.index}, timestamp={self.timestamp}, "
+            f"frame=<{len(self.frame)} bytes>)"
+        )
+
+
+def check_jpeg_bytes(frame: bytes) -> bool:
+    """Check a JPEG file starts and ends with the right magic bytes.
+
+    :param frame: the data, which should be in JPEG format.
+    :return: `True` if the data is a valid JPEG (i.e. has valid start/end bytes).
+    """
+    return (
+        frame[0] == 0xFF
+        and frame[1] == 0xD8
+        and frame[-2] == 0xFF
+        and frame[-1] == 0xD9
+    )
 
 
 class MJPEGStreamResponse(StreamingResponse):
@@ -84,7 +102,7 @@ class MJPEGStreamResponse(StreamingResponse):
         :param status_code: The status code associated with the response, by default
             a 200 code is returned.
         """
-        self.frame_async_generator = gen
+        self._frame_async_generator = gen
         StreamingResponse.__init__(
             self,
             self.mjpeg_async_generator(),
@@ -101,7 +119,7 @@ class MJPEGStreamResponse(StreamingResponse):
 
         :yield: JPEG frames, each with a ``--frame`` marker prepended.
         """
-        async for frame in self.frame_async_generator:
+        async for frame in self._frame_async_generator:
             yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
             yield frame
             yield b"\r\n"
@@ -128,111 +146,100 @@ class MJPEGStream:
     of new frames, and then retrieving the frame (shortly) afterwards.
     """
 
-    def __init__(
-        self, thing_server_interface: ThingServerInterface, ringbuffer_size: int = 10
-    ) -> None:
+    def __init__(self, thing: Thing, name: str) -> None:
         """Initialise an MJPEG stream.
 
         See the class docstring for `.MJPEGStream`. Note that it will
         often be initialised by `.MJPEGStreamDescriptor`.
 
-        :param thing_server_interface: the `~lt.ThingServerInterface` of the
-            `~lt.Thing` associated with this stream. It's used to run the async
-            code that relays frames to open connections.
-        :param ringbuffer_size: The number of frames to retain in
-            memory, to allow retrieval after the frame has been sent.
+        :param thing: the `~lt.Thing` on which this stream is defined.
+        :param name: The attribute name of this stream.
         """
         self._lock = threading.Lock()
-        self.condition = anyio.Condition()
-        self._streaming = False
-        self._ringbuffer: list[RingbufferEntry] = []
-        self._thing_server_interface = thing_server_interface
-        self.reset(ringbuffer_size=ringbuffer_size)
+        self._thing = thing
+        self._name = name
+        self.reset()
 
-    def reset(self, ringbuffer_size: Optional[int] = None) -> None:
-        """Reset the stream and optionally change the ringbuffer size.
+    @property
+    def _broker(self) -> MessageBroker:
+        """The message broker associated with our host Thing."""
+        return self._thing._thing_server_interface.message_broker
 
-        Discard all frames from the ringbuffer and reset the frame index.
-
-        :param ringbuffer_size: the number of frames to keep in memory.
-        """
+    def reset(self) -> None:
+        """Reset the frame index."""
         with self._lock:
-            self._streaming = True
-            n = ringbuffer_size or len(self._ringbuffer)
-            self._ringbuffer = [
-                RingbufferEntry(
-                    frame=b"",
-                    index=-1,
-                    timestamp=datetime.min,
-                )
-                for i in range(n)
-            ]
             self.last_frame_i = -1
 
     def stop(self) -> None:
         """Stop the stream.
 
         Stop the stream and cause all clients to disconnect.
+        This uses the thing server interface to allow it to be called from
+        a thread, for convenience.
+
+        To close all streams from the event loop, use the message broker directly.
         """
-        with self._lock:
-            self._streaming = False
-            self._thing_server_interface.start_async_task_soon(
-                self.notify_stream_stopped
-            )
+        self._thing._thing_server_interface.call_async_task(
+            self._broker.close_streams_for_affordance,
+            self._thing.name,
+            self._name,
+        )
 
-    async def ringbuffer_entry(self, i: int) -> RingbufferEntry:
-        """Return the ith frame acquired by the camera.
+    async def frames(self) -> AsyncGenerator[Frame, None]:
+        """Yield Frame objects (data and metadata).
 
-        The ringbuffer means we can retrieve frames even if they are not
-        the latest frame. Specifying ``i`` also makes it simple to ensure
-        that every frame in a stream is acquired.
+        This generator will return frames from the MJPEG stream along with timestamps,
+        using the `Frame` dataclass.
 
-        :param i: The index of the frame to read.
+        Note that this will wait for a new frame each time. There is no
+        guarantee that we won't skip frames. There's no timeout, if the MJPEG stream
+        doesn't get new frames this may block indefinitely. Frames are never buffered.
 
-        :return: the frame, together with a timestamp and its index.
-
-        :raise ValueError: if the frame is not available.
+        :yield: the frames in sequence.
         """
-        if i < 0:
-            raise ValueError("i must be >= 0")
-        if i < self.last_frame_i - len(self._ringbuffer) + 2:
-            raise ValueError("the ith frame has been overwritten")
-        if i > self.last_frame_i:
-            # TODO: await the ith frame
-            raise ValueError("the ith frame has not yet been acquired")
-        entry = self._ringbuffer[i % len(self._ringbuffer)]
-        if entry.index != i:
-            raise ValueError("the ith frame has been overwritten")
-        return entry
+        async for message in self._broker.messages_for_affordance(
+            self._thing.name,
+            self._name,
+            max_buffer_size=0,
+        ):
+            if isinstance(message.payload, Frame):
+                # We simply ignore messages that don't contain Frame objects.
+                # We don't expect to get any payloads that are not Frame objects.
+                yield message.payload
 
-    async def next_frame(self) -> int:
-        """Wait for the next frame, and return its index.
+    async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
+        """Yield frames as bytes objects.
 
-        This async function will yield until a new frame arrives, then return
-        its index. The index may then be used to retrieve the new frame
-        with `.MJPEGStream.ringbuffer_entry`.
+        This generator will return frames from the MJPEG stream.
 
-        :return: the index of the next frame to arrive.
+        See `frames` for how this works. This function wraps that one, returning
+        only the `bytes` object rather than the full `Frame` dataclass which also
+        includes metadata.
 
-        :raise StopAsyncIteration: if the stream has stopped.
+        :yield: the frames in sequence, as a `bytes` object containing
+            JPEG data.
         """
-        async with self.condition:
-            await self.condition.wait()
-            if not self._streaming:
-                raise StopAsyncIteration()
-            return self.last_frame_i
+        async for frame in self.frames():
+            yield frame.frame
+
+    async def grab_frame_with_metadata(self) -> Frame:
+        """Wait for the next frame, and return it.
+
+        This includes metadata such as the timestamp.
+
+        This method calls `frames` and returns the first frame that's yielded.
+
+        :return: The next JPEG frame, in a dataclass with metadata.
+        """
+        return await anext(self.frames())
 
     async def grab_frame(self) -> bytes:
         """Wait for the next frame, and return it.
 
-        This copies the frame for safety, so there is no need to release
-        or return the buffer.
-
         :return: The next JPEG frame, as a `bytes` object.
         """
-        i = await self.next_frame()
-        entry = await self.ringbuffer_entry(i)
-        return entry.frame
+        payload = await self.grab_frame_with_metadata()
+        return payload.frame
 
     async def next_frame_size(self) -> int:
         """Wait for the next frame and return its size.
@@ -241,34 +248,7 @@ class MJPEGStream:
 
         :return: The size of the next JPEG frame, in bytes.
         """
-        i = await self.next_frame()
-        entry = await self.ringbuffer_entry(i)
-        return len(entry.frame)
-
-    async def frame_async_generator(self) -> AsyncGenerator[bytes, None]:
-        """Yield frames as bytes objects.
-
-        This generator will return frames from the MJPEG stream.
-
-        Note that this will wait for a new frame each time. There is no
-        guarantee that we won't skip frames.
-
-        :yield: the frames in sequence, as a `bytes` object containing
-            JPEG data.
-        """
-        while self._streaming:
-            try:
-                i = await self.next_frame()
-                entry = await self.ringbuffer_entry(i)
-                yield entry.frame
-            except StopAsyncIteration:
-                break
-            except Exception as e:  # noqa: BLE001
-                # It's important that errors in the stream don't crash the server.
-                # This may be something we can remove in the future, now streams stop
-                # more elegantly. However, it will require careful testing.f
-                logging.exception(f"Error in stream: {e}, stream stopped")
-                return
+        return len(await self.grab_frame())
 
     async def mjpeg_stream_response(self) -> MJPEGStreamResponse:
         """Return a StreamingResponse that streams an MJPEG stream.
@@ -299,48 +279,22 @@ class MJPEGStream:
         :raise ValueError: if the supplied frame does not start with the JPEG
             start bytes and end with the end bytes.
         """
-        if not (
-            frame[0] == 0xFF
-            and frame[1] == 0xD8
-            and frame[-2] == 0xFF
-            and frame[-1] == 0xD9
-        ):
+        if not check_jpeg_bytes(frame):
             raise ValueError("Invalid JPEG")
         with self._lock:
-            entry = self._ringbuffer[(self.last_frame_i + 1) % len(self._ringbuffer)]
-            entry.timestamp = timestamp if timestamp is not None else datetime.now()
-            entry.frame = frame
-            entry.index = self.last_frame_i + 1
-            self._thing_server_interface.start_async_task_soon(
-                self.notify_new_frame, entry.index
-            )
-
-    async def notify_new_frame(self, i: int) -> None:
-        """Notify any waiting tasks that a new frame is available.
-
-        :param i: The number of the frame (which counts up since the server starts)
-        """
-        async with self.condition:
-            self.last_frame_i = i
-            self.condition.notify_all()
-
-    async def notify_stream_stopped(self) -> None:
-        """Raise an exception in any waiting tasks to signal the stream has stopped.
-
-        This should be run only when streaming has stopped, i.e. ``self._streaming``
-        is ``False`` and an error will be raised if this isn't the case.
-
-        :raises RuntimeError: if the stream is still streaming.
-        """
-        if self._streaming is True:
-            raise RuntimeError(
-                "This function should only be called when the stream is stopped."
-            )
-        async with self.condition:
-            self.condition.notify_all()
+            self.last_frame_i += 1
+            frame_index = self.last_frame_i
+        payload = Frame(
+            frame=frame,
+            timestamp=timestamp if timestamp is not None else datetime.now(),
+            index=frame_index,
+        )
+        self._thing._thing_server_interface.publish(
+            Message(self._thing.name, self._name, "stream", payload)
+        )
 
 
-class MJPEGStreamDescriptor:
+class MJPEGStreamDescriptor(BaseDescriptor[Thing, MJPEGStream]):
     """A descriptor that returns a MJPEGStream object when accessed.
 
     If this descriptor is added to a `~lt.Thing`, it will create an `.MJPEGStream`
@@ -357,48 +311,23 @@ class MJPEGStreamDescriptor:
         :param \**kwargs: keyword arguments are passed to the initialiser of
             `.MJPEGStream`.
         """
+        super().__init__()
         self._kwargs: Any = kwargs
 
-    def __set_name__(self, _owner: Thing, name: str) -> None:
-        """Remember the name to which we are assigned.
+    def instance_get(self, obj: Thing) -> MJPEGStream:
+        """Return the MJPEG Stream.
 
-        The name is important, as it will set the URL of the HTTP endpoint used
-        to access the stream.
-
-        :param _owner: the `~lt.Thing` to which we are attached.
-        :param name: the name to which this descriptor is assigned.
-        """
-        self.name = name
-
-    @overload
-    def __get__(self, obj: Literal[None], type: type | None = None) -> Self: ...  # noqa: D105
-
-    @overload
-    def __get__(self, obj: Thing, type: type | None = None) -> MJPEGStream: ...  # noqa: D105
-
-    def __get__(
-        self, obj: Optional[Thing], type: type[Thing] | None = None
-    ) -> Union[MJPEGStream, Self]:
-        """Return the MJPEG Stream, or the descriptor object.
-
-        When accessed on the class, this ``__get__`` method will return the descriptor
-        object. This allows LabThings to add it to the HTTP API.
-
-        When accessed on the object, an `.MJPEGStream` is returned.
-
-        :param obj: the host `~lt.Thing`, or ``None`` if accessed on the class.
-        :param type: the class on which we are defined.
+        :param obj: the host `~lt.Thing`.
 
         :return: an `.MJPEGStream`, or this descriptor.
         """
-        if obj is None:
-            return self
         try:
             return obj.__dict__[self.name]
         except KeyError:
             obj.__dict__[self.name] = MJPEGStream(
+                thing=obj,
+                name=self.name,
                 **self._kwargs,
-                thing_server_interface=obj._thing_server_interface,
             )
             return obj.__dict__[self.name]
 
