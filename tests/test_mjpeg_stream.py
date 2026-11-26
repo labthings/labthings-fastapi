@@ -424,12 +424,13 @@ async def test_clean_shutdown_with_connected_stream():
 if __name__ == "__main__":
     """This block allows you to connect manually with a web browser.
 
-    That's helpful, because the tests above don't actually stream anything
-    as noted in `test_mjpeg_stream_http`.
+    This is intended to allow manual testing with a web browser.
+    The newer tests now do actually start a real server, so this isn't
+    as crucial as it once was.
     """
     thing_server = lt.ThingServer.from_things({"telly": Telly})
-    telly = thing_server.things["telly"]
-    assert isinstance(telly, Telly)
-    telly.framerate = 6
-    telly.frame_limit = -1
+    tv = thing_server.things["telly"]
+    assert isinstance(tv, Telly)
+    tv.framerate = 6
+    tv.frame_limit = -1
     thing_server.serve()
