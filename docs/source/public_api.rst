@@ -164,7 +164,7 @@ This page summarises the parts of the LabThings API that should be most frequent
        of `.ActionDescriptor`.
 
 
-.. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ...) -> Any
+.. py:function:: thing_slot(default: str | collections.abc.Iterable[str] | None | types.EllipsisType = ..., start_before: bool = False) -> Any
 
    Declare a connection to another `~lt.Thing` in the same server.
 
@@ -193,6 +193,8 @@ This page summarises the parts of the LabThings API that should be most frequent
        If the default is omitted or set to ``...`` the server will attempt to find
        a matching `~lt.Thing` instance (or instances). A default value of `None` is
        allowed if the connection is type hinted as optional.
+    :param start_before: Whether the connected Thing(s) should be started before
+        the Thing on which the slot is defined.
    :return: A `.ThingSlot` descriptor.
 
 
