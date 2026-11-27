@@ -53,6 +53,8 @@ Laboratory automation software addresses the connection between experimental pro
 
 `labthings-fastapi` occupies a distinct position within this ecosystem. Existing frameworks typically focus on hardware abstraction, instrument-specific control, experiment orchestration, or general-purpose WoT infrastructure. In contrast, labthings-fastapi addresses the intermediate problem of publishing scientific instruments and laboratory software as standards-based network services. By automatically generating OpenAPI and WoT descriptions directly from Python implementations while providing lifecycle and concurrency semantics appropriate for physical hardware, it enables instruments to be exposed as interoperable, self-describing services with minimal additional software engineering effort. Provision in the Web of Things standard for semantic annotations provides the possibility of allowing bottom-up standardisation, where individual instruments may conform to one or many of the higher-level abstractions defined by existing domain-specific frameworks.
 
+<!--Should Labview be discussed as a comparison? BC-->
+
 # Software Design
 
 `labthings-fastapi` represents units of hardware or software as subclasses of `Thing`. Properties and actions exposed by each Thing are defined using Python attributes, methods, type annotations, and decorators, allowing the implementation and network-facing description of the instrument to be maintained together. FastAPI and Pydantic use the type information to validate data and generate an OpenAPI description of the HTTP API, avoiding separate endpoint and schema definitions for much of the instrument interface.
@@ -96,6 +98,14 @@ We also may want figures in this section.-->
 `labthings-fastapi` is the underlying framework for version 3 of the OpenFlexure Microscope software. The OpenFlexure Microscope is an open-source, automated microscope designed to be manufactured using accessible fabrication techniques [@collins2020]. Earlier work on the OpenFlexure software demonstrated the use of Web of Things concepts to simplify interactions between microscope hardware, server software, and user-facing applications [@collins2021]. `labthings-fastapi` continues this approach using a redesigned implementation based on FastAPI and Pydantic.
 
 The wider OpenFlexure project has supported research across a range of microscopy and laboratory applications [@collins2020; @knapper2024]. Within OpenFlexure Microscope version 3, `labthings-fastapi` provides the framework through which microscope functionality is exposed as a documented HTTP interface and represented through Web of Things concepts.
+
+Calibration and characterisation of hardware are key for the OpenFlexure Microscope. To enable rapid testing of new calibration techniques and quantitative analysis of new hardware designs, a test bed where multiple OpenFlexure microscopes could be controlled via a single host PC was assembled. The host PC was able to control all connected microscopes simultaneously using one Python script using only the hostname and port of each microscope stored in a JSON file, allowing characterisation and calibration methods to be tested across multiple devices to ensure repeatability.
+
+<!-- Do we want to do some more experiments on the Farm to demonstrate Labthings? -->
+
+In the same network, two microscopes were fitted with MCP9808 Temperature Sensors (PiHut, 1782) to monitor temperature in three different locations on the microscope during characterisation tests. `labthings-fastapi` enabled temperature monitoring to be added to existing protocols with ease. A new `Thing` was written which contained all the functionality of the temperature sensors and could be accessed by each characterisation protocol. Temperature could then be measured at different frequencies at different points in the procedures seamlessly.
+
+One such protocol, although not one where temperature monitoring was required, was automated range of motion measurements for testing new hardware revisions and characterising already printed stages[@range_of_motion]. Automated calibration of the stage requires synchronous use of the stage, camera and camera to stage mapping `Things`. `labthings-fastapi` allowed for the calibration routine to be written in a clear and obvious way where a code reviewer can clearly see what aspect of the microscope is being called upon within the code.
 
 <!-- TODO (Ben/Joe/Richard): Add concrete evidence of the impact specifically
 attributable to labthings-fastapi rather than OpenFlexure generally.
